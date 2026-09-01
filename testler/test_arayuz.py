@@ -27,9 +27,10 @@ def _sunucu_var():
 
 def adetSec(pg, n):
     """
-    Trafik sekmesinde asansör adedini seçer.
-    1 → tek hesap gövdesi ( #s-trafik ) ·  2-4 → grup gövdesi ( #s-coklu )
-    Dönen: o an açık olan gövdenin kimliği.
+    Trafik sekmesinde KAÇ ASANSÖR TANIMLANDIĞINI seçer.
+    Gövde tektir ( #s-coklu ); yöntemi ( PAFTA / PAFTA-COKLU ) program
+    asansörlerin aynı tip olup olmamasına bakarak kendisi seçer.
+    Dönen: o an açık olan gövdenin kimliği ( her zaman "s-coklu" ).
     """
     pg.click('.sekme[data-sekme="trafik"]')
     pg.wait_for_timeout(250)
@@ -86,9 +87,9 @@ def calistir():
                 acik = pg.evaluate("[...document.querySelectorAll('.sayfa')]"
                                    ".filter(s=>!s.hidden).map(s=>s.id)")
                 r.kontrol("trafik sekmesinde tek gövde açık", len(acik) == 1, f"→ {acik}")
-                r.kontrol("açık gövde trafik hesabı",
-                          acik and acik[0] in ("s-trafik", "s-coklu"), f"→ {acik}")
-                hedef = "t_sonuc" if acik and acik[0] == "s-trafik" else "c_sonuc"
+                r.esit("trafik gövdesi tek ( yöntem seçimi kalktı )",
+                       acik and acik[0], "s-coklu")
+                hedef = "c_sonuc"
                 uzunluk = pg.eval_on_selector(f"#{hedef}", "e => e.innerText.length")
                 r.kontrol("trafik sekmesi içerik üretti", uzunluk > 200, f"→ {uzunluk} karakter")
                 continue
@@ -100,7 +101,7 @@ def calistir():
         # --- trafik sonucu doğru mu (sunucudaki motorla aynı olmalı)
         adetSec(pg, 1)
         pg.wait_for_timeout(400)
-        ekran = pg.inner_text("#t_sonuc")
+        ekran = pg.inner_text("#c_sonuc")
         istek = urllib.request.Request(
             BASE + "/api/trafik", method="POST",
             data=json.dumps({"mod": "tek", "girdiler": {
@@ -115,23 +116,23 @@ def calistir():
         r.kontrol("kaynak referansları gösteriliyor", "Tablo-3" in ekran and "Tablo-5" in ekran)
 
         # --- canlı yeniden hesap
-        pg.fill("#t_N", "25")
+        pg.fill("#c_N", "25")
         pg.wait_for_timeout(900)
-        a = pg.inner_text("#t_sonuc .olcut .k:first-child .dg2")
-        pg.fill("#t_N", "11")
+        a = pg.inner_text("#c_sonuc .olcut .k:first-child .dg2")
+        pg.fill("#c_N", "11")
         pg.wait_for_timeout(900)
-        b = pg.inner_text("#t_sonuc .olcut .k:first-child .dg2")
+        b = pg.inner_text("#c_sonuc .olcut .k:first-child .dg2")
         r.kontrol("girdi değişince sonuç güncelleniyor", a != b, f"→ N=25:{a}  N=11:{b}")
 
         # --- hata mesajı görünür
-        pg.fill("#t_hizli1", "")
+        pg.fill("#c_hizli1", "")
         pg.wait_for_timeout(900)
         r.kontrol("nüfus silinince hata kutusu çıkıyor",
-                  "HESAP HATASI" in pg.inner_text("#t_sonuc"))
-        pg.fill("#t_hizli1", "44")
+                  "HESAP HATASI" in pg.inner_text("#c_sonuc"))
+        pg.fill("#c_hizli1", "44")
         pg.wait_for_timeout(900)
         r.kontrol("girdi geri gelince hata kalkıyor",
-                  "HESAP HATASI" not in pg.inner_text("#t_sonuc"))
+                  "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
 
         # --- trafikten avana OTOMATİK aktarım  ( v1.5 )
         #     Örnek proje 10 + 16 kişilik iki asansörlük bir gruptur.  Avandaki
@@ -172,14 +173,14 @@ def calistir():
         # ===================================================================
         adetSec(pg, 1)
         pg.wait_for_timeout(400)
-        r.kontrol("⑪ bodrum alanı var", pg.is_visible("#t_bodrum"))
-        pg.fill("#t_N", "13"); pg.fill("#t_h", "3")
-        pg.fill("#t_bodrum", "")
+        r.kontrol("⑪ bodrum alanı var", pg.is_visible("#c_bodrum"))
+        pg.fill("#c_N", "13"); pg.fill("#c_h", "3")
+        pg.fill("#c_bodrum", "")
         pg.wait_for_timeout(1100)
-        _v0 = pg.inner_text("#t_sonuc")
-        pg.fill("#t_bodrum", "2")
+        _v0 = pg.inner_text("#c_sonuc")
+        pg.fill("#c_bodrum", "2")
         pg.wait_for_timeout(1100)
-        _v2 = pg.inner_text("#t_sonuc")
+        _v2 = pg.inner_text("#c_sonuc")
         r.kontrol("bodrum girilince hesap değişiyor", _v0 != _v2)
         r.kontrol("bodrum satırı paftada görünüyor",
                   "Bodrum durak adedi" in _v2)
@@ -187,38 +188,38 @@ def calistir():
                   "Toplam durak adedi" in _v2)
         r.kontrol("bodrum açıklaması ( ! ) balonunda",
                   "H (Tablo-3)" in pg.eval_on_selector_all(
-                      "#t_sonuc .bilgi-balon", "e=>e.map(x=>x.textContent).join(' ')"))
+                      "#c_sonuc .bilgi-balon", "e=>e.map(x=>x.textContent).join(' ')"))
         r.kontrol("toplam seyahat mesafesi paftada",
                   "Toplam seyahat mesafesi" in _v2)
-        pg.fill("#t_bodrum", "99")
+        pg.fill("#c_bodrum", "99")
         pg.wait_for_timeout(1100)
         r.kontrol("geçersiz bodrum hata veriyor",
-                  "HESAP HATASI" in pg.inner_text("#t_sonuc"))
-        pg.fill("#t_bodrum", "")
+                  "HESAP HATASI" in pg.inner_text("#c_sonuc"))
+        pg.fill("#c_bodrum", "")
         #  N'yi örnek projedeki değere geri al: adet değişince ortak girdiler
         #  çoklu gövdeye aynalanıyor, sonraki adımlar örnek projeyi bekliyor.
-        pg.fill("#t_N", "11")
+        pg.fill("#c_N", "11")
         pg.wait_for_timeout(1000)
 
         # sekme uyarı rozeti — 6 kişilik kabin erişilebilirlik uyarısı üretir
-        pg.select_option("#t_P", "6")
+        pg.select_option("#c_P1", "6")
         pg.wait_for_timeout(1100)
         r.kontrol("uyarıda sekme rozeti çıkıyor",
                   pg.is_visible('.sekme[data-sekme="trafik"] .sekme-rozet'))
         r.kontrol("6 kişi erişilebilirlik uyarısı ekranda GÖRÜNÜR (balonda değil)",
-                  "81-70" in pg.inner_text("#t_sonuc"))
-        pg.select_option("#t_P", "10")
+                  "81-70" in pg.inner_text("#c_sonuc"))
+        pg.select_option("#c_P1", "10")
         pg.wait_for_timeout(1100)
         r.kontrol("uyarı bitince rozet kalkıyor",
                   not pg.is_visible('.sekme[data-sekme="trafik"] .sekme-rozet'))
 
         # ara değerli kapı genişlikleri artık hesaplanıyor
         for _kg in ("700", "1000", "1200"):
-            pg.select_option("#t_kapi_genisligi", _kg)
+            pg.select_option("#c_kg1", _kg)
             pg.wait_for_timeout(1000)
             r.kontrol(f"kapı {_kg} mm hesaplanıyor",
-                      "HESAP HATASI" not in pg.inner_text("#t_sonuc"))
-        pg.select_option("#t_kapi_genisligi", "900")
+                      "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
+        pg.select_option("#c_kg1", "900")
         pg.wait_for_timeout(900)
 
         # çoklu: asansör bazında bodrum ve imalatçı süreleri
@@ -286,7 +287,7 @@ def calistir():
         #  blok başında değiştirilen girdiyi geri al (sonraki adımlar N=11 bekler)
         adetSec(pg, 1)
         pg.wait_for_timeout(300)
-        pg.fill("#t_N", "11")
+        pg.fill("#c_N", "11")
         pg.wait_for_timeout(1100)
 
         # ===================================================================
@@ -332,18 +333,18 @@ def calistir():
         pg.wait_for_timeout(250)
         #  sağ paneldeki bölüm başlığında da olmalı
         r.kontrol("bölüm başlığında ( ! ) var",
-                  pg.query_selector("#t_sonuc .serit .bilgi") is not None)
+                  pg.query_selector("#c_sonuc .serit .bilgi") is not None)
 
         # ===================================================================
         #  v1.4 — birleşik trafik sekmesi, makine tipi, MRL kutusu
         # ===================================================================
         #  Adet seçici iki gövdeyi doğru değiştiriyor ve ortak girdiler duruyor
-        r.esit("adet 1 → tek hesap gövdesi", adetSec(pg, 1), "s-trafik")
-        r.esit("adet 1: N korundu", pg.input_value("#t_N"), "11")
-        r.esit("adet 1: nüfus korundu", pg.input_value("#t_hizli1"), "44")
-        r.kontrol("adet 1: hesap yapıldı", "HESAP HATASI" not in pg.inner_text("#t_sonuc"))
+        r.esit("adet 1 → aynı gövde ( tek ekran )", adetSec(pg, 1), "s-coklu")
+        r.esit("adet 1: N korundu", pg.input_value("#c_N"), "11")
+        r.esit("adet 1: nüfus korundu", pg.input_value("#c_hizli1"), "44")
+        r.kontrol("adet 1: hesap yapıldı", "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
         #  Tek hesap "n adet gerekir" diyorsa tek tıkla gruba geçilebilmeli
-        _ekran = pg.inner_text("#t_sonuc")
+        _ekran = pg.inner_text("#c_sonuc")
         r.kontrol("gerekli adet > 1 iken geçiş düğmesi çıkıyor",
                   "asansör olarak tanımla" in _ekran, f"→ {_ekran[:60]!r}")
         r.esit("adet 3 → grup gövdesi", adetSec(pg, 3), "s-coklu")
@@ -356,8 +357,8 @@ def calistir():
         r.esit("adet 3: 4. kolon boşaltıldı", pg.input_value("#c_P4"), "")
         r.kontrol("adet 3: grup hesabı yapıldı",
                   "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
-        r.esit("adet 1'e dönüş", adetSec(pg, 1), "s-trafik")
-        r.esit("dönüşte N hâlâ duruyor", pg.input_value("#t_N"), "11")
+        r.esit("adet 1'e dönüş", adetSec(pg, 1), "s-coklu")
+        r.esit("dönüşte N hâlâ duruyor", pg.input_value("#c_N"), "11")
 
         #  Avan: makine tipi η'yı dolduruyor, askı oranı ayrı girdi
         pg.click('.sekme[data-sekme="avan"]')
@@ -450,10 +451,10 @@ def calistir():
             r.kontrol(f"ofis sabitlerinde YOK: {_k}",
                       pg.query_selector("#of_" + _k) is None)
         r.kontrol("kat yüksekliği trafik sekmesinde",
-                  pg.query_selector("#t_h") is not None
+                  pg.query_selector("#c_h") is not None
                   and pg.query_selector("#c_h") is not None)
         r.kontrol("kapı tipi trafik sekmesinde",
-                  pg.query_selector("#t_kapi_tipi") is not None)
+                  pg.query_selector("#c_kt1") is not None)
         r.kontrol("taşındı bilgi bandı kaldırıldı",
                   pg.query_selector("#sabit_tasindi") is None)
         r.esit("U ofis varsayılanı 380", pg.input_value("#of_U"), "380")
@@ -759,42 +760,62 @@ def calistir():
                pg.inner_text("#adet_dugmeler_a .adet-dg.secili").strip(), "2")
         adetSec(pg, 1)
         pg.wait_for_timeout(800)
-        pg.fill("#t_N", "11")
+        pg.fill("#c_N", "11")
         pg.wait_for_timeout(1100)
 
         # --- kalıcılık: sayfa yenilenince girdiler duruyor
+        #  Proje kimliği artık PROJE KAPAĞI sekmesindedir ( k_* alanları );
+        #  eski "Proje Bilgileri" kartı ( p_proje_adi … ) kaldırıldı.
+        #  Kalıcılık kapak alanı üzerinden denetlenir.
+        pg.click('.sekme[data-sekme="proje"]')
+        pg.wait_for_timeout(250)
+        pg.fill("#k_owner", "Kalıcılık Denemesi A.Ş.")
+        pg.fill("#k_city", "İstanbul")
+        pg.wait_for_timeout(700)
+        pg.click('.sekme[data-sekme="trafik"]')
+        pg.wait_for_timeout(250)
         pg.reload(wait_until="networkidle")
         pg.wait_for_timeout(1500)
-        r.esit("yenileme sonrası N korundu", pg.input_value("#t_N"), "11")
-        r.esit("yenileme sonrası proje adı korundu",
-               pg.input_value("#p_proje_adi"), "Örnek Konut Projesi")
+        r.esit("yenileme sonrası N korundu", pg.input_value("#c_N"), "11")
+        r.esit("yenileme sonrası kapak alanı korundu",
+               pg.input_value("#k_owner"), "Kalıcılık Denemesi A.Ş.")
+        r.esit("yenileme sonrası kapak alanı korundu ( il )",
+               pg.input_value("#k_city"), "İstanbul")
 
         # --- indirme düğmeleri gerçekten dosya veriyor
-        #  "coklu" artık ayrı bir sekme değil, trafik sekmesinin 2+ adet hâli
-        for sekme, metin, uzanti in (("trafik", "PDF indir  (pafta)", ".pdf"),
-                                     ("trafik", "XLSX indir  (şablon)", ".xlsx"),
-                                     ("coklu", "PDF indir  (pafta)", ".pdf"),
-                                     ("coklu", "XLSX indir  (şablon)", ".xlsx"),
-                                     ("avan", "PDF indir", ".pdf"),
-                                     ("avan", "XLSX indir  (şablon)", ".xlsx")):
-            if sekme in ("trafik", "coklu"):
-                adetSec(pg, 1 if sekme == "trafik" else 2)
+        #  Trafik tek gövdedir; 1 ve 2 asansör tanımıyla iki kez denenir —
+        #  ilki PAFTA, ikincisi PAFTA-COKLU yolunu üretmelidir.
+        for adet, govde, metin, uzanti in ((1, "coklu", "PDF indir  (pafta)", ".pdf"),
+                                           (1, "coklu", "XLSX indir  (şablon)", ".xlsx"),
+                                           (2, "coklu", "PDF indir  (pafta)", ".pdf"),
+                                           (2, "coklu", "XLSX indir  (şablon)", ".xlsx"),
+                                           (0, "avan", "PDF indir", ".pdf"),
+                                           (0, "avan", "XLSX indir  (şablon)", ".xlsx")):
+            sekme = "trafik" if govde == "coklu" else govde
+            if adet:
+                adetSec(pg, adet)
             else:
                 pg.click(f'.sekme[data-sekme="{sekme}"]')
             pg.wait_for_timeout(300)
             try:
                 with pg.expect_download(timeout=45000) as bilgi:
-                    pg.click(f'#s-{sekme} button:has-text("{metin}")')
+                    pg.click(f'#s-{govde} button:has-text("{metin}")')
                 d = bilgi.value
                 ad = d.suggested_filename
-                r.kontrol(f"[{sekme}] '{metin}' indirdi → {ad}", ad.lower().endswith(uzanti))
+                r.kontrol(f"[{sekme}/{adet or 'avan'}] '{metin}' indirdi → {ad}",
+                          ad.lower().endswith(uzanti))
             except Exception as e:                       # noqa: BLE001
-                r.kontrol(f"[{sekme}] '{metin}' indirme", False, f"→ {e}")
+                r.kontrol(f"[{sekme}/{adet or 'avan'}] '{metin}' indirme", False, f"→ {e}")
 
         # --- proje dosyası kaydet
+        pg.click('.sekme[data-sekme="proje"]')
+        pg.wait_for_timeout(200)
+        pg.evaluate("document.querySelector('details.proje-araclari').open = true;")
+        pg.wait_for_timeout(200)
+        r.kontrol("proje araçları katlanır bölümde",
+                  pg.query_selector("details.proje-araclari") is not None)
         try:
             with pg.expect_download(timeout=20000) as bilgi:
-                pg.click('.sekme[data-sekme="proje"]')
                 pg.click('button:has-text("Projeyi kaydet")')
             r.kontrol("proje dosyası kaydedildi",
                       bilgi.value.suggested_filename.endswith(".avan"))
@@ -841,22 +862,35 @@ def calistir():
         pg.wait_for_timeout(1200)
         adetSec(pg, 1)
         pg.wait_for_timeout(300)
-        r.esit("sıfırlandıktan sonra N boş", pg.input_value("#t_N"), "")
+        r.esit("sıfırlandıktan sonra N boş", pg.input_value("#c_N"), "")
 
         pg.click('.sekme[data-sekme="proje"]')
         pg.wait_for_timeout(200)
+        #  "Proje araçları" katlanır bölümü kapalı gelir — içindeki düğme ve
+        #  özet alanı ancak açıkken görünür.
+        pg.evaluate("document.querySelector('details.proje-araclari').open = true;")
+        pg.wait_for_timeout(200)
+        #  Sıfırlama kapağı da temizledi ( doğrusu bu ).  "XLSX yüklemesi
+        #  kapağı silmiyor" kontrolü anlamlı olsun diye alan yeniden dolduruluyor.
+        pg.fill("#k_owner", "Kalıcılık Denemesi A.Ş.")
+        pg.wait_for_timeout(500)
         pg.set_input_files("#xlsx_ac", [_tx, _ax])
         pg.wait_for_timeout(3200)
         r.kontrol("yükleme özeti göründü",
                   "yüklendi" in pg.inner_text("#yukleme_ozeti"))
-        r.esit("proje adı geri geldi", pg.input_value("#p_proje_adi"), "Geri Yukleme Denemesi")
+        #  XLSX geri yükleme HESAP GİRDİLERİNİ tazeler; proje kimliği artık
+        #  kapak sekmesindedir ve dosyadan gelmez.  Kritik olan, hesap
+        #  yüklemenin kapağı SİLMEMESİDİR — kullanıcı kapağı yeniden yazmak
+        #  zorunda kalmamalı.
+        r.esit("XLSX yüklemesi kapak alanını silmedi",
+               pg.input_value("#k_owner"), "Kalıcılık Denemesi A.Ş.")
         adetSec(pg, 1)
         pg.wait_for_timeout(400)
-        for alan, beklenen in (("#t_N", "11"), ("#t_hizli1", "44"), ("#t_hizli2", "3"),
-                               ("#t_bina_yuksekligi", "39,98"), ("#t_P", "10"),
-                               ("#t_bodrum", "2"), ("#t_kapi_genisligi", "900")):
+        for alan, beklenen in (("#c_N", "11"), ("#c_hizli1", "44"), ("#c_hizli2", "3"),
+                               ("#c_bina_yuksekligi", "39,98"), ("#c_P1", "10"),
+                               ("#c_bodrum", "2"), ("#c_kg1", "900")):
             r.esit(f"trafik girdisi geri geldi {alan}", pg.input_value(alan), beklenen)
-        r.kontrol("hesap yeniden yapıldı", "HESAP HATASI" not in pg.inner_text("#t_sonuc"))
+        r.kontrol("hesap yeniden yapıldı", "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
         pg.click('.sekme[data-sekme="avan"]')
         pg.wait_for_timeout(400)
         for alan, beklenen in (("#a_kuyu_genisligi1", "1800"), ("#a_Hk1", "32,85"),

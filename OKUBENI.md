@@ -7,6 +7,31 @@ IEC 60364-5-52 kaynaklı asansör avan proje hesaplarını yapan, sonuçları
 Hesap motoru, ofisin mevcut iki Excel dosyasındaki **her formülün birebir Python
 karşılığıdır** — değerler hücre hücre karşılaştırılarak doğrulanmıştır.
 
+**Sürüm 2.0** — **tekli / çoklu ayrımı kalktı.  Yöntemi artık veri belirliyor.**
+
+Trafik sekmesinde iki ayrı gövde ( tek hesap · grup hesabı ) ve aralarında seçim
+yapan bir düğme vardı. Kullanıcının, hangi MMO yönteminin uygulanacağına karar
+vermesi gerekiyordu — oysa bu karar **girdiden çıkarılabilir**. Artık öyle:
+
+| | Önce | Sonra |
+|---|---|---|
+| **Ekran** | İki gövde; "asansör adedi 1" tek hesabı, "2-4" grup hesabını açıyordu | **Tek gövde.** Adet seçicisi duruyor ama anlamı değişti: *"Kaç asansör tanımlıyorsunuz"* — yöntem değil, veri |
+| **Yöntem** | Kullanıcı seçiyordu | **Program çıkarıyor:** asansörlerin hepsi aynı tipse MMO/697 s.11-12 yolu ( `PAFTA` ), farklı tip varsa grup formülü ( `PAFTA-COKLU` ) |
+| **1 asansör tanımı** | "kaç gerekir" hesabı | **Aynı** — eski davranışın birebir kopyası ( 87 senaryonun 87'sinde özet **bit bit aynı** çıktı ) |
+| **2-4 aynı tip** | Yalnız "grup yeterli mi" derdi | Grup denetlenir **ve gerekli adet ayrıca yazılır** — 3 koyduysan "gerekli 2" görürsün. Bu bilgi eskiden hiç verilmiyordu |
+| **Görünürlük** | — | Sonucun başında: *"Asansörlerin hepsi aynı tip — MMO/697 s.11-12 yolu. Üretilecek pafta: **PAFTA**"* Hangi yolun ve hangi Excel sayfasının kullanıldığı sessiz kalmıyor |
+
+**Neden güvenli:** iki yolun özdeş asansörlerde aynı sonucu verdiği ölçüldü —
+`ΣRi = n·R` ve `1/TReş = Σ(1/TRi) = n/TR` → `TReş = TR/n`, **fark 0,00e+00**.
+Yani seçim hesabın doğruluğunu değil, yalnız **belgenin biçimini** belirliyor:
+PAFTA türetmeyi adım adım yazar, PAFTA-COKLU asansör bazında tablo verir.
+Motorun iki yolu da, Excel'in iki pafta sayfası da yerinde duruyor.
+
+**Yol boyunca düzelen iki şey:** Excel'den geri yükleme artık tek forma doğru
+oturuyor ( TEK sayfasının bina alanları ortak alanlara, asansör alanları 1.
+kolona ); ve adet 2 → 1 → 2 gidip gelirken gizlenen kolonun değeri **silinmiyor**
+( 10 + 16 kişilik grup korunuyor ) — hesaba yalnız görünen kolonlar girer.
+
 **Sürüm 1.9** — dış denetimden gelen **dört bulgu** ölçülerek doğrulandı ve giderildi.
 
 | Bulgu | Ölçülen davranış | Ne yapıldı |

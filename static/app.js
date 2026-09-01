@@ -39,8 +39,9 @@ function sekmeGoster(ad){
   document.querySelectorAll('.sekme').forEach(x=>
     x.classList.toggle('etkin', x.dataset.sekme===ad));
   document.querySelectorAll('.sayfa').forEach(s=>s.hidden=true);
-  if(ad==='trafik') $(TRAFIK_ADET>1 ? 's-coklu' : 's-trafik').hidden=false;
-  else $('s-'+ad).hidden=false;
+  //  Trafik ARTIK TEK GÖVDEDİR ( #s-coklu ) — 1..4 asansör aynı formda
+  //  tanımlanır, yöntemi program veriden çıkarır.
+  $('s-' + (ad==='trafik' ? 'coklu' : ad)).hidden=false;
   window.scrollTo({top:0,behavior:'instant'});
 }
 document.querySelectorAll('.sekme').forEach(b=>b.onclick=()=>sekmeGoster(b.dataset.sekme));
@@ -59,16 +60,10 @@ const TRAFIK_ORTAK = ['bina_tipi','bina_yuksekligi','yapi_yuksekligi','N','h','b
                       'hizli1','hizli2','manuel_k','manuel_V'];
 
 function adetDugmeleriKur(){
-  ['t','c'].forEach(p=>{
-    const k=$('adet_dugmeler_'+p); if(!k) return;
-    k.innerHTML=[1,2,3,4].map(n=>
+  const kt=$('adet_dugmeler_c');
+  if(kt) kt.innerHTML=[1,2,3,4].map(n=>
       `<button type="button" class="adet-dg${n===TRAFIK_ADET?' secili':''}"
         onclick="trafikAdedi(${n})">${n}</button>`).join('');
-  });
-  const a=$('t_adet_aciklama');
-  if(a) a.textContent = TRAFIK_ADET>1
-    ? `${TRAFIK_ADET} asansör — her biri ayrı tanımlanır, grup kontrolü yapılır`
-    : 'Tek asansör — program yetmiyorsa kaç adet gerektiğini hesaplar';
 
   /* Avan sekmesindeki adet seçici — trafik adedinin ALTINA inemez, çünkü
      trafik grubundaki her asansörün elektrik hesabı da yapılmalıdır. */
@@ -86,56 +81,28 @@ function adetDugmeleriKur(){
   }
 }
 
-function trafikAynala(kaynak, hedef){
-  TRAFIK_ORTAK.forEach(k=>{
-    const s=$(kaynak+'_'+k), h=$(hedef+'_'+k);
-    if(s && h) alanaYaz(h, s.value);
-  });
-  ekNufusAktar(kaynak, hedef);
-  etiketleriGuncelle();
-}
-
+/*  Adet artık YÖNTEM değil, VERİ:  kaç asansör tanımlandığını söyler.
+    Kapanan kolonun DEĞERİ SİLİNMEZ, yalnız gizlenir — 2 → 1 → 2 gidip
+    gelindiğinde grupta tanımlı farklı kapasiteler ( ör. 10 + 16 kişilik )
+    kaybolmasın.  Hesaba yalnız GÖRÜNEN kolonlar gönderilir ( trafikGirdi ).
+    Yeni açılan boş kolon 1. asansörden doldurulur. */
 function trafikAdedi(n){
   n=Math.max(1,Math.min(4,parseInt(n,10)||1));
   if(n===TRAFIK_ADET){ return; }
-  const eski=TRAFIK_ADET;
   TRAFIK_ADET=n;
-  if(eski<=1 && n>1){
-    trafikAynala('t','c');
-    /*  1. kolon HER ZAMAN tek hesaptaki tanımı alır ( kullanıcı orada
-        düzenlemiştir ).  Diğer kolonlar yalnız BOŞSA doldurulur — böylece
-        2 → 1 → 2 gidip gelindiğinde grupta tanımlı farklı kapasiteler
-        ( ör. 10 + 16 kişilik ) silinmez. */
-    for(let i=1;i<=4;i++){
-      if(i>n){ if($('c_P'+i)) $('c_P'+i).value=''; continue; }
-      if(i===1 || !$('c_P'+i).value){
-        alanaYaz($('c_P'+i),  v('t_P'));
-        alanaYaz($('c_kg'+i), v('t_kapi_genisligi'));
-        alanaYaz($('c_kt'+i), v('t_kapi_tipi'));
-      }
-    }
-  } else if(eski>1 && n<=1){
-    trafikAynala('c','t');
-    alanaYaz($('t_P'), v('c_P1'));
-    alanaYaz($('t_kapi_genisligi'), v('c_kg1'));
-    alanaYaz($('t_kapi_tipi'), v('c_kt1'));
-  } else {
-    /* 2↔3↔4 : fazla kolonları boşalt, yeni açılanı ilk asansörden doldur */
-    for(let i=1;i<=4;i++){
-      if(i>n && $('c_P'+i)) $('c_P'+i).value='';
-      else if(i<=n && $('c_P'+i) && !$('c_P'+i).value){
-        alanaYaz($('c_P'+i),  v('c_P1'));
-        alanaYaz($('c_kg'+i), v('c_kg1'));
-        alanaYaz($('c_kt'+i), v('c_kt1'));
-      }
+  for(let i=2;i<=n;i++){
+    if($('c_P'+i) && !$('c_P'+i).value){
+      alanaYaz($('c_P'+i),  v('c_P1'));
+      alanaYaz($('c_kg'+i), v('c_kg1'));
+      alanaYaz($('c_kt'+i), v('c_kt1'));
     }
   }
   cokluKolonlariGoster();
   avanSenkron();                 // avan adedi trafik adedini takip eder
   sekmeGoster('trafik');
   yaz(); planla();
-  durum(TRAFIK_ADET>1 ? `${TRAFIK_ADET} asansörlü grup hesabı`
-                      : 'Tek asansör — gerekli adet hesaplanacak');
+  durum(n>1 ? `${n} asansör tanımlandı — grup denetlenecek`
+            : 'Tek asansör tanımlandı — gerekli adet hesaplanacak');
 }
 
 function cokluKolonlariGoster(){
@@ -298,17 +265,9 @@ function avanSenkron(){
 async function kur(){
   SEC = await (await fetch('/api/secenekler')).json();
   const opts=(a,f)=>a.map(v=>`<option value="${f?f(v):v}">${f?f(v):v}</option>`).join('');
-  ['t_bina_tipi','c_bina_tipi'].forEach(id=>$(id).innerHTML=opts(SEC.bina_tipleri));
-  ['t_kapi_genisligi'].forEach(id=>$(id).innerHTML=opts(SEC.kapi_genislikleri));
-  ['t_kapi_tipi'].forEach(id=>$(id).innerHTML=opts(SEC.kapi_tipleri));
-  $('t_P').innerHTML = SEC.kapasiteler.map(p=>{
-    const kg = SEC.tablo_7[p] || p*75;
-    return `<option value="${p}">${p} kişi  —  ${kg} kg${p===15?'  (MMO örnek istisnası)':''}</option>`;}).join('');
-  ['t_manuel_V','c_manuel_V'].forEach(id=>
-    $(id).innerHTML = '<option value="">Tablo-2 minimumu</option>' +
-      SEC.hizlar.map(v=>`<option value="${v}">${tr(v)} m/s</option>`).join(''));
-  $('t_kapi_genisligi').value = 900;
-  $('t_P').value = 10;
+  $('c_bina_tipi').innerHTML = opts(SEC.bina_tipleri);
+  $('c_manuel_V').innerHTML = '<option value="">Tablo-2 minimumu</option>' +
+      SEC.hizlar.map(v=>`<option value="${v}">${tr(v)} m/s</option>`).join('');
 
   cokluAsansorleriKur();
   avanAsansorleriKur();
@@ -354,7 +313,7 @@ function planla(hedef){
 function etiketleriGuncelle(){
   ofisTazele();
   temelCevresi();
-  [['t','t_bina_tipi'],['c','c_bina_tipi']].forEach(([p,id])=>{
+  [['c','c_bina_tipi']].forEach(([p,id])=>{
     const bt=$(id).value||'';
     let l1='⑤ —', l2='⑥ (bu bina tipinde gerekmiyor — boş bırakın)';
     if(bt==='Konut'){ l1='⑤ Daire sayısı (bağımsız bölüm adedi)';
@@ -370,29 +329,26 @@ function etiketleriGuncelle(){
 /* ---------------------------------------------------------- girdi topla */
 const v = id => { const e=$(id); return e ? e.value.trim() : ''; };
 
-function trafikGirdi(mod){
-  const p = mod==='coklu' ? 'c' : 't';
-  const g = {
-    bina_tipi:v(p+'_bina_tipi'), bina_yuksekligi:v(p+'_bina_yuksekligi'),
-    yapi_yuksekligi:v(p+'_yapi_yuksekligi'), N:v(p+'_N'), h:v(p+'_h'),
-    bodrum:v(p+'_bodrum'),
-    hizli1:v(p+'_hizli1'), hizli2:v(p+'_hizli2'),
-    manuel_k:v(p+'_manuel_k'), manuel_V:v(p+'_manuel_V'),
-    ek_nufus:ekNufusTopla(p)
-  };
-  if(mod==='coklu'){
-    g.asansorler=[1,2,3,4].map(i=>({
+/*  TEK GİRDİ BİÇİMİ:  bina alanları + asansör listesi.
+    Yöntemi ( PAFTA / PAFTA-COKLU ) sunucu, asansörlerin aynı tip olup
+    olmamasına bakarak seçer — kullanıcı seçmez. */
+function trafikGirdi(){
+  return {
+    bina_tipi:v('c_bina_tipi'), bina_yuksekligi:v('c_bina_yuksekligi'),
+    yapi_yuksekligi:v('c_yapi_yuksekligi'), N:v('c_N'), h:v('c_h'),
+    bodrum:v('c_bodrum'),
+    hizli1:v('c_hizli1'), hizli2:v('c_hizli2'),
+    manuel_k:v('c_manuel_k'), manuel_V:v('c_manuel_V'),
+    ek_nufus:ekNufusTopla('c'),
+    //  YALNIZ GÖRÜNEN kolonlar hesaba girer; gizli kolonlar değerlerini
+    //  korur ama tanımlanmamış sayılır.
+    asansorler:[1,2,3,4].filter(i=>i<=TRAFIK_ADET).map(i=>({
       P:v('c_P'+i), kapi_genisligi:v('c_kg'+i), kapi_tipi:v('c_kt'+i),
       V:v('c_V'+i), durak:v('c_durak'+i), h:v('c_h'+i), bodrum:v('c_bodrum'+i),
       manuel_ta:v('c_mta'+i), manuel_tk:v('c_mtk'+i),
       manuel_tg:v('c_mtg'+i), manuel_tp:v('c_mtp'+i)
-    })).filter(a=>a.P!=='');
-  }else{
-    Object.assign(g,{P:v('t_P'), kapi_genisligi:v('t_kapi_genisligi'), kapi_tipi:v('t_kapi_tipi'),
-      manuel_ta:v('t_manuel_ta'), manuel_tk:v('t_manuel_tk'),
-      manuel_tg:v('t_manuel_tg'), manuel_tp:v('t_manuel_tp'), manuel_adet:v('t_manuel_adet')});
-  }
-  return g;
+    })).filter(a=>a.P!=='')
+  };
 }
 function avanGirdi(){
   /*  U · κ · εmax · β · Is alanları avan panelinden kaldırıldı ( ofis
@@ -432,22 +388,24 @@ function sekmeRozeti(sekme, hata, sayi){
 /* Önce trafik hesaplanır — avan adedi ve kapasite/hız oradan gelir; avan
    ondan SONRA hesaplanır ki ilk çizimde eksik asansör görünmesin. */
 async function hesaplaHepsi(){
-  await Promise.all([hesapTrafik('tek'), hesapTrafik('coklu')]);
+  await hesapTrafik();
   avanSenkron();
   await hesapAvan();
 }
 
-async function hesapTrafik(mod){
-  const p = mod==='coklu'?'c':'t';
+/*  TEK HESAP YOLU.  Kullanıcı yöntem seçmez; sunucu, tanımlanan asansörler
+    aynı tipte mi diye bakıp PAFTA ya da PAFTA-COKLU yolunu kendisi seçer
+    ( engine.traffic.hesapla ).  Dönen sonuçta `yol` ve `pafta` alanları var. */
+async function hesapTrafik(){
   try{
     const r = await (await fetch('/api/trafik',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({mod, girdiler:trafikGirdi(mod)})})).json();
-    SON[p]=r; ciz(p+'_sonuc', r, mod);
-    sekmeRozeti(mod==='coklu'?'coklu':'trafik', !!r.hata, (r.uyarilar||[]).length);
-    const rz=$(p+'_std_rozet');
+      body:JSON.stringify({girdiler:trafikGirdi()})})).json();
+    SON.c=r; SON.t=r; ciz('c_sonuc', r, r.yol||'tek');
+    sekmeRozeti('trafik', !!r.hata, (r.uyarilar||[]).length);
+    const rz=$('c_std_rozet');
     if(rz) rz.innerHTML = r.ozet && r.ozet.standart
       ? `<span class="rozet ${r.ozet.standart==='Yükseltilmiş'?'sari':'ok'}">Hesap standardı: ${r.ozet.standart}</span>` : '';
-  }catch(e){ $(p+'_sonuc').innerHTML=`<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`; }
+  }catch(e){ $('c_sonuc').innerHTML=`<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`; }
 }
 async function hesapAvan(){
   try{
@@ -554,6 +512,15 @@ function ciz(hedef, r, mod){
   const o=r.ozet||{};
   let h=`<div class="pafta-bas"><h2>ASANSÖR TRAFİK HESABI${mod==='coklu'?'  —  ÇOKLU ASANSÖR':''}</h2>
          <div class="alt">MMO/697, 2. Baskı, Ocak 2020, s.11-17</div></div><div class="kart-ic">`;
+  /*  Hangi yolun ve hangi Excel pafta sayfasının kullanıldığı SESSİZ kalmasın:
+      kullanıcı yöntemi seçmiyor, o hâlde ne seçildiğini görmeli. */
+  if(!r.hata && r.pafta){
+    const ayni = r.yol!=='coklu';
+    h += `<div class="uyari mavi" style="margin:0 0 10px">
+      ${ayni ? 'Asansörlerin hepsi <b>aynı tip</b> — MMO/697 s.11-12 yolu.'
+             : 'Asansörler <b>farklı tipte</b> — grup formülü ( MMO/697 s.12 ).'}
+      Üretilecek pafta: <b>${kacis(r.pafta)}</b></div>`;
+  }
   if(r.hata) h+=`<div class="uyari kirmizi">${kacis(r.hata)}</div>`;
   (r.uyarilar||[]).forEach(u=>h+=`<div class="uyari ${uyariSinifi(u)}">${kacis(u)}</div>`);
 
@@ -568,7 +535,12 @@ function ciz(hedef, r, mod){
        + kutu('Taşınacak yüzde k', '%'+tr((o.k||0)*100,1), 'Tablo-9');
     }else{
       const ok = o.Ieer<=o.Izul;
-      h+=kutu('Asansör adedi', o.adet, 'adet  ·  '+trn(o.P,0)+' kişilik')
+      /*  Tanımlanan adet ile GEREKLİ adet ayrı gösterilir: kullanıcı
+          fazla ya da eksik koyduğunu görsün.  Eşitse tek satır yeter. */
+      const gerekli = o.adet_hesap;
+      h+=kutu('Asansör adedi', o.adet, (gerekli!=null && gerekli!==o.adet)
+               ? `adet  ·  gerekli ${trn(gerekli,0)}` : 'adet  ·  '+trn(o.P,0)+' kişilik',
+               (gerekli!=null && o.adet<gerekli) ? 'hata' : '')
        + kutu('Bekleme Ieer', tr(o.Ieer,1), 'sn  ·  sınır '+trn(o.Izul,0)+' sn', ok?'ok':'hata')
        + kutu('Kabin hızı V', tr(o.V), 'm/s')
        + kutu('Tur süresi TR', tr(o.TR,1), 'sn')
@@ -1140,9 +1112,7 @@ function turetilenGoster(r){
 /* Katlanır "manuel değerler" bölümü kapalıyken de elle girilmiş bir değer
    olduğu görünsün — gizlenen bir ezme sessiz kalmamalı. */
 function manuelRozet(){
-  [['t_manuel_rozet', ['t_manuel_V','t_manuel_k','t_manuel_ta','t_manuel_tk',
-                       't_manuel_tg','t_manuel_tp','t_manuel_adet']],
-   ['c_manuel_rozet', ['c_manuel_V','c_manuel_k']]].forEach(([rozet, alanlar])=>{
+  [['c_manuel_rozet', ['c_manuel_V','c_manuel_k']]].forEach(([rozet, alanlar])=>{
     const r=$(rozet); if(!r) return;
     const n = alanlar.filter(id=>v(id)!=='').length;
     r.textContent = n ? `${n} elle` : '';
@@ -1227,19 +1197,14 @@ function ekNufusEkle(p, veri){
   if(!veri) planla();
 }
 function ekNufusTopla(p){
-  return [...$(p+'_eknufus_liste').querySelectorAll('.satir')].map(r=>({
+  const kok = $(p+'_eknufus_liste');
+  if(!kok) return [];                      //  tek gövde kalktı: 't' listesi yok
+  return [...kok.querySelectorAll('.satir')].map(r=>({
     aciklama:r.querySelector('.en-ac').value, miktar:r.querySelector('.en-mi').value,
     kalem:r.querySelector('.en-ka').value })).filter(x=>x.miktar!=='');
 }
 /* Adet değişince ek nüfus kalemleri de taşınır — karma yapıda bunlar
    nüfusun tamamını belirlediği için kaybolmaları hesabı bozardı. */
-function ekNufusAktar(kaynak, hedef){
-  const satirlar=ekNufusTopla(kaynak);
-  const liste=$(hedef+'_eknufus_liste');
-  if(!liste) return;
-  liste.innerHTML='';
-  satirlar.forEach(s=>ekNufusEkle(hedef, s));
-}
 
 /* Avan sekmesi trafik sonucuyla karşılaştırılır: kapasite / hız / kuyu
    yüksekliği tutarsızlığı uyarı olarak görünür.  Çoklu hesap varsa o,
@@ -1247,11 +1212,8 @@ function ekNufusAktar(kaynak, hedef){
 function trafikKoprusu(){
   const al = x => (x && !x.hata && x.avan_koprusu
                    && (x.avan_koprusu.asansorler||[]).length) ? x.avan_koprusu : null;
-  /* SEÇİLİ hesap yolu esastır: 1 asansör seçiliyken tek hesap, 2-4 seçiliyken
-     grup hesabı.  ( İkisi de arka planda hesaplanır; adedi ve kapasiteyi
-     hangisinin belirlediği kullanıcının seçimine bağlıdır. )  Seçili yol
-     hesaplanamadıysa diğeri yedek olarak kullanılır. */
-  return TRAFIK_ADET>1 ? (al(SON.c) || al(SON.t)) : (al(SON.t) || al(SON.c));
+  /*  Tek hesap yolu kaldı — hangi yöntemin kullanıldığı sonucun içindedir. */
+  return al(SON.c);
 }
 
 /* ---------------------------------------------------------- aktarım
@@ -1277,12 +1239,12 @@ function trafiktenAktar(){
 }
 
 /* ---------------------------------------------------------- indir */
-async function indir(uc, mod){
+async function indir(uc){
   durum('Dosya hazırlanıyor…');
   const govde = uc==='kapak-pdf'
     ? {kapak:kapakGirdi()}
     : uc.startsWith('trafik')
-    ? {mod, girdiler:trafikGirdi(mod)}
+    ? {girdiler:trafikGirdi()}
     : {girdiler:avanGirdi()};
   try{
     const r = await fetch('/api/indir/'+uc, {method:'POST',
@@ -1337,7 +1299,7 @@ function tumGirdiler(){
     if(!e.id || e.id.indexOf('_goster') >= 0) return;
     o[e.id] = e.type==='checkbox' ? e.checked : e.value;
   });
-  o.__eknufus_t = ekNufusTopla('t'); o.__eknufus_c = ekNufusTopla('c');
+  o.__eknufus_c = ekNufusTopla('c');
   o.__trafik_adet = TRAFIK_ADET;
   o.__avan_ek = AVAN_EK;
   o.__avan_oto = AVAN_OTO;
@@ -1376,10 +1338,14 @@ function uygula(o){
   });
   // Ek nüfus listeleri yalnız o bölüm gerçekten verilmişse yeniden kurulur;
   // böylece kısmi yükleme (yalnız trafik ya da yalnız avan) diğerini bozmaz.
-  ['t','c'].forEach(p=>{
+  //  Eski projelerde ek nüfus 't' ( tek gövde ) altında saklanmış olabilir;
+  //  tek gövde kalktığı için 'c' boşsa oradan taşınır.
+  ['c','t'].forEach(p=>{
     if(!(('__eknufus_'+p) in o)) return;
-    $(p+'_eknufus_liste').innerHTML='';
-    (o['__eknufus_'+p]||[]).forEach(s=>ekNufusEkle(p,s));
+    const liste = o['__eknufus_'+p] || [];
+    if(p==='t' && (o.__eknufus_c || []).length) return;
+    $('c_eknufus_liste').innerHTML='';
+    liste.forEach(s=>ekNufusEkle('c', s));
   });
   /* Asansör adedi: kaydedilmişse ondan, yoksa dolu çoklu kolon sayısından
      türetilir — Excel'den geri yüklemede doğru gövde açılsın. */
@@ -1484,9 +1450,7 @@ function hepsiniTemizle(){
   localStorage.removeItem(ANAHTAR); location.reload();
 }
 function ornekYukle(){
-  const O={t_bina_tipi:'Konut', t_bina_yuksekligi:'39,98', t_yapi_yuksekligi:'43', t_N:'11', t_h:'3',
-    t_hizli1:'44', t_hizli2:'3', t_P:'10', t_kapi_genisligi:'900', t_kapi_tipi:'Merkezden Açılan Oto.',
-    c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43', c_N:'11', c_h:'3',
+  const O={c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43', c_N:'11', c_h:'3',
     c_hizli1:'44', c_hizli2:'3',
     c_P1:'10', c_kg1:'900', c_kt1:'Teleskopik Otomatik',
     c_P2:'16', c_kg2:'1100', c_kt2:'Teleskopik Otomatik', c_P3:'', c_P4:'',
@@ -1503,7 +1467,7 @@ function ornekYukle(){
     a_aktif2:true, a_tanim2:'Sedye + Yük', a_kapasite2:'16', a_V2:'1.6', a_eta2:'0,85', a_Hk2:'38,50',
     a_makine_tipi2:'Dişlisiz', a_i_palanga2:'2', a_toplam_verim2:false,
     a_kuyu_genisligi2:'2650', a_kabin_boyu2:'1350', a_kabin_genisligi2:'2100',
-    a_aktif3:false, a_aktif4:false, __eknufus_t:[], __eknufus_c:[],
+    a_aktif3:false, a_aktif4:false, __eknufus_c:[],
     /* Ofisin Excel örneği 10 + 16 kişilik İKİ asansörlük bir gruptur —
        trafik adedi 2, avanda trafik dışı asansör yok. */
     __trafik_adet:2, __avan_ek:0};

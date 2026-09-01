@@ -53,7 +53,7 @@ def calistir():
             veri = dict(TEMEL)
             veri[alan] = kotu
             try:
-                _, g = UYGULAMA._trafik_girdi({"mod": "tek", "girdiler": veri})
+                g = UYGULAMA._trafik_girdi({"girdiler": veri})
                 s = TR.hesapla_tek(g)
                 if not isinstance(s, dict):
                     cokme += 1
@@ -66,14 +66,14 @@ def calistir():
     # bina tipi ve kapı tipi metin alanları
     for kotu in ("", None, "Konut ", "konut", "<b>x</b>", "Yok", 5, ["Konut"]):
         try:
-            _, g = UYGULAMA._trafik_girdi({"mod": "tek", "girdiler": dict(TEMEL, bina_tipi=kotu)})
+            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, bina_tipi=kotu)})
             s = TR.hesapla_tek(g)
             r.kontrol(f"bina_tipi={kotu!r} anlamlı hata", isinstance(s, dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"bina_tipi={kotu!r} çökme", False, f"→ {e}")
     for kotu in ("", None, "Teleskopik", "yok", 7):
         try:
-            _, g = UYGULAMA._trafik_girdi({"mod": "tek", "girdiler": dict(TEMEL, kapi_tipi=kotu)})
+            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, kapi_tipi=kotu)})
             r.kontrol(f"kapi_tipi={kotu!r} çökmedi", isinstance(TR.hesapla_tek(g), dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"kapi_tipi={kotu!r} çökme", False, f"→ {e}")
@@ -87,7 +87,7 @@ def calistir():
                 [{"P": "10", "durak": "-3"}], [{"P": "10", "V": "9"}],
                 [{"P": "10", "h": "0"}], [{"P": "99"}]):
         try:
-            _, g = UYGULAMA._trafik_girdi({"mod": "coklu", "girdiler": dict(C, asansorler=asl)})
+            g = UYGULAMA._trafik_girdi({"girdiler": dict(C, asansorler=asl)})
             r.kontrol(f"çoklu asansorler={str(asl)[:38]} çökmedi",
                       isinstance(TR.hesapla_coklu(g), dict))
         except Exception as e:                                      # noqa: BLE001
@@ -152,7 +152,7 @@ def calistir():
                [{"kalem": "DOĞRUDAN KİŞİ — Tablo-1 dışı", "miktar": "1000000"}],
                [{"kalem": "KONUT — Diğer oda", "miktar": "1"}] * 30):
         try:
-            _, g = UYGULAMA._trafik_girdi({"mod": "tek", "girdiler": dict(TEMEL, ek_nufus=ek)})
+            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, ek_nufus=ek)})
             r.kontrol(f"ek_nufus={str(ek)[:34]} çökmedi", isinstance(TR.hesapla_tek(g), dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"ek_nufus={str(ek)[:34]} çökme", False, f"→ {e}")

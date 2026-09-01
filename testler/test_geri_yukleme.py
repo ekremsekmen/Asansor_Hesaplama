@@ -61,9 +61,15 @@ def calistir():
     for ad, g in tek_senaryolar():
         d = XI.xlsx_oku(XE.trafik_xlsx("tek", g, PROJE))
         r.esit(f"[tek] {ad} · tür", d["tur"], "tek")
+        #  Arayüzde ayrı "tek hesap" gövdesi kalmadı: TEK sayfasının girdileri
+        #  tek forma yüklenir — bina alanları c_*, asansöre ait olanlar 1.
+        #  kolona.  manuel_adet'in karşılığı yok ( adet = kolon sayısı ).
         for anahtar in H.TEK:
+            alan = H.tek_alan(anahtar)
+            if alan is None:
+                continue
             r.esit(f"[tek] {ad} · {anahtar}",
-                   d["alanlar"].get(H.tek_alan(anahtar)), _bekle(g.get(anahtar)))
+                   d["alanlar"].get(alan), _bekle(g.get(anahtar)))
         beklenen_ek = [s for s in (g.get("ek_nufus") or []) if s.get("kalem")]
         r.esit(f"[tek] {ad} · ek nüfus satır sayısı",
                len(d.get("ek_nufus") or []), len(beklenen_ek))
@@ -146,8 +152,8 @@ def calistir():
     wb[H.TEK_SAYFA][H.TEK["kapi_genisligi"]] = 1100  # ve kapıyı büyüttü
     buf = io.BytesIO(); wb.save(buf)
     d = XI.xlsx_oku(buf.getvalue())
-    r.esit("elle değiştirilen N okundu", d["alanlar"]["t_N"], "17")
-    r.esit("elle değiştirilen kapı okundu", d["alanlar"]["t_kapi_genisligi"], "1100")
+    r.esit("elle değiştirilen N okundu", d["alanlar"]["c_N"], "17")
+    r.esit("elle değiştirilen kapı okundu", d["alanlar"]["c_kg1"], "1100")
 
     # ---------------------------------------------------------- hatalı dosyalar
     for ad, icerik in (("boş", b""), ("metin", b"bu bir excel degil"),
@@ -190,14 +196,14 @@ def calistir():
     for V in (0.63, 1.6, 1.75, 2.5, 3.5, 6):
         g = dict(tek_senaryolar()[0][1], manuel_V=V)
         d = XI.xlsx_oku(XE.trafik_xlsx("tek", g, PROJE))
-        r.esit(f"trafik manuel V={V} geri geldi", d["alanlar"]["t_manuel_V"], _bekle(V))
+        r.esit(f"trafik manuel V={V} geri geldi", d["alanlar"]["c_manuel_V"], _bekle(V))
 
     # ---------------------------------------------------------- ikinci tur
     # Geri yüklenen girdilerle yeniden üretilen dosya, tekrar yüklenince
     # aynı sonucu vermeli (revizyon zinciri kapalı olmalı).
     g0 = tek_senaryolar()[0][1]
     d1 = XI.xlsx_oku(XE.trafik_xlsx("tek", g0, PROJE))
-    g1 = {a: d1["alanlar"][H.tek_alan(a)] for a in H.TEK}
+    g1 = {a: d1["alanlar"][H.tek_alan(a)] for a in H.TEK if H.tek_alan(a)}
     g1["ek_nufus"] = d1.get("ek_nufus") or []
     d2 = XI.xlsx_oku(XE.trafik_xlsx("tek", g1, PROJE))
     r.kontrol("ikinci tur aynı girdileri veriyor", d1["alanlar"] == d2["alanlar"])

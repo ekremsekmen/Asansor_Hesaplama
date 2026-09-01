@@ -155,8 +155,10 @@ def xlsx_oku(icerik: bytes) -> dict:
         tur = "tek"
         ws = wb[H.TEK_SAYFA]
         for anahtar, adres in H.TEK.items():
-            alanlar[H.tek_alan(anahtar)] = _oku(ws, adres)
-        ek_nufus = ("t", _ek_nufus_oku(ws, H.TEK_EK_NUFUS))
+            alan = H.tek_alan(anahtar)
+            if alan:                      # manuel_adet'in arayüzde karşılığı yok
+                alanlar[alan] = _oku(ws, adres)
+        ek_nufus = ("c", _ek_nufus_oku(ws, H.TEK_EK_NUFUS))
         ozet = "Tek asansör trafik hesabı"
 
     else:

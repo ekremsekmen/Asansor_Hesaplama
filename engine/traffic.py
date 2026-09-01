@@ -902,3 +902,90 @@ def trafik_ozeti(sonuc: dict) -> dict:
                                 "toplam_seyahat": a.get("toplam_seyahat")}
                                for a in (sonuc.get("asansorler") or [])]}
     return {}
+
+
+# =====================================================================
+#  TEK GİRİŞ  —  YÖNTEMİ VERİ BELİRLER
+#
+#  Kullanıcı artık "tek mi çoklu mu" seçmez: binayı ve planladığı
+#  asansör(ler)i tanımlar, yöntemi program çıkarır.
+#
+#      hepsi AYNI tipse   →  hesapla_tek( manuel_adet = tanımlanan adet )
+#                            ( HESAPLAMA → PAFTA;  "kaç gerekir" de söylenir )
+#      farklı tip varsa   →  hesapla_coklu
+#                            ( ÇOKLU ASANSÖR → PAFTA-COKLU )
+#
+#  İki yolun ÖZDEŞ asansörlerde aynı sonucu verdiği ölçüldü:
+#      ΣRi = n·R   ve   1/TReş = Σ(1/TRi) = n/TR   →   TReş = TR/n
+#  ( fark 0,00e+00 ).  Yani seçim doğruluğu değil, BELGEYİ belirler:
+#  PAFTA türetmeyi adım adım gösterir, PAFTA-COKLU asansör bazında tablo verir.
+# =====================================================================
+
+#  Asansörleri "aynı tip" yapan alanlar.  Biri bile farklıysa her asansörün
+#  kendi H, S, ts, TR'si olur ve grup ( çoklu ) yolu gerekir.
+OZDESLIK_ALANLARI = ("P", "kapi_genisligi", "kapi_tipi", "V", "durak", "h",
+                     "bodrum", "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp")
+
+
+def _bos(x):
+    return x is None or (isinstance(x, str) and not x.strip())
+
+
+def _ayni(x, y):
+    if _bos(x) and _bos(y):
+        return True
+    if _bos(x) or _bos(y):
+        return False
+    if sayi_mi(x) and sayi_mi(y):
+        return abs(float(x) - float(y)) < 1e-9
+    return str(x).strip() == str(y).strip()
+
+
+def ozdes_mi(asansorler) -> bool:
+    """Tanımlı asansörlerin hepsi aynı tip mi?  ( 0 ya da 1 asansör → evet )"""
+    liste = [a for a in (asansorler or []) if isinstance(a, dict)]
+    if len(liste) <= 1:
+        return True
+    ilk = liste[0]
+    return all(_ayni(ilk.get(k), a.get(k)) for a in liste[1:] for k in OZDESLIK_ALANLARI)
+
+
+def hesapla(g: dict) -> dict:
+    """
+    Tek giriş noktası.  `g` içinde bina girdileri ve `asansorler` listesi bulunur.
+    Dönen sözlüğe iki alan eklenir:
+
+        yol    : "tek" | "coklu"      —  kullanılan hesap yolu
+        pafta  : "PAFTA" | "PAFTA-COKLU"  —  üretilecek Excel çıktı sayfası
+    """
+    g = g if isinstance(g, dict) else {}
+    liste = [a for a in (g.get("asansorler") or []) if isinstance(a, dict)]
+    #  Kapasitesi girilmemiş kolon "tanımlanmamış" sayılır.
+    liste = [a for a in liste if not _bos(a.get("P"))]
+
+    if ozdes_mi(liste):
+        bir = dict(liste[0]) if liste else {}
+        tekil = dict(g)
+        tekil.pop("asansorler", None)
+        for k in ("P", "kapi_genisligi", "kapi_tipi",
+                  "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp"):
+            if not _bos(bir.get(k)):
+                tekil[k] = bir[k]
+        #  Asansör bazında verilen h / bodrum / V ortak değeri ezer.
+        for kaynak, hedef in (("h", "h"), ("bodrum", "bodrum"), ("V", "manuel_V")):
+            if not _bos(bir.get(kaynak)):
+                tekil[hedef] = bir[kaynak]
+        #  TEK KOLON  =  "boyutlandır"  :  adet verilmez, program
+        #     n = MAX[ taşıma ; bekleme ] ile kaç gerektiğini söyler.
+        #  İKİ VE DAHA FAZLA KOLON  =  "doğrula"  :  tanımlanan adet
+        #     uygulanan adettir; program ayrıca gerekli adedi ( adet_hesap )
+        #     yine hesaplar, böylece fazla/eksik olduğu görünür.
+        if len(liste) >= 2:
+            tekil["manuel_adet"] = len(liste)
+        s = hesapla_tek(tekil)
+        s["yol"], s["pafta"] = "tek", "PAFTA"
+        return s
+
+    s = hesapla_coklu(g)
+    s["yol"], s["pafta"] = "coklu", "PAFTA-COKLU"
+    return s

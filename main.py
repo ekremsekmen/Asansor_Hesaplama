@@ -33,7 +33,7 @@ from exports import sablon_denetim as X_DEN
 from exports import xlsx_export as X_XLS     # noqa: E402
 from exports import xlsx_import as X_IMP     # noqa: E402
 
-SURUM = "1.9"
+SURUM = "2.0"
 KOK = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("AVAN_PORT", "8760"))
 
@@ -146,9 +146,16 @@ def _sozluk_listesi(x):
 
 
 def _trafik_girdi(veri: dict):
+    """
+    Trafik girdisini tek biçime getirir:  bina alanları + `asansorler` listesi.
+
+    Yöntemi ( tek / çoklu ) ARTIK KULLANICI SEÇMEZ, veri belirler — bkz.
+    engine.traffic.hesapla().  Eski `mod` alanı ve düz `P / kapi_genisligi /
+    kapi_tipi` girdileri geriye dönük uyumluluk için hâlâ kabul edilir:
+    liste boşsa düz alanlardan TEK asansörlük bir liste kurulur.
+    """
     _BELIRSIZ.clear()
     veri = veri if isinstance(veri, dict) else {}
-    mod = veri.get("mod") if veri.get("mod") in ("tek", "coklu") else "tek"
     ham = veri.get("girdiler")
     ham = ham if isinstance(ham, dict) else {}
     g = _temiz(ham, TRAFIK_SAYISAL)
@@ -156,11 +163,16 @@ def _trafik_girdi(veri: dict):
                       "kalem": s.get("kalem")}
                      for s in _sozluk_listesi(ham.get("ek_nufus"))
                      if s.get("kalem") and _sayi(s.get("miktar")) is not None]
-    if mod == "coklu":
-        g["asansorler"] = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ")
-                           for i, a in enumerate(_sozluk_listesi(ham.get("asansorler")), 1)
-                           if _sayi(a.get("P")) is not None][:4]
-    return mod, g
+    liste = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ")
+             for i, a in enumerate(_sozluk_listesi(ham.get("asansorler")), 1)
+             if _sayi(a.get("P")) is not None][:4]
+    if not liste and g.get("P") is not None:
+        bir = {k: g.get(k) for k in ("P", "kapi_genisligi",
+                                     "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp")}
+        bir["kapi_tipi"] = ham.get("kapi_tipi")
+        liste = [bir]
+    g["asansorler"] = liste
+    return g
 
 
 def _avan_girdi(veri: dict):
@@ -244,11 +256,11 @@ def secenekler():
 @app.post("/api/trafik")
 def api_trafik(veri: dict = Body(...)):
     try:
-        mod, g = _trafik_girdi(veri)
+        g = _trafik_girdi(veri)
         belirsiz = _belirsiz_hata()
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
-        s = E_TRF.hesapla_coklu(g) if mod == "coklu" else E_TRF.hesapla_tek(g)
+        s = E_TRF.hesapla(g)
         #  Avan sekmesi bu özeti geri gönderir; kapasite / hız / kuyu yüksekliği
         #  tutarsızlığı orada uyarı olarak görünür.
         s["avan_koprusu"] = E_TRF.trafik_ozeti(s)
@@ -301,7 +313,7 @@ def _uretilemedi(e: Exception):
 @app.post("/api/indir/trafik-xlsx")
 def indir_trafik_xlsx(veri: dict = Body(...)):
     try:
-        mod, g = _trafik_girdi(veri)
+        g = _trafik_girdi(veri)
         #  Ekranda reddedilen bir girdiyle DOSYA ÜRETİLMEZ.  Belirsiz sayı
         #  yazımı ( "1.200" ) _sayi() tarafından boşa çevriliyor; denetim
         #  olmadan hücre boş kalıyor ve dosya eksik girdiyle teslim edilebilir
@@ -309,6 +321,7 @@ def indir_trafik_xlsx(veri: dict = Body(...)):
         belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
+        mod = E_TRF.hesapla(g).get("yol", "tek")      # yöntemi veri belirler
         ek = "Trafik Hesabi (PAFTA)" if mod == "tek" else "Coklu Asansor Trafik (PAFTA-COKLU)"
         return _indir(X_XLS.trafik_xlsx(mod, g),
                       _dosya_adi(None, ek, "xlsx"), XLSX_TUR)
@@ -319,12 +332,12 @@ def indir_trafik_xlsx(veri: dict = Body(...)):
 @app.post("/api/indir/trafik-pdf")
 def indir_trafik_pdf(veri: dict = Body(...)):
     try:
-        mod, g = _trafik_girdi(veri)
+        g = _trafik_girdi(veri)
         belirsiz = _belirsiz_hata()
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
-        s = E_TRF.hesapla_coklu(g) if mod == "coklu" else E_TRF.hesapla_tek(g)
-        ek = "Trafik Hesabi" if mod == "tek" else "Coklu Asansor Trafik"
+        s = E_TRF.hesapla(g)
+        ek = "Trafik Hesabi" if s.get("yol") == "tek" else "Coklu Asansor Trafik"
         return _indir(X_PDF.trafik_pdf(s),
                       _dosya_adi(None, ek, "pdf"), "application/pdf")
     except Exception as e:                                    # noqa: BLE001

@@ -179,8 +179,24 @@ def evet_mi(metin):
 # =====================================================================
 #  Arayüz alan adları  ( form alanı kimliği ↔ girdi anahtarı )
 # =====================================================================
+#  TEK ASANSÖR sayfasının girdileri artık AYNI FORMA yüklenir:  arayüzde
+#  ayrı bir "tek hesap" gövdesi kalmadı, 1..4 asansör tek formda tanımlanır.
+#  Bu yüzden bina alanları ortak ( c_ ) alanlara, asansöre ait olanlar da
+#  1. asansör kolonuna yazılır.
+TEK_ASANSOR_ALANLARI = {
+    "P": "P", "kapi_genisligi": "kapi_genisligi", "kapi_tipi": "kapi_tipi",
+    "manuel_ta": "manuel_ta", "manuel_tk": "manuel_tk",
+    "manuel_tg": "manuel_tg", "manuel_tp": "manuel_tp",
+}
+
+
 def tek_alan(anahtar):
-    return "t_" + anahtar
+    if anahtar in TEK_ASANSOR_ALANLARI:
+        return coklu_asansor_alan(TEK_ASANSOR_ALANLARI[anahtar], 1)
+    if anahtar == "manuel_adet":
+        #  Adet artık tanımlanan kolon sayısıdır; ayrı bir alanı yok.
+        return None
+    return "c_" + anahtar
 
 
 def coklu_ortak_alan(anahtar):
