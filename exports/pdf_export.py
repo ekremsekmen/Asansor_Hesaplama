@@ -57,6 +57,19 @@ YESIL = colors.HexColor("#1B6B37")
 KIRMIZI = colors.HexColor("#A8231F")
 SARI_AC = colors.HexColor("#FFF8E1")
 
+#  TABLO GENİŞLİK ÇARPANI
+#  Pafta küçültülerek basıldığında ( bkz. _Belge.olcek ) çerçeve 1/olcek
+#  büyüklüğünde kurulur.  Tablolar sabit mm genişlikte olduğu için, çarpan
+#  uygulanmazsa ortada dar bir sütun hâlinde kalır ve sayfanın iki yanı boş
+#  gider.  Bu çarpan tabloları da aynı oranda genişletir; ölçekten sonra
+#  tam A4 yazı alanına otururlar.
+_GEN = 1.0
+
+
+def _w(x):
+    return x * _GEN
+
+
 S = {
     "h1": ParagraphStyle("h1", fontName=FB, fontSize=13.5, leading=17, textColor=MAVI,
                          alignment=TA_CENTER, spaceAfter=1),
@@ -94,7 +107,17 @@ def _p(metin, stil="n"):
 
 # ---------------------------------------------------------------- belge iskeleti
 class _Belge(BaseDocTemplate):
-    def __init__(self, buf, ust_baslik, alt_baslik, **kw):
+    """
+    `olcek` < 1 ise içerik KÜÇÜLTÜLEREK sayfaya sığdırılır.
+
+    Kâğıt yine A4'tür; yalnız iç çerçeve 1/olcek büyüklüğünde kurulur ve
+    çizim anında olcek ile küçültülür.  Böylece dizgi daha geniş bir alana
+    yapılır ( satırlar daha az kırılır ), sonra tamamı orantılı olarak
+    A4 yazı alanına oturur.  Üst bant ve alt bilgi ölçekten etkilenmez —
+    onlar gerçek A4 koordinatlarında çizilir.
+    """
+
+    def __init__(self, buf, ust_baslik, alt_baslik, olcek=1.0, **kw):
         # Pafta PDF'leri proje antedi taşımaz; bu bilgiler yalnız kapaktadır.
         baslik = ust_baslik
         super().__init__(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
@@ -102,7 +125,9 @@ class _Belge(BaseDocTemplate):
                          title=baslik, author="",
                          subject=alt_baslik, creator="Asansör Avan Hesaplama Programı", **kw)
         self.ust_baslik, self.alt_baslik = ust_baslik, alt_baslik
-        cerceve = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="ana")
+        self.olcek = k = float(olcek) if olcek else 1.0
+        cerceve = Frame(self.leftMargin / k, self.bottomMargin / k,
+                        self.width / k, self.height / k, id="ana")
         self.addPageTemplates([PageTemplate(id="std", frames=cerceve, onPage=self._sayfa)])
 
     def _sayfa(self, cnv, doc):
@@ -133,13 +158,18 @@ class _Belge(BaseDocTemplate):
         cnv.drawString(15 * mm, 9 * mm, sol)
         cnv.drawRightString(w - 15 * mm, 9 * mm, sag_metin)
         cnv.restoreState()
+        #  Çerçeve içeriği bundan sonra çizilir; ölçek yalnız ONU etkiler.
+        #  Sayfa değişiminde çizim durumu sıfırlandığı için her sayfada
+        #  yeniden uygulanır.
+        if self.olcek != 1.0:
+            cnv.scale(self.olcek, self.olcek)
 
 
 def _baslik_seridi(metin, kaynak=""):
     #  Yükseklik SABİT DEĞİLDİR: uzun bir bölüm başlığı iki satıra düştüğünde
     #  şerit de büyür, yoksa ikinci satır mavi bandın dışına taşıyordu.
     t = Table([[_p(metin, "h2"), _p(kaynak, "h2k")]],
-              colWidths=[108 * mm, 72 * mm])
+              colWidths=[_w(108 * mm), _w(72 * mm)])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), MAVI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -184,7 +214,7 @@ def _adim_tablosu(adimlar):
         stil += [("LINEBELOW", (0, i), (-1, i), 0.25, colors.HexColor("#E6EAEF"))]
         i += 1
 
-    t = Table(veriler, colWidths=[13 * mm, 84 * mm, 5 * mm, 30 * mm, 18 * mm, 30 * mm])
+    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
@@ -199,7 +229,7 @@ def _sonuc_kutusu(sonuc):
         return None
     renk = YESIL if sonuc.get("uygun", True) else KIRMIZI
     satirlar = [[_p(sonuc.get("baslik", "SONUÇ"), "sonuc"), _p(sonuc.get("metin", ""), "sonuc")]]
-    t = Table(satirlar, colWidths=[52 * mm, 128 * mm])
+    t = Table(satirlar, colWidths=[_w(52 * mm), _w(128 * mm)])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), renk),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -247,7 +277,7 @@ def _cetvel_tablosu(cetvel):
                         _p(trn(c["guc"], 0), "sag"), _p(c["birim"], "n"), _p(c["sigorta"], "n")])
     veriler.append(["", _p("<b>ASANSÖRÜN KURULU GÜCÜ</b>", "n"), _p("=", "n"),
                     _p(trn(toplam, 0), "sag"), _p("W", "n"), ""])
-    t = Table(veriler, colWidths=[13 * mm, 84 * mm, 5 * mm, 30 * mm, 18 * mm, 30 * mm])
+    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
     n = len(veriler) - 1
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
@@ -278,7 +308,7 @@ def _uyari_kutusu(metinler, hata=False):
         return "ℹ  " if str(m).lstrip()[:1] == "ℹ" else "⚠  "
 
     satirlar = [[_p(_simge(m) + _sadelestir(m), "n")] for m in metinler]
-    t = Table(satirlar, colWidths=[180 * mm])
+    t = Table(satirlar, colWidths=[_w(180 * mm)])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), SARI_AC if not hata else colors.HexColor("#FDECEA")),
         ("BOX", (0, 0), (-1, -1), 0.6, KIRMIZI if hata else colors.HexColor("#E0B84C")),
@@ -290,7 +320,7 @@ def _uyari_kutusu(metinler, hata=False):
 
 def _kv_tablo(satirlar, genislikler=(70 * mm, 110 * mm), vurgu_son=False):
     veriler = [[_p(f"<b>{a}</b>", "n"), _p(b, "n")] for a, b in satirlar]
-    t = Table(veriler, colWidths=list(genislikler))
+    t = Table(veriler, colWidths=[_w(x) for x in genislikler])
     stil = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -305,8 +335,38 @@ def _kv_tablo(satirlar, genislikler=(70 * mm, 110 * mm), vurgu_son=False):
 # =====================================================================
 #  TRAFİK HESABI PDF   (PAFTA / PAFTA-COKLU karşılığı)
 # =====================================================================
+#  Trafik paftası TEK SAYFA olmalıdır.  İçerik sığmazsa küçültülür.
+#  Ölçek büyükten küçüğe denenir ve SIĞAN İLK ( yani en büyük ) ölçek
+#  seçilir — yazı gereğinden fazla küçülmesin diye adım 0,02'dir.
+#  Alt sınır 0,40: bunun altında okunmaz olurdu, orada iki sayfaya izin verilir.
+TRAFIK_OLCEKLERI = tuple(round(1.0 - 0.02 * i, 2) for i in range(31))
+
+
 def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:
-    # ``proje`` eski çağrılarla uyumluluk için kabul edilir, paftaya yazılmaz.
+    """
+    ASANSÖR TRAFİK HESABI paftası  —  her zaman TEK SAYFA.
+
+    Pafta SONUÇ ile biter.  İçerik A4'e sığmazsa yazı ve tablolar orantılı
+    olarak küçültülür; hiçbir satır atılmaz, ikinci sayfaya taşma olmaz.
+    """
+    for _olcek in TRAFIK_OLCEKLERI:
+        cikti, sayfa = _trafik_bas(sonuc, _olcek)
+        if sayfa <= 1:
+            return cikti
+    return cikti
+
+
+def _trafik_bas(sonuc: dict, olcek: float):
+    """Paftayı verilen ölçekle basar; ( bayt, sayfa adedi ) döner."""
+    global _GEN
+    _GEN = 1.0 / (olcek or 1.0)
+    try:
+        return _trafik_bas_ic(sonuc, olcek)
+    finally:
+        _GEN = 1.0
+
+
+def _trafik_bas_ic(sonuc: dict, olcek: float):
     coklu = sonuc.get("tip") == "coklu"
     # Başlıklar Excel'deki çıktı sayfalarının A1 hücreleriyle birebir aynıdır:
     #   PAFTA        -> "ASANSÖR TRAFİK HESABI"
@@ -318,7 +378,8 @@ def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:
     buf = io.BytesIO()
     doc = _Belge(buf, baslik,
                  "MMO / 697  “Asansör Avan Projesi Hazırlama Teknik Esasları”, 2. Baskı, Ocak 2020, s.11-17"
-                 "   ·   ISO 8100-32:2020   ·   BYKHY md.4")
+                 "   ·   ISO 8100-32:2020   ·   BYKHY md.4",
+                 olcek=olcek)
     # Hesap tamamlanamadıysa da geçerli bir belge üretilir; hata paftaya yazılır.
     o = sonuc.get("ozet") or {}
     ic = [_p(baslik, "h1"), _p(alt, "alt"), Spacer(1, 3 * mm)]
@@ -336,11 +397,9 @@ def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:
         ic += [Spacer(1, 3.5 * mm), _baslik_seridi("ASANSÖR BAZINDA HESAP", "MMO/697 s.11-12"),
                Spacer(1, 1.2 * mm), _coklu_tablo(sonuc["asansorler"])]
 
-    # nüfus dökümü
-    if sonuc.get("nufus"):
-        ic += [Spacer(1, 3.5 * mm), _baslik_seridi("NÜFUSUN AYRINTISI   ( b = Σc )", "MMO/697 Tablo-1"),
-               Spacer(1, 1.2 * mm), _nufus_tablo(sonuc["nufus"], o.get("b"))]
-
+    #  NÜFUS DÖKÜMÜ PAFTAYA BASILMAZ.  b = Σc değeri ve nasıl bulunduğu
+    #  zaten ilk bölümde ( "BİNADA BULUNAN İNSAN SAYISININ TESPİTİ" ) satır
+    #  satır yazılı; kalem kalem döküm ekranda durur.  Pafta tek sayfadır.
     # sonuç
     ic += [Spacer(1, 4 * mm)]
     _sonuc_metni = (o.get("sonuc") or sonuc.get("hata")
@@ -353,17 +412,12 @@ def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:
     elif o.get("pafta_satiri"):
         ic += [Spacer(1, 1.5 * mm), _p(o["pafta_satiri"], "nb")]
 
-    # öneri tablosu
-    if sonuc.get("oneriler"):
-        ic += [Spacer(1, 4 * mm),
-               _baslik_seridi("OTOMATİK ÖNERİ   —   hangi kabin ve hız kaç asansör gerektirir?",
-                              "bilgi amaçlıdır"), Spacer(1, 1.2 * mm),
-               _oneri_tablo(sonuc["oneriler"])]
-
-    ic += [Spacer(1, 5 * mm), _imza_kutusu()]
+    #  TRAFİK PAFTASI TEK SAYFADIR.  Pafta SONUÇ ile biter: otomatik öneri
+    #  tablosu ( bilgi amaçlıydı ) ve imza kutusu paftadan çıkarıldı — öneri
+    #  ekranda duruyor, imza bilgisi kapak sayfasındadır.
     doc.build(ic)
     buf.seek(0)
-    return buf.read()
+    return buf.read(), doc.page
 
 
 def _coklu_tablo(asansorler):
@@ -389,7 +443,7 @@ def _coklu_tablo(asansorler):
     for etiket, fn in satirlar:
         veriler.append([_p(etiket, "n")] + [_p(fn(a), "sag") for a in asansorler])
     gen = [72 * mm] + [(108 / len(asansorler)) * mm] * len(asansorler)
-    t = Table(veriler, colWidths=gen, repeatRows=1)
+    t = Table(veriler, colWidths=[_w(x) for x in gen], repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
         ("BACKGROUND", (0, 1), (0, -1), GRI_AC),
@@ -410,7 +464,7 @@ def _nufus_tablo(nufus, b):
                         _p(s["kalem"], "n"), _p(s["birim"], "n"),
                         _p(trn(s["katsayi"], 4), "sag"), _p(trn(s["c"], 2), "sag")])
     veriler.append([_p("<b>TOPLAM  b = Σc</b>", "n"), "", "", "", "", _p(trn(b, 2), "sag")])
-    t = Table(veriler, colWidths=[58 * mm, 20 * mm, 48 * mm, 16 * mm, 18 * mm, 20 * mm], repeatRows=1)
+    t = Table(veriler, colWidths=[_w(58 * mm), _w(20 * mm), _w(48 * mm), _w(16 * mm), _w(18 * mm), _w(20 * mm)], repeatRows=1)
     n = len(veriler) - 1
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
@@ -435,7 +489,7 @@ def _oneri_tablo(oneriler):
                         _p(tr(s["TR"], 1), "sag"), _p(tr(s["R"], 1), "sag")])
         if s.get("onerilen"):
             stil.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#E4F3E8")))
-    t = Table(veriler, colWidths=[74 * mm, 14 * mm, 24 * mm, 30 * mm, 19 * mm, 19 * mm], repeatRows=1)
+    t = Table(veriler, colWidths=[_w(74 * mm), _w(14 * mm), _w(24 * mm), _w(30 * mm), _w(19 * mm), _w(19 * mm)], repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
         ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
@@ -451,7 +505,7 @@ def _imza_kutusu():
     t = Table([[_p("<b>Hesabı yapan</b><br/><br/><br/>", "n"),
                 _p("<b>Kontrol eden</b><br/><br/><br/>", "n"),
                 _p("<b>Onay</b><br/><br/><br/>", "n")]],
-              colWidths=[60 * mm, 60 * mm, 60 * mm])
+              colWidths=[_w(60 * mm), _w(60 * mm), _w(60 * mm)])
     t.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.5, CIZGI), ("INNERGRID", (0, 0), (-1, -1), 0.4, CIZGI),
         ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -556,7 +610,7 @@ def _avan_ozet_tablo(sonuc):
                     _p("UYGUN" if oz["topraklama_uygun"] else "UYGUN DEĞİL", "sag")] +
                    [""] * (len(aktif) - 1) + [""])
     gen = [70 * mm] + [(94 / len(aktif)) * mm] * len(aktif) + [16 * mm]
-    t = Table(veriler, colWidths=gen, repeatRows=1)
+    t = Table(veriler, colWidths=[_w(x) for x in gen], repeatRows=1)
     n = len(veriler)
     stil = [
         ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),

@@ -136,6 +136,17 @@ AVAN_SABIT = {
 AVAN_AYD_SUTUN_SAYFA = "TABLOLAR"
 AVAN_AYD_SUTUN_HUCRE = "B19"
 
+#  MOTOR KORUMA CİHAZI  —  her asansörün kendi pafta sayfasındaki KURULU GÜÇ
+#  cetvelinde sabit metin olarak duran hücre ( şablonda "4 x 25" yazılıydı ).
+#  Formül değil, düz metindir; program motor akımından hesapladığı değeri
+#  buraya yazar, böylece indirilen Excel ile ekrandaki pafta ayrışmaz.
+AVAN_SIGORTA_HUCRE = "G102"
+
+
+def avan_asansor_sayfasi(no: int) -> str:
+    """1 → '1 NOLU ASANSÖR' — asansörün kendi pafta sayfasının adı."""
+    return f"{int(no)} NOLU ASANSÖR"
+
 # =====================================================================
 #  PROJE BİLGİSİ
 #  Şablonda proje antedine ait bir hücre yoktur; bu bilgi dosyanın

@@ -887,6 +887,72 @@ def calistir():
     r.esit("özette şerit boyu ve kaynağı var",
            (round(AV.hesapla(_v)["ozet"]["serit_L"], 2),
             AV.hesapla(_v)["ozet"]["serit_L_kaynak"]), (118.80, "türetilen"))
+    # ==================================================================
+    #  v1.9 — DIŞ DENETİM BULGULARI
+    #  ( S2 akım kontrolü · motor sigortası · kabin/kuyu uyumu )
+    # ==================================================================
+    import math as _m
+
+    #  --- Motor koruma cihazı standart kademeden seçilir
+    r.kontrol("sigorta kademeleri artan ve tekrarsız",
+              list(T.SIGORTA_KADEMELERI) == sorted(set(T.SIGORTA_KADEMELERI)))
+    for _kW, _bek in ((11, 25), (15, 32), (37, 80), (110, 250)):
+        _In = _kW * 1000 / (_m.sqrt(3) * 380 * 0.90)
+        r.esit(f"{_kW} kW motor → sigorta kademesi", T.sigorta_sec(_In, 1.25), _bek)
+    r.kontrol("geçersiz akımda kademe yok", T.sigorta_sec(0) is None
+              and T.sigorta_sec(None) is None and T.sigorta_sec(-5) is None)
+    r.kontrol("liste dışına taşan akımda kademe yok", T.sigorta_sec(9000) is None)
+    r.esit("geçersiz katsayı varsayılana döner",
+           T.sigorta_sec(18.58, 0), T.sigorta_sec(18.58, 1.25))
+
+    _s = _av()["asansorler"][0]["ozet"]
+    r.esit("ofis örneğinde sigorta Excel'deki gibi 4 x 25", _s["motor_sigorta"], "4 x 25")
+    r.esit("motor akımı özette", round(_s["I_motor"], 1),
+           round(_s["Nsc"] * 1000 / (_m.sqrt(3) * 380 * 0.90), 1))
+    _cet = [b for b in _av()["asansorler"][0]["bolumler"] if b.get("cetvel")][0]["cetvel"]
+    r.esit("cetveldeki sigorta hesaplanan değer", _cet[0]["sigorta"], "4 x 25")
+    r.kontrol("sigorta artık sabit değil — güç büyüyünce değişiyor",
+              _av({"Nsc": 110})["asansorler"][0]["ozet"]["motor_sigorta"] == "4 x 250")
+    #  Katsayı ofis standardındadır
+    r.esit("katsayı büyüyünce sigorta da büyüyor",
+           _av(sab={"sigorta_katsayisi": 2.5})["asansorler"][0]["ozet"]["motor_sigorta"],
+           "4 x 50")
+    r.kontrol("geçersiz katsayı reddediliyor",
+              any("sigorta_katsayisi" in x
+                  for x in AV.sabitler({"sigorta_katsayisi": 0})["_reddedilen"]))
+
+    #  --- S2 ( makine besleme ) akım kontrolü
+    #  37 kW motor + 1,5 mm² : I2 = 62 A, kablo 17,5 A taşır.  ε2 küçük
+    #  kaldığı için paftada yakalanmıyordu.
+    _ince = _av({"kapasite": 25, "V": 2.5, "S2": 1.5, "S1": 50, "L1": 5, "L2": 1})
+    _oz = _ince["asansorler"][0]["ozet"]
+    r.kontrol("ince S2'de gerilim düşümü hâlâ 'uygun' — tek başına yetmiyor",
+              _oz["eps_uygun"] is True)
+    r.kontrol("S2 akım kontrolü yapılıyor", _oz["akim2_uygun"] is False)
+    r.kontrol("S2 yetersizliği uyarı üretiyor",
+              any("MAKİNE BESLEME KESİTİ" in x for x in (_ince.get("uyarilar") or [])),
+              f"→ {_ince.get('uyarilar')}")
+    r.kontrol("yeterli S2'de uyarı yok",
+              not any("MAKİNE BESLEME" in x
+                      for x in (_av({"kapasite": 25, "V": 2.5, "S2": 25,
+                                     "S1": 50}).get("uyarilar") or [])))
+    r.kontrol("S2 kontrolü pafta SONUCUNU değiştirmiyor ( XLSX ile ayrışmasın )",
+              [b for b in _ince["asansorler"][0]["bolumler"]
+               if (b.get("sonuc") or {}).get("baslik", "").startswith("KONTROL      ε")
+               ][0]["sonuc"]["uygun"] is True)
+
+    #  --- Kabin kuyuya sığmalı
+    _sig = _av({"kuyu_genisligi": 1500, "kabin_genisligi": 2100})
+    r.kontrol("kabin > kuyu uyarı üretiyor",
+              any("KABİN KUYUYA SIĞMIYOR" in x for x in (_sig.get("uyarilar") or [])),
+              f"→ {_sig.get('uyarilar')}")
+    r.kontrol("kabin = kuyu de reddediliyor",
+              any("SIĞMIYOR" in x for x in
+                  (_av({"kuyu_genisligi": 1800, "kabin_genisligi": 1800}
+                       ).get("uyarilar") or [])))
+    r.kontrol("normal ölçülerde uyarı yok",
+              not any("SIĞMIYOR" in x for x in (_av().get("uyarilar") or [])))
+
 
     return r
 

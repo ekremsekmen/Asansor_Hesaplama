@@ -116,6 +116,10 @@ OFIS_VARSAYILAN = {
     "beta": 150,              # Toprak özgül direnci, Ω·m
     "cubuk_sayisi": 4,        # Çubuk topraklayıcı adedi
     "goz_araligi": 20,        # Temel topraklama karelaj gözü, m ( 20 × 20 )
+    #  Motor koruma cihazı ( sigorta / şalter ) anma akımı = bu katsayı × In,
+    #  sonra standart kademeye yuvarlanır.  1,25 ofisin kendi paftasını birebir
+    #  verir:  11 kW → In 18,6 A → 23,2 A → "4 x 25".
+    "sigorta_katsayisi": 1.25,
 }
 
 #  KAT YÜKSEKLİĞİ ve KAPI TİPİ burada DEĞİLDİR:  her projede değişirler,
@@ -130,6 +134,7 @@ OFIS_ARALIK = {
     "gr": (1, 200), "Fmk": (1, 5000), "Fsh": (0, 3000),
     "S1": (1, 400), "S2": (1, 400), "L2": (0.1, 500), "L1_pay": (0, 100),
     "beta": (1, 100000), "cubuk_sayisi": (0, 100), "goz_araligi": (1, 200),
+    "sigorta_katsayisi": (1, 4),
 }
 
 #  Asansör kartından ezilebilen ofis varsayılanları ( "özel değer" bölümü )
@@ -188,6 +193,7 @@ ALAN_ADI = {
     "kappa": "κ — iletkenlik", "eps_max": "εmax — gerilim düşümü sınırı",
     "beta": "β — toprak özgül direnci", "cubuk_sayisi": "Is — çubuk adedi",
     "goz_araligi": "karelaj gözü — temel topraklama",
+    "sigorta_katsayisi": "motor sigortası kalkış katsayısı",
 }
 
 
@@ -631,9 +637,20 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     g_priz = S["priz_adedi"] * S["priz_gucu"]
     P_kurulu = g_motor + g_kuyu + g_kabin + g_priz
 
+    #  MOTOR KORUMA CİHAZI  —  şablonda sabit metin ( "4 x 25" ) olarak
+    #  duruyordu; her güçte aynı yazıyordu.  Motor anma akımından seçiliyor:
+    #  In = P2 / ( √3 · U · cosφ ),  kademe = katsayı · In üstündeki ilk
+    #  standart değer.  Ofisin 11 kW örneğinde sonuç yine "4 x 25" çıkar.
+    I_motor = (g_motor / (math.sqrt(3) * U_sebeke * S["cosfi"])
+               if all(sayi_mi(x) and x > 0 for x in (U_sebeke, S["cosfi"])) else None)
+    sigorta_A = T.sigorta_sec(I_motor, S["sigorta_katsayisi"])
+    motor_sigorta = f"4 x {trn(sigorta_A, 0)}" if sigorta_A else "uygulama projesinde"
+
     b5 = Bolum(f"5 -  KURULU GÜÇ CETVELİ", f"tablo adı :  TAS{no}")
+    b5["aciklamalar"] = [T.SIGORTA_NOTU]
     b5["cetvel"] = [
-        {"lin": 1, "sorti": "MOTOR", "guc": g_motor, "birim": "W", "sigorta": "4 x 25"},
+        {"lin": 1, "sorti": "MOTOR", "guc": g_motor, "birim": "W",
+         "sigorta": motor_sigorta},
         {"lin": 2, "sorti": f"KUYU AYDINLATMASI          ( {n_kuyu} X {trn(S['kuyu_armatur_W'],0)} W )",
          "guc": g_kuyu, "birim": "W", "sigorta": "10"},
         {"lin": 3, "sorti": (f"KABİN + KABİN ÜSTÜ AYD.     ( {n_kabin} X {trn(S['kabin_armatur_W'],0)} W"
@@ -661,6 +678,19 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         if all(sayi_mi(x) and x > 0 for x in (U_sebeke, cosfi)) else None
     Iz = T.kablo_iz(S1)
     akim_uygun = sayi_mi(I_hat) and sayi_mi(Iz) and I_hat <= Iz
+
+    #  MAKİNE BESLEME HATTININ ( S2 ) AKIM KONTROLÜ
+    #  Paftadaki "I ≤ Iz" kontrolü KOLON HATTINA ( S1 ) aittir ve öyle
+    #  olmalıdır: o hat asansörün toplam kurulu gücünü taşır.  Ama makine
+    #  besleme hattı hiç denetlenmiyordu — yalnız gerilim düşümüne ( ε2 )
+    #  giriyordu ve ε2 kısa bir hatta çok ince kesitte bile küçük çıkar.
+    #  Sonuç: 37 kW motor + S2 = 1,5 mm² ( I2 = 62 A, kablo 17,5 A )
+    #  birleşimi "uygundur" görünüyordu.  Bu kontrol ofisin Excel'inde de
+    #  yok; pafta ve XLSX ayrışmasın diye SONUÇ SATIRI DEĞİŞTİRİLMEDİ,
+    #  yetersizlik ⚠ UYARI olarak bildiriliyor.
+    Iz2 = T.kablo_iz(S2)
+    I2 = I_motor
+    akim2_uygun = sayi_mi(I2) and sayi_mi(Iz2) and I2 <= Iz2
 
     b6 = Bolum("6 -  GERİLİM DÜŞÜMÜ VE KESİT KONTROLÜ", "Elektrik İç Tesisleri Yönetmeliği")
     b6["aciklamalar"] = [
@@ -707,10 +737,30 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     }
     bolumler.append(b6)
 
+    # =========================================================
+    #  PAFTAYA GİRMEYEN EK DENETİMLER  —  ⚠ uyarı olarak bildirilir
+    # =========================================================
+    ikaz = []
+    if sayi_mi(I2) and not akim2_uygun:
+        ikaz.append(
+            f"MAKİNE BESLEME KESİTİ AKIM BAKIMINDAN YETERSİZ : S2 = {tr(S2)} mm² "
+            f"kablo {(tr(Iz2) + ' A') if sayi_mi(Iz2) else 'tablo dışı'} taşır, "
+            f"motor akımı I2 = {tr(I2)} A. Paftadaki 'I ≤ Iz' kontrolü yalnız "
+            "KOLON HATTINI ( S1 ) denetler; S2'yi büyütün.")
+    #  Kabin kuyunun içine girer — genişlik karşılaştırması fizikseldir.
+    #  Aradaki boşluk kapı tipine, karşı ağırlık ve ray konumuna göre değişir,
+    #  bu yüzden asgari boşluk dayatılmaz; yalnız "kabin ≥ kuyu" reddedilir.
+    if all(sayi_mi(x) and x > 0 for x in (kuyu_b, kabin_b)) and kabin_b >= kuyu_b:
+        ikaz.append(
+            f"KABİN KUYUYA SIĞMIYOR : kabin genişliği {trn(kabin_b,0)} mm, kuyu "
+            f"genişliği {trn(kuyu_b,0)} mm. Kabin genişliği kuyudan KÜÇÜK olmalıdır "
+            "( aradaki boşluk kapı tipine, ray ve karşı ağırlık konumuna göre belirlenir ).")
+
     return {
         "no": no, "aktif": True, "tanim": tanim, "baslik": f"{no} NOLU ASANSÖR",
-        #  Girilip de kullanılamayan değerler — sessiz kalmamalı
-        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in red],
+        #  Girilip de kullanılamayan değerler ve fiziksel tutarsızlıklar —
+        #  sessiz kalmamalı
+        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in (red + ikaz)],
         "bolumler": bolumler,
         "ozet": {
             "tanim": tanim, "kapasite": P_kap, "Q": Q, "Q0": Q0, "V": V, "eta": eta,
@@ -730,7 +780,9 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
             "kabin_a": ka, "kabin_b": kb, "kuyu_a": qa, "kuyu_b": qb,
             "P_kurulu": P_kurulu, "eps1": eps1, "eps2": eps2, "eps": eps,
             "eps_uygun": eps_uygun, "I": I_hat, "Iz": Iz, "akim_uygun": akim_uygun,
-            "Hk": Hk, "kablo_tipi": kablo_tipi, "S1": S1, "L1": L1,
+            "I2": I2, "Iz2": Iz2, "akim2_uygun": akim2_uygun,
+            "I_motor": I_motor, "sigorta_A": sigorta_A, "motor_sigorta": motor_sigorta,
+            "Hk": Hk, "kablo_tipi": kablo_tipi, "S1": S1, "L1": L1, "S2": S2, "L2": L2,
         },
     }
 

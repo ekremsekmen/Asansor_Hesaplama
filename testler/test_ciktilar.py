@@ -82,6 +82,25 @@ def calistir():
         kirik = [n for n, d in wb.defined_names.items() if "#REF" in str(d.value)]
         r.kontrol(f"{ad}.xlsx tanımlı adlar sağlam", not kirik, f"→ {kirik}")
 
+        #  v1.9 — MOTOR SİGORTASI: şablonda her asansörde sabit "4 x 25"
+        #  yazıyordu.  Program motor akımından seçtiği kademeyi hücreye
+        #  yazmalı ki indirilen Excel ile ekrandaki pafta ayrışmasın.
+        if ad == "avan":
+            import engine.avan as _AV
+            _hes = _AV.hesapla(AV_VERI)
+            _bek = {h["no"]: (h["ozet"]["motor_sigorta"] if h.get("aktif") else None)
+                    for h in (_hes.get("asansorler") or []) if h}
+            for _i in range(1, 5):
+                _sayfa = f"{_i} NOLU ASANSÖR"
+                if _sayfa not in wb.sheetnames:
+                    continue
+                _okunan = wb[_sayfa]["G102"].value
+                r.esit(f"avan.xlsx {_sayfa}!G102 motor sigortası",
+                       _okunan, _bek.get(_i))
+                r.kontrol(f"avan.xlsx {_sayfa} şablondaki sabit metin kalmadı",
+                          not (_bek.get(_i) not in (None, "4 x 25") and _okunan == "4 x 25"))
+
+
     # yeniden hesaplandığında hata hücresi kalmamalı
     if soffice_yolu():
         cikis = os.path.join(GECICI, "hesaplandi")
@@ -160,15 +179,38 @@ def calistir():
         except ImportError:
             pass
 
-    # proje bilgisi antette görünmeli
+    #  PROJE ANTEDİ PAFTADA DEĞİL, KAPAKTADIR.
+    #  Kapak sayfası eklendiğinde proje adı / işveren / mühendis bilgisi
+    #  pafta PDF'lerinden bilerek kaldırıldı ( bkz. exports/pdf_export.py:
+    #  "Pafta PDF'leri proje antedi taşımaz; bu bilgiler yalnız kapaktadır." ).
+    #  Test bunu doğrular: bilgi paftada GÖRÜNMEMELİ.
+    #
+    #  TRAFİK PAFTASI ayrıca TEK SAYFADIR ve SONUÇ ile biter: otomatik öneri
+    #  tablosu ve imza kutusu paftadan çıkarıldı.  İçerik sığmazsa orantılı
+    #  küçültülür — hiçbir satır atılmaz, ikinci sayfaya taşma olmaz.
     if pdfium:
-        d = pdfium.PdfDocument(os.path.join(GECICI, "tek.pdf"))
-        t = d[0].get_textpage().get_text_range()
-        r.kontrol("pafta antedinde proje adı var", "Türkçe Şıkır" in t)
-        r.kontrol("pafta antedinde işveren var", "ÇAĞDAŞ" in t)
-        r.kontrol("imza kutusunda mühendis adı var",
-                  "Ekrem Sekmen" in "\n".join(d[i].get_textpage().get_text_range()
-                                              for i in range(len(d))))
+        for _ad in ("tek", "coklu"):
+            d = pdfium.PdfDocument(os.path.join(GECICI, f"{_ad}.pdf"))
+            tum = "\n".join(d[i].get_textpage().get_text_range() for i in range(len(d)))
+            r.esit(f"{_ad} trafik paftası TEK SAYFA", len(d), 1)
+            r.kontrol(f"{_ad} paftasında proje adı YOK ( kapağa taşındı )",
+                      "Türkçe Şıkır" not in tum)
+            r.kontrol(f"{_ad} paftasında işveren YOK ( kapağa taşındı )",
+                      "ÇAĞDAŞ" not in tum)
+            r.kontrol(f"{_ad} paftasında imza kutusu YOK", "Hesabı yapan" not in tum)
+            r.kontrol(f"{_ad} paftasında otomatik öneri tablosu YOK",
+                      "OTOMATİK ÖNERİ" not in tum)
+            r.kontrol(f"{_ad} paftasında nüfus dökümü YOK",
+                      "NÜFUSUN AYRINTISI" not in tum)
+            r.kontrol(f"{_ad} paftası SONUÇ ile bitiyor", "SONUÇ" in tum)
+            #  Küçültme İÇERİK KAYBETMEZ — hesabın gövdesi yerinde olmalı
+            for _im in (("BİNADA BULUNAN İNSAN SAYISININ TESPİTİ", "B = b + ( n · b )")
+                        if _ad == "tek" else ("ORTAK BİNA BİLGİLERİ", "GRUP KONTROLÜ")):
+                r.kontrol(f"{_ad} paftasında bölüm duruyor: {_im[:28]}", _im in tum)
+        #  Avan paftası çok sayfalıdır ve imza kutusu ORADA durur
+        d = pdfium.PdfDocument(os.path.join(GECICI, "avan.pdf"))
+        _av = "\n".join(d[i].get_textpage().get_text_range() for i in range(len(d)))
+        r.kontrol("avan paftasında imza kutusu duruyor", "Hesabı yapan" in _av)
 
     # ------------------------------------------------- v1.3 içerik kontrolleri
     #  Yeni büyüklükler paftaya gerçekten basılıyor mu?

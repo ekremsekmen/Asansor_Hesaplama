@@ -33,7 +33,7 @@ from exports import sablon_denetim as X_DEN
 from exports import xlsx_export as X_XLS     # noqa: E402
 from exports import xlsx_import as X_IMP     # noqa: E402
 
-SURUM = "1.8"
+SURUM = "1.9"
 KOK = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("AVAN_PORT", "8760"))
 
@@ -302,6 +302,13 @@ def _uretilemedi(e: Exception):
 def indir_trafik_xlsx(veri: dict = Body(...)):
     try:
         mod, g = _trafik_girdi(veri)
+        #  Ekranda reddedilen bir girdiyle DOSYA ÜRETİLMEZ.  Belirsiz sayı
+        #  yazımı ( "1.200" ) _sayi() tarafından boşa çevriliyor; denetim
+        #  olmadan hücre boş kalıyor ve dosya eksik girdiyle teslim edilebilir
+        #  hâlde çıkıyordu.  Ekran ile indirme aynı kapıdan geçmeli.
+        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
+        if belirsiz:
+            return JSONResponse({"hata": belirsiz}, status_code=200)
         ek = "Trafik Hesabi (PAFTA)" if mod == "tek" else "Coklu Asansor Trafik (PAFTA-COKLU)"
         return _indir(X_XLS.trafik_xlsx(mod, g),
                       _dosya_adi(None, ek, "xlsx"), XLSX_TUR)
@@ -347,7 +354,11 @@ def sablon_durumu():
 def indir_avan_xlsx(veri: dict = Body(...)):
     try:
         #  Ofis varsayılanlarının girdiye yazılması avan_xlsx içinde yapılır.
-        return _indir(X_XLS.avan_xlsx(_avan_girdi(veri)),
+        g = _avan_girdi(veri)
+        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
+        if belirsiz:
+            return JSONResponse({"hata": belirsiz}, status_code=200)
+        return _indir(X_XLS.avan_xlsx(g),
                       _dosya_adi(None, "Avan Hesaplari", "xlsx"), XLSX_TUR)
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
@@ -356,7 +367,11 @@ def indir_avan_xlsx(veri: dict = Body(...)):
 @app.post("/api/indir/avan-pdf")
 def indir_avan_pdf(veri: dict = Body(...)):
     try:
-        s = E_AVAN.hesapla(_avan_girdi(veri))
+        g = _avan_girdi(veri)
+        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
+        if belirsiz:
+            return JSONResponse({"hata": belirsiz}, status_code=200)
+        s = E_AVAN.hesapla(g)
         return _indir(X_PDF.avan_pdf(s),
                       _dosya_adi(None, "Avan Hesaplari", "pdf"), "application/pdf")
     except Exception as e:                                    # noqa: BLE001

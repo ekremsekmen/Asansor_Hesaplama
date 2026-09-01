@@ -99,6 +99,7 @@ def _girdi_hucreleri(tur):
               for c in H.AVAN_KOLONLAR for r in H.AVAN_ASANSOR]
         h += [(H.AVAN_SABIT_SAYFA, a) for a in H.AVAN_SABIT.values()]
         h += [(H.AVAN_AYD_SUTUN_SAYFA, H.AVAN_AYD_SUTUN_HUCRE)]
+        h += [(H.avan_asansor_sayfasi(i), H.AVAN_SIGORTA_HUCRE) for i in range(1, 5)]
     return h
 
 

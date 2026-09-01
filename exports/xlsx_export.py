@@ -174,6 +174,20 @@ def avan_xlsx(veriler: dict, proje: dict = None) -> bytes:
     if sb.get("ayd_sutun") is not None:
         _yaz(wb[H.AVAN_AYD_SUTUN_SAYFA], H.AVAN_AYD_SUTUN_HUCRE, sb["ayd_sutun"])
 
+    # 4) MOTOR KORUMA CİHAZI — şablonda her asansör paftasında sabit metin
+    #    ( "4 x 25" ) olarak duruyor ve motor gücünden bağımsızdı.  Program
+    #    motor akımından seçtiği kademeyi buraya yazar; boş asansörün
+    #    cetvelinde sigorta değeri kalmaz.
+    hes = E_AVAN.hesapla(veriler)
+    hesaplanan = {h.get("no"): h for h in (hes.get("asansorler") or []) if h}
+    for i in range(1, 5):
+        sayfa = H.avan_asansor_sayfasi(i)
+        if sayfa not in wb.sheetnames:
+            continue
+        h = hesaplanan.get(i) or {}
+        deger = (h.get("ozet") or {}).get("motor_sigorta") if h.get("aktif") else None
+        _yaz(wb[sayfa], H.AVAN_SIGORTA_HUCRE, deger)
+
     for sh in wb.worksheets:
         sh.views.sheetView[0].tabSelected = (sh.title == "ÖZET")
     wb.active = wb.index(wb["ÖZET"])

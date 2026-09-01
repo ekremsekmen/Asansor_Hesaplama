@@ -7,6 +7,15 @@ IEC 60364-5-52 kaynaklı asansör avan proje hesaplarını yapan, sonuçları
 Hesap motoru, ofisin mevcut iki Excel dosyasındaki **her formülün birebir Python
 karşılığıdır** — değerler hücre hücre karşılaştırılarak doğrulanmıştır.
 
+**Sürüm 1.9** — dış denetimden gelen **dört bulgu** ölçülerek doğrulandı ve giderildi.
+
+| Bulgu | Ölçülen davranış | Ne yapıldı |
+|---|---|---|
+| **S2 ( makine besleme ) akım bakımından hiç denetlenmiyordu** | 37 kW motor + **S2 = 1,5 mm²** : motor akımı **62,5 A**, kablonun taşıma kapasitesi **17,5 A** — program yine **"uygundur"** diyordu. Gerilim düşümü yakalamıyor: kısa hatta ε2 = %0,31. Bu kontrol **ofis Excel'inde de yok**. | Motor akımı I2 ve kablo kapasitesi Iz2 hesaplanıyor; yetersizse **⚠ uyarı** çıkıyor. Paftadaki `I ≤ Iz` satırı **kolon hattına ( S1 ) ait ve öyle kalmalı** — o hat asansörün toplam kurulu gücünü taşır. Sonuç satırı değiştirilmedi ki **XLSX ile pafta ayrışmasın**. |
+| **Motor sigortası her güçte "4 x 25"** | Şablonda `G102` hücresinde **sabit metin**. 37 kW motorda akım ≈ 62 A, 110 kW'ta ≈ 186 A — üçünde de "4 x 25" yazıyordu. | **Motor akımından seçiliyor**: `In = P2 / ( √3 · U · cosφ )`, sigorta = kalkış katsayısı × In üstündeki ilk standart kademe ( IEC 60269 gG ). Katsayı **Sabitler → ③** altında, varsayılan **1,25** — bu katsayı ofisin 11 kW örneğinde yine **"4 x 25"** verir. Değer hem paftaya hem **XLSX'e** yazılıyor; şablon hücresi metin olduğu için Excel'e formül eklenmedi. |
+| **Ekran reddediyor, indirme üretiyor** | `1.200` gibi belirsiz yazım ekranda reddediliyordu ama **trafik-XLSX, avan-XLSX ve avan-PDF** aynı girdiyle dosya üretiyordu; sayı boşa çevrildiği için hücre **boş** kalıyor, eksik girdili pafta teslim edilebilir hâlde çıkıyordu. | Beş indirme ucunun **hepsi** artık ekranla aynı kapıdan geçiyor. |
+| **Kabin kuyuya sığıyor mu diye bakılmıyordu** | Kuyu 1500 mm + kabin 2100 mm sessizce hesaplanıyordu. | `kabin genişliği ≥ kuyu genişliği` ise **⚠ uyarı**. Asgari boşluk **dayatılmıyor** — kapı tipine, ray ve karşı ağırlık konumuna göre değişir. |
+
 **Sürüm 1.8** — **şerit boyu artık girdi değil, temel ölçülerinden türetiliyor.**
 
 Ofiste temel topraklama hesabı için **yalnız uzunluk ve genişlik** giriliyor;

@@ -222,6 +222,45 @@ def calistir():
             except Exception as e:                                  # noqa: BLE001
                 r.kontrol(f"{yol} boş girdi", False, f"→ {e}")
 
+    # ---------------------------------------------------- v1.9: EKRAN = İNDİRME
+    #  Belirsiz sayı yazımı ( "1.200" ) ekranda reddediliyordu ama İNDİRME
+    #  uçlarının bir kısmı aynı girdiyle dosya üretiyordu: hücre boş kalıyor,
+    #  kullanıcı eksik girdili bir paftayı teslim edebilir hâlde alıyordu.
+    #  Artık her uç aynı kapıdan geçer.
+    _BT = dict(TEMEL, P="1.200")
+    _BA = {"ortak": {"temel_a": "26,55", "temel_b": "16,4", "mk_yok": True},
+           "asansorler": [{"aktif": True, "kapasite": "10", "V": "1.6", "eta": "0,85",
+                           "Hk": "1.200", "makine_tipi": "Dişlisiz", "i_palanga": "2",
+                           "kuyu_genisligi": "1800", "kabin_boyu": "1450",
+                           "kabin_genisligi": "1300"}],
+           "sabitler": {}}
+    for _yol, _gov in (("/api/trafik", {"mod": "tek", "girdiler": _BT}),
+                       ("/api/indir/trafik-pdf", {"mod": "tek", "girdiler": _BT, "proje": {}}),
+                       ("/api/indir/trafik-xlsx", {"mod": "tek", "girdiler": _BT, "proje": {}}),
+                       ("/api/avan", {"girdiler": _BA}),
+                       ("/api/indir/avan-pdf", {"girdiler": _BA, "proje": {}}),
+                       ("/api/indir/avan-xlsx", {"girdiler": _BA, "proje": {}})):
+        try:
+            _k, _ic, _b = istek(_yol, _gov)
+            _hata = ""
+            if _ic[:4] not in (b"%PDF",) and _ic[:2] != b"PK":
+                try:
+                    _hata = (json.loads(_ic) or {}).get("hata") or ""
+                except Exception:                                   # noqa: BLE001
+                    _hata = ""
+            r.kontrol(f"{_yol} belirsiz sayıyla DOSYA ÜRETMİYOR",
+                      "Belirsiz sayı" in _hata,
+                      f"→ {_ic[:40]!r}")
+        except Exception as e:                                      # noqa: BLE001
+            r.kontrol(f"{_yol} belirsiz sayı", False, f"→ {e}")
+    #  Temiz girdide indirme yine çalışmalı — denetim fazla sıkı olmamalı
+    for _yol, _gov, _im in (
+            ("/api/indir/trafik-pdf", {"mod": "tek", "girdiler": dict(TEMEL), "proje": {}}, b"%PDF"),
+            ("/api/indir/trafik-xlsx", {"mod": "tek", "girdiler": dict(TEMEL), "proje": {}}, b"PK")):
+        _k, _ic, _b = istek(_yol, _gov)
+        r.kontrol(f"{_yol} temiz girdide yine üretiyor", _ic[:len(_im)] == _im)
+
+
     # proje adı dosya adına güvenli biçimde geçmeli
     kod, icerik, basliklar = istek("/api/indir/trafik-pdf", {
         "mod": "tek",

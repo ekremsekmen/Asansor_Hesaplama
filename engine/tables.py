@@ -485,3 +485,34 @@ MOTOR_NOTU = ("Seçilen motor gücü, hesaplanan güçten büyük ilk STANDART a
               "gücüdür ( IEC 60072 / TS EN 60034 kademeleri ). İmalatçının "
               "kademesi farklıysa alan elle doldurulur; program yine "
               "Nsç ≥ N kontrolünü yapar.")
+
+
+# =====================================================================
+#  MOTOR KORUMA CİHAZI ( SİGORTA / ŞALTER ) ANMA AKIMI KADEMELERİ
+#  IEC 60269 / TS EN 60269 gG serisi.  Şablonda bu değer sabit metin
+#  ( "4 x 25" ) olarak duruyordu; motor akımından seçilmesi için eklendi.
+# =====================================================================
+SIGORTA_KADEMELERI = (6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125,
+                      160, 200, 250, 315, 400, 500, 630)
+
+SIGORTA_NOTU = (
+    "Motor koruma cihazı anma akımı, motor anma akımının kalkış katsayısı "
+    "( ofis standardı, varsayılan 1,25 ) katından büyük ilk standart kademedir "
+    "( IEC 60269 gG ). AVAN değeridir: kesin seçim kalkış yöntemine, sürücü "
+    "tipine ve kablo koordinasyonuna göre uygulama projesinde yapılır.")
+
+
+def sigorta_sec(I_anma, katsayi=1.25):
+    """
+    Motor anma akımına göre standart koruma cihazı kademesi.
+    Kademe listesinin dışına taşarsa None döner ( paftada 'uygulama projesinde' ).
+    """
+    if not isinstance(I_anma, (int, float)) or isinstance(I_anma, bool) or I_anma <= 0:
+        return None
+    if not isinstance(katsayi, (int, float)) or isinstance(katsayi, bool) or katsayi <= 0:
+        katsayi = 1.25
+    gerekli = I_anma * katsayi
+    for x in SIGORTA_KADEMELERI:
+        if x >= gerekli - 1e-9:
+            return x
+    return None
