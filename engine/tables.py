@@ -331,6 +331,35 @@ def kablo_iz(kesit):
     return KABLO_IZ.get(kesit)
 
 
+def kablo_iz_sinir(kesit):
+    """
+    Tabloda BULUNMAYAN kesitler için GÜVENLİ ALT SINIR verir.
+
+    Iz kesitle birlikte artar ( monoton ).  Bu yüzden tabloda olmayan bir
+    kesit için, ondan küçük en büyük tablo satırının değeri güvenle
+    kullanılabilir:  gerçek taşıma kapasitesi bundan AZ olamaz.
+
+    Eskiden tablo dışı kesitte Iz = None dönüyor ve pafta "UYGUN DEĞİLDİR —
+    kesiti büyütün" diyordu; yani kesiti BÜYÜTMEK sonucu kötüleştiriyor,
+    verilen öğüt de hiçbir zaman işe yaramıyordu ( 150 mm² kablo standart
+    bir kesittir ).
+
+    Döner:  ( Iz, kesin_mi )
+        kesin_mi = True   kesit tabloda birebir var
+        kesin_mi = False  Iz bir ALT SINIRDIR ( tablo dışı kesit )
+        Iz = None         tablonun en küçük kesitinin de altında — sınır yok
+    """
+    if not isinstance(kesit, (int, float)) or isinstance(kesit, bool):
+        return None, False
+    kesin = KABLO_IZ.get(kesit)
+    if kesin is not None:
+        return kesin, True
+    altlar = [k for k in KABLO_IZ if k < kesit]
+    if not altlar:
+        return None, False
+    return KABLO_IZ[max(altlar)], False
+
+
 # --------------- TABLO 4 (AVAN) — Armatür ışık akıları
 ARMATUR_ISIK_AKISI = [
     ("Akkor telli", "15 W", "120 – 135"), ("Akkor telli", "25 W", "215 – 240"),

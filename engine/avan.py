@@ -404,8 +404,23 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         eta_p = (eta - S["palanga_verim_dususu"]) if i_pal > 1 else eta    # η′
         eta_p_aciklama = "Palangalı sistemde verim ( i > 1 ise η − 0,10 )"
         eta_p_kaynak = "SABİTLER A  /  MMO/697 §2.4"
-    N_hes = ((1 - q) * Q * V / (S["motor_sabiti"] * eta_p)) \
-        if (sayi_mi(eta_p) and eta_p > 0) else None
+    #  η′ ≤ 0 FİZİKSEL DEĞİLDİR.  Palangalı ( i > 1 ) sistemde MMO/697 §2.4
+    #  gereği η′ = η − 0,10;  η bunun altında girilirse η′ sıfır ya da negatif
+    #  çıkar.  Eskiden hesap durmuyordu:  paftaya η′ = −0,02 basılıyor, N boş
+    #  kalıyor ve sonuç "UYGUN DEĞİL — motoru büyütün" diyordu — YANLIŞ TEŞHİS,
+    #  motor değil verim değeri hatalıydı.  ( Nsç boşsa mesaj "Nsç alanını
+    #  doldurun" diyordu; doldurmak da negatif verimli bir pafta üretirdi. )
+    if not (sayi_mi(eta_p) and eta_p > 0):
+        return {"no": no, "aktif": False,
+                "uyari": f"!!!   {no} NOLU ASANSÖR — hesaba giren verim η′ = {tr(eta_p)}   ·   "
+                         f"girilen η = {tr(eta)}"
+                         + (f" ve {T.aski_orani_metni(i_pal)} askıda MMO/697 §2.4 gereği "
+                            f"η′ = η − {tr(S['palanga_verim_dususu'])} uygulanır"
+                            if i_pal > 1 else "")
+                         + ".  Verim sıfır ya da negatif olamaz: η değerini düzeltin ya da "
+                           "imalatçının TOPLAM sistem verimini giriyorsanız "
+                           "'Girilen η toplam sistem verimidir' kutusunu işaretleyin.   !!!"}
+    N_hes = (1 - q) * Q * V / (S["motor_sabiti"] * eta_p)
 
     #  Nsç — SEÇİLEN motor gücü.  Elle girilmemişse hesaplanan güçten büyük
     #  ilk STANDART anma gücü seçilir ( IEC 60072 kademeleri ).  Böylece
@@ -676,7 +691,11 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     eps_uygun = sayi_mi(eps) and sayi_mi(eps_max) and eps <= eps_max
     I_hat = (P_kurulu / (math.sqrt(3) * U_sebeke * cosfi)) \
         if all(sayi_mi(x) and x > 0 for x in (U_sebeke, cosfi)) else None
-    Iz = T.kablo_iz(S1)
+    #  KESİT TABLODA YOKSA:  Iz kesitle birlikte arttığı için, kesitten küçük
+    #  en büyük tablo satırı GÜVENLİ ALT SINIRDIR.  Eskiden Iz = None dönüyor,
+    #  pafta 150 mm² gibi standart bir kesitte bile "UYGUN DEĞİLDİR — kesiti
+    #  büyütün" diyordu;  kesiti büyütmek sonucu iyileştirmiyordu.
+    Iz, Iz_kesin = T.kablo_iz_sinir(S1)
     akim_uygun = sayi_mi(I_hat) and sayi_mi(Iz) and I_hat <= Iz
 
     #  MAKİNE BESLEME HATTININ ( S2 ) AKIM KONTROLÜ
@@ -688,7 +707,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  birleşimi "uygundur" görünüyordu.  Bu kontrol ofisin Excel'inde de
     #  yok; pafta ve XLSX ayrışmasın diye SONUÇ SATIRI DEĞİŞTİRİLMEDİ,
     #  yetersizlik ⚠ UYARI olarak bildiriliyor.
-    Iz2 = T.kablo_iz(S2)
+    Iz2, Iz2_kesin = T.kablo_iz_sinir(S2)
     I2 = I_motor
     akim2_uygun = sayi_mi(I2) and sayi_mi(Iz2) and I2 <= Iz2
 
@@ -724,8 +743,11 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("I   =   P1   /   ( √3 · U · cosφ )",
               f"=   {trn(P_kurulu,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · {tr(cosfi)} )",
               I_hat, "A", "hat akımı"),
-        veri("Iz", "Kablonun akım taşıma kapasitesi", Iz if sayi_mi(Iz) else "tablo dışı",
-             "A", "TABLOLAR / IEC 60364-5-52", 1),
+        veri("Iz", "Kablonun akım taşıma kapasitesi",
+             (trn(Iz, 1) if Iz_kesin else f"≥ {trn(Iz, 1)}") if sayi_mi(Iz)
+             else "tablo dışı — kontrol edilemedi", "A",
+             "TABLOLAR / IEC 60364-5-52" if Iz_kesin
+             else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
     ]
     b6["sonuc"] = {
         "baslik": "KONTROL      ε ≤ εmax    ve    I ≤ Iz",
@@ -733,7 +755,9 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                   + ("uygundur." if (eps_uygun and akim_uygun) else "UYGUN DEĞİLDİR.")),
         "uygun": bool(eps_uygun and akim_uygun),
         "alt": [f"ε  ≤  εmax  :  " + ("UYGUN" if eps_uygun else "UYGUN DEĞİL — kesiti büyütün"),
-                f"I  ≤  Iz    :  " + ("UYGUN" if akim_uygun else "UYGUN DEĞİL — kesiti büyütün")],
+                f"I  ≤  Iz    :  " + ("UYGUN" if akim_uygun else
+                                      ("UYGUN DEĞİL — kesiti büyütün" if sayi_mi(Iz) else
+                                       "KONTROL EDİLEMEDİ — kesit akım tablosunun dışında"))],
     }
     bolumler.append(b6)
 
@@ -741,6 +765,20 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  PAFTAYA GİRMEYEN EK DENETİMLER  —  ⚠ uyarı olarak bildirilir
     # =========================================================
     ikaz = []
+    for _ad, _kesit, _iz, _kesin in (("S1 — kolon hattı", S1, Iz, Iz_kesin),
+                                     ("S2 — makine besleme", S2, Iz2, Iz2_kesin)):
+        if _kesin:
+            continue
+        if sayi_mi(_iz):
+            ikaz.append(
+                f"{_ad} kesiti {tr(_kesit)} mm² akım tablosunda BULUNMUYOR : kontrol, bir "
+                f"küçük tablo satırının değeriyle ( Iz ≥ {trn(_iz,0)} A ) emniyetli tarafta "
+                "yapıldı. Kesin taşıma kapasitesi IEC 60364-5-52 / imalatçı verisinden "
+                "alınmalı ve paftaya yazılmalıdır.")
+        else:
+            ikaz.append(
+                f"{_ad} kesiti {tr(_kesit)} mm² akım tablosunun EN KÜÇÜK kesitinin altında : "
+                "akım taşıma kontrolü yapılamadı.")
     if sayi_mi(I2) and not akim2_uygun:
         ikaz.append(
             f"MAKİNE BESLEME KESİTİ AKIM BAKIMINDAN YETERSİZ : S2 = {tr(S2)} mm² "

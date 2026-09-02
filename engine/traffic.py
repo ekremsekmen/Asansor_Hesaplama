@@ -280,6 +280,17 @@ def hesapla_tek(g: dict) -> dict:
     Izul = t10["yukseltilmis"] if standart == "Yükseltilmiş" else t10["standart"]  # K68
 
     # ---- asansör adedi
+    #  GEREKLİ ADET İKİ ÖLÇÜTÜN BİRLİKTE SAĞLANMASIDIR.  Yalnız bekleme
+    #  süresinden bir sayı türetmek yanıltıcıdır: taşıma kapasitesi daha çok
+    #  asansör gerektiriyorsa taahhütname o eksiği kapatmaz.
+    def _gerekli_adet(sinir):
+        """Verilen bekleme sınırında HER İKİ ölçütü de sağlayan asansör adedi."""
+        if not (sayi_mi(TR) and sayi_mi(sinir) and sinir > 0):
+            return None
+        bek = yukari_yuvarla(TR / sinir, 0)
+        tas = tasima_adedi if sayi_mi(tasima_adedi) else 0
+        return int(max(1, tas, bek))
+
     adet_hesap = None
     tasima_adedi = bekleme_adedi = None
     if all(sayi_mi(x) for x in (B, k, R, TR, Izul)) and R and Izul:
@@ -295,15 +306,25 @@ def hesapla_tek(g: dict) -> dict:
     esik_yukseltilmis = t10["yukseltilmis"]
 
     # ---- SONUÇ (C44)
+    #  İKİ ÖLÇÜT AYRI AYRI TUTULUR:  hangisinin sağlanmadığı sonuç cümlesinde
+    #  DOĞRU yazılmalıdır.  Eskiden her olumsuz sonuçta "bekleme süresi
+    #  sağlanmıyor" yazıyordu; oysa elle seçilen adette çoğu zaman sağlanmayan
+    #  TAŞIMA kapasitesidir ( bekleme sağlanıyor olabilir ) — paftanın en
+    #  görünür cümlesi yanlış gerekçe söylüyordu.
+    tasima_ok = (all(sayi_mi(x) for x in (adet, R, B, k)) and adet * R >= B * k)
+    bekleme_ok = (sayi_mi(Ieer) and sayi_mi(Izul) and Ieer <= Izul)
+    bekleme_sartli_ok = (sayi_mi(Ieer) and sayi_mi(sartli) and bool(sartli)
+                         and Ieer <= sartli)
     if hata:
         sonuc = hata
-    elif all(sayi_mi(x) for x in (adet, R, B, k, Ieer)) and \
-            adet * R >= B * k and Ieer <= Izul:
+    elif tasima_ok and bekleme_ok:
         sonuc = f"{standart} kriteri karşılanıyor"
-    elif sayi_mi(sartli) and sartli and all(sayi_mi(x) for x in (adet, R, B, k, Ieer)) and \
-            adet * R >= B * k and Ieer <= sartli:
-        sonuc = (f"Şartlı Kabul (taahhütname ile) — Standart için "
-                 f"{int(yukari_yuvarla(TR/esik_standart,0))} adet gerekir")
+    elif tasima_ok and bekleme_sartli_ok:
+        #  UYGULANAN sınır esas alınır.  Bina yüksek yapıysa geçerli sınır
+        #  "Yükseltilmiş"tir; "Standart" sütunu o bina için ölçüt değildir —
+        #  oradan adet vermek gereken asansör sayısını OLDUĞUNDAN AZ gösterir.
+        sonuc = (f"Şartlı Kabul (taahhütname ile) — {standart} sınırı "
+                 f"( {trn(Izul,0)} sn ) için {adet_hesap} adet gerekir")
     elif sayi_mi(manuel_adet):
         sonuc = (f"Kabul Edilmez — seçilen {int(manuel_adet)} adet asansör bu bina için "
                  f"UYGUN DEĞİLDİR; en az {adet_hesap} adet gerekir")
@@ -313,14 +334,20 @@ def hesapla_tek(g: dict) -> dict:
     if hata:
         sonuc_cumlesi = hata
     elif sonuc.startswith("Kabul"):
-        sonuc_cumlesi = ("Bekleme süresi kriteri sağlanmıyor; kabin kapasitesi, hız veya "
-                         "asansör adedi gözden geçirilmelidir.")
+        _eksik = ([] if tasima_ok else ["taşıma kapasitesi"]) + \
+                 ([] if bekleme_ok else ["bekleme süresi"])
+        _ad = " ve ".join(_eksik) if _eksik else "uygunluk"
+        sonuc_cumlesi = (_ad[0].upper() + _ad[1:] +
+                         (" kriterleri" if len(_eksik) > 1 else " kriteri") +
+                         " sağlanmıyor; kabin kapasitesi, hız veya asansör adedi "
+                         "gözden geçirilmelidir" +
+                         (f". En az {adet_hesap} adet gerekir." if sayi_mi(adet_hesap) else "."))
     elif sonuc.startswith("Şartlı"):
         sonuc_cumlesi = (f"Toplamda {adet} adet {trn(P,0)} kişilik ({trn(yuk_kg,0)} kg), {tr(V)} m/s "
                          f"hızında asansör önerilmektedir. Bekleme süresi {tr(Ieer,1)} sn olup "
                          f"MMO/697 Tablo-10 şartlı kabul sınırı {trn(sartli,0)} sn içindedir; taahhütname ile "
-                         f"uygundur. Standart sınır ({trn(esik_standart,0)} sn) için "
-                         f"{int(yukari_yuvarla(TR/esik_standart,0))} adet gerekir.")
+                         f"uygundur. Bu bina için uygulanan {standart} sınırı "
+                         f"( {trn(Izul,0)} sn ) sağlanacaksa {adet_hesap} adet gerekir.")
     else:
         sonuc_cumlesi = (f"Toplamda {adet} adet {trn(P,0)} kişilik ({trn(yuk_kg,0)} kg), {tr(V)} m/s "
                          f"hızında asansör yapılması uygundur.")
@@ -393,8 +420,10 @@ def hesapla_tek(g: dict) -> dict:
                  f"(uygulanan sınır Izul = {trn(Izul,0)} sn — Tablo-10 {standart})"
                  f"  →  Nihai gerekli sayı = {adet_hesap} adet")
         if sayi_mi(sartli) and sartli:
+            #  Bu sayı da İKİ ölçütü birden sağlamalıdır: taşıma kapasitesi
+            #  daha çoğunu gerektiriyorsa taahhütname o eksiği kapatmaz.
             satir += (f"   |   Şartlı Kabul sınırı ({trn(sartli,0)} sn) için "
-                      f"{int(yukari_yuvarla(TR/sartli,0))} adet yeterli olurdu (taahhütname gerekir)")
+                      f"{_gerekli_adet(sartli)} adet yeterli olurdu (taahhütname gerekir)")
         b4["notlar"].append(satir)
     b4["adimlar"].append(veri("n", "Uygulanan asansör adedi", adet, "adet",
                               "Elle seçildi" if sayi_mi(manuel_adet) else "MAX[taşıma; bekleme]", 0))
@@ -405,13 +434,30 @@ def hesapla_tek(g: dict) -> dict:
               Ieer, "s", "MMO/697", 1),
         veri("Izul", f"İzin verilen bekleme süresi ({standart})", Izul, "s", "Tablo-10", 0),
     ]
+    #  BELİRLEYİCİ ÖLÇÜTLER  —  paftanın SONUÇ kutusunda gösterilir.
+    #  Eskiden bu satır "Bekleme Zamanı" bölümünün dip notuydu; oysa nihai
+    #  kararın DAYANAĞI odur: hangi sınır, hangi sayıyla sağlandı.  Sonuçla
+    #  aynı yerde durması gerekir — bölümde Ieer ve Izul satırları zaten var.
+    karar_olcutleri = []
+    _gerekli_tasima = (B * k) if all(sayi_mi(x) for x in (B, k)) else None
+    if all(sayi_mi(x) for x in (R, _gerekli_tasima)) and sayi_mi(adet):
+        _toplam_R = R * adet
+        karar_olcutleri.append({
+            "ad": "Taşıma",
+            "metin": (f"{int(adet)} × R = {tr(_toplam_R,1)}" if adet > 1 else f"R = {tr(R,1)}")
+                     + ("  ≥  " if _toplam_R >= _gerekli_tasima else "  <  ")
+                     + f"B·k = {tr(_gerekli_tasima,1)} kişi/5dk",
+            "uygun": bool(_toplam_R >= _gerekli_tasima)})
     if sayi_mi(Ieer) and sayi_mi(Izul):
-        b5["notlar"].append(
-            f"{standart} sınır {trn(Izul,0)} sn: "
-            + ("SAĞLANIYOR" if Ieer <= Izul else "AŞILIYOR")
-            + (f"      |      Şartlı Kabul sınırı {trn(sartli,0)} sn: "
-               + ("sağlanıyor" if Ieer <= sartli else "aşılıyor")
-               if sayi_mi(sartli) and sartli else "      |      bu bina sınıfında şartlı kabul yoktur"))
+        ek = ""
+        if sayi_mi(sartli) and sartli:
+            ek = (f"   ·   Şartlı Kabul {trn(sartli,0)} sn: "
+                  + ("sağlanıyor" if Ieer <= sartli else "aşılıyor"))
+        karar_olcutleri.append({
+            "ad": "Bekleme",
+            "metin": f"Ieer = {tr(Ieer,1)} s" + ("  ≤  " if Ieer <= Izul else "  >  ")
+                     + f"Izul = {trn(Izul,0)} s ( {standart} ){ek}",
+            "uygun": bool(Ieer <= Izul)})
 
     return {
         "tip": "tek",
@@ -429,6 +475,7 @@ def hesapla_tek(g: dict) -> dict:
             "esik_yukseltilmis": esik_yukseltilmis,
             "kapi_genisligi": kg_, "kapi_tipi": kt,
             "tasima_adedi": tasima_adedi, "bekleme_adedi": bekleme_adedi,
+            "karar_olcutleri": karar_olcutleri,
             "pafta_satiri": (hata if hata else
                              f"  {trn(P,0)} kişilik, {tr(V)} m/s hızında, {adet} adet asansör → {sonuc}"),
         },
@@ -838,14 +885,20 @@ def hesapla_coklu(g: dict) -> dict:
 
     b3 = Bolum("GRUP KONTROLÜ", "MMO/697 s.12 — farklı kapasiteli asansörler")
     b3["aciklamalar"] = ["Reş = ΣRi ≥ B·k    ve    1/TReş = Σ(1/TRi),  TReş ≤ Izul"]
+    #  BELİRLEYİCİ ÖLÇÜTLER  —  bölüm dip notu değil, SONUÇ kutusunun dayanağı.
+    karar_olcutleri = []
     if not hata and all(sayi_mi(x) for x in (Res, gereken, TRes)):
-        b3["notlar"] = [
-            "Reş = " + " + ".join(f"R{a['no']}={tr(a['R'],1)}" for a in asansorler)
-            + f" = {tr(Res,1)}  ≥  B·k = {tr(gereken,1)}  →  "
-            + ("SAĞLANIYOR" if Res >= gereken else "SAĞLANMIYOR"),
-            "1/TReş = " + " + ".join(f"1/TR{a['no']} (1/{tr(a['TR'],1)})" for a in asansorler)
-            + f"  →  TReş = {tr(TRes,1)} s  ≤  Izul = {trn(Izul,0)} s  →  "
-            + ("SAĞLANIYOR" if TRes <= Izul else "SAĞLANMIYOR"),
+        karar_olcutleri = [
+            {"ad": "Taşıma",
+             "metin": "Reş = " + " + ".join(f"R{a['no']}={tr(a['R'],1)}" for a in asansorler)
+                      + f" = {tr(Res,1)}" + ("  ≥  " if Res >= gereken else "  <  ")
+                      + f"B·k = {tr(gereken,1)} kişi/5dk",
+             "uygun": bool(Res >= gereken)},
+            {"ad": "Bekleme",
+             "metin": "1/TReş = " + " + ".join(f"1/{tr(a['TR'],1)}" for a in asansorler)
+                      + f"  →  TReş = {tr(TRes,1)} s" + ("  ≤  " if TRes <= Izul else "  >  ")
+                      + f"Izul = {trn(Izul,0)} s ( {standart} )",
+             "uygun": bool(TRes <= Izul)},
         ]
     b3["adimlar"] = [
         veri("Reş", "Grubun 5 dk taşıma kapasitesi = ΣR", Res, "kişi/5dk", "MMO/697 s.12", 1),
@@ -866,6 +919,7 @@ def hesapla_coklu(g: dict) -> dict:
             "bodrum": Nb_ortak, "durak": durak_ortak,
             "b": b, "n_artis": n_artis, "B": B, "k": k,
             "Res": Res, "gereken": gereken, "TRes": TRes, "Izul": Izul,
+            "karar_olcutleri": karar_olcutleri,
             "esik_sartli": sartli, "esik_standart": t10["standart"],
             "esik_yukseltilmis": t10["yukseltilmis"],
             "adet": len(asansorler), "sonuc": sonuc, "pafta_satiri": pafta_satiri,

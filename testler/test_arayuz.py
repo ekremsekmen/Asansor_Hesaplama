@@ -396,8 +396,10 @@ def calistir():
         pg.wait_for_timeout(1300)
         r.kontrol("MRL işaretliyken ölçüler kapanıyor",
                   pg.evaluate("document.getElementById('a_mk_uzunluk').disabled"))
-        r.kontrol("MRL işaretliyken hesap yapılmıyor",
-                  "MRL" in pg.inner_text("#a_sonuc"))
+        #  MRL işaretliyse makine dairesi bölümü EKRANDA DA hiç görünmez —
+        #  makine dairesi yoksa aydınlatma hesabının konusu da yoktur.
+        r.kontrol("MRL işaretliyken makine dairesi bölümü hiç görünmüyor",
+                  "MAKİNE DAİRESİ" not in pg.inner_text("#a_sonuc"))
         pg.uncheck("#a_mk_yok")
         pg.wait_for_timeout(1300)
         r.kontrol("MRL kapalı + ölçü yok → açık uyarı",

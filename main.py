@@ -33,7 +33,7 @@ from exports import sablon_denetim as X_DEN
 from exports import xlsx_export as X_XLS     # noqa: E402
 from exports import xlsx_import as X_IMP     # noqa: E402
 
-SURUM = "2.0"
+SURUM = "2.2"
 KOK = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("AVAN_PORT", "8760"))
 
@@ -101,7 +101,31 @@ def _sayi(x):
 
 #  Belirsiz yazılmış alanların adları burada toplanır ki kullanıcıya
 #  "eksik girdi" yerine gerçek sebep söylenebilsin.
-_BELIRSIZ = []
+#
+#  İSTEK BAŞINA AYRI LİSTE:  FastAPI'de `def` ( async olmayan ) uç noktalar bir
+#  iş parçacığı havuzunda koşar, yani İKİ İSTEK AYNI ANDA çalışabilir.  Ortak
+#  bir liste kullanılsaydı biri listeyi temizlerken diğeri okuyabilir ve
+#  geçerli bir indirme "belirsiz sayı" diye reddedilebilir ya da tersi, bozuk
+#  bir girdi denetimden kaçabilirdi.  ( Ekran her tuş vuruşunda hesap
+#  isterken indirmeye basılması bu iki isteği gerçekten çakıştırır. )
+class _BelirsizListesi(threading.local):
+    def __init__(self):
+        self.kalemler = []
+
+    def clear(self):
+        self.kalemler = []
+
+    def append(self, x):
+        self.kalemler.append(x)
+
+    def __bool__(self):
+        return bool(self.kalemler)
+
+    def __iter__(self):
+        return iter(self.kalemler)
+
+
+_BELIRSIZ = _BelirsizListesi()
 
 
 def _temiz(d: dict, sayisal: tuple, on_ek: str = "") -> dict:
@@ -118,7 +142,7 @@ def _belirsiz_hata():
     """Belirsiz yazılmış sayı varsa açık hata metni, yoksa None."""
     if not _BELIRSIZ:
         return None
-    liste = "  ·  ".join(sorted(set(_BELIRSIZ))[:6])
+    liste = "  ·  ".join(sorted(set(_BELIRSIZ.kalemler))[:6])
     return ("HESAP HATASI: Belirsiz sayı yazımı  —  " + liste +
             "   ·   Bu yazımda binlik ayracı mı ondalık ayracı mı olduğu "
             "anlaşılmıyor ( Türkçede 1.200 = bin iki yüz, 1,200 = bir virgül iki; "

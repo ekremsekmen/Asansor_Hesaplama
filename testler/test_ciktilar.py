@@ -203,6 +203,18 @@ def calistir():
             r.kontrol(f"{_ad} paftasında nüfus dökümü YOK",
                       "NÜFUSUN AYRINTISI" not in tum)
             r.kontrol(f"{_ad} paftası SONUÇ ile bitiyor", "SONUÇ" in tum)
+            #  SİYAH BEYAZ / AutoCAD UYUMU:  paftada RENK olmamalı.
+            #  Renkli zemin gri baskıda ayrışmaz, AutoCAD'de PDFIMPORT ile
+            #  solid hatch'e döner ve üstündeki beyaz yazı kaybolur.
+            import re as _re
+            _ic = open(os.path.join(GECICI, f"{_ad}.pdf"), "rb").read().decode("latin-1")
+            _renk = set()
+            for _m in _re.finditer(r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+(rg|RG)\b", _ic):
+                _r, _g, _b = (round(float(_m.group(i)), 3) for i in (1, 2, 3))
+                if abs(_r - _g) > 0.02 or abs(_g - _b) > 0.02:
+                    _renk.add((_r, _g, _b))
+            r.kontrol(f"{_ad} paftasında renk yok ( siyah beyaz / AutoCAD )",
+                      not _renk, f"→ {sorted(_renk)[:4]}")
             #  Küçültme İÇERİK KAYBETMEZ — hesabın gövdesi yerinde olmalı
             for _im in (("BİNADA BULUNAN İNSAN SAYISININ TESPİTİ", "B = b + ( n · b )")
                         if _ad == "tek" else ("ORTAK BİNA BİLGİLERİ", "GRUP KONTROLÜ")):
@@ -252,6 +264,27 @@ def calistir():
         m = _metin(PE.avan_pdf(_av, PROJE))
         r.kontrol("avan paftasında asansör bazı kaynağı", "bazında" in m)
         r.kontrol("avan paftasında tutarlılık uyarısı", "NOLU ASANSÖR:" in m)
+
+        #  MAKİNE DAİRESİZ ( MRL ) SİSTEM — bölüm paftada HİÇ BASILMAZ.
+        #  Makine dairesi yoksa aydınlatma hesabının konusu da yoktur; eskiden
+        #  "bu hesap uygulanmaz" satırı boşuna yer kaplıyordu.  Ama MRL kutusu
+        #  İŞARETLİ DEĞİLKEN ölçü de girilmemişse bu unutulmuş bir girdidir —
+        #  o zaman uyarı basılmalı, yoksa eksik hesap sessizce gizlenirdi.
+        def _mkm(**ortak_ek):
+            return _metin(PE.avan_pdf(AV.hesapla(
+                {"ortak": dict(ORT, **ortak_ek), "asansorler": [dict(A1)]}), PROJE))
+
+        _mk_yok = {"mk_uzunluk": None, "mk_genislik": None}
+        for _ad, _ek in (("kutu işaretli", dict(_mk_yok, mk_yok=True)),
+                         ("kutu işaretli + ölçü dolu", dict(mk_yok=True)),
+                         ("eski dosya, kutu gönderilmemiş", dict(_mk_yok))):
+            r.kontrol(f"MRL ( {_ad} ) → makine dairesi bölümü paftada YOK",
+                      "MAKİNE DAİRESİ" not in _mkm(**_ek))
+        _m2 = _mkm(**dict(_mk_yok, mk_yok=False))
+        r.kontrol("MRL kutusu kapalı + ölçü yok → uyarı paftada basılıyor",
+                  "MAKİNE DAİRESİ" in _m2 and "ÖLÇÜLERİ GİRİLMEDİ" in _m2)
+        r.kontrol("ölçü girilince makine dairesi hesabı paftada",
+                  "MAKİNE DAİRESİ AYDINLATMA HESABI" in _mkm(mk_yok=False))
 
     # ---------------------------------------------------------- büyük/uç durumlar
     buyuk = dict(GC, asansorler=[dict(P=25, kapi_genisligi=1300,

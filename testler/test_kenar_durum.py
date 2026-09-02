@@ -319,9 +319,53 @@ def calistir():
     kesit = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, S1=1.5, L1=200)]}
                        )["asansorler"][0]["ozet"]
     r.kontrol("kesit yetersizse ε ve I uyarır", not kesit["eps_uygun"] and not kesit["akim_uygun"])
-    r.kontrol("tablo dışı kesitte Iz yok",
-              AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, S1=3)]}
-                         )["asansorler"][0]["ozet"]["Iz"] is None)
+    #  TABLO DIŞI KESİT  ( v2.2 )
+    #  Iz kesitle birlikte arttığı için, tabloda bulunmayan bir kesitte
+    #  ondan küçük en büyük tablo satırı GÜVENLİ ALT SINIRDIR.  Eskiden
+    #  Iz = None dönüyordu ve pafta 150 mm² gibi standart bir kesitte bile
+    #  "UYGUN DEĞİLDİR — kesiti büyütün" diyordu ( büyütmek işe yaramıyordu ).
+    def _kesit(s1):
+        return AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, S1=s1)]})["asansorler"][0]
+
+    r.esit("tablo dışı kesit ( 3 mm² ) → bir küçük satırın değeri",
+           _kesit(3)["ozet"]["Iz"], T.KABLO_IZ[2.5])
+    r.esit("tablonun üstündeki kesit ( 150 mm² ) → en büyük tablo değeri",
+           _kesit(150)["ozet"]["Iz"], T.KABLO_IZ[120])
+    r.kontrol("150 mm² kesitte akım kontrolü UYGUN çıkıyor",
+              _kesit(150)["ozet"]["akim_uygun"] is True)
+    r.kontrol("tablo dışı kesit uyarı üretiyor",
+              any("akım tablosunda BULUNMUYOR" in x
+                  for x in (_kesit(150).get("uyarilar") or [])))
+    r.kontrol("paftada Iz alt sınır olarak yazılıyor",
+              any(a.get("sembol") == "Iz" and str(a.get("metin", "")).startswith("≥")
+                  for a in _kesit(150)["bolumler"][5]["adimlar"]))
+    r.esit("tablodaki kesitte Iz kesin değer", _kesit(6)["ozet"]["Iz"], T.KABLO_IZ[6])
+    r.kontrol("tablodaki kesitte '≥' işareti yok",
+              not any(a.get("sembol") == "Iz" and str(a.get("metin", "")).startswith("≥")
+                      for a in _kesit(6)["bolumler"][5]["adimlar"]))
+    r.kontrol("tablonun altındaki kesit ( 1 mm² ) → kontrol edilemedi",
+              _kesit(1)["ozet"]["Iz"] is None
+              and "KONTROL EDİLEMEDİ" in _kesit(1)["bolumler"][5]["sonuc"]["alt"][1])
+
+    #  η′ ≤ 0 FİZİKSEL DEĞİL  ( v2.2 )
+    #  Palangalı sistemde η′ = η − 0,10;  η bunun altındaysa η′ negatif çıkar.
+    #  Eskiden hesap durmuyor, paftaya η′ = −0,02 basılıyor ve sonuç
+    #  "motoru büyütün" diyordu — yanlış teşhis.
+    def _verim(eta, **kw):
+        return AV.hesapla({"ortak": ORT,
+                           "asansorler": [dict(AS, eta=eta, i_palanga=2, **kw)]}
+                          )["asansorler"][0]
+
+    for _eta in (0.05, 0.08, 0.10):
+        _h = _verim(_eta)
+        r.kontrol(f"η = {_eta} + 2:1 askı → hesap duruyor", _h["aktif"] is False)
+        r.kontrol(f"η = {_eta} mesajı VERİMİ işaret ediyor",
+                  "η" in (_h.get("uyari") or "") and "motor" not in (_h.get("uyari") or "").lower())
+    r.kontrol("η = 0,08 + toplam sistem verimi → hesaplanıyor",
+              _verim(0.08, toplam_verim=True)["aktif"] is True)
+    r.kontrol("η = 0,20 + 2:1 askı → hesaplanıyor", _verim(0.20)["aktif"] is True)
+    r.kontrol("Nsç elle girilmişken de negatif η′ durduruyor",
+              _verim(0.08, Nsc=11)["aktif"] is False)
 
     # topraklama
     t = AV.hesapla({"ortak": ORT, "asansorler": [AS]})["topraklama"]
@@ -953,6 +997,77 @@ def calistir():
     r.kontrol("normal ölçülerde uyarı yok",
               not any("SIĞMIYOR" in x for x in (_av().get("uyarilar") or [])))
 
+    # ============================================================
+    #  v2.2 — SONUÇ CÜMLESİ DOĞRU GEREKÇEYİ SÖYLEMELİ
+    #
+    #  Paftanın en görünür satırı sonuç cümlesidir.  Eskiden her olumsuz
+    #  sonuçta "Bekleme süresi kriteri sağlanmıyor" yazıyordu; oysa elle
+    #  seçilen adette çoğu zaman sağlanmayan TAŞIMA kapasitesidir ve bekleme
+    #  süresi pekâlâ sağlanıyor olabilir.  Ölçüt listesi ( ✔ / ✘ ) ile
+    #  cümlenin çelişmesi, denetime giren bir paftada kabul edilemez.
+    # ============================================================
+    _GY = dict(bina_tipi="Konut", bina_yuksekligi=45, yapi_yuksekligi=50, N=15, h=3,
+               hizli1=60, hizli2=3, P=8, kapi_genisligi=900,
+               kapi_tipi="Merkezden Açılan Oto.")
+
+    def _trf(**kw):
+        return TR.hesapla_tek(dict(_GY, **kw))["ozet"]
+
+    _iki = _trf(manuel_adet=2)          # taşıma ✘ , bekleme ✔
+    _olc = {x["ad"]: x["uygun"] for x in _iki["karar_olcutleri"]}
+    r.kontrol("kurgu doğru: taşıma ✘ / bekleme ✔",
+              _olc.get("Taşıma") is False and _olc.get("Bekleme") is True)
+    r.kontrol("cümle TAŞIMA kapasitesini işaret ediyor",
+              "aşıma kapasitesi" in _iki["sonuc_cumlesi"])
+    r.kontrol("cümle bekleme süresini SUÇLAMIYOR",
+              "Bekleme süresi kriteri sağlanmıyor" not in _iki["sonuc_cumlesi"])
+    _bir = _trf(manuel_adet=1)          # ikisi de ✘
+    r.kontrol("iki ölçüt de sağlanmıyorsa ikisi de yazılıyor",
+              "aşıma kapasitesi" in _bir["sonuc_cumlesi"]
+              and "bekleme süresi" in _bir["sonuc_cumlesi"])
+    r.kontrol("olumsuz cümle gerekli adedi söylüyor",
+              f"{_bir['adet_hesap']} adet" in _bir["sonuc_cumlesi"])
+
+    #  Hiçbir senaryoda cümle ile ölçüt listesi çelişmemeli
+    _celiski = 0
+    for _P in (6, 8, 10, 13, 16):
+        for _n in (1, 2, 3, 4):
+            _o = _trf(P=_P, manuel_adet=_n)
+            _bk = next((x for x in _o["karar_olcutleri"] if x["ad"] == "Bekleme"), None)
+            if _bk and _bk["uygun"] and \
+                    "Bekleme süresi kriteri sağlanmıyor" in str(_o["sonuc_cumlesi"]):
+                _celiski += 1
+    r.esit("cümle ↔ ölçüt çelişkisi ( 20 senaryo )", _celiski, 0)
+
+    # ---- ŞARTLI KABUL:  UYGULANAN sınır esas alınmalı
+    #  Yüksek yapıda geçerli sınır "Yükseltilmiş"tir;  "Standart" sütunundan
+    #  adet vermek gereken asansör sayısını OLDUĞUNDAN AZ gösteriyordu.
+    _SY = dict(bina_tipi="Konut", bina_yuksekligi=29, yapi_yuksekligi=32, N=10, h=2.9,
+               hizli1=20, hizli2=3, P=6, kapi_genisligi=900,
+               kapi_tipi="Merkezden Açılan Oto.", manuel_adet=1)
+    _sk = TR.hesapla_tek(_SY)["ozet"]
+    r.esit("kurgu doğru: yüksek yapı → Yükseltilmiş", _sk["standart"], "Yükseltilmiş")
+    r.kontrol("kurgu doğru: şartlı kabul çıkıyor", str(_sk["sonuc"]).startswith("Şartlı"))
+    r.kontrol("şartlı sonucu UYGULANAN sınırı yazıyor",
+              f"{int(_sk['Izul'])} sn" in _sk["sonuc"] and _sk["standart"] in _sk["sonuc"])
+    r.kontrol("şartlı sonucu Standart sütununu ölçüt saymıyor",
+              f"{int(_sk['esik_standart'])} sn" not in _sk["sonuc"])
+    r.kontrol("şartlı sonucundaki adet, iki ölçütü birden sağlayan adettir",
+              f"{_sk['adet_hesap']} adet" in _sk["sonuc"])
+    r.kontrol("şartlı cümlesi de aynı adedi veriyor",
+              f"{_sk['adet_hesap']} adet" in _sk["sonuc_cumlesi"])
+
+    # ---- "şartlı sınırı için N adet yeterli olurdu" notu taşımayı yok saymamalı
+    _TN = dict(bina_tipi="Konut", bina_yuksekligi=18, yapi_yuksekligi=20, N=6, h=3,
+               hizli1=36, hizli2=3, P=6, kapi_genisligi=900,
+               kapi_tipi="Merkezden Açılan Oto.")
+    _s = TR.hesapla_tek(_TN)
+    _o = _s["ozet"]
+    _not = [b for b in _s["bolumler"] if b["baslik"].startswith("GEREKLİ")][0]["notlar"][0]
+    r.kontrol("kurgu doğru: taşıma bekleme'den fazla asansör istiyor",
+              _o["tasima_adedi"] > _o["bekleme_adedi"])
+    r.kontrol("şartlı notu taşıma adedinin altına inmiyor",
+              f"({int(_o['esik_sartli'])} sn) için {int(_o['tasima_adedi'])} adet" in _not)
 
     return r
 

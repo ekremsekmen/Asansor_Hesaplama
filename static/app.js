@@ -557,8 +557,19 @@ function ciz(hedef, r, mod){
   if(o.sonuc){
     const kotu = /^(Kabul|YETERSİZ|HESAP)/.test(o.sonuc);
     h+=`<div class="sonuc-kutu ${kotu?'hata':'ok'}"><span class="et">SONUÇ</span><span>${kacis(o.sonuc)}</span></div>`;
+    /*  NİHAİ CEVAP ve DAYANAĞI  —  paftadaki karar kutusunun ekran karşılığı.
+        Hangi ölçütün hangi sayıyla sağlandığı sonucun yanında durur; bölüm
+        dip notu olarak ayrı yerde aranmaz. */
     const c = o.sonuc_cumlesi||o.pafta_satiri;
-    if(c && c!==o.sonuc) h+=`<div class="notlar" style="margin-top:8px"><div><b>${kacis(c)}</b></div></div>`;
+    const olc = o.karar_olcutleri||[];
+    if((c && c!==o.sonuc) || olc.length){
+      h+=`<div class="karar-kutu ${kotu?'hata':'ok'}">`;
+      if(c && c!==o.sonuc) h+=`<div class="karar-metin">${kacis(c)}</div>`;
+      if(olc.length) h+=`<div class="karar-olcut">` + olc.map(x=>
+        `<div><span class="im ${x.uygun?'ok':'hata'}">${x.uygun?'✔':'✘'}</span>
+         <b>${kacis(x.ad)}</b><span>${kacis(x.metin)}</span></div>`).join('') + `</div>`;
+      h+=`</div>`;
+    }
     /* Tek asansör hesabı "n adet gerekir" diyorsa, o n asansörü tek tıkla
        tanımlamaya geçiş — kullanıcı adedi elle değiştirmek zorunda kalmasın. */
     if(mod!=='coklu' && o.adet>1 && o.adet<=4 && !r.hata){
@@ -672,14 +683,20 @@ function cizAvan(r){
     a.bolumler.forEach(b=>h+=bolumCiz(b));
   });
 
-  /* makine dairesi */
+  /* makine dairesi
+     MRL ( makine dairesiz ) sistemde bu bölüm HİÇ GÖSTERİLMEZ — makine dairesi
+     yoksa aydınlatma hesabının konusu da yoktur.  Ekran ile pafta aynı kuralı
+     uygular ( bkz. pdf_export.avan_pdf ).
+     Tek istisna EKSİK GİRDİ:  MRL kutusu işaretli değil ama A × B ölçüsü de
+     girilmemişse bu bir tercih değil unutulmuş bir girdidir — kırmızı uyarı
+     basılır, yoksa eksik hesap sessizce gizlenmiş olurdu. */
   const mk=r.makine_dairesi||{};
-  h+=`<div class="serit" style="margin-top:22px;background:#0E3357"><span>MAKİNE DAİRESİ AYDINLATMASI</span>
-      <span class="kaynak">TS EN 81-20</span></div>`;
-  h += mk.aktif ? bolumCiz(mk.bolum)
-     : (mk.mk_yok === false
-        ? `<div class="uyari kirmizi" style="margin-top:8px">${kacis(mk.uyari||'')}</div>`
-        : `<div class="notlar" style="margin-top:8px"><div>${kacis(mk.uyari||'')}</div></div>`);
+  if(mk.aktif || mk.mk_yok === false){
+    h+=`<div class="serit" style="margin-top:22px;background:#0E3357"><span>MAKİNE DAİRESİ AYDINLATMASI</span>
+        <span class="kaynak">TS EN 81-20</span></div>`;
+    h += mk.aktif ? bolumCiz(mk.bolum)
+       : `<div class="uyari kirmizi" style="margin-top:8px">${kacis(mk.uyari||'')}</div>`;
+  }
 
   /* topraklama */
   const tp=r.topraklama||{};

@@ -378,3 +378,19 @@ html,body{max-width:100%;overflow-x:hidden}
 /* Grup başlığındaki açıklama BÜYÜK harfe çevrilmesin — başlık kısa kalsın,
    açıklama normal okunsun. */
 .bolum-bas .ipucu{text-transform:none;letter-spacing:0;font-weight:500}
+
+/*  KARAR KUTUSU  —  paftanın nihai cevabı ve dayanağı.
+    Sonuç şeridinin hemen altında, çerçeveli.  Ekran ile PDF aynı şeyi
+    aynı yerde gösterir; ölçüt satırları bölüm dip notu olarak aranmaz.  */
+.karar-kutu{margin-top:6px;border:1.5px solid var(--yesil,#1B6B37);
+  background:#F2F8F4;border-radius:6px;padding:10px 12px}
+.karar-kutu.hata{border-color:#A8231F;background:#FCF3F2}
+.karar-metin{font-size:15px;font-weight:700;color:#123E6B;text-align:center;line-height:1.35}
+.karar-kutu.hata .karar-metin{color:#A8231F}
+.karar-olcut{margin-top:8px;border-top:1px solid rgba(0,0,0,.12);padding-top:6px;
+  display:grid;gap:2px;font-size:12px;color:#333}
+.karar-olcut > div{display:grid;grid-template-columns:16px 68px 1fr;align-items:baseline;gap:6px}
+.karar-olcut b{color:#666;font-weight:600}
+.karar-olcut .im{font-weight:700}
+.karar-olcut .im.ok{color:#1B6B37}
+.karar-olcut .im.hata{color:#A8231F}

@@ -48,14 +48,28 @@ def _fontlari_yukle():
 F, FB = _fontlari_yukle()
 
 # ------------------------------------------------------------------ renkler
-MAVI = colors.HexColor("#123E6B")
-MAVI_AC = colors.HexColor("#EAF1F8")
-GRI = colors.HexColor("#666666")
-GRI_AC = colors.HexColor("#F4F5F7")
-CIZGI = colors.HexColor("#C9D3DE")
-YESIL = colors.HexColor("#1B6B37")
-KIRMIZI = colors.HexColor("#A8231F")
-SARI_AC = colors.HexColor("#FFF8E1")
+# ------------------------------------------------------------------ palet
+#  PAFTA SİYAH BEYAZ BASILIR ve AutoCAD'e PDFIMPORT ile alınır.  Bu iki
+#  koşul birlikte tasarımı belirler:
+#
+#   · DOLGU YOK.  Renkli zeminler gri baskıda birbirinden ayrılmaz; AutoCAD'de
+#     ise her dolgu bir SOLID/HATCH nesnesine dönüşür ve monokrom çizim
+#     ayarında ( monochrome.ctb ) siyah bir bloğa döner.  Zeminin üstündeki
+#     BEYAZ yazı da beyaz geometri olarak gelir — beyaz kâğıtta kaybolur.
+#     Bu yüzden hiçbir yerde "beyaz yazı / koyu zemin" kullanılmaz.
+#   · RENK ANLAM TAŞIMAZ.  Uygun / uygun değil ayrımı SÖZCÜKLE ve ✔ / ✘
+#     işaretiyle verilir, yeşil-kırmızı ile değil.
+#   · ÇİZGİLER SAÇ TELİ OLMAZ.  0,4 pt'nin altı hem gri baskıda hem
+#     plotterda kaybolur; en ince çizgi 0,4 pt'dir.
+SIYAH = colors.HexColor("#000000")
+MAVI = SIYAH                       # başlık ve formül metni — düz siyah
+MAVI_AC = colors.white             # zemin kullanılmıyor
+GRI = colors.HexColor("#444444")   # ikincil metin ( kaynak kolonu )
+GRI_AC = colors.white              # zemin kullanılmıyor
+CIZGI = SIYAH
+YESIL = SIYAH
+KIRMIZI = SIYAH
+SARI_AC = colors.white
 
 #  TABLO GENİŞLİK ÇARPANI
 #  Pafta küçültülerek basıldığında ( bkz. _Belge.olcek ) çerçeve 1/olcek
@@ -70,11 +84,21 @@ def _w(x):
     return x * _GEN
 
 
+def _c(x):
+    """
+    ÇİZGİ KALINLIĞI  —  pafta küçültülerek basıldığında ( bkz. _Belge.olcek )
+    çizgiler de küçülür ve 0,4 pt istediğimiz çizgi 0,31 pt'ye düşüp SİLİK
+    çıkardı.  Genişlik çarpanı ile bölerek son kalınlığın istenen değerde
+    kalması sağlanır.
+    """
+    return x * _GEN
+
+
 S = {
     "h1": ParagraphStyle("h1", fontName=FB, fontSize=13.5, leading=17, textColor=MAVI,
                          alignment=TA_CENTER, spaceAfter=1),
-    "h2": ParagraphStyle("h2", fontName=FB, fontSize=9.5, leading=13, textColor=colors.white),
-    "h2k": ParagraphStyle("h2k", fontName=F, fontSize=7.4, leading=9.5, textColor=colors.white,
+    "h2": ParagraphStyle("h2", fontName=FB, fontSize=9.5, leading=13, textColor=SIYAH),
+    "h2k": ParagraphStyle("h2k", fontName=F, fontSize=7.4, leading=9.5, textColor=GRI,
                           alignment=2),
     "alt": ParagraphStyle("alt", fontName=F, fontSize=7.6, leading=10, textColor=GRI,
                           alignment=TA_CENTER),
@@ -83,9 +107,18 @@ S = {
     "sag": ParagraphStyle("sag", fontName=FB, fontSize=8.6, leading=11.2, alignment=2),
     "kaynak": ParagraphStyle("kaynak", fontName=F, fontSize=6.9, leading=9, textColor=GRI),
     "formul": ParagraphStyle("formul", fontName=FB, fontSize=8.4, leading=11.5, textColor=MAVI),
-    "islem": ParagraphStyle("islem", fontName=F, fontSize=8.2, leading=11.5, textColor=colors.HexColor("#333")),
+    "islem": ParagraphStyle("islem", fontName=F, fontSize=8.2, leading=11.5, textColor=colors.HexColor("#333333")),
     "not": ParagraphStyle("not", fontName=F, fontSize=7.2, leading=9.6, textColor=GRI),
-    "sonuc": ParagraphStyle("sonuc", fontName=FB, fontSize=9, leading=12.5, textColor=colors.white),
+    "sonuc": ParagraphStyle("sonuc", fontName=FB, fontSize=9, leading=12.5, textColor=SIYAH),
+    #  Paftanın NİHAİ CEVABI — "1 adet 8 kişilik (630 kg), 1,00 m/s ...".
+    #  Sayfadaki en önemli cümle budur; en büyük punto onundur.
+    "karar": ParagraphStyle("karar", fontName=FB, fontSize=13, leading=17,
+                            alignment=TA_CENTER, textColor=MAVI),
+    #  Kararın DAYANAĞI — iki belirleyici ölçüt, sonucun hemen altında.
+    "olcut": ParagraphStyle("olcut", fontName=F, fontSize=7.6, leading=10.5,
+                            textColor=colors.HexColor("#333333")),
+    "olcut_ad": ParagraphStyle("olcut_ad", fontName=FB, fontSize=7.6, leading=10.5,
+                               textColor=GRI),
 }
 
 
@@ -121,7 +154,7 @@ class _Belge(BaseDocTemplate):
         # Pafta PDF'leri proje antedi taşımaz; bu bilgiler yalnız kapaktadır.
         baslik = ust_baslik
         super().__init__(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
-                         topMargin=22 * mm, bottomMargin=16 * mm,
+                         topMargin=28 * mm, bottomMargin=22 * mm,
                          title=baslik, author="",
                          subject=alt_baslik, creator="Asansör Avan Hesaplama Programı", **kw)
         self.ust_baslik, self.alt_baslik = ust_baslik, alt_baslik
@@ -131,32 +164,34 @@ class _Belge(BaseDocTemplate):
         self.addPageTemplates([PageTemplate(id="std", frames=cerceve, onPage=self._sayfa)])
 
     def _sayfa(self, cnv, doc):
+        """
+        PAFTA ÇERÇEVESİ  —  ofisin kendi Excel paftasındaki düzen:
+        tüm hesap kalın bir çerçeve içinde, üstte tek başlık şeridi,
+        altta sayfa numarası.  Dolgu yoktur; yalnız çizgi.
+        """
         cnv.saveState()
         w, h = A4
-        cnv.setFillColor(MAVI)
-        cnv.rect(0, h - 14 * mm, w, 14 * mm, stroke=0, fill=1)
-        cnv.setFillColor(colors.white)
-        cnv.setFont(FB, 9.5)
-        cnv.drawString(15 * mm, h - 9.6 * mm, self.ust_baslik)
-        cnv.setFont(F, 7.6)
-        cnv.setStrokeColor(CIZGI)
-        cnv.setLineWidth(0.5)
-        cnv.line(15 * mm, 12.5 * mm, w - 15 * mm, 12.5 * mm)
+        sol, sag = 12 * mm, w - 12 * mm
+        ust, alt = h - 12 * mm, 12 * mm
+        cnv.setStrokeColor(SIYAH)
+        cnv.setLineWidth(1.2)
+        cnv.rect(sol, alt, sag - sol, ust - alt, stroke=1, fill=0)
+        #  Üst şerit: belge adı ( solda ) — çerçevenin İÇİNDE, altında çizgi
+        #  Pafta başlığı BİR KEZ yazılır — çerçevenin üst şeridinde, ortalı.
+        cnv.setFillColor(SIYAH)
+        cnv.setFont(FB, 12)
+        cnv.drawCentredString((sol + sag) / 2, ust - 8.2 * mm, self.ust_baslik)
+        cnv.setLineWidth(0.8)
+        cnv.line(sol, ust - 11.4 * mm, sag, ust - 11.4 * mm)
+        #  Alt şerit: sayfa numarası ( sağda ), üstünde çizgi
+        cnv.line(sol, alt + 7.0 * mm, sag, alt + 7.0 * mm)
         cnv.setFillColor(GRI)
         cnv.setFont(F, 6.4)
-        sag_metin = f"Sayfa {cnv.getPageNumber()}"
-        sag_gen = cnv.stringWidth(sag_metin, F, 6.4)
-        kalan = w - 30 * mm - sag_gen - 6 * mm
-        sol = self.alt_baslik
-        if cnv.stringWidth(sol, F, 6.4) > kalan:
-            # kelime ortasından değil, ayraçtan kırp
-            parcalar = sol.split("   ·   ")
-            while len(parcalar) > 1 and \
-                    cnv.stringWidth("   ·   ".join(parcalar) + " …", F, 6.4) > kalan:
-                parcalar.pop()
-            sol = "   ·   ".join(parcalar) + (" …" if len(parcalar) < len(self.alt_baslik.split("   ·   ")) else "")
-        cnv.drawString(15 * mm, 9 * mm, sol)
-        cnv.drawRightString(w - 15 * mm, 9 * mm, sag_metin)
+        #  KAYNAK DİZESİ PAFTAYA BASILMAZ.  Standart ve baskı bilgisi zaten her
+        #  hesap satırının "kaynak" kolonunda yazılı; alt bilgide tekrarlanması
+        #  paftayı kalabalıklaştırıyordu.  Bilgi dosyanın ÖZELLİKLERİNDE
+        #  ( subject ) taşınmaya devam eder.
+        cnv.drawRightString(sag - 3 * mm, alt + 2.4 * mm, f"Sayfa {cnv.getPageNumber()}")
         cnv.restoreState()
         #  Çerçeve içeriği bundan sonra çizilir; ölçek yalnız ONU etkiler.
         #  Sayfa değişiminde çizim durumu sıfırlandığı için her sayfada
@@ -168,13 +203,16 @@ class _Belge(BaseDocTemplate):
 def _baslik_seridi(metin, kaynak=""):
     #  Yükseklik SABİT DEĞİLDİR: uzun bir bölüm başlığı iki satıra düştüğünde
     #  şerit de büyür, yoksa ikinci satır mavi bandın dışına taşıyordu.
+    #  Dolgu yerine KURAL ÇİZGİSİ: üstte kalın, altta ince.  Baskıda ve
+    #  AutoCAD'de aynı görünür, siyah blok üretmez.
     t = Table([[_p(metin, "h2"), _p(kaynak, "h2k")]],
               colWidths=[_w(108 * mm), _w(72 * mm)])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), MAVI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (0, 0), 5), ("RIGHTPADDING", (1, 0), (1, 0), 5),
+        ("BOX", (0, 0), (-1, 0), _c(0.7), SIYAH),
+        ("LINEABOVE", (0, 0), (-1, 0), _c(1.2), SIYAH),
+        ("TOPPADDING", (0, 0), (-1, -1), 3.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.0),
+        ("LEFTPADDING", (0, 0), (0, 0), 3), ("RIGHTPADDING", (1, 0), (1, 0), 3),
         ("ALIGN", (1, 0), (1, 0), "RIGHT"),
     ]))
     return t
@@ -187,39 +225,57 @@ def _adim_tablosu(adimlar):
     hesap satırı : denklem (tam genişlik)  +  '= sayılar'  |  sonuç | birim | kaynak
     """
     veriler, stil, i = [], [], 0
-    for a in adimlar:
+    for j, a in enumerate(adimlar):
         tip = a.get("tip")
+        bas = i                       # bu adımın ilk satırı
         if tip == "metin":
             veriler.append([_p(f"<b>{a['deger']}</b>", "n"), "", "", "", "", ""])
-            stil += [("SPAN", (0, i), (-1, i)),
-                     ("BACKGROUND", (0, i), (-1, i), MAVI_AC),
+            stil += [("SPAN", (0, i), (2, i)),
                      ("TOPPADDING", (0, i), (-1, i), 4), ("BOTTOMPADDING", (0, i), (-1, i), 3)]
             i += 1
+            #  ALT BAŞLIK ile ardındaki ilk birim AYRILMAZ: "A - KUYU ALT
+            #  BOŞLUĞU TABANINA GELEN KUVVET" bir sayfanın dibinde, denklemi
+            #  öbür sayfada kalmasın.
+            if j + 1 < len(adimlar):
+                stil.append(("NOSPLIT", (0, bas), (-1, bas +
+                             (2 if adimlar[j + 1].get("tip") == "hesap" else 1))))
             continue
         if tip == "hesap":
             veriler.append([_p(a["formul"], "formul"), "", "", "", "", ""])
-            stil += [("SPAN", (0, i), (-1, i)), ("TOPPADDING", (0, i), (-1, i), 5),
+            stil += [("SPAN", (0, i), (2, i)), ("TOPPADDING", (0, i), (-1, i), 5),
                      ("BOTTOMPADDING", (0, i), (-1, i), 0)]
             i += 1
             veriler.append(["", _p(a["islem"], "islem"), "",
                             _p(a["metin"], "sag"), _p(a["birim"], "n"), _p(a["kaynak"], "kaynak")])
-            stil += [("SPAN", (1, i), (2, i)), ("BACKGROUND", (3, i), (3, i), GRI_AC),
+            stil += [("SPAN", (1, i), (2, i)),
                      ("BOTTOMPADDING", (0, i), (-1, i), 4),
-                     ("LINEBELOW", (0, i), (-1, i), 0.4, CIZGI)]
+                     ("LINEBELOW", (0, i), (-1, i), _c(0.4), CIZGI),
+                     #  DENKLEM ile sayıların yerine konmuş hâli AYRILMAZ.
+                     ("NOSPLIT", (0, bas), (-1, i))]
             i += 1
             continue
         veriler.append([_p(f"<b>{a['sembol']}</b>", "n"), _p(a["aciklama"], "n"),
                         _p("=", "n") if a["sembol"] or a["aciklama"] else "",
                         _p(a["metin"], "sag"), _p(a["birim"], "n"), _p(a["kaynak"], "kaynak")])
-        stil += [("LINEBELOW", (0, i), (-1, i), 0.25, colors.HexColor("#E6EAEF"))]
+        stil += [("LINEBELOW", (0, i), (-1, i), _c(0.4), SIYAH)]
         i += 1
 
-    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
+    #  TAM IZGARA:  ofis paftasında her satır çerçeveli bir hücredir.  Dikey
+    #  çizgiler değer / birim / kaynak kolonlarını ayırır — dolgu kalktığı
+    #  için sayıların hizasını artık bu çizgiler tutuyor.
+    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm),
+                                  _w(30 * mm), _w(18 * mm), _w(30 * mm)])
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
         ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ("ALIGN", (2, 0), (2, -1), "CENTER"),
+        #  Yalnız İKİ dikey ayraç:  değerin solunda ve kaynağın solunda.
+        #  Birim, değerin devamıdır — araya çizgi girince boş birim
+        #  hücrelerinde başıboş bir çizgi gibi görünüyordu.
+        ("BOX", (0, 0), (-1, -1), _c(0.7), SIYAH),
+        ("LINEBEFORE", (3, 0), (3, -1), _c(0.5), SIYAH),
+        ("LINEBEFORE", (5, 0), (5, -1), _c(0.5), SIYAH),
     ] + stil))
     return t
 
@@ -227,14 +283,14 @@ def _adim_tablosu(adimlar):
 def _sonuc_kutusu(sonuc):
     if not sonuc:
         return None
-    renk = YESIL if sonuc.get("uygun", True) else KIRMIZI
     satirlar = [[_p(sonuc.get("baslik", "SONUÇ"), "sonuc"), _p(sonuc.get("metin", ""), "sonuc")]]
     t = Table(satirlar, colWidths=[_w(52 * mm), _w(128 * mm)])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), renk),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEABOVE", (0, 0), (-1, 0), 1.2, SIYAH),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, SIYAH),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2),
     ]))
     ogeler = [Spacer(1, 1.5 * mm), t]
     for alt in sonuc.get("alt", []) or []:
@@ -242,29 +298,152 @@ def _sonuc_kutusu(sonuc):
     return ogeler
 
 
+def _karar_kutusu(metin, uygun=True, olcutler=None, verdikt=None):
+    """
+    Paftanın NİHAİ CEVABI  —  "Toplamda 1 adet 8 kişilik (630 kg), 1,00 m/s
+    hızında asansör yapılması uygundur."
+
+    Bu cümle sayfadaki en önemli bilgidir: projeci paftaya baktığında önce
+    bunu arar.  Küçük punto bir not satırı olarak değil, sonuç şeridinin
+    hemen altında ÇERÇEVELİ ve BÜYÜK yazılır.
+    """
+    if not metin:
+        return []
+    #  Uygun / uygun değil ayrımı RENKLE DEĞİL, sözcük ve ✔ / ✘ ile verilir;
+    #  çıktı siyah beyazdır.  Kutu dolgusuzdur, yalnız kalın çerçevesi vardır.
+    #  SONUÇ ŞERİDİ ve NİHAİ CEVAP tek bloktur — ofis paftasındaki gibi.
+    satirlar, stil, sira = [], [], 0
+    if verdikt:
+        ust = Table([[_p("SONUÇ", "sonuc"), _p(str(verdikt), "sonuc")]],
+                    colWidths=[_w(30 * mm), _w(146 * mm)])
+        ust.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        satirlar.append([ust])
+        stil += [("TOPPADDING", (0, 0), (0, 0), 4), ("BOTTOMPADDING", (0, 0), (0, 0), 4),
+                 ("LINEBELOW", (0, 0), (0, 0), _c(0.6), SIYAH)]
+        sira = 1
+    satirlar.append([_p(str(metin), "karar")])
+    stil += [
+        ("BOX", (0, 0), (-1, -1), _c(1.4), SIYAH),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, sira), (0, sira), 7), ("BOTTOMPADDING", (0, sira), (0, sira), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]
+    #  Kararın dayanağı: hangi ölçüt, hangi sayıyla sağlandı.  Sonuçla AYNI
+    #  kutuda durur — bölüm dip notu olarak ayrı yerde aranmasın.
+    for i, o in enumerate(olcutler or [], start=sira + 1):
+        isaret = "✔" if o.get("uygun") else "✘"
+        ic = Table([[_p(f"{isaret}  {o.get('ad','')}", "olcut_ad"),
+                     _p(o.get("metin", ""), "olcut")]],
+                   colWidths=[_w(22 * mm), _w(142 * mm)])
+        ic.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TEXTCOLOR", (0, 0), (0, 0), SIYAH),
+        ]))
+        satirlar.append([ic])
+        stil += [("TOPPADDING", (0, i), (0, i), 0),
+                 ("BOTTOMPADDING", (0, i), (0, i), 3 if i == sira + len(olcutler or []) else 0)]
+        if i == sira + 1:
+            stil.append(("LINEABOVE", (0, i), (0, i), _c(0.5), SIYAH))
+    t = Table(satirlar, colWidths=[_w(180 * mm)])
+    t.setStyle(TableStyle(stil))
+    return [t]
+
+
 def _notlar(notlar):
     if not notlar:
         return []
-    o = [Spacer(1, 1.2 * mm)]
-    for n in notlar:
-        o.append(_p("▪  " + str(n), "not"))
+    #  Not satırları da bir bütündür: bir cümlenin ortasından sayfa
+    #  değişmesin diye hepsi tek blok hâlinde taşınır.
+    #  DİKKAT — burada KeepTogether KULLANILMAZ.  İç içe KeepTogether'da
+    #  dış blok, iç bloğun yüksekliğini "sonsuz" okur ( wrap 0xffffff döner )
+    #  ve sayfada yer olsa bile her seferinde sayfa atlar.  Notlar zaten
+    #  bölümün kuyruk bloğunun içinde, tek parça hâlinde taşınıyor.
+    o = [_p("▪  " + str(n), "not") for n in notlar]
+    o[0].spaceBefore = 1.2 * mm
     return o
 
 
-def _bolum(b):
-    o = [Spacer(1, 3.5 * mm), _baslik_seridi(b["baslik"], b.get("kaynak", "")), Spacer(1, 1.2 * mm)]
-    if b.get("adimlar"):
-        o.append(_adim_tablosu(b["adimlar"]))
+# ------------------------------------------------------- sayfa bölme öbekleri
+def _birim_sinirlari(adimlar):
+    """
+    Adım listesini BÖLÜNMEZ BİRİMLERE ayırır ve ( başlangıç, bitiş ) verir.
+
+    Bir birim:  tek bir veri satırı,  bir denklem ( formül + sayıların yerine
+    konmuş hâli ),  ya da bir alt başlık ile hemen ardındaki birim.
+    """
+    sinir, i, n = [], 0, len(adimlar)
+    while i < n:
+        j = i + 1
+        if adimlar[i].get("tip") == "metin" and j < n:
+            j += 1                       # alt başlık, ardındaki birimle bir bütün
+        sinir.append((i, j))
+        i = j
+    return sinir
+
+
+def _bas_orta_son(adimlar):
+    """
+    Adımları üçe böler:  BAŞ ( başlıkla birlikte kalacak ilk birim ),
+    ORTA ( serbest — sayfayı doldurur, güvenli satırlardan bölünür ),
+    SON ( SONUÇ satırıyla birlikte kalacak son birim ).
+
+    Böylece ne bölüm başlığı sayfanın dibinde yalnız kalır, ne de "UYGUNDUR"
+    satırı bir sonraki sayfaya tek başına düşer;  arada kalan satırlar ise
+    sayfayı sonuna kadar doldurur ( bkz. _adim_tablosu içindeki NOSPLIT ).
+    """
+    u = _birim_sinirlari(adimlar)
+    if not u:
+        return [], [], []
+    if len(u) == 1:
+        return adimlar, [], []
+    return adimlar[:u[0][1]], adimlar[u[0][1]:u[-1][0]], adimlar[u[-1][0]:]
+
+
+def _bolum(b, ust=None, bosluk=None):
+    """
+    Bir hesap bölümünü basar.
+
+    SAYFA DÜZENİ KURALI —  hiçbir parça yarıda kalmaz:
+      · bölüm başlığı ( ve varsa üstündeki asansör başlığı ) İLK birimle,
+      · SONUÇ satırı ve notlar SON birimle birlikte yolculuk eder,
+      · aradaki satırlar serbesttir, sayfayı doldururlar;  bölünme yalnız
+        güvenli satır sınırlarında olur ( _adim_tablosu / NOSPLIT ).
+    Parçalar aynı kolon genişliğinde ardışık tablolardır; aralarında boşluk
+    olmadığı için baskıda tek bir tablo gibi görünürler.
+    """
+    #  Başlık ile tablosu ARASINDA boşluk yok: ofis paftasındaki gibi tek
+    #  bloktur, başlığın alt çizgisi tablonun üst çizgisidir.
+    bas = _baslik_seridi(b["baslik"], b.get("kaynak", ""))
+    parcalar = [_adim_tablosu(g)
+                for g in _bas_orta_son(b.get("adimlar") or []) if g]
     if b.get("cetvel"):
-        o.append(_cetvel_tablosu(b["cetvel"]))
-    sk = _sonuc_kutusu(b.get("sonuc"))
-    if sk:
-        o += sk
+        parcalar.append(_cetvel_tablosu(b["cetvel"]))
     #  Paftada iki liste de basılır: "notlar" bu bölümün sonucuna ait satırlar,
     #  "aciklamalar" yöntemi anlatan bilgi metinleri.  Ekranda ikincisi ⓘ
     #  simgesine toplanır; çıktıda hiçbir şey eksilmez.
-    o += _notlar(list(b.get("notlar") or []) + list(b.get("aciklamalar") or []))
-    return o
+    kuyruk = list(_sonuc_kutusu(b.get("sonuc")) or []) + \
+        _notlar(list(b.get("notlar") or []) + list(b.get("aciklamalar") or []))
+    ustluk = ([ust] if ust is not None else []) + [bas]
+    #  Bloklar arası boşluk SPACER olarak değil, ilk öğenin "spaceBefore"u
+    #  olarak verilir.  ReportLab sayfanın tepesindeki spaceBefore'u yok sayar;
+    #  ayrı bir Spacer konsaydı hem her sayfa boşlukla başlar hem de
+    #  KeepTogether kendini "sayfa başında değil" sanıp önüne BOŞ SAYFA atardı.
+    ustluk[0].spaceBefore = bosluk if bosluk is not None else \
+        (6 * mm if ust is not None else 3.2 * mm)
+
+    if not parcalar:
+        return [KeepTogether(ustluk + kuyruk)]
+    if len(parcalar) == 1:
+        return [KeepTogether(ustluk + parcalar + kuyruk)]
+    return ([KeepTogether(ustluk + [parcalar[0]])]
+            + list(parcalar[1:-1])
+            + [KeepTogether([parcalar[-1]] + kuyruk)])
 
 
 def _cetvel_tablosu(cetvel):
@@ -280,13 +459,11 @@ def _cetvel_tablosu(cetvel):
     t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
     n = len(veriler) - 1
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
-        ("BACKGROUND", (0, n), (-1, n), GRI_AC),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ("ALIGN", (2, 0), (2, -1), "CENTER"),
-        ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
+        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
     ]))
     return t
 
@@ -310,8 +487,7 @@ def _uyari_kutusu(metinler, hata=False):
     satirlar = [[_p(_simge(m) + _sadelestir(m), "n")] for m in metinler]
     t = Table(satirlar, colWidths=[_w(180 * mm)])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), SARI_AC if not hata else colors.HexColor("#FDECEA")),
-        ("BOX", (0, 0), (-1, -1), 0.6, KIRMIZI if hata else colors.HexColor("#E0B84C")),
+        ("BOX", (0, 0), (-1, -1), _c(0.8), SIYAH),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
     ]))
@@ -324,10 +500,9 @@ def _kv_tablo(satirlar, genislikler=(70 * mm, 110 * mm), vurgu_son=False):
     stil = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
-            ("BACKGROUND", (0, 0), (0, -1), GRI_AC)]
+            ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),]
     if vurgu_son:
-        stil.append(("BACKGROUND", (0, len(veriler) - 1), (-1, len(veriler) - 1), MAVI_AC))
+        stil.append(("LINEABOVE", (0, len(veriler) - 1), (-1, len(veriler) - 1), 0.9, SIYAH))
     t.setStyle(TableStyle(stil))
     return t
 
@@ -382,7 +557,9 @@ def _trafik_bas_ic(sonuc: dict, olcek: float):
                  olcek=olcek)
     # Hesap tamamlanamadıysa da geçerli bir belge üretilir; hata paftaya yazılır.
     o = sonuc.get("ozet") or {}
-    ic = [_p(baslik, "h1"), _p(alt, "alt"), Spacer(1, 3 * mm)]
+    #  Başlık ÇERÇEVENİN ÜST ŞERİDİNDE yazılır ( _Belge._sayfa ); gövdede
+    #  ikinci kez tekrarlanmaz.
+    ic = []
 
     if sonuc.get("hata"):
         ic += _uyari_kutusu([sonuc["hata"]], hata=True)
@@ -406,11 +583,9 @@ def _trafik_bas_ic(sonuc: dict, olcek: float):
                     or "Hesap tamamlanamadı — girdileri kontrol edin.")
     sk = _sonuc_kutusu({"baslik": "SONUÇ", "metin": _sonuc_metni,
                         "uygun": not str(_sonuc_metni).startswith(("Kabul", "YETERSİZ", "HESAP"))})
-    ic += sk
-    if o.get("sonuc_cumlesi"):
-        ic += [Spacer(1, 1.5 * mm), _p(o["sonuc_cumlesi"], "nb")]
-    elif o.get("pafta_satiri"):
-        ic += [Spacer(1, 1.5 * mm), _p(o["pafta_satiri"], "nb")]
+    _uygun = not str(_sonuc_metni).startswith(("Kabul", "YETERSİZ", "HESAP"))
+    ic += _karar_kutusu(o.get("sonuc_cumlesi") or o.get("pafta_satiri"), _uygun,
+                        o.get("karar_olcutleri"), _sonuc_metni)
 
     #  TRAFİK PAFTASI TEK SAYFADIR.  Pafta SONUÇ ile biter: otomatik öneri
     #  tablosu ( bilgi amaçlıydı ) ve imza kutusu paftadan çıkarıldı — öneri
@@ -445,9 +620,7 @@ def _coklu_tablo(asansorler):
     gen = [72 * mm] + [(108 / len(asansorler)) * mm] * len(asansorler)
     t = Table(veriler, colWidths=[_w(x) for x in gen], repeatRows=1)
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
-        ("BACKGROUND", (0, 1), (0, -1), GRI_AC),
-        ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
+        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.6),
         ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -467,10 +640,8 @@ def _nufus_tablo(nufus, b):
     t = Table(veriler, colWidths=[_w(58 * mm), _w(20 * mm), _w(48 * mm), _w(16 * mm), _w(18 * mm), _w(20 * mm)], repeatRows=1)
     n = len(veriler) - 1
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
-        ("BACKGROUND", (0, n), (-1, n), GRI_AC),
         ("SPAN", (0, n), (4, n)),
-        ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
+        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.6),
         ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -488,11 +659,10 @@ def _oneri_tablo(oneriler):
                         _p(tr(s["Ieer"], 1), "sag"), _p(s["sinif"], "n"),
                         _p(tr(s["TR"], 1), "sag"), _p(tr(s["R"], 1), "sag")])
         if s.get("onerilen"):
-            stil.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#E4F3E8")))
+            stil.append(("LINEBELOW", (0, i), (-1, i), 0.6, SIYAH))
     t = Table(veriler, colWidths=[_w(74 * mm), _w(14 * mm), _w(24 * mm), _w(30 * mm), _w(19 * mm), _w(19 * mm)], repeatRows=1)
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
-        ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
+        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
         ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -523,48 +693,60 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:
     doc = _Belge(buf, "ASANSÖR AVAN PROJE HESAPLARI",
                  "MMO / 697  “Asansör Avan Projesi Hazırlama Teknik Esasları”, 2. Baskı, Ocak 2020, s.18-21"
                  "   ·   TS EN 81-20   ·   IEEE Std 80   ·   IEC 60364-5-52")
-    ic = [_p("ASANSÖR AVAN PROJE HESAPLARI", "h1"),
-          _p("Motor · kuvvetler · aydınlatma · kurulu güç · topraklama  —  MMO/697 s.18-21"
-             "   ( Excel : ÖZET ve NOLU ASANSÖR sayfaları )", "alt"),
-          Spacer(1, 3 * mm)]
+    ic = []                       # başlık çerçevenin üst şeridindedir
     if sonuc.get("hata"):
         ic += _uyari_kutusu([sonuc["hata"]], hata=True)
     if sonuc.get("uyarilar"):
         ic += _uyari_kutusu(sonuc["uyarilar"])
 
-    # ---- ÖZET
-    ic += [Spacer(1, 3.5 * mm), _baslik_seridi("SONUÇ ÖZETİ", "tüm asansörler"), Spacer(1, 1.2 * mm),
-           _avan_ozet_tablo(sonuc)]
+    #  SIRA:  önce hesaplar, EN SONDA sonuç özeti.  Özet, kendisinden önce
+    #  gelen hesapların çıktısıdır; paftanın başında dururken okuyucu neyin
+    #  nereden geldiğini göremiyordu.
 
-    # ---- her asansör
+    # ---- her asansör  ( grup başlığı ilk bölümün ilk öbeğine yapışıktır )
     for a in (sonuc.get("asansorler") or []):
         if not a.get("aktif"):
             continue
-        ic += [Spacer(1, 6 * mm),
-               _baslik_seridi(f"{a['baslik']}" + (f"   —   {a['tanim']}" if a["tanim"] else ""),
-                              "AVAN PROJE HESAPLARI")]
-        for b in a["bolumler"]:
-            ic += _bolum(b)
+        ust = _baslik_seridi(f"{a['baslik']}" + (f"   —   {a['tanim']}" if a["tanim"] else ""),
+                             "AVAN PROJE HESAPLARI")
+        for i, b in enumerate(a["bolumler"]):
+            ic += _bolum(b, ust=ust if i == 0 else None)
 
     # ---- makine dairesi
+    #  MAKİNE DAİRESİZ ( MRL ) SİSTEMDE BU BÖLÜM HİÇ BASILMAZ.  Makine dairesi
+    #  yoksa aydınlatma hesabının konusu da yoktur; "bu hesap uygulanmaz"
+    #  satırı paftada yer kaplamaktan başka bir işe yaramıyordu.
+    #  Tek istisna EKSİK GİRDİdir:  MRL kutusu işaretli DEĞİL ama A × B ölçüsü
+    #  de girilmemişse bu bir tercih değil, unutulmuş bir girdidir — o zaman
+    #  uyarı basılır, yoksa eksik hesap sessizce gizlenmiş olurdu.
+    #
+    #  Bölümün kendi başlığı zaten "MAKİNE DAİRESİ AYDINLATMA HESABI"; üstüne
+    #  ayrıca grup başlığı konunca aynı yazı iki kez basılıyordu.  Grup başlığı
+    #  yalnız uyarı metni için gerekli.
     mk = sonuc.get("makine_dairesi") or {}
-    ic += [Spacer(1, 6 * mm), _baslik_seridi("MAKİNE DAİRESİ AYDINLATMASI", "TS EN 81-20")]
     if mk.get("aktif"):
-        ic += _bolum(mk["bolum"])
-    else:
-        ic += [Spacer(1, 1.5 * mm), _p(mk.get("uyari", ""), "nb")]
+        ic += _bolum(mk["bolum"], bosluk=6 * mm)
+    elif mk.get("mk_yok") is False:
+        ust = _baslik_seridi("MAKİNE DAİRESİ AYDINLATMASI", "TS EN 81-20")
+        ust.spaceBefore = 6 * mm
+        ic += [KeepTogether([ust, Spacer(1, 1.5 * mm), _p(mk.get("uyari", ""), "nb")])]
 
     # ---- topraklama
     tp = sonuc.get("topraklama") or {}
-    ic += [Spacer(1, 6 * mm), _baslik_seridi("TEMEL TOPRAKLAMA HESABI",
-                                             "Temel ( ızgara ) + paralel çubuk topraklayıcı")]
+    ust = _baslik_seridi("TEMEL TOPRAKLAMA HESABI",
+                         "Temel ( ızgara ) + paralel çubuk topraklayıcı")
     if tp.get("aktif"):
-        for b in tp["bolumler"]:
-            ic += _bolum(b)
+        for i, b in enumerate(tp["bolumler"]):
+            ic += _bolum(b, ust=ust if i == 0 else None)
     else:
-        ic += _uyari_kutusu([tp.get("uyari", "")], hata=True)
+        ust.spaceBefore = 6 * mm
+        ic += [KeepTogether([ust] + _uyari_kutusu([tp.get("uyari", "")], hata=True))]
 
-    ic += [Spacer(1, 5 * mm), _imza_kutusu()]
+    # ---- SONUÇ ÖZETİ  ( en sonda )  —  imza kutusuyla birlikte tek blok
+    ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "tüm asansörler")
+    ozet_bas.spaceBefore = 6 * mm
+    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _avan_ozet_tablo(sonuc),
+                         Spacer(1, 5 * mm), _imza_kutusu()])]
     doc.build(ic)
     buf.seek(0)
     return buf.read()
@@ -613,16 +795,14 @@ def _avan_ozet_tablo(sonuc):
     t = Table(veriler, colWidths=[_w(x) for x in gen], repeatRows=1)
     n = len(veriler)
     stil = [
-        ("BACKGROUND", (0, 0), (-1, 0), MAVI_AC),
-        ("BACKGROUND", (0, 1), (0, -1), GRI_AC),
-        ("GRID", (0, 0), (-1, -1), 0.3, CIZGI),
+        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
         ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ("FONTSIZE", (0, 0), (-1, -1), 7.8),
     ]
     for r in (n - 3, n - 2, n - 1):
-        stil.append(("BACKGROUND", (0, r), (-1, r), MAVI_AC))
+        stil.append(("LINEABOVE", (0, r), (-1, r), 0.9, SIYAH))
         if len(aktif) > 1:
             stil.append(("SPAN", (1, r), (len(aktif), r)))
     t.setStyle(TableStyle(stil))
