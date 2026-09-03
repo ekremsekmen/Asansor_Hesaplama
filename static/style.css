@@ -394,3 +394,64 @@ html,body{max-width:100%;overflow-x:hidden}
 .karar-olcut .im{font-weight:700}
 .karar-olcut .im.ok{color:#1B6B37}
 .karar-olcut .im.hata{color:#A8231F}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AÇILIŞ EKRANI  —  program açıldığında hangi projenin hazırlanacağı seçilir
+   ═══════════════════════════════════════════════════════════════════════ */
+/*  Seçim yapılana kadar uygulamanın kendisi ( üst şerit, sekmeler, sayfalar )
+    gizlidir;  seçimden sonra açılış ekranı gizlenir.  Gizleme BODY sınıfıyla
+    yapılır ki JS yüklenmeden önce de doğru ekran görünsün.               */
+body.giriste .ust,
+body.giriste .sekmeler,
+body.giriste .kabuk,
+body.giriste .durum{display:none}
+body:not(.giriste) .giris{display:none}
+
+.giris{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px;
+  background:radial-gradient(1200px 600px at 50% -10%, #1B5A9E 0%, #123E6B 55%, #0E3053 100%);
+  color:#fff;
+}
+.giris-ic{width:100%;max-width:880px;text-align:center}
+.giris-bas h1{font-size:26px;letter-spacing:.6px;margin:14px 0 6px}
+.giris-bas p{margin:0 0 30px;font-size:14.5px;color:#C9DCEF}
+.giris-kartlar{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.giris-kart{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:34px 24px 28px;border:1px solid rgba(255,255,255,.22);border-radius:12px;
+  background:rgba(255,255,255,.07);color:#fff;cursor:pointer;text-align:center;
+  transition:.16s;backdrop-filter:blur(2px);
+}
+.giris-kart:hover{background:rgba(255,255,255,.14);border-color:#FFC65C;transform:translateY(-2px)}
+.giris-kart:focus-visible{outline:2px solid #FFC65C;outline-offset:3px}
+.giris-kart svg{color:#FFC65C}
+.gk-ad{font-size:17px;font-weight:700;letter-spacing:.5px}
+.gk-alt{font-size:12.5px;line-height:1.6;color:#C9DCEF}
+.gk-rozet{
+  position:absolute;top:12px;right:12px;font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  padding:3px 8px;border-radius:20px;background:rgba(255,255,255,.16);color:#E8F1FA;
+}
+.gk-rozet.ok{background:#FFC65C;color:#3A2A00}
+.giris-kart.pasif{opacity:.62}
+.giris-kart.pasif:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.35);transform:none}
+.giris-kart.pasif svg{color:#9FB8D2}
+.giris-alt{margin-top:30px;font-size:11px;color:#93AECB;letter-spacing:.2px}
+
+/*  başlıktaki "ana ekran" düğmesi  */
+.ust-dugme{
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.28);color:#fff;
+  padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;
+  white-space:nowrap;transition:.15s;
+}
+.ust-dugme:hover{background:rgba(255,255,255,.20);border-color:#FFC65C}
+
+/*  Sekme şeridi:  işlem adımları solda, başvuru sekmeleri ( Sabitler,
+    Tablolar ) sağ uçta.  Onlar bir adım değil, gerektikçe bakılan
+    kaynaklardır — akışın içinde durmaları kafa karıştırıyordu.          */
+.sekme-ayrac{margin-left:auto}
+.sekme.yan{color:#C2D6EA}
+.sekme.yan.ayrik{position:relative}
+.sekme.yan.ayrik::before{
+  content:"";position:absolute;left:0;top:10px;bottom:10px;
+  border-left:1px solid rgba(255,255,255,.22);
+}

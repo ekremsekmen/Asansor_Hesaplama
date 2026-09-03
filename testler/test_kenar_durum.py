@@ -224,6 +224,13 @@ def calistir():
     r.esit("15 kişi tabloda açık", T.TABLO_7[15], 1125)
     r.esit("15 kişi kaynağı ayrı", T.tablo7_kaynagi(15), "MMO örneği s.53-54 (Tablo-7 dışı)")
     r.esit("16 kişi normal kaynak", T.tablo7_kaynagi(16), "Tablo-7")
+    #  v2.8 — Tablo-7'de OLMAYAN bir kapasiteye kaynak olarak "Tablo-7" yazmak,
+    #  olmayan bir tablo satırına atıf yapmaktır ( 7 kişi → 525 kg ).
+    r.kontrol("tablo dışı kapasite Tablo-7 diye gösterilmez",
+              T.tablo7_kaynagi(7) != "Tablo-7" and "DIŞI" in T.tablo7_kaynagi(7))
+    r.kontrol("tablo dışı büyük kapasite de gösterilmez",
+              T.tablo7_kaynagi(34) != "Tablo-7")
+    r.esit("kapasite girilmemişse kaynak boş", T.tablo7_kaynagi(None), "—")
     r.kontrol("15 kişi hesaplanabiliyor", TR.hesapla_tek(g(P=15)).get("hata") is None)
 
     r.kontrol("nüfus yok → uyarı",
@@ -278,6 +285,38 @@ def calistir():
                   dict(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik", durak=5),
                   dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik", durak=6)
               ])).get("hata") is not None)
+    #  v2.8 — KAPASİTE DENETİMİ İKİ YOLDA DA VAR.  Tek yol ( _dogrula_tek )
+    #  P'yi Tablo-7'ye karşı aratıyordu, çoklu yol aratmıyordu:  P = 7 sessizce
+    #  geçiyor, Q = 525 kg türetiliyor ve pafta kaynak olarak "Tablo-7" yazıyordu.
+    r.kontrol("çoklu: Tablo-7 dışı kapasite reddedilir",
+              "Tablo-7'de yoktur" in (TR.hesapla_coklu(dict(c, asansorler=[
+                  dict(P=7, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"),
+                  dict(P=9, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik")
+              ])).get("hata") or ""))
+    r.kontrol("tek: Tablo-7 dışı kapasite reddedilir",
+              TR.hesapla_tek(g(P=7)).get("hata") is not None)
+    r.kontrol("çoklu: geçerli kapasiteler hâlâ geçiyor",
+              TR.hesapla_coklu(dict(c, asansorler=[
+                  dict(P=8, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"),
+                  dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik")
+              ])).get("hata") is None)
+
+    #  v2.8 — DURAK ALANI TEK YOLDA DA OKUNUYOR.  hesapla() asansör bazındaki
+    #  alanları tek hesaba aktarırken `durak`ı atlıyordu:  çoklu yol aynı girdiyi
+    #  reddederken tek yol alanı hiç görmüyor, kullanıcının yazdığı sayı hiçbir
+    #  şeyi değiştirmiyordu ( N = 11 iken durak = 5 sessizce yok sayılıyordu ).
+    def _dg(d):
+        return TR.hesapla(dict(g(), asansorler=[
+            dict(P=10, kapi_genisligi=900, kapi_tipi="Merkezden Açılan Oto.", durak=d)]))
+
+    r.kontrol("tek: N ile çelişen durak reddedilir",
+              "durak adedi" in (_dg(5).get("hata") or ""))
+    r.kontrol("tek: aralık dışı durak reddedilir",
+              "durak sayısı geçersiz" in (_dg(99).get("hata") or ""))
+    r.kontrol("tek: N + 1 durak sorunsuz geçer", _dg(12).get("hata") is None)
+    r.kontrol("tek: boş durak sorunsuz geçer", _dg(None).get("hata") is None)
+    r.esit("tek: durak girilse de N değişmez", _dg(12)["ozet"]["N"], 11)
+
     tek1 = TR.hesapla_tek(g(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"))
     cok1 = TR.hesapla_coklu(dict(c, asansorler=[dict(P=10, kapi_genisligi=900,
                                                      kapi_tipi="Teleskopik Otomatik")]))
@@ -293,6 +332,40 @@ def calistir():
               abs(a["P_kurulu"] - (a["g_motor"] + a["g_kuyu"] + a["g_kabin"] + a["g_priz"])) < 1e-9)
     r.kontrol("ε = ε1 + ε2", abs(a["eps"] - (a["eps1"] + a["eps2"])) < 1e-9)
     r.kontrol("kuyu armatürü = MAX(n1, n2)", a["n_kuyu"] == max(a["n1_kuyu"], a["n2_kuyu"]))
+
+    #  v2.8 — ARMATÜR IŞIK AKISI TABLO-4'TEN GELİR VE KAYNAĞI PAFTADA YAZAR.
+    #  Kuyu / makine dairesi varsayılanı eskiden kaynağı belirsiz 2600 lm idi
+    #  ( Tablo-4: 40 W flüoresan = 2100 lm ) ve pafta ØL satırına yalnız
+    #  "SABİTLER B" yazdığı için tablodan sapıldığı GÖRÜNMÜYORDU.  2600 daha az
+    #  armatür verir, yani emniyetsiz taraftır.
+    _t4 = {(t, w): lm for t, w, lm in T.ARMATUR_ISIK_AKISI}
+    r.esit("kuyu ØL varsayılanı Tablo-4'ten",
+           AV.SABIT_B_VARSAYILAN["kuyu_armatur_lm"], int(_t4[("Flüoresan", "40 W")]))
+    r.esit("kabin ØL varsayılanı Tablo-4'ten",
+           AV.SABIT_B_VARSAYILAN["kabin_armatur_lm"], int(_t4[("LED spot", "5 W")]))
+
+    def _ol_kaynagi(sabit, bolum):
+        S_ = AV.sabitler(sabit)
+        if bolum == "mk":
+            #  ORT makine dairesiz ( MRL ) — bu kontrol için ölçü verilir
+            b = AV.hesapla_makine_dairesi(
+                dict(ORT, mk_uzunluk=3000, mk_genislik=2500), S_)["bolum"]
+        else:
+            b = AV.hesapla_asansor(AS, ORT, S_, 1)["bolumler"][bolum]
+        return next(x for x in b["adimlar"] if x.get("sembol") == "ØL")["kaynak"]
+
+    for bolum, ad in ((2, "kabin"), (3, "kuyu"), ("mk", "mk.dairesi")):
+        r.kontrol(f"{ad}: varsayılan ØL kaynağı Tablo-4 diyor",
+                  "Tablo-4" in _ol_kaynagi(None, bolum))
+    for bolum, ad in ((3, "kuyu"), ("mk", "mk.dairesi")):
+        r.kontrol(f"{ad}: elle girilen ØL kaynağı imalatçı diyor",
+                  "imalatçı" in _ol_kaynagi({"kuyu_armatur_lm": 2600}, bolum))
+    r.kontrol("elle girilen armatür GÜCÜ de kaynağı değiştirir",
+              "imalatçı" in _ol_kaynagi({"kuyu_armatur_W": 58}, 3))
+    r.kontrol("sabitler() kabul edilen ezmeyi kaydediyor",
+              "kuyu_armatur_lm" in AV.sabitler({"kuyu_armatur_lm": 2600})["_ozel"])
+    r.kontrol("reddedilen ezme _ozel'e girmiyor",
+              "kuyu_armatur_lm" not in AV.sabitler({"kuyu_armatur_lm": 0})["_ozel"])
     for V, k1 in ((0.5, 5), (0.63, 5), (0.7, 3), (1.0, 3), (1.01, 2), (2.5, 2)):
         r.esit(f"k1 (V={V})", AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, V=V)]}
                                          )["asansorler"][0]["ozet"]["k1"], k1)
@@ -720,6 +793,15 @@ def calistir():
     o16e = av(as_ek={"kapasite": 16, "Nsc": 11})["asansorler"][0]["ozet"]
     r.esit("elle girilen Nsç korunuyor", o16e["Nsc"], 11)
     r.kontrol("elle girilen küçük Nsç uygun değil", o16e["motor_uygun"] is False)
+    #  v2.8 — SEÇİM ile KONTROL AYNI TOLERANSI KULLANIR.  N = ( 1−q )·Q·V/( 102·η′ )
+    #  kayan noktada kademenin bir kıl payı üstüne düşebilir; motor_sec toleranslı
+    #  seçtiği hâlde kontrol katı olunca program KENDİ seçtiği motoru reddediyor,
+    #  pafta "Nsç = 15,00  ≥  N = 15,00  →  UYGUN DEĞİL" basıyordu.
+    _kil = av(as_ek={"kapasite": 16, "V": 1.6, "eta": 0.6, "i_palanga": 1,
+                     "q_denge": 0.55, "Nsc": None})["asansorler"][0]["ozet"]
+    r.kontrol("kıl payı üstteki N kademeyi bulur", _kil["Nsc"] == 15.0)
+    r.kontrol("otomatik seçim kendi kendini reddetmez", _kil["motor_uygun"] is True)
+    r.esit("tolerans tek yerde", T.MOTOR_TOLERANS, 1e-9)
 
     #  girdileri_coz — XLSX'e yazılacak çözülmüş girdi
     c = AV.girdileri_coz({"ortak": dict(O_ORT), "asansorler": [dict(O_AS)],
@@ -1068,6 +1150,33 @@ def calistir():
               _o["tasima_adedi"] > _o["bekleme_adedi"])
     r.kontrol("şartlı notu taşıma adedinin altına inmiyor",
               f"({int(_o['esik_sartli'])} sn) için {int(_o['tasima_adedi'])} adet" in _not)
+
+
+    # ---- EK NÜFUS: pafta notu KENDİ İÇİNDE TUTARLI olmalı  ( denetim 2.5 )
+    #  Kusur:  ⑤/⑥ dışında elle nüfus eklendiğinde not "Daire adedi 44 →
+    #  b = 44 × 5 = 1.360 kişi" diye yazıyordu.  44 × 5 = 220'dir; denetimde
+    #  bu satır hesap hatası olarak okunur.  Ek kalemler artık ayrı yazılır.
+    _EK = [{"aciklama": "Zemin kattaki dükkânlar", "miktar": 420,
+            "kalem": "İŞ MERKEZİ — Çalışma alanı"},
+           {"aciklama": "1. kat büro", "miktar": 300,
+            "kalem": "İŞ MERKEZİ — Çalışma alanı"}]
+    _sn = TR.hesapla(g(ek_nufus=_EK))
+    _nt = [n for b in _sn["bolumler"] for n in (b.get("notlar") or [])]
+    _ana = [n for n in _nt if n.startswith("Daire adedi")]
+    r.esit("ek nüfusta ana formül satırı var", len(_ana), 1)
+    r.kontrol("ana formül KENDİ toplamını yazıyor ( 44 × 5 = 220 )",
+              bool(_ana) and "= 220 kişi" in _ana[0], f"→ {_ana}")
+    r.esit("her ek nüfus kalemi ayrı satırda",
+           len([n for n in _nt if n.startswith("Ek nüfus —")]), 2)
+    _top = [n for n in _nt if n.startswith("Toplam  b = Σc")]
+    r.esit("toplam satırı var", len(_top), 1)
+    r.kontrol("toplam satırı b ile aynı",
+              bool(_top) and f"= {TRS(_sn['ozet']['b'], 0)} kişi" in _top[0].replace(",00", ""),
+              f"→ {_top} · b = {_sn['ozet']['b']}")
+    #  ek nüfus YOKKEN not değişmemeli
+    _nt0 = [n for b in TR.hesapla(g())["bolumler"] for n in (b.get("notlar") or [])]
+    r.esit("ek nüfus yokken fazladan satır eklenmiyor",
+           len([n for n in _nt0 if n.startswith(("Ek nüfus —", "Toplam  b"))]), 0)
 
     return r
 

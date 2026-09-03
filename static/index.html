@@ -4,10 +4,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Asansör Avan Hesaplama Programı</title>
-<link rel="stylesheet" href="/static/style.css?v=2.2">
+<link rel="stylesheet" href="/static/style.css?v=2.7">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23123E6B'/><path d='M9 7h14v18H9z' fill='none' stroke='%23fff' stroke-width='2'/><path d='M16 7v18M12 12l0 8M20 12l0 8' stroke='%23fff' stroke-width='1.6'/></svg>">
 </head>
-<body>
+<body class="giriste">
+
+<!-- ═══════════════════════════ AÇILIŞ EKRANI ═══════════════════════════
+     Program açıldığında önce burası görünür.  Kullanıcı hangi projeyi
+     hazırlayacağını seçer;  "Avan Proje" seçilince alttaki uygulama
+     ( sekmeler + sayfalar ) açılır.  Uygulama projesi bölümü sonra
+     eklenecek — şimdilik yalnız duyurusu var.                        -->
+<section id="giris" class="giris">
+  <div class="giris-ic">
+    <div class="giris-bas">
+      <svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="5" y="3" width="22" height="26" rx="2.5" stroke="#FFC65C" stroke-width="2"/>
+        <path d="M16 3v26M10 10v12M22 10v12" stroke="#fff" stroke-width="1.7"/>
+        <path d="M13 8l3-3 3 3M13 24l3 3 3-3" stroke="#FFC65C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>ASANSÖR PROJE PROGRAMI</h1>
+      <p>Hangi projeyi hazırlayacaksınız?</p>
+    </div>
+
+    <div class="giris-kartlar">
+      <button type="button" class="giris-kart" id="gk_avan" onclick="uygulamaAc('avan')">
+        <span class="gk-rozet ok">HAZIR</span>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 3h11l5 5v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+          <path d="M15 3v5h5M7 12h10M7 16h7M7 8h4"/>
+        </svg>
+        <span class="gk-ad">AVAN PROJE</span>
+        <span class="gk-alt">Trafik hesabı · avan hesapları · proje kapağı<br>PDF, Excel ve CAD çıktısı</span>
+      </button>
+
+      <button type="button" class="giris-kart pasif" id="gk_uygulama" onclick="uygulamaAc('uygulama')">
+        <span class="gk-rozet">YAKINDA</span>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 21h18M5 21V8l7-5 7 5v13"/>
+          <path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/>
+        </svg>
+        <span class="gk-ad">UYGULAMA PROJESİ</span>
+        <span class="gk-alt">Bu bölüm hazırlanıyor —<br>daha sonra eklenecek</span>
+      </button>
+    </div>
+
+    <div class="giris-alt">MMO/697 · TS EN 81-20 · ISO 8100-32:2020 · IEEE Std 80 · IEC 60364-5-52 · BYKHY md.4</div>
+  </div>
+</section>
 
 <header class="ust">
   <div class="ust-ic">
@@ -19,6 +64,8 @@
       </svg>
       <span>ASANSÖR AVAN HESAPLAMA PROGRAMI</span>
     </div>
+    <button type="button" class="ust-dugme" id="dg_ana_ekran" onclick="anaEkran()"
+            title="Proje seçim ekranına dön">← Ana ekran</button>
     <div class="kaynak">
       MMO/697, 2. Baskı, Ocak 2020 &nbsp;·&nbsp; TS EN 81-20 &nbsp;·&nbsp; ISO 8100-32:2020<br>
       IEEE Std 80 &nbsp;·&nbsp; IEC 60364-5-52 &nbsp;·&nbsp; BYKHY md.4
@@ -28,18 +75,22 @@
 
 <nav class="sekmeler">
   <div class="sekmeler-ic">
-    <button class="sekme etkin" data-sekme="proje">Proje Kapağı</button>
-    <button class="sekme" data-sekme="trafik">1 · Trafik Hesabı</button>
+    <!--  İŞLEM ADIMLARI  ( soldan sağa, sırayla )  -->
+    <button class="sekme etkin" data-sekme="trafik">1 · Trafik Hesabı</button>
     <button class="sekme" data-sekme="avan">2 · Avan Hesapları</button>
-    <button class="sekme" data-sekme="sabitler">Sabitler / Ofis Standardı</button>
-    <button class="sekme" data-sekme="tablolar">Tablolar</button>
+    <button class="sekme" data-sekme="proje">3 · Proje Kapağı</button>
+    <!--  BAŞVURU SEKMELERİ  —  işlem adımı değil, gerektikçe bakılır;
+          bu yüzden şeridin sağ ucuna itilir ( .sekme-ayrac ).            -->
+    <span class="sekme-ayrac"></span>
+    <button class="sekme yan ayrik" data-sekme="sabitler">Sabitler / Ofis Standardı</button>
+    <button class="sekme yan" data-sekme="tablolar">Tablolar</button>
   </div>
 </nav>
 
 <main class="kabuk">
 
 <!-- ═══════════════════════════ PROJE KAPAĞI ═══════════════════════════ -->
-<section id="s-proje" class="sayfa">
+<section id="s-proje" class="sayfa" hidden>
   <details class="proje-araclari">
     <summary>Proje araçları <span>Excel'den aç · proje dosyası</span></summary>
     <div class="proje-araclari-ic">
@@ -167,7 +218,7 @@
 </section>
 
 <!-- ═══════════════════════════════ ÇOKLU ═══════════════════════════════ -->
-<section id="s-coklu" class="sayfa" hidden>
+<section id="s-coklu" class="sayfa">
   <div class="ikili">
     <div class="sol">
       <div class="kart">
@@ -353,6 +404,28 @@
           <button class="dg" onclick="window.print()">Yazdır</button>
         </div></div>
       </div>
+      <!-- BÜTÜN PROJE — CAD.  Akışın SONU burasıdır ( kapak → trafik → avan ),
+           bu yüzden proje dosyası da burada verilir. -->
+      <div class="kart">
+        <div class="kart-bas"><span>BÜTÜN PROJE — CAD</span>
+          <span class="kaynak">ofisin tip proje formatı içinde</span></div>
+        <div class="kart-ic">
+          <div class="yardim">Projedeki bütün paftalar, <b>ofisin tip proje formatının içine</b>
+            yerleştirilir: kapak soldaki antet hücresine oturur, hesap paftaları sağdaki
+            büyük alana A4 boyutunda soldan sağa dizilir. AutoCAD'de açtığınızda çizim
+            baskıya hazırdır — ayrıca <b>PDFIMPORT çalıştırmanız gerekmez</b>. Yazılar
+            gerçek metindir, çizgiler tek tek çizgidir; siyah-beyaz baskıya uygundur.</div>
+          <div class="dugmeler">
+            <button class="dg ana" id="dg_proje_dwg" onclick="indirProjeDwg()">
+              Avan Projesini DWG al</button>
+          </div>
+          <div class="ipucu" style="margin-top:6px">
+            ZIP'in içinde <b>.dxf</b> çizim ( AutoCAD çift tıkla açar; DWG için
+            <b>Farklı Kaydet → AutoCAD Çizimi</b> demeniz yeterli ) ve
+            <b>pafta pdf</b> klasöründe kaynak paftalar bulunur.
+            ODA File Converter kuruluysa <b>.dwg</b> de eklenir.</div>
+        </div>
+      </div>
     </div>
     <div><div class="kart"><div id="a_sonuc"></div></div></div>
   </div>
@@ -421,6 +494,6 @@
 </main>
 
 <div class="durum" id="durum"></div>
-<script src="/static/app.js?v=2.2"></script>
+<script src="/static/app.js?v=2.7"></script>
 </body>
 </html>

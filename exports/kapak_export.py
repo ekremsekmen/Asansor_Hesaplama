@@ -273,6 +273,32 @@ def _values(c, d: Mapping[str, object]):
     _center(c, d.get("project_title") or "ASANSÖR AVAN PROJESİ", 91.0, 502.0, 631.7, 667.0, 23.0)
 
 
+#  Kapak çiziminin kendi kutusu ( _structure içindeki en dış çerçeve ) ve
+#  hesap paftalarının doldurduğu alan — ikisi de PDF puntosu cinsinden.
+CIZIM_KUTUSU = (70.0, 99.9, 525.0, 741.9)        # sol, alt, sağ, üst
+PAFTA_KENAR = 12.0 * 72.0 / 25.4                 # paftalarda 12 mm kenar boşluğu
+
+
+def _sayfaya_sigdir(c):
+    """
+    Kapak çizimini, oranını bozmadan hesap paftalarıyla aynı yüksekliğe
+    büyütür ve sayfada ortalar.
+
+    Oranlar birebir aynı olmadığı için YÜKSEKLİK esas alınır:  sayfalar CAD
+    çıktısında yan yana dizildiğinde göz önce üst ve alt kenarları takip eder.
+    Ölçekleme her iki eksende AYNIDIR — farklı olsaydı yazılar da yatayda
+    gerilir, harfler bozulurdu.
+    """
+    sol, alt, sag, ust = CIZIM_KUTUSU
+    gen, yuk = sag - sol, ust - alt
+    hedef_yuk = PAGE_H - 2 * PAFTA_KENAR
+    hedef_gen = PAGE_W - 2 * PAFTA_KENAR
+    olcek = min(hedef_yuk / yuk, hedef_gen / gen)
+    c.translate((PAGE_W - gen * olcek) / 2 - sol * olcek,
+                (PAGE_H - yuk * olcek) / 2 - alt * olcek)
+    c.scale(olcek, olcek)
+
+
 def pdf_bytes(kapak: Mapping[str, object] | None, proje: Mapping[str, object] | None = None) -> bytes:
     """Kapağı tek sayfalı, temiz ve bağımsız PDF baytları olarak verir."""
     d = dict(kapak or {})
@@ -284,8 +310,17 @@ def pdf_bytes(kapak: Mapping[str, object] | None, proje: Mapping[str, object] | 
     c.setAuthor(_s(d.get("mech_name") or "Asansör Avan Hesaplama Programı"))
     c.setSubject("Asansör avan proje kapağı")
     c.setCreator("Asansör Avan Hesaplama Programı")
+    #  SAYFAYI DOLDUR  —  kapak çizimi 455 x 642 pt'lik bir kutuya yerleşiktir
+    #  ( 160,5 x 226,5 mm ).  Hesap paftaları ise A4'ün 12 mm kenar boşluğuyla
+    #  186 x 273 mm'lik alanı doldurur.  Kapak, o paftaların yanına dizildiğinde
+    #  ( CAD çıktısı ) gözle görülür biçimde KÜÇÜK kalıyordu.  Çizim, oranı
+    #  bozulmadan paftaların YÜKSEKLİĞİNİ dolduracak kadar büyütülür; böylece
+    #  bütün sayfaların üst ve alt kenarları aynı hizada olur.
+    c.saveState()
+    _sayfaya_sigdir(c)
     _structure(c)
     _values(c, d)
+    c.restoreState()
     c.showPage()
     c.save()
     return out.getvalue()

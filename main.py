@@ -27,13 +27,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from engine import avan as E_AVAN            # noqa: E402
 from engine import tables as E_TAB           # noqa: E402
 from engine import traffic as E_TRF          # noqa: E402
+#  CAD çıktısı ezdxf + pdfminer.six ister.  Bunlar kurulu değilse PROGRAM
+#  YİNE AÇILIR — yalnız "Avan Projesini DWG al" düğmesi anlaşılır bir hata verir.
+_BASLATICI = "baslat.bat" if os.name == "nt" else "baslat.command"
+try:
+    from exports import dxf_export as X_DXF      # noqa: E402
+except Exception as _dxf_hata:                   # noqa: BLE001
+    X_DXF, _DXF_HATA = None, str(_dxf_hata)
+else:
+    _DXF_HATA = None
 from exports import kapak_export as X_KAPAK  # noqa: E402
 from exports import pdf_export as X_PDF      # noqa: E402
 from exports import sablon_denetim as X_DEN
 from exports import xlsx_export as X_XLS     # noqa: E402
 from exports import xlsx_import as X_IMP     # noqa: E402
 
-SURUM = "2.2"
+SURUM = "2.7"
 KOK = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("AVAN_PORT", "8760"))
 
@@ -306,6 +315,29 @@ def api_avan(veri: dict = Body(...)):
         return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
 
 
+def _proje_kimligi(veri):
+    """
+    KAPAK SEKMESİNDEKİ PROJE KİMLİĞİ  →  indirilen dosyanın adı ve XLSX'in
+    dosya özellikleri.
+
+    Bu bağlanmadan önce her indirme "Asansor - Avan Hesaplari.xlsx" adıyla
+    iniyordu:  aynı klasördeki iki projenin dosyaları birbirinden ayırt
+    edilemiyor, ikincisi "(1)" olarak kaydediliyordu.  Pafta içeriği
+    değişmez — proje adı yalnız KAPAK sayfasında yazılıdır.
+    """
+    k = veri.get("kapak") if isinstance(veri.get("kapak"), dict) else {}
+
+    def _birlestir(*alanlar):
+        return " ".join(str(k.get(x) or "").strip() for x in alanlar).strip()
+
+    return {"proje_adi": str(k.get("project_title") or "").strip(),
+            "isveren": str(k.get("owner") or k.get("contractor") or "").strip(),
+            "pafta_no": str(k.get("sheet_no") or "").strip(),
+            "tarih": "",
+            "muhendis": _birlestir("elec_name", "elec_surname")
+            or _birlestir("mech_name", "mech_surname")}
+
+
 def _dosya_adi(proje, ek, uzanti):
     ad = (proje or {}).get("proje_adi") or "Asansor"
     ad = "".join(c for c in str(ad) if c.isalnum() or c in " -_")[:48].strip() or "Asansor"
@@ -347,8 +379,9 @@ def indir_trafik_xlsx(veri: dict = Body(...)):
             return JSONResponse({"hata": belirsiz}, status_code=200)
         mod = E_TRF.hesapla(g).get("yol", "tek")      # yöntemi veri belirler
         ek = "Trafik Hesabi (PAFTA)" if mod == "tek" else "Coklu Asansor Trafik (PAFTA-COKLU)"
-        return _indir(X_XLS.trafik_xlsx(mod, g),
-                      _dosya_adi(None, ek, "xlsx"), XLSX_TUR)
+        _p = _proje_kimligi(veri)
+        return _indir(X_XLS.trafik_xlsx(mod, g, _p),
+                      _dosya_adi(_p, ek, "xlsx"), XLSX_TUR)
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 
@@ -362,8 +395,9 @@ def indir_trafik_pdf(veri: dict = Body(...)):
             return JSONResponse({"hata": belirsiz}, status_code=200)
         s = E_TRF.hesapla(g)
         ek = "Trafik Hesabi" if s.get("yol") == "tek" else "Coklu Asansor Trafik"
-        return _indir(X_PDF.trafik_pdf(s),
-                      _dosya_adi(None, ek, "pdf"), "application/pdf")
+        _p = _proje_kimligi(veri)
+        return _indir(X_PDF.trafik_pdf(s, _p),
+                      _dosya_adi(_p, ek, "pdf"), "application/pdf")
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 
@@ -395,8 +429,9 @@ def indir_avan_xlsx(veri: dict = Body(...)):
         belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
-        return _indir(X_XLS.avan_xlsx(g),
-                      _dosya_adi(None, "Avan Hesaplari", "xlsx"), XLSX_TUR)
+        _p = _proje_kimligi(veri)
+        return _indir(X_XLS.avan_xlsx(g, _p),
+                      _dosya_adi(_p, "Avan Hesaplari", "xlsx"), XLSX_TUR)
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 
@@ -409,8 +444,71 @@ def indir_avan_pdf(veri: dict = Body(...)):
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
         s = E_AVAN.hesapla(g)
-        return _indir(X_PDF.avan_pdf(s),
-                      _dosya_adi(None, "Avan Hesaplari", "pdf"), "application/pdf")
+        _p = _proje_kimligi(veri)
+        return _indir(X_PDF.avan_pdf(s, _p),
+                      _dosya_adi(_p, "Avan Hesaplari", "pdf"), "application/pdf")
+    except Exception as e:                                    # noqa: BLE001
+        return _uretilemedi(e)
+
+
+@app.post("/api/indir/proje-dwg")
+def indir_proje_dwg(veri: dict = Body(...)):
+    """
+    BÜTÜN PROJE  —  tek CAD dosyası.
+
+    Kapak, ofis TİP PROJE FORMATININ antet hücresine; trafik paftası ve avan
+    hesapları formatın büyük çerçevesine A4 boyutunda dizilir ( şablon yoksa
+    yan yana serbest bir şerit ).  Geometri programın KENDİ PDF'lerinden
+    okunur, bu yüzden CAD çıktısı paftanın birebir aynısıdır
+    ( bkz. exports/dxf_export ).
+    """
+    if X_DXF is None:
+        return JSONResponse(
+            {"hata": "HESAP HATASI: CAD çıktısı için gereken kitaplıklar kurulu değil "
+                     f"( {_DXF_HATA} ).  Programı kapatıp {_BASLATICI} dosyasını "
+                     "yeniden çalıştırın; eksik kitaplıklar kendiliğinden kurulur."},
+            status_code=200)
+    try:
+        paftalar = []
+        kapak = veri.get("kapak") if isinstance(veri.get("kapak"), dict) else None
+        if kapak:
+            paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak, None)))
+
+        #  Trafik ve avan girdileri ayrı ayrı temizlenir; ikisi de belirsiz
+        #  sayı denetiminden geçer — ekran neyi reddediyorsa CAD çıktısı da
+        #  reddeder, yarım bir proje dosyası teslim edilmez.
+        ham = veri.get("girdiler") if isinstance(veri.get("girdiler"), dict) else {}
+        trafik_ham = ham.get("trafik")
+        if isinstance(trafik_ham, dict):
+            g = _trafik_girdi({"girdiler": trafik_ham})
+            belirsiz = _belirsiz_hata()
+            if belirsiz:
+                return JSONResponse({"hata": belirsiz}, status_code=200)
+            paftalar.append(("Trafik", X_PDF.trafik_pdf(E_TRF.hesapla(g))))
+
+        avan_ham = ham.get("avan")
+        if isinstance(avan_ham, dict):
+            a = _avan_girdi({"girdiler": avan_ham})
+            belirsiz = _belirsiz_hata()
+            if belirsiz:
+                return JSONResponse({"hata": belirsiz}, status_code=200)
+            paftalar.append(("Avan", X_PDF.avan_pdf(E_AVAN.hesapla(a))))
+
+        if not paftalar:
+            return JSONResponse(
+                {"hata": "HESAP HATASI: Projede hiç sayfa yok — önce kapağı doldurun "
+                         "ya da trafik / avan hesabını yapın."}, status_code=200)
+
+        ad = _dosya_adi(_proje_kimligi(veri), "Avan Projesi", "zip")
+        paket, sebep, tasti = X_DXF.proje_paketi(paftalar, os.path.splitext(ad)[0])
+        yanit = _indir(paket, ad, "application/zip")
+        #  Kullanıcının BİLMESİ GEREKENLER başlıkta taşınır:
+        #    DXF   → DWG üretilemedi, pakette yalnız DXF var ( sebebi OKUBENI'de )
+        #    TASMA → paftalar formatın çerçevesine sığmadı, taşan sayfalar var
+        notlar = ([ "DXF" ] if sebep else []) + ([ "TASMA" ] if tasti else [])
+        if notlar:
+            yanit.headers["X-Avan-Not"] = ",".join(notlar)
+        return yanit
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 
@@ -420,7 +518,8 @@ def indir_kapak_pdf(veri: dict = Body(...)):
     """Hesap motorundan bağımsız, tek sayfalık avan proje kapağı."""
     try:
         return _indir(X_KAPAK.pdf_bytes(veri.get("kapak")),
-                      _dosya_adi(None, "Kapak", "pdf"), "application/pdf")
+                      _dosya_adi(_proje_kimligi(veri), "Kapak", "pdf"),
+                      "application/pdf")
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 

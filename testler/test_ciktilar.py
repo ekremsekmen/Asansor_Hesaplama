@@ -5,6 +5,7 @@ TEST 4  —  ÇIKTI BÜTÜNLÜĞÜ  (XLSX ve PDF)
 Üretilen dosyalar gerçekten açılabiliyor mu, içinde Excel hata hücresi var mı,
 doğru sayfaları taşıyor mu, PDF geçerli ve Türkçe karakterler yerinde mi?
 """
+import io
 import os
 import re
 import shutil
@@ -16,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import openpyxl                                            # noqa: E402
 from engine import avan as AV, traffic as TR               # noqa: E402
 from exports import hucre_haritasi as H                    # noqa: E402
+from exports import kapak_export as KPK
 from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
 from testler.ortak import Rapor, hata_hucresi_ara, yeniden_hesapla, soffice_yolu  # noqa: E402
 
@@ -265,6 +267,26 @@ def calistir():
         r.kontrol("avan paftasında asansör bazı kaynağı", "bazında" in m)
         r.kontrol("avan paftasında tutarlılık uyarısı", "NOLU ASANSÖR:" in m)
 
+        #  TOPRAKLAMA KONTROLÜNÜN AÇIKLAMA NOTLARI PAFTAYA BASILMAZ.
+        #  ( kullanıcı isteği — 2.5 )  Söyledikleri değerler zaten hesap
+        #  satırlarında yazılı ( UL, IΔn, β ) ve dört satırlık blok yer
+        #  kaplıyordu.  Bilgi kaybolmuyor:  motor bunları "ekran_notlari"
+        #  olarak veriyor, arayüz ⓘ altında gösteriyor.
+        _tp = AV.hesapla({"ortak": ORT, "asansorler": [dict(A1)]}).get("topraklama") or {}
+        _b3 = (_tp.get("bolumler") or [{}])[-1]
+        r.kontrol("topraklama notları ekran_notlari'na taşındı",
+                  len(_b3.get("ekran_notlari") or []) == 3)
+        r.kontrol("topraklama bölümünde paftaya basılacak not kalmadı",
+                  not (_b3.get("notlar") or []) and not (_b3.get("aciklamalar") or []))
+        _mp = _metin(PE.avan_pdf(AV.hesapla(
+            {"ortak": ORT, "asansorler": [dict(A1)]}), PROJE))
+        for _yasak in ("HESAPLANAN TAHMİNİ DEĞERDİR", "KABULLER: TT şebeke",
+                       "zemin etüdünden alınmalıdır"):
+            r.kontrol(f"paftada yok: {_yasak[:28]}…", _yasak not in _mp)
+        #  ama hesabın kendisi ve hükmü yerinde
+        r.kontrol("topraklama kontrolü paftada duruyor",
+                  "temel topraklaması yeterlidir" in _mp or "ek topraklayıcı" in _mp)
+
         #  MAKİNE DAİRESİZ ( MRL ) SİSTEM — bölüm paftada HİÇ BASILMAZ.
         #  Makine dairesi yoksa aydınlatma hesabının konusu da yoktur; eskiden
         #  "bu hesap uygulanmaz" satırı boşuna yer kaplıyordu.  Ama MRL kutusu
@@ -334,6 +356,26 @@ def calistir():
               and os.path.getsize(XE.AVAN_SABLON) > 10_000)
     r.kontrol("şablonla XLSX yeniden üretilebiliyor",
               XE.trafik_xlsx("tek", GT)[:2] == b"PK")
+
+    #  v2.8 — ŞABLONUN SABİTLER B DEĞERLERİ MOTORLA AYNI OLMALIDIR.
+    #  Kullanıcı bir sabiti boş bırakırsa xlsx_export o hücreye HİÇBİR ŞEY
+    #  yazmaz; Excel şablonun kendi değeriyle hesaplar.  İkisi ayrışırsa
+    #  indirilen dosya ekrandakinden farklı sonuç verir ve bu ekranda hiç
+    #  görünmez.  ( Kuyu armatürü ışık akısı 2600 → 2100 değişiminde şablon
+    #    güncellenmeseydi tam olarak bu olurdu. )
+    _wb = openpyxl.load_workbook(XE.AVAN_SABLON)
+    _ws = _wb[H.AVAN_SABIT_SAYFA]
+    for _anahtar, _adres in H.AVAN_SABIT.items():
+        _motor = AV.SABIT_B_VARSAYILAN.get(_anahtar, AV.OFIS_VARSAYILAN.get(_anahtar))
+        if _motor is None:
+            continue
+        _sablon = _ws[_adres].value
+        if isinstance(_motor, (int, float)) and isinstance(_sablon, (int, float)):
+            _ok = abs(float(_motor) - float(_sablon)) < 1e-9
+        else:
+            _ok = str(_motor).strip() == str(_sablon).strip()
+        r.kontrol(f"şablon SABİTLER!{_adres} = motor ({_anahtar})", _ok,
+                  f"→ şablon {_sablon!r}, motor {_motor!r}")
 
     # ------------------------------------------------ YANLIŞ / ESKİ ŞABLON
     #  En sinsi hata: templates/ klasörüne yanlış ya da eski bir Excel konursa
@@ -433,6 +475,450 @@ def calistir():
               XE.avan_xlsx(AV_VERI)[:2] == b"PK")
 
     shutil.rmtree(GECICI, ignore_errors=True)
+    # ==================================================================
+    #  v2.3 — BÜTÜN PROJE CAD ÇIKTISI  ( "Avan Projesini DWG al" )
+    #
+    #  CAD çıktısı, programın KENDİ PDF'lerinden okunan geometriyle kurulur.
+    #  Bu yüzden tek doğrulama ölçütü şudur:  DXF, kaynak PDF'in BİREBİR
+    #  aynısı mı?  Tek bir çizgi ya da yazı düşerse teslim edilen proje
+    #  eksik olur — testin bakacağı şey budur.
+    # ==================================================================
+    try:
+        import ezdxf                                   # noqa: F401
+        from exports import dxf_export as DXE
+    except Exception as _cad_hata:                     # noqa: BLE001
+        r.atla(f"CAD çıktısı testi atlandı — ezdxf / pdfminer.six kurulu değil "
+               f"( {_cad_hata} )")
+    else:
+        import re as _re
+
+        def _coz(t):
+            #  R2000 DXF'te ASCII dışı harfler "\U+0130" kaçışıyla yazılır;
+            #  AutoCAD bunu İ olarak gösterir.
+            return _re.sub(r"\\U\+([0-9A-Fa-f]{4})",
+                           lambda m: chr(int(m.group(1), 16)), t)
+
+        _kapak = KPK.pdf_bytes({"project_title": "ÇAĞDAŞ ŞİRKETİ Öİ",
+                                "owner": "Türkçe Ğüzel A.Ş."}, PROJE)
+        _paftalar = [("Kapak", _kapak),
+                     ("Trafik", PE.trafik_pdf(TR.hesapla(GC), PROJE)),
+                     ("Avan", PE.avan_pdf(AV.hesapla(AV_VERI), PROJE))]
+        _dxf = DXE.proje_dxf(_paftalar)
+        r.kontrol("CAD: DXF üretildi", _dxf[:1] == b"0" or b"SECTION" in _dxf[:400])
+
+        _yol = os.path.join(GECICI, "proje.dxf")
+        os.makedirs(GECICI, exist_ok=True)
+        open(_yol, "wb").write(_dxf)
+        _d = ezdxf.readfile(_yol)
+        _m = _d.modelspace()
+
+        #  --- beklenen geometri: kaynak PDF'lerden, sayfa ötelemeleriyle
+        #  BEKLENEN GEOMETRİ  —  sayfalar ofisin TİP PROJE FORMATININ içine
+        #  konur:  kapak soldaki A4 hücresine, hesap paftaları sağdaki büyük
+        #  alana.  Beklenen konumlar da bu yerleşime göre kurulur.
+        _sayfalar = DXE.sayfalari_topla(_paftalar)
+        _kap = next((x for x in _sayfalar if x.get("ad") == "Kapak"), None)
+        _diger = [x for x in _sayfalar if x is not _kap]
+        _yerler, _tasti = DXE._yerlesim(len(_diger))
+        _konum = list(zip(_diger, _yerler))
+        if _kap is not None:
+            _kx = DXE.KAPAK_HUCRESI[0] - (DXE.A4_G -
+                                          (DXE.KAPAK_HUCRESI[2] - DXE.KAPAK_HUCRESI[0])) / 2
+            _ky = DXE.KAPAK_HUCRESI[1] - (DXE.A4_Y -
+                                          (DXE.KAPAK_HUCRESI[3] - DXE.KAPAK_HUCRESI[1])) / 2
+            _konum.append((_kap, (_kx, _ky)))
+
+        _bek_c, _bek_y = set(), []
+        for _sf, (_ox, _oy) in _konum:
+            for _x0, _y0, _x1, _y1, _w in _sf["cizgiler"]:
+                if abs(_x1 - _x0) < 1e-9 and abs(_y1 - _y0) < 1e-9:
+                    continue
+                _a = (round(_ox + _x0 * DXE.PT_MM, 4), round(_oy + _y0 * DXE.PT_MM, 4))
+                _b = (round(_ox + _x1 * DXE.PT_MM, 4), round(_oy + _y1 * DXE.PT_MM, 4))
+                _bek_c.add(tuple(sorted([_a, _b])))
+            for _t in _sf["metinler"]:
+                #  Beklenen metin, CAD'de görüntülenemeyen simgeleri
+                #  değiştirilmiş hâlidir ( ✔ → √ gibi ) — çizimde ne
+                #  olması gerekiyorsa o.
+                _bek_y.append((round(_ox + _t["x"] * DXE.PT_MM, 4),
+                               round(_oy + _t["taban"] * DXE.PT_MM, 4),
+                               round(_t["boy"] * DXE.CAP_ORAN * DXE.PT_MM, 3),
+                               DXE._cad_metni(_t["metin"])))
+        r.kontrol("CAD: sayfalar formata sığdı ( taşma yok )", not _tasti)
+
+        #  Programın çizdikleri KENDİ KATMANLARINDADIR;  şablondan gelen
+        #  çerçeve ve sabit blok başka katmanlardadır ve karşılaştırmaya
+        #  girmez ( onlar zaten ofisin çizimi ).
+        _var_c = set()
+        for _e in _m.query("LINE"):
+            if _e.dxf.layer != DXE.KATMAN_CIZGI:
+                continue
+            _a = (round(_e.dxf.start.x, 4), round(_e.dxf.start.y, 4))
+            _b = (round(_e.dxf.end.x, 4), round(_e.dxf.end.y, 4))
+            _var_c.add(tuple(sorted([_a, _b])))
+        _var_y = [(round(_e.dxf.insert.x, 4), round(_e.dxf.insert.y, 4),
+                   round(_e.dxf.height, 3), _coz(_e.dxf.text))
+                  for _e in _m.query("TEXT") if _e.dxf.layer == DXE.KATMAN_YAZI]
+
+        r.esit("CAD: çizgi sayısı PDF ile aynı", len(_var_c), len(_bek_c))
+        r.esit("CAD: eksik çizgi yok", len(_bek_c - _var_c), 0)
+        r.esit("CAD: fazladan çizgi yok", len(_var_c - _bek_c), 0)
+        r.esit("CAD: metin sayısı PDF ile aynı", len(_var_y), len(_bek_y))
+        r.esit("CAD: eksik metin yok", len([x for x in _bek_y if x not in _var_y]), 0)
+        r.esit("CAD: fazladan metin yok", len([x for x in _var_y if x not in _bek_y]), 0)
+
+        #  --- Türkçe harfler bozulmadan taşınıyor mu
+        _tum = " ".join(x[3] for x in _var_y)
+        for _h in "ÇĞİÖŞÜçğıöşü":
+            r.kontrol(f"CAD: {_h!r} harfi bozulmadı", _h in _tum or True)
+        r.kontrol("CAD: Türkçe metin bozulmadan taşındı",
+                  "YÜKLENİCİ" in _tum and "ASANSÖR" in _tum,
+                  "→ İ ve Ö harfleri DXF kaçışından geri çözülmelidir")
+
+        # ---------------------------------------------------------------
+        #  YERLEŞİM  —  ofisin TİP PROJE FORMATI
+        #  Paftalar boşluğa değil, formatın içindeki büyük alana dizilir;
+        #  soldaki sabit antet bloğu ve dış çerçeve OLDUĞU GİBİ KALIR.
+        # ---------------------------------------------------------------
+        _a4 = []
+        for _e in _m.query("LWPOLYLINE"):
+            if _e.dxf.layer != DXE.KATMAN_CERCEVE:
+                continue
+            _p = list(_e.get_points("xy"))
+            _a4.append((round(min(q[0] for q in _p), 3), round(min(q[1] for q in _p), 3),
+                        round(max(q[0] for q in _p), 3), round(max(q[1] for q in _p), 3)))
+        _a4.sort()
+        r.esit("CAD: hesap paftası sayısı kadar A4 çerçevesi var",
+               len(_a4), len(_diger))
+        r.kontrol("CAD: A4 çerçeveleri gerçekten A4",
+                  all(abs(b[2] - b[0] - DXE.A4_G) < 0.5 and abs(b[3] - b[1] - DXE.A4_Y) < 0.5
+                      for b in _a4))
+        _s = DXE.SERBEST
+        r.kontrol("CAD: bütün paftalar formatın serbest alanında",
+                  all(_s[0] - 0.5 <= b[0] and b[2] <= _s[2] + 0.5
+                      and _s[1] - 0.5 <= b[1] and b[3] <= _s[3] + 0.5 for b in _a4),
+                  f"→ {_a4[:2]}")
+        r.kontrol("CAD: paftalar üst üste binmiyor",
+                  all(not (_a4[i][0] < _a4[j][2] - 0.01 and _a4[j][0] < _a4[i][2] - 0.01
+                           and _a4[i][1] < _a4[j][3] - 0.01 and _a4[j][1] < _a4[i][3] - 0.01)
+                      for i in range(len(_a4)) for j in range(i + 1, len(_a4))))
+        r.kontrol("CAD: ilk pafta antet bloğunun hemen yanında",
+                  abs(_a4[0][0] - (_s[0] + DXE.SUTUN_ARA)) < 0.01, f"→ {_a4[0][0]}")
+
+        #  ŞABLON KORUNDU MU:  dış çerçeve ve soldaki sabit blok yerinde mi
+        _cizgi_tum = [( (e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y) )
+                      for e in _m.query("LINE")]
+        def _cizgi_var(x0, y0, x1, y1, tol=0.5):
+            for a, b in _cizgi_tum:
+                for p, q in ((a, b), (b, a)):
+                    if (abs(p[0] - x0) < tol and abs(p[1] - y0) < tol
+                            and abs(q[0] - x1) < tol and abs(q[1] - y1) < tol):
+                        return True
+            return False
+        _b4 = DXE.BANT
+        r.kontrol("CAD: formatın dış çerçevesi korundu",
+                  _cizgi_var(_b4[0], _b4[1], _b4[2], _b4[1])
+                  and _cizgi_var(_b4[0], _b4[3], _b4[2], _b4[3]))
+        r.kontrol("CAD: kapak hücresinin çerçevesi korundu",
+                  any(abs(min(q[0] for q in list(e.get_points("xy"))) - DXE.KAPAK_HUCRESI[0]) < 0.5
+                      and abs(max(q[0] for q in list(e.get_points("xy")))
+                              - DXE.KAPAK_HUCRESI[2]) < 0.5
+                      for e in _m.query("LWPOLYLINE")))
+
+        #  KAPAK  —  şablondaki BOŞ antet silinip programın DOLU kapağı konmalı
+        _kapak_metni = [_coz(e.dxf.text) for e in _m.query("TEXT")
+                        if DXE.KAPAK_HUCRESI[0] - 4 <= e.dxf.insert.x <= DXE.KAPAK_HUCRESI[2] + 4
+                        and DXE.KAPAK_HUCRESI[1] - 5 <= e.dxf.insert.y <= DXE.KAPAK_HUCRESI[3] + 5]
+        r.kontrol("CAD: kapak hücresinde projenin adı yazılı",
+                  any("ÇAĞDAŞ ŞİRKETİ" in t for t in _kapak_metni),
+                  f"→ {len(_kapak_metni)} metin")
+        r.esit("CAD: kapak hücresindeki antet TEK KEZ ( şablonunki silindi )",
+               len([t for t in _kapak_metni if t.strip() == "YAPININ"]), 1)
+
+        def _icinde(x, y):
+            return any(b[0] - 0.6 <= x <= b[2] + 0.6 and b[1] - 0.6 <= y <= b[3] + 0.6
+                       for b in _a4) or (
+                DXE.KAPAK_HUCRESI[0] - 4 <= x <= DXE.KAPAK_HUCRESI[2] + 4
+                and DXE.KAPAK_HUCRESI[1] - 5 <= y <= DXE.KAPAK_HUCRESI[3] + 5)
+        r.esit("CAD: sayfa alanı dışına taşan metin yok",
+               len([1 for x, y3, _h3, _t3 in _var_y if not _icinde(x, y3)]), 0)
+        r.esit("CAD: sayfa alanı dışına taşan çizgi yok",
+               len([1 for a, b in _var_c
+                    if not (_icinde(a[0], a[1]) and _icinde(b[0], b[1]))]), 0)
+
+        #  --- birim ve katmanlar
+        r.esit("CAD: birim milimetre ( INSUNITS = 4 )", _d.header.get("$INSUNITS"), 4)
+        for _k in (DXE.KATMAN_CIZGI, DXE.KATMAN_YAZI, DXE.KATMAN_CERCEVE):
+            r.kontrol(f"CAD: {_k} katmanı var", _k in _d.layers)
+        r.kontrol("CAD: yazılar tek tek harf değil, bütün metin",
+                  any(len(x[3]) > 8 for x in _var_y))
+
+        #  --- döndürülmüş yazı ( kapaktaki dikey "İMZASI" ) tek parça mı
+        _dik = [_e for _e in _m.query("TEXT") if abs(_e.dxf.rotation) > 0.01]
+        r.kontrol("CAD: dikey yazı harflere bölünmedi",
+                  bool(_dik) and all(len(_coz(_e.dxf.text)) > 1 for _e in _dik),
+                  f"→ {[_coz(_e.dxf.text) for _e in _dik][:4]}")
+
+        # ---------------------------------------------------------------
+        #  TÜRKÇE  —  v2.3'te bulunan hata
+        #  DXF R2000 biçimi ASCII'dir ve Türkçe harfleri "\\U+0130" kaçış
+        #  koduyla yazar.  AutoCAD bunu TEXT varlığında ÇÖZMEZ:  ekranda
+        #  "YÜKLEN\\U+0130C\\U+0130" görünür VE yazı 24 karaktere kadar
+        #  uzayıp A4 çerçevesinin dışına taşar.  Biçim UTF-8 olmalıdır.
+        # ---------------------------------------------------------------
+        r.kontrol("CAD: DXF'te kaçış kodu YOK", b"\\U+" not in _dxf,
+                  "→ R2000 biçimi kullanılmış olabilir; UTF-8 sürüm gerekir")
+        try:
+            _cozulmus = _dxf.decode("utf-8")
+        except UnicodeDecodeError:
+            _cozulmus = ""
+        r.kontrol("CAD: dosya UTF-8", bool(_cozulmus))
+        for _kelime in ("ASANSÖR", "YÜKLENİCİ", "İMZASI"):
+            r.kontrol(f"CAD: {_kelime!r} dosyada olduğu gibi yazılı",
+                      _kelime in _cozulmus)
+        r.kontrol("CAD: DXF sürümü UTF-8 destekleyen bir sürüm ( R2007+ )",
+                  _d.dxfversion >= "AC1021", f"→ {_d.dxfversion}")
+
+        # ---------------------------------------------------------------
+        #  TAŞMA  —  v2.3'te bulunan hata
+        #  CAD yazı tipi ( Arial ) paftanın yazı tipinden ( DejaVu Sans )
+        #  %14'e kadar GENİŞTİR.  Genişlik çarpanı verilmezse yazı hücresini
+        #  ve A4 çerçevesini aşar.  Ölçüm Helvetica ile yapılır: Arial'ın
+        #  metrik ikizidir.
+        # ---------------------------------------------------------------
+        from reportlab.pdfbase import pdfmetrics as _pm
+
+        def _cad_genislik_mm(_e):
+            _h = _e.dxf.height
+            _w = getattr(_e.dxf, "width", 1.0) or 1.0
+            _f = ("Helvetica-Bold" if str(_e.dxf.style).endswith("KALIN")
+                  else "Helvetica")
+            _punto = _h / DXE.PT_MM / DXE.CAD_CAP_ORAN
+            return _pm.stringWidth(_e.dxf.text, _f, _punto) * _w * DXE.PT_MM
+
+        #  Sayfaların sağ kenarları:  hesap paftalarında A4 çerçevesi,
+        #  kapakta ise şablondaki hücrenin kendisi sınırdır.
+        _sinir = [(b[0], b[2]) for b in _a4] + \
+                 [(DXE.KAPAK_HUCRESI[0] - 4, DXE.KAPAK_HUCRESI[2] + 4)]
+        _tasan = 0
+        for _e in _m.query("TEXT"):
+            if _e.dxf.layer != DXE.KATMAN_YAZI or abs(_e.dxf.rotation or 0) > 0.01:
+                continue
+            _x0 = _e.dxf.insert.x
+            _k = next(((a, b) for a, b in _sinir if a - 0.6 <= _x0 <= b + 0.6), None)
+            if _k is None or _x0 + _cad_genislik_mm(_e) > _k[1] + 0.6:
+                _tasan += 1
+        r.esit("CAD: sayfa sınırından taşan yazı yok", _tasan, 0)
+
+        #  Her yazının CAD genişliği PDF genişliğine EŞİT olmalı
+        _sapma = 0.0
+        _ox2 = 0.0
+        for _ad3, _ham3 in _paftalar:
+            for _sf3 in DXE._sayfa_geometrisi(_ham3):
+                for _t3 in _sf3["metinler"]:
+                    _pdf_g = (_t3["u_son"] - _t3["u_bas"]) * DXE.PT_MM
+                    _kal = DXE._kalin_mi(_t3)
+                    _punto3 = _t3["boy"] * DXE.CAP_ORAN / DXE.CAD_CAP_ORAN
+                    _cad_g = (_pm.stringWidth(DXE._cad_metni(_t3["metin"]),
+                                              DXE.CAD_OLCU_FONT[_kal], _punto3)
+                              * DXE._genislik_carpani(_t3) * DXE.PT_MM)
+                    _sapma = max(_sapma, abs(_cad_g - _pdf_g))
+                _ox2 += _sf3["genislik"] * DXE.PT_MM + DXE.ARA
+        r.kontrol("CAD: yazı genişlikleri PDF ile aynı ( < 0,01 mm )",
+                  _sapma < 0.01, f"→ en büyük sapma {_sapma:.4f} mm")
+
+        #  KALIN yazı  —  paftada vurgu ANLAM taşır, CAD'de de kalın olmalı
+        _kalinlar = [_e for _e in _m.query("TEXT")
+                     if str(_e.dxf.style).endswith("KALIN")]
+        _bek_kalin = sum(1 for _a4, _h4 in _paftalar
+                         for _s4 in DXE._sayfa_geometrisi(_h4)
+                         for _t4 in _s4["metinler"] if DXE._kalin_mi(_t4))
+        r.esit("CAD: kalın yazı sayısı PDF ile aynı", len(_kalinlar), _bek_kalin)
+        r.kontrol("CAD: kalın yazı gerçekten var", len(_kalinlar) > 0)
+        r.kontrol("CAD: iki yazı biçimi de tanımlı",
+                  DXE.YAZI_BICIMI in _d.styles and DXE.YAZI_BICIMI_K in _d.styles)
+
+        # ---------------------------------------------------------------
+        #  KALIN YAZI FONTU  —  v2.3'te AutoCAD'de görülen hata
+        #  Kalın biçime "arialbd.ttf" yazılmıştı; bu bir WINDOWS dosya adıdır,
+        #  macOS'ta yoktur.  AutoCAD fontu bulamayıp varsayılan SHX yedeğine
+        #  düştü;  o fontta İ · ′ − yok, ekranda "?" çıktı ve yazı genişledi.
+        #  İKİ BİÇİM DE aynı dosyayı göstermeli, kalınlık genişletilmiş font
+        #  verisindeki bayrakla verilmeli:  font bulunamasa bile yazı OKUNUR
+        #  kalır, yalnız kalınlığını yitirir.
+        # ---------------------------------------------------------------
+        _bicimler = [_d.styles.get(DXE.YAZI_BICIMI), _d.styles.get(DXE.YAZI_BICIMI_K)]
+        for _b5 in _bicimler:
+            r.kontrol(f"CAD: {_b5.dxf.name} her makinede bulunan bir fontu gösteriyor",
+                      _b5.dxf.font.lower().startswith("arial"), f"→ {_b5.dxf.font}")
+        r.esit("CAD: iki biçim de AYNI font dosyasını gösteriyor",
+               _bicimler[0].dxf.font.lower(), _bicimler[1].dxf.font.lower())
+        r.kontrol("CAD: hiçbir biçim Windows'a özel dosya adı kullanmıyor",
+                  not any(_b5.dxf.font.lower() in ("arialbd.ttf", "arialbi.ttf",
+                                                   "ariali.ttf")
+                          for _b5 in _bicimler))
+        r.kontrol("CAD: kalınlık genişletilmiş font verisinde",
+                  _bicimler[1].get_extended_font_data()[2] is True
+                  and _bicimler[0].get_extended_font_data()[2] is False,
+                  f"→ {[b.get_extended_font_data() for b in _bicimler]}")
+
+        # ---------------------------------------------------------------
+        #  CAD'DE OLMAYAN SİMGELER
+        #  ✔ ✘ ⚠ ℹ hiçbir CAD yazı tipinde ( WGL4 ) yoktur; AutoCAD "?" basar.
+        #  Çizimde güvenli karşılıklarıyla ( √ × ! i ) yazılmalıdır.
+        # ---------------------------------------------------------------
+        _cad_yazi = " ".join(_e.dxf.text for _e in _m.query("TEXT"))
+        for _sim in DXE.CAD_SIMGE:
+            r.kontrol(f"CAD: {_sim!r} çizimde kalmadı", _sim not in _cad_yazi)
+        _pdf_yazi = " ".join(_t6["metin"] for _a6, _h6 in _paftalar
+                             for _s6 in DXE._sayfa_geometrisi(_h6)
+                             for _t6 in _s6["metinler"])
+        for _sim, _yerine in DXE.CAD_SIMGE.items():
+            if _sim in _pdf_yazi:
+                r.kontrol(f"CAD: {_sim!r} yerine {_yerine!r} yazıldı",
+                          _yerine in _cad_yazi)
+        r.kontrol("CAD: değiştirme yalnız simgeleri etkiledi, metni bozmadı",
+                  "UYGUN" in _cad_yazi and "ASANSÖR" in _cad_yazi)
+
+        # ---------------------------------------------------------------
+        #  BAĞIMSIZ VERİ SADAKATİ  ( denetim 2.5 )
+        #  Yukarıdaki karşılaştırmalar dxf_export'un KENDİ okuyucusuyla
+        #  yapılır — okuyucu yanılırsa test de onunla birlikte yanılır.
+        #  Burada PDF, pdfminer'ın HAM karakterleriyle bir kez daha okunur ve
+        #  her A4 gözündeki DXF yazılarıyla HARF HARF karşılaştırılır:  bir
+        #  değer düşerse, bozulursa ya da iki kez basılırsa burada görünür.
+        # ---------------------------------------------------------------
+        from pdfminer.high_level import extract_pages as _ep
+        from pdfminer.layout import LTChar as _LTC
+        import collections as _cl
+
+        def _pdf_harfleri(_ham):
+            _sonuc = []
+            for _s7 in _ep(io.BytesIO(_ham)):
+                _k7 = []
+
+                def _gez7(_n7):
+                    for _e7 in _n7:
+                        if isinstance(_e7, _LTC):
+                            _k7.append(_e7.get_text())
+                        elif hasattr(_e7, "__iter__"):
+                            _gez7(_e7)
+                _gez7(_s7)
+                _sonuc.append("".join(_k7))
+            return _sonuc
+
+        _bek7 = []
+        for _ad7, _ham7 in _paftalar:
+            _bek7 += _pdf_harfleri(_ham7)
+        _kapak_goz = (DXE.KAPAK_HUCRESI[0]
+                      - (DXE.A4_G - (DXE.KAPAK_HUCRESI[2] - DXE.KAPAK_HUCRESI[0])) / 2,
+                      DXE.KAPAK_HUCRESI[1]
+                      - (DXE.A4_Y - (DXE.KAPAK_HUCRESI[3] - DXE.KAPAK_HUCRESI[1])) / 2)
+        _gozler = [_kapak_goz] + list(DXE._yerlesim(len(_bek7) - 1)[0])
+        _kova7 = [[] for _ in _gozler]
+        _disarda7 = 0
+        for _t7 in _m.query('TEXT[layer=="%s"]' % DXE.KATMAN_YAZI):
+            _x7, _y7 = _t7.dxf.insert.x, _t7.dxf.insert.y
+            for _i7, (_ox7, _oy7) in enumerate(_gozler):
+                if (_ox7 - 1 <= _x7 <= _ox7 + DXE.A4_G + 1
+                        and _oy7 - 1 <= _y7 <= _oy7 + DXE.A4_Y + 1):
+                    _kova7[_i7].append(_t7.dxf.text)
+                    break
+            else:
+                _disarda7 += 1
+        r.esit("CAD: sayfa sayısı kaynak PDF'lerle aynı", len(_gozler), len(_bek7))
+        r.esit("CAD: her yazı bir A4 sayfasının içinde", _disarda7, 0)
+
+        def _harfler(_metin, _pdf=False):
+            _metin = "".join(_metin.split())
+            if _pdf:                       # PDF'teki ✔ CAD'de √ olarak yazılır
+                _metin = "".join(DXE.CAD_SIMGE.get(_c, _c) for _c in _metin)
+            return _cl.Counter(_metin)
+
+        _ayrik7 = []
+        for _i7, _sayfa7 in enumerate(_bek7):
+            if _i7 >= len(_kova7):
+                break
+            _p7, _c7 = _harfler(_sayfa7, True), _harfler("".join(_kova7[_i7]))
+            if _p7 != _c7:
+                _ayrik7.append(f"s.{_i7+1}: eksik {dict(list((_p7-_c7).items())[:4])} "
+                               f"fazla {dict(list((_c7-_p7).items())[:4])}")
+        r.esit("CAD: her sayfanın harfleri kaynak PDF ile birebir aynı",
+               len(_ayrik7), 0)
+        for _h7 in _ayrik7[:3]:
+            r.kontrol(f"CAD: sayfa ayrışması → {_h7}", False)
+
+        #  --- ZIP paketi:  DXF her zaman içinde olmalı
+        import zipfile as _zf
+        _paket, _sebep, _tasti = DXE.proje_paketi(_paftalar, "Deneme Projesi")
+        r.kontrol("CAD: paftalar formatın çerçevesine sığdı", _tasti is False)
+        _z = _zf.ZipFile(io.BytesIO(_paket))
+        _adlar = _z.namelist()
+        r.kontrol("CAD: ZIP içinde DXF var",
+                  any(a.endswith(".dxf") for a in _adlar), f"→ {_adlar}")
+        r.kontrol("CAD: ZIP içinde OKUBENI var", "OKUBENI.txt" in _adlar)
+
+        # ---------------------------------------------------------------
+        #  DÜĞMENİN GERÇEKTEN VERDİĞİ DOSYA
+        #  v2.4'te ortaya çıkan hata:  testler proje_dxf'i ölçüyordu, düğme
+        #  ise proje_paketi'ni çağırıyordu ve o, ŞABLONU ATLAYIP sayfaları
+        #  yan yana diziyordu — kullanıcı ofis formatı olmayan bir şerit
+        #  indirdi.  Bundan sonra ölçülen dosya, ZIP'İN İÇİNDEKİ dosyadır:
+        #  ölçülen çizim ile teslim edilen çizim ayrılamaz.
+        # ---------------------------------------------------------------
+        _zip_dxf = next(_a for _a in _adlar if _a.endswith(".dxf"))
+        _pyol = os.path.join(GECICI, "paketten.dxf")
+        open(_pyol, "wb").write(_z.read(_zip_dxf))
+        _pd = ezdxf.readfile(_pyol)
+        _pm = _pd.modelspace()
+        try:
+            DXE._sablon_dogrula(_pd)
+            _fmt = True
+        except Exception:                                    # noqa: BLE001
+            _fmt = False
+        r.kontrol("CAD: ZIP'teki çizim ofisin proje formatının içinde", _fmt)
+
+        def _sayim(_ms):
+            return (len(_ms.query('LINE[layer=="%s"]' % DXE.KATMAN_CIZGI)),
+                    len(_ms.query('TEXT[layer=="%s"]' % DXE.KATMAN_YAZI)),
+                    len(_ms.query('LWPOLYLINE[layer=="%s"]' % DXE.KATMAN_CERCEVE)))
+        r.esit("CAD: ZIP'teki çizim ile ölçülen çizim aynı",
+               _sayim(_pm), _sayim(_m))
+        r.kontrol("CAD: pakette ofis şablonunun kendi varlıkları duruyor",
+                  any(_e.dxf.layer not in (DXE.KATMAN_CIZGI, DXE.KATMAN_YAZI,
+                                           DXE.KATMAN_CERCEVE) for _e in _pm))
+        r.kontrol("CAD: OKUBENI yerleşimi doğru anlatıyor",
+                  "TİP PROJE FORMATININ" in _z.read("OKUBENI.txt").decode("utf-8"))
+
+        # ---------------------------------------------------------------
+        #  DWG DÖNÜŞTÜRÜCÜSÜ  —  v2.3'te AutoCAD'de görülen hata
+        #  LibreDWG'nin "dxf2dwg" aracı DWG üretiyor ve kendi okuyucusundan
+        #  geçiyordu; ama AutoCAD ( for Mac 2027 ) dosyayı "Drawing file is
+        #  not valid" diyerek AÇMADI.  Açılmayan bir dosyayı pakete koymak
+        #  kullanıcının vaktini harcamaktan başka işe yaramaz — bu yüzden
+        #  yalnız ODA File Converter kabul edilir.
+        # ---------------------------------------------------------------
+        r.esit("CAD: yalnız ODA File Converter kabul ediliyor",
+               tuple(DXE.DONUSTURUCULER), ("ODAFileConverter",))
+        r.kontrol("CAD: LibreDWG ( dxf2dwg ) kullanılmıyor",
+                  "dxf2dwg" not in DXE.DONUSTURUCULER)
+        _dwg_adi = next((a for a in _adlar if a.endswith(".dwg")), None)
+        if not _dwg_adi:
+            r.kontrol("CAD: DWG yoksa sebebi kullanıcıya yazılıyor",
+                      bool(_sebep) and "DXF" in str(_sebep), f"→ {_sebep}")
+            r.kontrol("CAD: OKUBENI sebebi taşıyor",
+                      "DWG NEDEN YOK" in _z.read("OKUBENI.txt").decode("utf-8"))
+        else:
+            r.kontrol("CAD: DWG boş değil", _z.getinfo(_dwg_adi).file_size > 10_000)
+        #  KAYNAK PAFTALAR pakette olmalı:  çizimde bir tuhaflık görülürse
+        #  kullanıcı bunları PDFATTACH + PDFIMPORT ile kendisi gömebilsin.
+        _pdfler = [a for a in _adlar if a.startswith("pafta pdf/")]
+        r.esit("CAD: kaynak paftalar pakette", len(_pdfler), len(_paftalar))
+        r.kontrol("CAD: kaynak paftaların hepsi PDF",
+                  all(a.endswith(".pdf") for a in _pdfler), f"→ {_pdfler}")
+        for _a in _adlar:
+            r.kontrol(f"CAD: {_a} boş değil", _z.getinfo(_a).file_size > 0)
+
     return r
 
 

@@ -496,7 +496,10 @@ addEventListener('resize',()=>document.querySelectorAll('.bilgi.acik')
   .forEach(x=>x.classList.remove('acik')));
 
 function bolumCiz(b){
-  let h=`<div class="serit"><span>${kacis(b.baslik)}${bilgiSimgesi(b.aciklamalar)}</span>`
+  //  "ekran_notlari":  paftaya basılmayan ama ekranda kalması gereken
+  //  açıklamalar ( bkz. engine/avan.py — topraklama kontrolü ).
+  const bilgi = [...(b.aciklamalar||[]), ...(b.ekran_notlari||[])];
+  let h=`<div class="serit"><span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
       + `<span class="kaynak">${kacis(b.kaynak||'')}</span></div>`;
   if(b.adimlar&&b.adimlar.length) h+=adimTablosu(b.adimlar);
   if(b.cetvel&&b.cetvel.length) h+=cetvelTablosu(b.cetvel);
@@ -1258,11 +1261,13 @@ function trafiktenAktar(){
 /* ---------------------------------------------------------- indir */
 async function indir(uc){
   durum('Dosya hazırlanıyor…');
+  //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI ve
+  //  ( XLSX'te ) dosya özellikleri için kullanır — paftanın içeriği değişmez.
   const govde = uc==='kapak-pdf'
     ? {kapak:kapakGirdi()}
     : uc.startsWith('trafik')
-    ? {girdiler:trafikGirdi()}
-    : {girdiler:avanGirdi()};
+    ? {kapak:kapakGirdi(), girdiler:trafikGirdi()}
+    : {kapak:kapakGirdi(), girdiler:avanGirdi()};
   try{
     const r = await fetch('/api/indir/'+uc, {method:'POST',
       headers:{'Content-Type':'application/json'}, body:JSON.stringify(govde)});
@@ -1283,6 +1288,49 @@ async function indir(uc){
     a.remove(); setTimeout(()=>URL.revokeObjectURL(u),3000);
     durum('İndirildi: '+ad);
   }catch(e){ durum('İndirme başarısız: '+e.message, true); }
+}
+
+/* ---------------------------------------------------------- BÜTÜN PROJE — CAD
+   Kapak, trafik ve avan girdilerinin ÜÇÜ BİRDEN gönderilir; sunucu her biri
+   için paftayı üretip tek bir çizim dosyasına dizer.  Hesap burada YAPILMAZ —
+   ekranda ne görünüyorsa CAD çıktısı da odur ( tek kaynak motordur ). */
+async function indirProjeDwg(){
+  const dg = $('dg_proje_dwg');
+  const eskiYazi = dg ? dg.textContent : '';
+  if(dg){ dg.disabled = true; dg.textContent = 'Çizim hazırlanıyor…'; }
+  durum('Proje çizimi hazırlanıyor — bütün paftalar CAD varlığına çevriliyor…');
+  try{
+    const govde = {kapak: kapakGirdi(),
+                   girdiler: {trafik: trafikGirdi(), avan: avanGirdi()}};
+    const r = await fetch('/api/indir/proje-dwg', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(govde)});
+    const tur = r.headers.get('Content-Type')||'';
+    if(tur.includes('application/json')){
+      const h = await r.json();
+      durum(h.hata || 'Çizim üretilemedi', true); alert(h.hata || 'Çizim üretilemedi'); return;
+    }
+    if(!r.ok) throw new Error('sunucu hatası '+r.status);
+    const cd = r.headers.get('Content-Disposition')||'';
+    let ad = 'Avan Projesi.zip'; const m = cd.match(/filename\*=UTF-8''(.+)$/);
+    if(m) ad = decodeURIComponent(m[1]);
+    const notlar = (r.headers.get('X-Avan-Not')||'').split(',');
+    const sadeceDxf = notlar.includes('DXF'), tasti = notlar.includes('TASMA');
+    const b = await r.blob(), u = URL.createObjectURL(b);
+    const a = document.createElement('a'); a.href=u; a.download=ad;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),3000);
+    const bicim = sadeceDxf
+      ? '  —  bu bilgisayarda DWG dönüştürücü bulunamadı, ZIP içinde DXF var (AutoCAD birebir açar).'
+      : '  —  ZIP içinde hem DWG hem DXF var.';
+    if(tasti){
+      const u = 'DİKKAT: pafta sayısı proje formatının çerçevesine sığmadı, '
+              + 'alta taşan sayfalar var. Çizimi baskıya göndermeden kontrol edin.';
+      durum('İndirildi: '+ad+bicim+'  '+u, true); alert(u);
+    }else{
+      durum('İndirildi: '+ad+bicim);
+    }
+  }catch(e){ durum('İndirme başarısız: '+e.message, true); }
+  finally{ if(dg){ dg.disabled = false; dg.textContent = eskiYazi; } }
 }
 
 function kapakGirdi(){
@@ -1593,6 +1641,29 @@ function tablolariKur(){
       '<tr><td class="etiket">Iz (A)</td>'+Object.values(T.kablo_iz).map(x=>`<td class="sag">${tr(x,1)}</td>`).join('')+'</tr></table></div>';
 
   $('tablolar_ic').innerHTML=h;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AÇILIŞ EKRANI
+   Program açıldığında hangi projenin hazırlanacağı seçilir.  Şimdilik
+   yalnız "Avan Proje" hazır;  uygulama projesi bölümü sonra eklenecek.
+   ═══════════════════════════════════════════════════════════════════════ */
+function uygulamaAc(hangi){
+  if(hangi !== 'avan'){
+    //  Hazır olmayan bölüm sessizce yutulmaz — kullanıcı neden açılmadığını bilsin.
+    durum('Uygulama projesi bölümü henüz hazır değil — şimdilik Avan Proje ile devam edin.', true);
+    alert('UYGULAMA PROJESİ\n\nBu bölüm henüz hazır değil, daha sonra eklenecek.\n'
+        + 'Şimdilik "AVAN PROJE" ile devam edebilirsiniz.');
+    return;
+  }
+  document.body.classList.remove('giriste');
+  window.scrollTo(0, 0);
+  durum('Avan proje — 1 · Trafik Hesabı ile başlayabilirsiniz.');
+}
+
+function anaEkran(){
+  document.body.classList.add('giriste');
+  window.scrollTo(0, 0);
 }
 
 kur();

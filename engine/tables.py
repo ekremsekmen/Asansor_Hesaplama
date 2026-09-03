@@ -171,7 +171,18 @@ def tablo7_yuk(P):
 
 
 def tablo7_kaynagi(P):
-    return "MMO örneği s.53-54 (Tablo-7 dışı)" if P in TABLO_7_ORNEK else "Tablo-7"
+    """
+    Paftaya basılan KAYNAK metni.  Tabloda BULUNMAYAN bir kapasite için
+    "Tablo-7" yazmak, olmayan bir tablo satırına atıf yapmaktır ( ör. 7 kişi
+    → 525 kg ); denetimde bu yanlış kaynak gösterimi olarak okunur.
+    """
+    if P in TABLO_7_ORNEK:
+        return "MMO örneği s.53-54 (Tablo-7 dışı)"
+    if P in TABLO_7:
+        return "Tablo-7"
+    if P is None:
+        return "—"                   # kapasite girilmemiş; pafta zaten hata basar
+    return "Tablo-7 DIŞI — Q = P × 75 kg kabulü"
 
 
 # ---------------------------------------------------------------- TABLO - 8
@@ -497,6 +508,15 @@ TOPLAM_VERIM_NOTU = (
 MOTOR_KADEMELERI = (2.2, 3.0, 4.0, 5.5, 7.5, 11.0, 15.0, 18.5, 22.0,
                     30.0, 37.0, 45.0, 55.0, 75.0, 90.0, 110.0, 132.0, 160.0)
 
+#  KADEME SEÇİMİ ile "Nsç ≥ N" KONTROLÜ AYNI TOLERANSI KULLANMALIDIR.
+#  N = ( 1 − q )·Q·V / ( 102 · η′ ) kayan noktada tam kademenin bir kıl payı
+#  üstüne düşebilir ( ör. 1275 kg · 1,6 m/s · η′ 0,60 · q 0,55  →
+#  N = 15,000000000000002 ).  motor_sec toleranslı seçtiği hâlde kontrol katı
+#  olursa program KENDİ seçtiği motoru reddeder ve pafta
+#  "Nsç = 15,00  ≥  N = 15,00   →   UYGUN DEĞİL" gibi kendi kendisiyle çelişen
+#  bir satır basar.  Tolerans bu yüzden tek yerde durur.
+MOTOR_TOLERANS = 1e-9
+
 
 def motor_sec(N_hes):
     """Hesaplanan güçten büyük ya da ona eşit ilk standart kademe."""
@@ -505,7 +525,7 @@ def motor_sec(N_hes):
     if N_hes != N_hes or N_hes in (float("inf"), float("-inf")):
         return None
     for kademe in MOTOR_KADEMELERI:
-        if kademe >= N_hes - 1e-9:
+        if kademe >= N_hes - MOTOR_TOLERANS:
             return kademe
     return None                      # listenin üstünde — özel imalat
 

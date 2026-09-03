@@ -4,6 +4,13 @@ uvicorn>=0.27
 openpyxl>=3.1
 reportlab>=4.0
 
+#  "Avan Projesini DWG al" düğmesi için ( CAD çıktısı ):
+#    ezdxf        DXF yazar
+#    pdfminer.six programın kendi PDF'inden geometriyi okur
+#  Bunlar kurulu değilse yalnız o düğme çalışmaz, program açılır.
+ezdxf>=1.1
+pdfminer.six>=20221105
+
 #  ── DOĞRULAMA PAKETİ İÇİN ( isteğe bağlı ) ───────────────────────────────
 #  Aşağıdakiler programın çalışması için GEREKMEZ; yalnız
 #  "python3 testler/calistir.py" ile testleri koşturmak içindir.

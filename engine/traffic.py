@@ -31,6 +31,25 @@ def _bodrum_oku(deger):
     return int(deger), None
 
 
+#  DURAK ADEDİ  ( ana giriş dâhil )  —  tek ve çoklu hesapta AYNI kural.
+#  Boş bırakılırsa asansör ana giriş üstündeki bütün katlara hizmet eder
+#  ( Ni = N ).  Kural TEK YERDE dursun ki iki hesap yolu ayrışmasın:
+#  çoklu yol alanı okuyup H / S / TR'yi ona göre kurarken tek yol alanı hiç
+#  görmüyordu — kullanıcı bir sayı yazıyor, hiçbir şey olmuyordu.
+def _durak_oku(deger, N, on_ek=""):
+    """
+    Asansörün durduğu kat adedini ana giriş ÜSTÜ kat adedine çevirir.
+    Dönen: (Ni, hata)   —  boş / None  →  (N, None)
+    """
+    if deger is None or deger == "":
+        return N, None
+    if not (sayi_mi(deger) and float(deger).is_integer()
+            and 2 <= deger <= (N or 0) + 1):
+        return None, (f"HESAP HATASI: {on_ek}durak sayısı geçersiz — 2 ile ortak durak sayısı "
+                      "(N+1) arasında tam sayı girin veya boş bırakın")
+    return int(deger) - 1, None
+
+
 def _hesap_standardi(bina_yuksekligi, yapi_yuksekligi):
     """BYKHY md.4 — yüksek yapı ölçütü."""
     by = bina_yuksekligi or 0
@@ -80,20 +99,40 @@ def _nufus_satirlari(bina_tipi, hizli1, hizli2, ek_satirlar=None):
                 "aciklama": s.get("aciklama") or "Ek nüfus kalemi", "miktar": miktar,
                 "kalem": kalem, "birim": t["birim"], "katsayi": t["katsayi"],
                 "c": miktar * t["katsayi"],
+                #  Bu satır ⑤/⑥ girdilerinden DEĞİL, "ek nüfus" listesinden
+                #  gelir.  Pafta notunun doğru yazılabilmesi için ayırt edilir
+                #  ( bkz. _nufus_bolunmus ).
+                "ek": True,
             })
 
     b = excel_round(sum(s["c"] for s in satirlar), 6)
     return satirlar, b
 
 
-def _nufus_bolunmus(bina_tipi, hizli1, hizli2, b):
+def _nufus_bolunmus(bina_tipi, hizli1, hizli2, b, nufus_satirlari=None):
     """
     (aciklamalar, notlar) — ilk satır Tablo-1 KURALIDIR (yöntem açıklaması,
     ekranda ⓘ içinde), kalanlar bu projenin türetimidir (ekranda görünür).
+
+    EK NÜFUS:  ⑤/⑥ girdilerinin dışında elle eklenen nüfus kalemleri varsa
+    ana formül YALNIZ kendi toplamını yazar ( "44 × 5 = 220 kişi" ), her ek
+    kalem kendi satırında gösterilir ve en sona toplam konur.  Aksi hâlde
+    pafta "44 × 5 = 1.360 kişi" gibi KENDİ İÇİNDE ÇELİŞEN bir satır basar;
+    denetimde bu hesap hatası olarak okunur.
     """
-    satirlar = [x for x in _nufus_aciklamasi(bina_tipi, hizli1, hizli2, b) if x]
+    ek = [x for x in (nufus_satirlari or []) if x.get("ek")]
+    b_ana = (excel_round(sum(x["c"] for x in nufus_satirlari if not x.get("ek")), 6)
+             if nufus_satirlari else b)
+    satirlar = [x for x in _nufus_aciklamasi(bina_tipi, hizli1, hizli2, b_ana) if x]
     if not satirlar:
         return [], []
+    for x in ek:
+        satirlar.append(
+            f"Ek nüfus — {x['aciklama']}: {trn(x['miktar'], 2)} {x['birim']} × "
+            f"{trn(x['katsayi'], 4)} = {trn(x['c'], 2)} kişi  ({x['kalem']})")
+    if ek:
+        satirlar.append(
+            f"Toplam  b = Σc = {trn(b_ana, 2)} + {trn(b - b_ana, 2)} = {trn(b, 2)} kişi")
     return satirlar[:1], satirlar[1:]
 
 
@@ -365,7 +404,8 @@ def hesapla_tek(g: dict) -> dict:
     ]
     if Nb:
         b1["aciklamalar"].append(T.BODRUM_NOTU)
-    _ac, _no = _nufus_bolunmus(bina_tipi, g.get("hizli1"), g.get("hizli2"), b)
+    _ac, _no = _nufus_bolunmus(bina_tipi, g.get("hizli1"), g.get("hizli2"), b,
+                              nufus_satirlari)
     b1["aciklamalar"] += _ac
     b1["notlar"] += _no
     b1["adimlar"] += [
@@ -570,6 +610,19 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
     bina = _bina_hatasi(g, N, h, by, yy)
     if bina:
         return bina
+    #  DURAK ADEDİ  —  çokluyla aynı kural.  Tek hesap yolunda tanımlı
+    #  asansörlerin hepsi AYNI TİPTİR, dolayısıyla en yüksek durağa çıkan da
+    #  onlardır:  durak adedi N + 1 olmalıdır.  ( Çoklu yol bunu
+    #  "kat sayısı N, aktif asansörlerin en yüksek durak sayısına göre
+    #  girilmelidir" diye reddediyordu; tek yol alanı hiç okumuyordu. )
+    Ni, d_hata = _durak_oku(g.get("durak"), N)
+    if d_hata:
+        return d_hata
+    if sayi_mi(Ni) and sayi_mi(N) and Ni != N:
+        return (f"HESAP HATASI: durak adedi {int(Ni) + 1} girilmiş; asansör ana giriş "
+                f"üstündeki {int(N)} katın tümüne hizmet ettiğinden durak adedi "
+                f"N + 1 = {int(N) + 1} olmalıdır. Asansör daha az durakta duruyorsa "
+                "⑩ kat sayısını o asansöre göre girin ya da durak alanını boşaltın.")
     sure = _manuel_sure_hatasi(g)
     if sure:
         return sure
@@ -735,16 +788,9 @@ def hesapla_coklu(g: dict) -> dict:
         kg_ = a.get("kapi_genisligi")
         kt = a.get("kapi_tipi")
         # durak sayısı (ana giriş dâhil) — boşsa ortak N+1
-        d_in = a.get("durak")
-        if sayi_mi(d_in):
-            if not (float(d_in).is_integer() and 2 <= d_in <= (N or 0) + 1):
-                hata = hata or ("HESAP HATASI: durak sayısı geçersiz — 2 ile ortak durak sayısı "
-                                "(N+1) arasında tam sayı girin veya boş bırakın")
-                Ni = None
-            else:
-                Ni = int(d_in) - 1
-        else:
-            Ni = N
+        Ni, d_hata = _durak_oku(a.get("durak"), N)
+        if d_hata:
+            hata = hata or d_hata
         hi = a.get("h") if sayi_mi(a.get("h")) else h
         # bodrum: asansör bazında; boş bırakılırsa ortak değer kullanılır
         if a.get("bodrum") in (None, ""):
@@ -808,6 +854,15 @@ def hesapla_coklu(g: dict) -> dict:
                             "manuel tg girin.")
         if T.kapsam_disi(Ni, P):
             hata = hata or f"HESAP HATASI: ASANSÖR-{i} — P/N aralık dışı (P: 6-34, N: 1-30)"
+        #  KAPASİTE TABLO-7'DE OLMALIDIR  —  tek hesap yolunda ( _dogrula_tek )
+        #  zaten aranıyordu, çokluda aranmıyordu:  P = 7 sessizce geçiyor,
+        #  Q = 7 × 75 = 525 kg türetiliyor ve pafta bu değere kaynak olarak
+        #  "Tablo-7" yazıyordu — tabloda böyle bir satır YOK.
+        if P not in T.GECERLI_KAPASITELER:
+            hata = hata or (
+                f"HESAP HATASI: ASANSÖR-{i} — kabin kapasitesi P = {trn(P, 0)} kişi "
+                "MMO/697 Tablo-7'de yoktur; listedeki kapasitelerden birini seçin ( "
+                + " / ".join(str(x) for x in T.GECERLI_KAPASITELER) + " kişi ).")
 
         asansorler.append({
             "no": i, "ad": f"ASANSÖR-{i}", "P": P, "yuk_kg": T.tablo7_yuk(P),
@@ -877,7 +932,8 @@ def hesapla_coklu(g: dict) -> dict:
               B, "kişi", "MMO/697", 0),
         veri("k", "Taşınacak insan yüzdesi", k, "—", k_notu, 4),
     ]
-    _ac, _no = _nufus_bolunmus(bina_tipi, g.get("hizli1"), g.get("hizli2"), b)
+    _ac, _no = _nufus_bolunmus(bina_tipi, g.get("hizli1"), g.get("hizli2"), b,
+                              nufus_satirlari)
     b1["aciklamalar"] = _ac
     b1["notlar"] = _no
     if Nb_ortak or any(a.get("bodrum") for a in asansorler):
@@ -1021,7 +1077,7 @@ def hesapla(g: dict) -> dict:
         bir = dict(liste[0]) if liste else {}
         tekil = dict(g)
         tekil.pop("asansorler", None)
-        for k in ("P", "kapi_genisligi", "kapi_tipi",
+        for k in ("P", "kapi_genisligi", "kapi_tipi", "durak",
                   "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp"):
             if not _bos(bir.get(k)):
                 tekil[k] = bir[k]

@@ -52,7 +52,14 @@ SABIT_B_VARSAYILAN = {
     "kabin_armatur_lm": 300,
     "kabin_ustu_armatur": 1,
     "kuyu_armatur_W": 40,    # Flüoresan
-    "kuyu_armatur_lm": 2600, # Ofis teamülü (Tablo-4'te 40 W = 2100 lm)
+    #  MMO/697 Tablo-4 ( bkz. tables.ARMATUR_ISIK_AKISI ):  Flüoresan 40 W = 2100 lm.
+    #  Burada eskiden kaynağı belirsiz bir "ofis teamülü" olarak 2600 lm duruyordu;
+    #  pafta ØL satırına kaynak olarak yalnız "SABİTLER B" yazdığı için tablodan
+    #  sapıldığı GÖRÜNMÜYORDU.  2600 daha az armatür verir — yani emniyetsiz
+    #  taraftır: saha ölçümünde TS EN 81-20'nin 50 lüksü tutmayabilir.  Varsayılan
+    #  tabloya çekildi;  farklı bir armatür kullanılacaksa alan doldurulur ve pafta
+    #  kaynağı "GİRİŞ — imalatçı verisi" olarak yazar ( bkz. _armatur_kaynagi ).
+    "kuyu_armatur_lm": 2100, # MMO/697 Tablo-4 — Flüoresan 40 W
     "kuyu_Dmax": 7,          # Armatürler arası azami aralık, m (0 = kontrol kapalı)
     "priz_adedi": 3,
     "priz_gucu": 300,        # W
@@ -148,11 +155,16 @@ def sabitler(ozel=None):
     Yönetmelik sabitleri (A) + ofis standardı (B).
     `ozel` içindeki geçersiz değerler yok sayılır, varsayılan kullanılır;
     reddedilenlerin listesi "_reddedilen" anahtarında döner.
+
+    KABUL EDİLEN ezmeler ayrıca "_ozel" listesinde tutulur:  paftada bir
+    değerin tablodan mı yoksa kullanıcıdan mı geldiğini yazabilmek için
+    ( bkz. _armatur_kaynagi ).  Aksi hâlde ØL satırı, değer ne olursa olsun
+    "SABİTLER B" diyordu ve tablodan sapıldığı paftada görünmüyordu.
     """
     s = dict(SABIT_A)
     s.update(SABIT_B_VARSAYILAN)
     s.update(OFIS_VARSAYILAN)
-    reddedilen = []
+    reddedilen, kabul = [], []
     for k, v in (ozel or {}).items():
         if v is None or (k not in SABIT_B_VARSAYILAN and k not in OFIS_VARSAYILAN):
             continue
@@ -160,16 +172,30 @@ def sabitler(ozel=None):
             metin = str(v).strip()
             if metin:
                 s[k] = metin
+                kabul.append(k)
             continue
         alt, ust = SABIT_B_ARALIK.get(k) or OFIS_ARALIK.get(k) or (None, None)
         if not sayi_mi(v) or (alt is not None and not (alt <= v <= ust)):
             reddedilen.append(f"{k} = {v}")
             continue
         s[k] = v
+        kabul.append(k)
     if "ayd_sutun" in s:
         s["ayd_sutun"] = int(round(s["ayd_sutun"]))
     s["_reddedilen"] = reddedilen
+    s["_ozel"] = sorted(kabul)
     return s
+
+
+#  ARMATÜR IŞIK AKISININ KAYNAĞI  —  paftada GÖRÜNMELİDİR.
+#  Varsayılan ( W, lm ) çiftleri MMO/697 Tablo-4'ten alınmıştır.  Kullanıcı
+#  gücü ya da ışık akısını elle girdiyse artık tablo değeri değildir; paftaya
+#  bunu yazmak, imalatçı referansının belgeye girmesini de sağlar.
+def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
+    ozel = set(S.get("_ozel") or ())
+    if ozel & {w_anahtar, lm_anahtar}:
+        return "GİRİŞ — imalatçı verisi ( marka-model paftada belirtilmelidir )"
+    return "MMO/697 Tablo-4"
 
 
 def _evet_mi(x):
@@ -438,7 +464,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                 "uyari": f"!!!   {no} NOLU ASANSÖR — motor gücü belirlenemedi   ·   "
                          "hesaplanan güç bulunamadığı için standart kademe "
                          "seçilemedi; 'Nsç' alanını elle doldurun   !!!"}
-    motor_uygun = sayi_mi(N_hes) and sayi_mi(Nsc) and Nsc >= N_hes
+    #  Tolerans motor_sec ile ORTAKTIR ( bkz. tables.MOTOR_TOLERANS ):  seçim
+    #  ile kontrol ayrı eşik kullanırsa pafta kendi seçtiği motoru reddeder.
+    motor_uygun = (sayi_mi(N_hes) and sayi_mi(Nsc)
+                   and Nsc >= N_hes - T.MOTOR_TOLERANS)
 
     b1 = Bolum("1 -  MOTOR GÜCÜ HESABI", "MMO / 697  —  s.21")
     b1["adimlar"] = [
@@ -586,7 +615,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E_kabin,0)} · {tr(ka)} · {tr(kb)} · {tr(d)}   /   {tr(eta_kabin)}",
               T_kabin, "lm", "gerekli toplam ışık akısı"),
-        veri("ØL", "Bir armatürün ışık akısı", OL_kabin, "lm", "SABİTLER B", 0),
+        veri("ØL", "Bir armatürün ışık akısı", OL_kabin, "lm",
+             _armatur_kaynagi(S, "kabin_armatur_W", "kabin_armatur_lm"), 0),
         hesap("Z   =   T   /   ØL", f"=   {tr(T_kabin)}   /   {trn(OL_kabin,0)}",
               Z_kabin, "adet", "hesaplanan armatür sayısı"),
         veri("n", "SEÇİLEN armatür sayısı  ( Z yukarı yuvarlanır )", n_kabin, "adet", "", 0),
@@ -626,7 +656,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E_kuyu,0)} · {tr(qa)} · {tr(qb)} · {tr(d)}   /   {tr(eta_kuyu)}",
               T_kuyu, "lm", "gerekli toplam ışık akısı"),
-        veri("ØL", "Bir armatürün ışık akısı", OL_kuyu, "lm", "SABİTLER B", 0),
+        veri("ØL", "Bir armatürün ışık akısı", OL_kuyu, "lm",
+             _armatur_kaynagi(S, "kuyu_armatur_W", "kuyu_armatur_lm"), 0),
         hesap("Z   =   T   /   ØL", f"=   {tr(T_kuyu)}   /   {trn(OL_kuyu,0)}",
               Z_kuyu, "adet", "hesaplanan armatür sayısı"),
         veri("n1", "Işık akısından  =  ROUNDUP( Z ) + 2   ( kuyu dibi + üstü )", n1, "adet",
@@ -874,7 +905,8 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
         veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "SABİTLER A"),
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E,0)} · {tr(a)} · {tr(b)} · {tr(d)}   /   {tr(eta)}", Tt, "lm", ""),
-        veri("ØL", "Bir armatürün ışık akısı", OL, "lm", "SABİTLER B", 0),
+        veri("ØL", "Bir armatürün ışık akısı", OL, "lm",
+             _armatur_kaynagi(S, "kuyu_armatur_W", "kuyu_armatur_lm"), 0),
         hesap("Z   =   T   /   ØL", f"=   {tr(Tt)}   /   {trn(OL,0)}", Z, "adet", ""),
         veri("n", "SEÇİLEN armatür sayısı  ( Z yukarı yuvarlanır )", n, "adet", "", 0),
     ]
@@ -989,13 +1021,15 @@ def hesapla_topraklama(ortak: dict, S: dict) -> dict:
                   f"Re = {tr(Re)} Ω   >   {tr(Re_max)} Ω   —   ek topraklayıcı gereklidir."),
         "uygun": bool(uygun),
     }
-    #  İlk iki satır sonucun GEÇERLİLİK ŞARTIDIR — ekranda görünür kalır.
-    b3["notlar"] = [
+    #  BU NOTLAR PAFTAYA VE CAD ÇIKTISINA BASILMAZ  ( "ekran_notlari" ).
+    #  Gerekçe:  söyledikleri değerler zaten hesap satırlarında yazılı
+    #  ( UL, IΔn, β — kaynak kolonuyla birlikte ) ve dört satırlık blok,
+    #  topraklama hesabının üç bölümünün tek sayfada kalmasını engelliyordu.
+    #  Bilgi kaybolmuyor:  ekranda bölüm başlığındaki ⓘ altında duruyor.
+    b3["ekran_notlari"] = [
         "HESAPLANAN TAHMİNİ DEĞERDİR — TESİS TAMAMLANDIKTAN SONRA ÖLÇÜMLE DOĞRULANACAKTIR.",
         f"KABULLER: TT şebeke, UL = {trn(S['UL'],0)} V, IΔn = {tr(S['IDn'])} A. "
         "Şebeke TN sistem ise bu kontrol ölçütü geçerli değildir.",
-    ]
-    b3["aciklamalar"] = [
         "Toprak özgül direnci β zemin etüdünden alınmalıdır; verilmemişse 150 Ω·m kabul "
         "edilir. Rç bağıntısı çubuk çapını ve çubuklar arası etkileşimi içermeyen bir ön "
         "kabuldür — kesin değer ölçümle bulunur.",

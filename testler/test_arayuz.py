@@ -25,6 +25,17 @@ def _sunucu_var():
         return False
 
 
+def uygulamayaGir(pg):
+    """
+    AÇILIŞ EKRANI ( 2.6 ):  program önce hangi projenin hazırlanacağını
+    sorar.  Sayfa her yüklendiğinde / yenilendiğinde tekrar oraya döner,
+    bu yüzden hesap ekranına geçmek için Avan Proje seçilir.
+    """
+    if pg.is_visible("#giris"):
+        pg.click("#gk_avan")
+        pg.wait_for_timeout(350)
+
+
 def adetSec(pg, n):
     """
     Trafik sekmesinde KAÇ ASANSÖR TANIMLANDIĞINI seçer.
@@ -69,6 +80,62 @@ def calistir():
         pg.wait_for_timeout(800)
 
         r.kontrol("sayfa başlığı doğru", "Avan" in pg.title(), f"→ {pg.title()!r}")
+
+        # ---------------------------------------------------------------
+        #  AÇILIŞ EKRANI  ( 2.6 )
+        #  Program artık doğrudan hesap ekranına düşmüyor:  önce hangi
+        #  projenin hazırlanacağı seçiliyor.  Şimdilik yalnız "Avan Proje"
+        #  hazır;  uygulama projesi sonra eklenecek ve seçilince uygulamayı
+        #  AÇMAMALI — yarım bir bölüme girilmiş olmasın.
+        # ---------------------------------------------------------------
+        pg.on("dialog", lambda d: d.dismiss())
+        r.kontrol("açılışta proje seçim ekranı görünüyor", pg.is_visible("#giris"))
+        r.kontrol("açılışta hesap sekmeleri gizli",
+                  not pg.is_visible('.sekme[data-sekme="avan"]'))
+        r.esit("açılışta iki seçenek var",
+               pg.eval_on_selector_all(".giris-kart", "e=>e.length"), 2)
+        r.kontrol("avan seçeneği hazır işaretli", "HAZIR" in (pg.inner_text("#gk_avan") or ""))
+        r.kontrol("uygulama projesi 'yakında' işaretli",
+                  "YAKINDA" in (pg.inner_text("#gk_uygulama") or ""))
+        pg.click("#gk_uygulama")
+        pg.wait_for_timeout(400)
+        r.kontrol("hazır olmayan bölüm uygulamayı açmıyor", pg.is_visible("#giris"))
+        pg.click("#gk_avan")
+        pg.wait_for_timeout(400)
+        r.kontrol("avan seçilince uygulama açılıyor",
+                  (not pg.is_visible("#giris")) and pg.is_visible('.sekme[data-sekme="avan"]'))
+        pg.click("#dg_ana_ekran")
+        pg.wait_for_timeout(300)
+        r.kontrol("ana ekran düğmesi seçim ekranına döndürüyor", pg.is_visible("#giris"))
+        pg.click("#gk_avan")
+        pg.wait_for_timeout(300)
+        r.kontrol("geri dönülüp yeniden girilebiliyor", not pg.is_visible("#giris"))
+
+        # ---------------------------------------------------------------
+        #  SEKME SIRASI  ( 2.7 )
+        #  Şerit işlem sırasını anlatır:  1 trafik · 2 avan · 3 proje kapağı.
+        #  "Sabitler" ve "Tablolar" birer adım değil, gerektikçe bakılan
+        #  kaynaklardır — akışın ortasında değil, şeridin sağ ucundadırlar.
+        # ---------------------------------------------------------------
+        r.esit("sekme sırası işlem sırası",
+               pg.eval_on_selector_all(".sekme", "e=>e.map(x=>x.dataset.sekme)"),
+               ["trafik", "avan", "proje", "sabitler", "tablolar"])
+        r.esit("açılışta 1. adım etkin",
+               pg.eval_on_selector(".sekme.etkin", "e=>e.dataset.sekme"), "trafik")
+        r.kontrol("açılışta trafik gövdesi görünür", pg.is_visible("#s-coklu"))
+        r.kontrol("proje kapağı 3. adım olarak yazılı",
+                  "3" in (pg.inner_text('.sekme[data-sekme="proje"]') or ""))
+        _yer = pg.evaluate("""() => {
+            const q = s => document.querySelector(s).getBoundingClientRect();
+            return {kapak: q('.sekme[data-sekme="proje"]').right,
+                    sabit: q('.sekme[data-sekme="sabitler"]').left,
+                    serit: q('.sekmeler-ic').right,
+                    tablo: q('.sekme[data-sekme="tablolar"]').right};
+        }""")
+        r.kontrol("başvuru sekmeleri sağ uca itildi",
+                  _yer["sabit"] - _yer["kapak"] > 100, f"→ {_yer}")
+        r.kontrol("son sekme şeridin sağ ucunda",
+                  _yer["serit"] - _yer["tablo"] < 40, f"→ {_yer}")
 
         # örnek proje yüklensin
         pg.evaluate("ornekYukle()")
@@ -778,6 +845,7 @@ def calistir():
         pg.wait_for_timeout(250)
         pg.reload(wait_until="networkidle")
         pg.wait_for_timeout(1500)
+        uygulamayaGir(pg)
         r.esit("yenileme sonrası N korundu", pg.input_value("#c_N"), "11")
         r.esit("yenileme sonrası kapak alanı korundu",
                pg.input_value("#k_owner"), "Kalıcılık Denemesi A.Ş.")
@@ -862,6 +930,7 @@ def calistir():
         pg.evaluate("localStorage.clear()")
         pg.reload(wait_until="networkidle")
         pg.wait_for_timeout(1200)
+        uygulamayaGir(pg)
         adetSec(pg, 1)
         pg.wait_for_timeout(300)
         r.esit("sıfırlandıktan sonra N boş", pg.input_value("#c_N"), "")

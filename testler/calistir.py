@@ -25,6 +25,7 @@ TESTLER = [
     ("4", "Çıktı bütünlüğü", "testler.test_ciktilar", False),
     ("5", "Arayüz", "testler.test_arayuz", False),
     ("6", "Geri yükleme", "testler.test_geri_yukleme", False),
+    ("7", "Altın çıktı", "testler.test_altin", False),
 ]
 
 

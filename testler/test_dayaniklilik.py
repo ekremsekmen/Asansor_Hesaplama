@@ -285,6 +285,43 @@ def calistir():
     except Exception as e:                                    # noqa: BLE001
         r.kontrol("/api/sablon çalışıyor", False, f"→ {e}")
 
+
+    # ---------------------------------------------- PROJE KİMLİĞİ  ( denetim 2.5 )
+    #  Kusur:  indirilen her dosya "Asansor - Avan Hesaplari.xlsx" adıyla
+    #  iniyordu — aynı klasördeki iki projenin dosyaları ayırt edilemiyordu.
+    #  Kapak sekmesindeki proje adı artık dosya adına ve XLSX'in
+    #  ÖZELLİKLERİNE geçer;  paftanın İÇERİĞİ değişmez.
+    _KP = {"project_title": "ÇAĞDAŞ KONUTLARI B BLOK", "owner": "Örnek Yapı A.Ş.",
+           "sheet_no": "EL-04", "elec_name": "Ekrem", "elec_surname": "Sekmen"}
+    _pk = UYGULAMA._proje_kimligi({"kapak": _KP})
+    r.esit("kapak → proje adı", _pk["proje_adi"], "ÇAĞDAŞ KONUTLARI B BLOK")
+    r.esit("kapak → işveren", _pk["isveren"], "Örnek Yapı A.Ş.")
+    r.esit("kapak → pafta no", _pk["pafta_no"], "EL-04")
+    r.esit("kapak → mühendis", _pk["muhendis"], "Ekrem Sekmen")
+    r.kontrol("dosya adı proje adıyla başlıyor",
+              UYGULAMA._dosya_adi(_pk, "Avan Hesaplari", "xlsx")
+              .startswith("ÇAĞDAŞ KONUTLARI B BLOK"))
+    #  kapak gönderilmezse ( eski istemci / boş kapak ) eski davranış sürer
+    r.esit("kapaksız istek eski adı verir",
+           UYGULAMA._dosya_adi(UYGULAMA._proje_kimligi({}), "Avan Hesaplari", "xlsx"),
+           "Asansor - Avan Hesaplari.xlsx")
+    #  dosya adına yol ayracı / üst dizin sızmamalı
+    _kotu = UYGULAMA._dosya_adi(
+        UYGULAMA._proje_kimligi({"kapak": {"project_title": "../../etc/passwd"}}),
+        "Avan Hesaplari", "xlsx")
+    r.kontrol("dosya adında yol ayracı yok",
+              "/" not in _kotu and ".." not in _kotu, f"→ {_kotu}")
+    #  XLSX bu kimliği taşıyıp geri veriyor mu
+    try:
+        from exports import xlsx_export as _XE, xlsx_import as _XI
+        _ham = _XE.avan_xlsx({"ortak": {"U": 380}, "asansorler": [{"kapasite": 10}]}, _pk)
+        _geri = (_XI.xlsx_oku(_ham) or {}).get("proje") or {}
+        for _alan in ("proje_adi", "isveren", "pafta_no", "muhendis"):
+            r.esit(f"XLSX proje kimliğini taşıyor: {_alan}",
+                   _geri.get(_alan), _pk[_alan])
+    except Exception as e:                                    # noqa: BLE001
+        r.kontrol("XLSX proje kimliği gidiş-dönüşü", False, f"→ {e}")
+
     return r
 
 

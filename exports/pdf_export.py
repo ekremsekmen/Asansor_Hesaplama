@@ -405,7 +405,30 @@ def _bas_orta_son(adimlar):
     return adimlar[:u[0][1]], adimlar[u[0][1]:u[-1][0]], adimlar[u[-1][0]:]
 
 
-def _bolum(b, ust=None, bosluk=None):
+#  Bir bölümün TAMAMI bu alana sığıyorsa sayfaya bölünmeden basılır.
+#  ( A4 eksi kenar boşlukları — bkz. _Belge.__init__ )
+SAYFA_ALANI = (A4[0] - 30 * mm, A4[1] - 50 * mm)
+#  Bir bölüm sayfanın bu kadarından KISAYSA hiç bölünmez.  Sınır yoksa uzun
+#  bölümler de bütün hâlde atlar ve arkalarında yarım sayfa boşluk bırakır —
+#  bölünmüş bir hesaptan daha kötü görünür.
+SAYFA_TAM_ORAN = 0.60
+
+
+def _yukseklik(akis, gen, yuk):
+    """Akışın toplam yüksekliği.  Ölçülemezse None döner ( o zaman bölünür )."""
+    toplam = 0.0
+    for f in akis:
+        try:
+            _g, h = f.wrap(gen, yuk)
+        except Exception:                                    # noqa: BLE001
+            return None
+        if h >= 0x7FFFFF:            # KeepTogether ölçülemez
+            return None
+        toplam += h + float(getattr(f, "spaceBefore", 0) or 0)
+    return toplam
+
+
+def _bolum(b, ust=None, bosluk=None, sayfa=None):
     """
     Bir hesap bölümünü basar.
 
@@ -441,6 +464,14 @@ def _bolum(b, ust=None, bosluk=None):
         return [KeepTogether(ustluk + kuyruk)]
     if len(parcalar) == 1:
         return [KeepTogether(ustluk + parcalar + kuyruk)]
+    #  BÖLÜM BİR SAYFAYA SIĞIYORSA HİÇ BÖLÜNMEZ.  Baş/orta/son ayrımı yalnız
+    #  gerçekten bir sayfadan UZUN bölümler için gerekir;  kısa bir bölümün
+    #  başlığı ile ilk denklemi sayfanın dibinde kalıp gerisi öbür sayfaya
+    #  geçerse pafta yarım görünür ( denetime giden çıktıda istenmez ).
+    if sayfa is not None:
+        _tam = _yukseklik(ustluk + parcalar + kuyruk, sayfa[0], sayfa[1])
+        if _tam is not None and _tam <= sayfa[1] * SAYFA_TAM_ORAN:
+            return [KeepTogether(ustluk + parcalar + kuyruk)]
     return ([KeepTogether(ustluk + [parcalar[0]])]
             + list(parcalar[1:-1])
             + [KeepTogether([parcalar[-1]] + kuyruk)])
@@ -710,7 +741,7 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:
         ust = _baslik_seridi(f"{a['baslik']}" + (f"   —   {a['tanim']}" if a["tanim"] else ""),
                              "AVAN PROJE HESAPLARI")
         for i, b in enumerate(a["bolumler"]):
-            ic += _bolum(b, ust=ust if i == 0 else None)
+            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
 
     # ---- makine dairesi
     #  MAKİNE DAİRESİZ ( MRL ) SİSTEMDE BU BÖLÜM HİÇ BASILMAZ.  Makine dairesi
@@ -725,7 +756,7 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:
     #  yalnız uyarı metni için gerekli.
     mk = sonuc.get("makine_dairesi") or {}
     if mk.get("aktif"):
-        ic += _bolum(mk["bolum"], bosluk=6 * mm)
+        ic += _bolum(mk["bolum"], bosluk=6 * mm, sayfa=SAYFA_ALANI)
     elif mk.get("mk_yok") is False:
         ust = _baslik_seridi("MAKİNE DAİRESİ AYDINLATMASI", "TS EN 81-20")
         ust.spaceBefore = 6 * mm
@@ -737,7 +768,7 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:
                          "Temel ( ızgara ) + paralel çubuk topraklayıcı")
     if tp.get("aktif"):
         for i, b in enumerate(tp["bolumler"]):
-            ic += _bolum(b, ust=ust if i == 0 else None)
+            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
     else:
         ust.spaceBefore = 6 * mm
         ic += [KeepTogether([ust] + _uyari_kutusu([tp.get("uyari", "")], hata=True))]
