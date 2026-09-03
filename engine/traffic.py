@@ -8,7 +8,7 @@ ASANSOR_TRAFIK_HESABI_v2_1.xlsx dosyasındaki
 formüllerinin birebir Python karşılığıdır.
 """
 from . import tables as T
-from .steps import (Bolum, veri, hesap, metin, tr, trn, yukari_yuvarla,
+from .steps import (Bolum, veri, hesap, tr, trn, yukari_yuvarla,
                     excel_round, sayi_mi)
 
 
@@ -48,6 +48,51 @@ def _durak_oku(deger, N, on_ek=""):
         return None, (f"HESAP HATASI: {on_ek}durak sayısı geçersiz — 2 ile ortak durak sayısı "
                       "(N+1) arasında tam sayı girin veya boş bırakın")
     return int(deger) - 1, None
+
+
+#  SÜRELERİN ÇÖZÜMÜ  —  ta / tk / tg / tp   ( tek ve çoklu hesapta AYNI kural )
+#
+#  Excel'de HESAPLAMA ve ÇOKLU ASANSÖR sayfaları bu değerleri AYNI TABLO-4 /
+#  TABLO-6 / TABLO-8 sayfalarından okur;  tablo tek kopyadır.  Python'da tablo
+#  OKUMA zaten ortaktı ( tables.py ) ama tablonun ETRAFINDAKİ katman —  elle
+#  ezme, uyarı metinleri, kaynak yazısı — iki kez yazılmıştı ve ayrışmıştı:
+#  çoklu pafta, Tablo-4 / Tablo-8 ara değer uyarılarının KISALTILMIŞ hâlini
+#  basıyor, "imalatçı katalog değeri varsa manuel girin" öğüdünü hiç
+#  yazmıyordu.  Kural artık tek yerde.
+def _sure_cozumle(kaynak, kg_, kt, V, P, on_ek=""):
+    """
+    kaynak : manuel_ta / manuel_tk / manuel_tg / manuel_tp taşıyan girdi sözlüğü
+    on_ek  : uyarıların başına konur ( çoklu hesapta "ASANSÖR-2: " )
+
+    Dönen sözlük:  ta, tk, tg, tp, kaynak{...}, uyarilar[...], elle
+    """
+    m = {ad: (kaynak or {}).get("manuel_" + ad) for ad in ("ta", "tk", "tg", "tp")}
+    t4_ta, t4_tk = T.tablo4_ta_tk(kg_, kt)
+    tablo = {"ta": t4_ta, "tk": t4_tk, "tg": T.tablo6_tg(V), "tp": T.tablo8_tp(kg_)}
+    deger = {ad: (m[ad] if sayi_mi(m[ad]) else tablo[ad]) for ad in tablo}
+
+    tablo_kaynagi = {"ta": T.tablo4_kaynagi(kg_), "tk": T.tablo4_kaynagi(kg_),
+                     "tg": T.tg_kaynagi(V), "tp": T.tablo8_kaynagi(kg_)}
+    kaynaklar = {ad: ("İmalatçı verisi" if sayi_mi(m[ad]) else tablo_kaynagi[ad])
+                 for ad in tablo}
+
+    U = []
+    elle = sum(1 for x in m.values() if sayi_mi(x))
+    if elle:
+        U.append(f"⚠ {on_ek}{elle} adet süre imalatçı verisiyle değiştirildi "
+                 "(MMO Tablo-4/6/8 yerine). Paftada marka-model ve teknik föy "
+                 "referansı belirtilmelidir.")
+    if kg_ in T.TABLO_4_ARA and not (sayi_mi(m["ta"]) and sayi_mi(m["tk"])):
+        U.append(f"⚠ {on_ek}{kg_} mm MMO/697 Tablo-4'te basılı değildir; ta/tk komşu "
+                 "satırlar arasında doğrusal enterpolasyonla bulunmuştur. İmalatçı "
+                 "katalog değeri varsa manuel ta/tk girilmesi tercih edilir.")
+    if kg_ in T.TABLO_8_ARA and not sayi_mi(m["tp"]):
+        U.append(f"⚠ {on_ek}{kg_} mm ISO 8100-32:2020 Tablo 6 kapsamı dışındadır "
+                 "(tablo 800 mm'de başlar); tp = 1,3 s, 800→900 mm eğiminden dış "
+                 "değerlemeyle alınmıştır (emniyetli taraf). İmalatçı verisi varsa "
+                 "manuel tp girin.")
+    U += T.erisilebilirlik_uyarilari(P, kg_, on_ek=on_ek)
+    return {**deger, "kaynak": kaynaklar, "uyarilar": U, "elle": elle}
 
 
 def _hesap_standardi(bina_yuksekligi, yapi_yuksekligi):
@@ -278,29 +323,10 @@ def hesapla_tek(g: dict) -> dict:
     H = T.tablo3_H(N, P) if (sayi_mi(N) and sayi_mi(P)) else None
     S = T.tablo5_S(N, P) if (sayi_mi(N) and sayi_mi(P)) else None
 
-    t4_ta, t4_tk = T.tablo4_ta_tk(kg_, kt)
-    t6_tg = T.tablo6_tg(V)
-    t8_tp = T.tablo8_tp(kg_)
-
-    mta, mtk, mtg, mtp = (g.get("manuel_ta"), g.get("manuel_tk"),
-                          g.get("manuel_tg"), g.get("manuel_tp"))
-    ta = mta if sayi_mi(mta) else t4_ta
-    tk = mtk if sayi_mi(mtk) else t4_tk
-    tg = mtg if sayi_mi(mtg) else t6_tg
-    tp = mtp if sayi_mi(mtp) else t8_tp
-    elle_sure = sum(1 for x in (mta, mtk, mtg, mtp) if sayi_mi(x))
-    if elle_sure:
-        U.append(f"⚠ {elle_sure} adet süre imalatçı verisiyle değiştirildi (MMO Tablo-4/6/8 yerine). "
-                 "Paftada marka-model ve teknik föy referansı belirtilmelidir.")
-    if kg_ in T.TABLO_4_ARA and not (sayi_mi(mta) and sayi_mi(mtk)):
-        U.append(f"⚠ {kg_} mm MMO/697 Tablo-4'te basılı değildir; ta/tk komşu satırlar "
-                 "arasında doğrusal enterpolasyonla bulunmuştur. İmalatçı katalog "
-                 "değeri varsa manuel ta/tk girilmesi tercih edilir.")
-    if kg_ in T.TABLO_8_ARA and not sayi_mi(mtp):
-        U.append(f"⚠ {kg_} mm ISO 8100-32:2020 Tablo 6 kapsamı dışındadır (tablo 800 mm'de "
-                 "başlar); tp = 1,3 s, 800→900 mm eğiminden dış değerlemeyle alınmıştır "
-                 "(emniyetli taraf). İmalatçı verisi varsa manuel tp girin.")
-    U += T.erisilebilirlik_uyarilari(P, kg_)
+    _s = _sure_cozumle(g, kg_, kt, V, P)
+    ta, tk, tg, tp = _s["ta"], _s["tk"], _s["tg"], _s["tp"]
+    mtg = g.get("manuel_tg")            # yalnız öneri tablosuna geçer
+    U += _s["uyarilar"]
 
     # ---- doğrulama (E45 / H45 karşılığı)
     if hata is None:
@@ -429,14 +455,10 @@ def hesapla_tek(g: dict) -> dict:
               f"=  {tr(ta)} + {tr(tk)} + {tr(tg)} − {tr(tv)}", ts, "s", "MMO/697"),
         veri("P", "Kabin kişi adedi", P, "kişi", T.tablo7_kaynagi(P), 0),
         veri("p", "İndirgenmiş kişi sayısı  p = 0,8·P", p, "kişi", "MMO/697", 1),
-        veri("tp", "Kişi transfer zamanı", tp, "s",
-             "İmalatçı verisi" if sayi_mi(mtp) else T.tablo8_kaynagi(kg_)),
-        veri("ta", "Kapı açılma zamanı", ta, "s",
-             "İmalatçı verisi" if sayi_mi(mta) else T.tablo4_kaynagi(kg_)),
-        veri("tk", "Kapı kapanma zamanı", tk, "s",
-             "İmalatçı verisi" if sayi_mi(mtk) else T.tablo4_kaynagi(kg_)),
-        veri("tg", "Tek katı geçme zamanı", tg, "s",
-             "İmalatçı verisi" if sayi_mi(mtg) else T.tg_kaynagi(V)),
+        veri("tp", "Kişi transfer zamanı", tp, "s", _s["kaynak"]["tp"]),
+        veri("ta", "Kapı açılma zamanı", ta, "s", _s["kaynak"]["ta"]),
+        veri("tk", "Kapı kapanma zamanı", tk, "s", _s["kaynak"]["tk"]),
+        veri("tg", "Tek katı geçme zamanı", tg, "s", _s["kaynak"]["tg"]),
     ]
     b2["notlar"] = [x for x in [V_notu] if x]
 
@@ -521,8 +543,8 @@ def hesapla_tek(g: dict) -> dict:
         },
         "nufus": nufus_satirlari,
         "bolumler": [b1, b2, b3, b4, b5],
-        "oneriler": _oneri_tablosu(g, N, B, k, Izul, standart, sartli,
-                                   esik_standart, V_min, h, kg_, kt, P, ta, tk, tp, mtg, V),
+        "oneriler": _oneri_tablosu(N, B, k, Izul, standart, sartli,
+                                   V_min, h, kg_, kt, P, ta, tk, tp, mtg, V),
     }
 
 
@@ -557,7 +579,7 @@ def _manuel_sure_hatasi(g, on_ek=""):
 #  BİNA GİRDİLERİ  —  tek ve çoklu hesapta AYNI kural.  ( Çoklu hesap bu
 #  denetimleri hiç yapmıyordu: h = −3 m ile "Yükseltilmiş kriteri
 #  karşılanıyor" sonucu üretiyordu. )
-def _bina_hatasi(g, N, h, by, yy):
+def _bina_hatasi(N, h, by, yy):
     if not (sayi_mi(N) and 1 <= N <= 30):
         return "HESAP HATASI: Kat sayısı N 1 - 30 aralığında olmalıdır."
     if not sayi_mi(h) or not (0 < h <= 10):
@@ -607,7 +629,7 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
     nb = g.get("bodrum")
     if nb not in (None, "") and _bodrum_oku(nb)[1]:
         return _bodrum_oku(nb)[1]
-    bina = _bina_hatasi(g, N, h, by, yy)
+    bina = _bina_hatasi(N, h, by, yy)
     if bina:
         return bina
     #  DURAK ADEDİ  —  çokluyla aynı kural.  Tek hesap yolunda tanımlı
@@ -637,7 +659,7 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
     return None
 
 
-def _oneri_tablosu(g, N, B, k, Izul, standart, esik_sartli, esik_standart,
+def _oneri_tablosu(N, B, k, Izul, standart, esik_sartli,
                    V_min, h, kg_, kt, P_secili, ta_secili, tk_secili, tp_secili,
                    manuel_tg, V_secili):
     """
@@ -669,24 +691,39 @@ def _oneri_tablosu(g, N, B, k, Izul, standart, esik_sartli, esik_standart,
             if TR <= 0:
                 continue
             R = 300 * 0.8 * kap / TR
-            adet = int(max(1, yukari_yuvarla(B * k / R, 0), yukari_yuvarla(TR / Izul, 0)))
+            tas = yukari_yuvarla(B * k / R, 0)        # taşıma kapasitesinin istediği adet
+            adet = int(max(1, tas, yukari_yuvarla(TR / Izul, 0)))
             Ieer = TR / adet
-            if Ieer <= Izul:
-                sinif = f"{standart} ✔"
-                anahtar = 0
-            elif sayi_mi(esik_sartli) and esik_sartli and Ieer <= esik_sartli:
-                sinif, anahtar = "Şartlı kabul", 100_000_000
-            else:
-                sinif, anahtar = "Kriteri aşıyor", 100_000_000
+            #  ADET ZATEN HER İKİ ÖLÇÜTÜ SAĞLAYACAK ŞEKİLDE SEÇİLİYOR, bu yüzden
+            #  Ieer ≤ Izul bir SINIFLANDIRMA değil, bir ÖZDEŞLİKTİR.  Burada eskiden
+            #  "Şartlı kabul" ve "Kriteri aşıyor" dalları vardı;  25.116 üretilmiş
+            #  satırın hiçbirinde çalışmadılar — çalışamazlar da, çünkü adedi
+            #  artırmak Ieer'i her zaman düşürür.  ( İkisi de aynı sıralama
+            #  anahtarını aldığından, çalışsalardı kriteri AŞAN bir seçenek şartlı
+            #  kabul edilebilir olanın önüne geçebilirdi. )
+            #
+            #  ŞARTLI KABULÜN GERÇEK KARŞILIĞI ŞU SORUDUR:  taahhütnameyle
+            #  ( MMO/697 Tablo-10 şartlı sınırı ) bu seçenek DAHA AZ asansörle
+            #  yapılabilir miydi?  Taahhütname yalnız BEKLEME süresini gevşetir —
+            #  taşıma kapasitesi ölçütü aynen durur;  bu yüzden alt sınır yine
+            #  `tas`tır.  ( hesapla_tek içindeki _gerekli_adet ile birebir aynı kural. )
+            sinif = f"{standart} ✔"
+            adet_sartli = None
+            if sayi_mi(esik_sartli) and esik_sartli and esik_sartli > Izul:
+                _as = int(max(1, tas, yukari_yuvarla(TR / esik_sartli, 0)))
+                if _as < adet:
+                    adet_sartli = _as
+                    sinif += f"  ·  şartlı kabulle {_as} adet (taahhütname)"
             # TS EN 81-70 / TS 9111 erişilebilirlik ölçütünü karşılamayan seçenek
             # (630 kg altı kabin veya 800 mm altı kapı) sıralamaya alınmaz.
             erisim = T.erisilebilir_mi(kap, W)
-            siralama = 999_999_999 if not erisim else anahtar + adet * 10_000 + kap * 10
+            siralama = 999_999_999 if not erisim else adet * 10_000 + kap * 10
             satirlar.append({
                 "secenek": (f"{kap} kişilik ({trn(T.tablo7_yuk(kap),0)} kg) — {tr(V)} m/s"
                             f"  ·  {W} mm kapı ({etiket})"
                             + ("" if erisim else "  ⚠ TS EN 81-70 erişilebilirlik ölçütü dışı")),
                 "kapasite": kap, "V": V, "kapi": W, "adet": adet, "Ieer": Ieer,
+                "adet_sartli": adet_sartli,
                 "sinif": sinif, "TR": TR, "R": R, "_siralama": siralama,
                 "erisilebilir": erisim,
             })
@@ -727,7 +764,7 @@ def hesapla_coklu(g: dict) -> dict:
     #  ( Bu blok yokken h = −3 m, h = 0, h = 99 ya da boş bırakılmış bina /
     #    yapı yüksekliği çokluda hata vermeden geçiyordu: yükseklikler boşken
     #    hesap sessizce "Standart" sınıfına düşüyordu. )
-    bina = _bina_hatasi(g, N, h, by, yy)
+    bina = _bina_hatasi(N, h, by, yy)
     if bina:
         return {"hata": bina}
     #  Ortak manuel süreler + asansör bazında girilenler
@@ -812,27 +849,10 @@ def hesapla_coklu(g: dict) -> dict:
                      "altındadır — bekleme kriteri esas alındı, gerekçeyi paftaya yazın.")
 
         # ---- süreler: tablo değeri, imalatçı verisi varsa onunla ezilir
-        t4_ta, t4_tk = T.tablo4_ta_tk(kg_, kt)
-        t6_tg = T.tablo6_tg(Vi)
-        t8_tp = T.tablo8_tp(kg_)
-        mta_i, mtk_i = a.get("manuel_ta"), a.get("manuel_tk")
-        mtg_i, mtp_i = a.get("manuel_tg"), a.get("manuel_tp")
-        ta = mta_i if sayi_mi(mta_i) else t4_ta
-        tk = mtk_i if sayi_mi(mtk_i) else t4_tk
-        tg = mtg_i if sayi_mi(mtg_i) else t6_tg
-        tp = mtp_i if sayi_mi(mtp_i) else t8_tp
-        elle_i = sum(1 for x in (mta_i, mtk_i, mtg_i, mtp_i) if sayi_mi(x))
-        if elle_i:
-            U.append(f"⚠ ASANSÖR-{i}: {elle_i} adet süre imalatçı verisiyle değiştirildi "
-                     "(MMO Tablo-4/6/8 yerine). Paftada marka-model ve teknik föy "
-                     "referansı belirtilmelidir.")
-        if kg_ in T.TABLO_4_ARA and not (sayi_mi(mta_i) and sayi_mi(mtk_i)):
-            U.append(f"⚠ ASANSÖR-{i}: {kg_} mm MMO/697 Tablo-4'te basılı değildir; ta/tk "
-                     "komşu satırlar arasında doğrusal enterpolasyonla bulunmuştur.")
-        if kg_ in T.TABLO_8_ARA and not sayi_mi(mtp_i):
-            U.append(f"⚠ ASANSÖR-{i}: {kg_} mm ISO 8100-32:2020 Tablo 6 kapsamı dışındadır; "
-                     "tp = 1,3 s dış değerlemeyle alınmıştır (emniyetli taraf).")
-        U += T.erisilebilirlik_uyarilari(P, kg_, on_ek=f"ASANSÖR-{i}: ")
+        _s = _sure_cozumle(a, kg_, kt, Vi, P, on_ek=f"ASANSÖR-{i}: ")
+        ta, tk, tg, tp = _s["ta"], _s["tk"], _s["tg"], _s["tp"]
+        elle_i = _s["elle"]
+        U += _s["uyarilar"]
         H = T.tablo3_H(Ni, P) if (sayi_mi(Ni) and sayi_mi(P)) else None
         S = T.tablo5_S(Ni, P) if (sayi_mi(Ni) and sayi_mi(P)) else None
         p = 0.8 * P if sayi_mi(P) else None
@@ -874,10 +894,10 @@ def hesapla_coklu(g: dict) -> dict:
             "h": hi, "V": Vi, "V_min": Vmin_i, "p": p, "H": H, "S": S,
             "ta": ta, "tk": tk, "tg": tg, "tp": tp, "tv": tv, "ts": ts, "TR": TR, "R": R,
             "elle_sure": elle_i,
-            "kaynak_ta": "İmalatçı verisi" if sayi_mi(mta_i) else T.tablo4_kaynagi(kg_),
-            "kaynak_tk": "İmalatçı verisi" if sayi_mi(mtk_i) else T.tablo4_kaynagi(kg_),
-            "kaynak_tg": "İmalatçı verisi" if sayi_mi(mtg_i) else T.tg_kaynagi(Vi),
-            "kaynak_tp": "İmalatçı verisi" if sayi_mi(mtp_i) else T.tablo8_kaynagi(kg_),
+            "kaynak_ta": _s["kaynak"]["ta"],
+            "kaynak_tk": _s["kaynak"]["tk"],
+            "kaynak_tg": _s["kaynak"]["tg"],
+            "kaynak_tp": _s["kaynak"]["tp"],
             "kaynak_P": T.tablo7_kaynagi(P),
         })
 

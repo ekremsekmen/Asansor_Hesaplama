@@ -472,7 +472,7 @@ def indir_proje_dwg(veri: dict = Body(...)):
         paftalar = []
         kapak = veri.get("kapak") if isinstance(veri.get("kapak"), dict) else None
         if kapak:
-            paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak, None)))
+            paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak)))
 
         #  Trafik ve avan girdileri ayrı ayrı temizlenir; ikisi de belirsiz
         #  sayı denetiminden geçer — ekran neyi reddediyorsa CAD çıktısı da

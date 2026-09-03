@@ -631,7 +631,7 @@ def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False):
                   "  Pafta sayısı formatın çerçevesine sığmadı; alta taşan",
                   "  sayfalar var.  Çerçeveyi büyütün ya da paftaları azaltın."]
     if not dwg_var:
-        satir += ["", "DWG NEDEN YOK", "  " + (sebep or "")]
+        satir += ["", "DWG İSTERSENİZ", "  " + (sebep or "")]
     return "\n".join(satir) + "\n"
 
 

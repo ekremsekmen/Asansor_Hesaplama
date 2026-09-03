@@ -14,7 +14,7 @@ sayfalarının birebir Python karşılığıdır.
 import math
 from . import tables as T
 from .steps import (Bolum, veri, hesap, metin, tr, trn,
-                    yukari_yuvarla, tavana_yuvarla, excel_round, sayi_mi)
+                    yukari_yuvarla, tavana_yuvarla, sayi_mi)
 
 
 # ---------------------------------------------------------------- SABİTLER
@@ -198,6 +198,90 @@ def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
     return "MMO/697 Tablo-4"
 
 
+#  ELLE GİRİLEN FİZİKSEL BÜYÜKLÜKLERİN SINIRLARI
+#  Denetimsizken  Q elle = 0  →  N = 0 kW  →  2,2 kW motor "uygun" çıkıyor;
+#  Gk elle negatif olabiliyor; η = 10 girilince motor gereksiz küçülüyordu.
+#  Bunlar hesabı DURDURUR — sessizce yanlış bir motor seçilmesindense
+#  kullanıcıya hangi alanın imkânsız olduğu söylenir.
+FIZIKSEL_SINIR = (
+    ("Q elle — anma yükü",          "Q_elle",  50,   20000, "kg"),
+    ("Gk elle — boş kabin kütlesi", "Gk_elle", 50,   20000, "kg"),
+    ("η — makine verimi",           "eta",     0.05, 1.0,   "—"),
+)
+
+#  HESABA GİRMESİ ZORUNLU ALANLAR.  Üçüncü sütun: sıfır ya da negatif OLAMAZ mı?
+#  ( Eskiden "eksik" ve "pozitif" listeleri AYRI tutuluyordu ve ikisi elle
+#    eşlenmek zorundaydı;  tek tabloya alındı, ayrışamazlar. )
+ZORUNLU_ALANLAR = (
+    ("V",               "Kabin hızı",                   True),
+    ("eta",             "Makine verimi",                True),
+    ("Hk",              "Kuyu yüksekliği",              True),
+    ("kuyu_genisligi",  "Kuyu genişliği",               True),
+    ("kabin_boyu",      "Kabin boyu",                   True),
+    ("kabin_genisligi", "Kabin genişliği",              True),
+    ("gr",              "Kılavuz ray birim kütlesi",    False),
+    ("Fmk",             "Makine ağırlığı",              False),
+    ("Fsh",             "Makine sehpası ağırlığı",      False),
+    ("S1",              "Kolon hattı kesiti",           True),
+    ("L1",              "Kolon hattı uzunluğu",         False),
+    ("S2",              "Makine besleme kesiti",        True),
+    ("L2",              "Makine besleme uzunluğu",      False),
+    ("U",               "Şebeke gerilimi",              True),
+    ("kappa",           "İletken iletkenliği",          True),
+    ("eps_max",         "İzin verilen gerilim düşümü",  False),
+)
+
+
+def _fiziksel_hatasi(no, d):
+    """Elle girilmiş fiziksel büyüklükler sınır dışında mı?  Hata metni ya da None."""
+    for ad, anahtar, alt, ust, birim in FIZIKSEL_SINIR:
+        deger = d.get(anahtar)
+        if deger in (None, ""):
+            continue
+        if not sayi_mi(deger) or not (alt <= deger <= ust):
+            return (f"!!!   {no} NOLU ASANSÖR — {ad} = {tr(deger)} {birim}   ·   "
+                    f"geçerli aralık {tr(alt)} - {tr(ust)} {birim}. "
+                    "Sıfır, negatif ya da fiziksel olmayan bir değer girilemez; "
+                    "boş bırakırsanız tablo / ofis değeri kullanılır.   !!!")
+    return None
+
+
+def _zorunlu_hatasi(no, d):
+    """Eksik ya da sıfır/negatif zorunlu alan var mı?  Hata metni ya da None."""
+    eksik = [ad for anahtar, ad, _ in ZORUNLU_ALANLAR if not sayi_mi(d.get(anahtar))]
+    gecersiz = [ad for anahtar, ad, poz in ZORUNLU_ALANLAR
+                if poz and sayi_mi(d.get(anahtar)) and d.get(anahtar) <= 0]
+    if not (eksik or gecersiz):
+        return None
+    parcalar = []
+    if eksik:
+        parcalar.append("eksik : " + ", ".join(eksik))
+    if gecersiz:
+        parcalar.append("sıfır veya negatif olamaz : " + ", ".join(gecersiz))
+    return (f"!!!   {no} NOLU ASANSÖR — girdi tamamlanmadı   ·   "
+            + "   ·   ".join(parcalar) + "   !!!")
+
+
+#  LÜMEN YÖNTEMİ  —  kabin, kuyu ve makine dairesi aydınlatması AYNI hesaptır.
+#  Üç yerde birebir yazılıydı;  biri değişse diğerleri sessizce eskide kalırdı.
+#      k = a·b / ( h·( a + b ) )      bölge indeksi
+#      T = E·a·b·d / η                gerekli toplam ışık akısı   ( η: TABLOLAR T2 )
+#      Z = T / ØL                     hesaplanan armatür sayısı
+def _aydinlatma(a_m, b_m, E, OL, S):
+    """
+    a_m, b_m : METRE cinsinden ölçüler        E : asgari aydınlatma şiddeti, lüks
+    OL       : bir armatürün ışık akısı, lm
+
+    Dönen:  (k, eta, T, Z)  —  η okunamazsa T ve Z None döner.
+    """
+    hh = S["h_armatur"]
+    k = a_m * b_m / (hh * (a_m + b_m))
+    eta = T.ayd_verim(k, S["ayd_sutun"])
+    isik = E * a_m * b_m * S["kirlenme_faktoru"] / eta if eta else None
+    Z = isik / OL if sayi_mi(isik) else None
+    return k, eta, isik, Z
+
+
 def _evet_mi(x):
     """Excel'den 'Evet' / 'Hayır', arayüzden True / False gelebilir."""
     if isinstance(x, bool):
@@ -336,25 +420,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     kappa = _ortak_degeri(ortak, S, "kappa", red)
     eps_max = _ortak_degeri(ortak, S, "eps_max", red)
 
-    # ---------- ELLE GİRİLEN FİZİKSEL BÜYÜKLÜKLERİN SINIRLARI
-    #  Denetimsizken  Q elle = 0  →  N = 0 kW  →  2,2 kW motor "uygun" çıkıyor;
-    #  Gk elle negatif olabiliyor; η = 10 girilince motor gereksiz küçülüyordu.
-    #  Bunlar hesabı DURDURUR — sessizce yanlış bir motor seçilmesindense
-    #  kullanıcıya hangi alanın imkânsız olduğu söylenir.
-    FIZIKSEL = [
-        ("Q elle — anma yükü", Q_elle, 50, 20000, "kg"),
-        ("Gk elle — boş kabin kütlesi", Gk_elle, 50, 20000, "kg"),
-        ("η — makine verimi", eta, 0.05, 1.0, "—"),
-    ]
-    for ad, deger, alt, ust, birim in FIZIKSEL:
-        if deger in (None, ""):
-            continue
-        if not sayi_mi(deger) or not (alt <= deger <= ust):
-            return {"no": no, "aktif": False,
-                    "uyari": f"!!!   {no} NOLU ASANSÖR — {ad} = {tr(deger)} {birim}   ·   "
-                             f"geçerli aralık {tr(alt)} - {tr(ust)} {birim}. "
-                             "Sıfır, negatif ya da fiziksel olmayan bir değer girilemez; "
-                             "boş bırakırsanız tablo / ofis değeri kullanılır.   !!!"}
+    # ---------- elle girilen fiziksel büyüklüklerin sınırları
+    _fh = _fiziksel_hatasi(no, {"Q_elle": Q_elle, "Gk_elle": Gk_elle, "eta": eta})
+    if _fh:
+        return {"no": no, "aktif": False, "uyari": _fh}
 
     # ---------- Q  (Tablo-7 → elle)
     Q0 = T.TABLO_7.get(P_kap) if sayi_mi(P_kap) else None
@@ -366,36 +435,14 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                           "!!!   KAPASİTE TABLO-7 DIŞI   —   'Anma yükü — elle' alanını doldurun   !!!")}
 
     # ---------- zorunlu girdi denetimi
-    #  Eksik ya da geçersiz bir alan varsa hesap yapılmaz; hangi alanların
-    #  eksik olduğu adıyla bildirilir (program çökmez).
-    ZORUNLU = [
-        ("V", V, "Kabin hızı"), ("eta", eta, "Makine verimi"),
-        ("Hk", Hk, "Kuyu yüksekliği"), ("kuyu_genisligi", kuyu_b, "Kuyu genişliği"),
-        ("kabin_boyu", kabin_a, "Kabin boyu"), ("kabin_genisligi", kabin_b, "Kabin genişliği"),
-        ("gr", gr, "Kılavuz ray birim kütlesi"), ("Fmk", Fmk, "Makine ağırlığı"),
-        ("Fsh", Fsh, "Makine sehpası ağırlığı"),
-        ("S1", S1, "Kolon hattı kesiti"), ("L1", L1, "Kolon hattı uzunluğu"),
-        ("S2", S2, "Makine besleme kesiti"), ("L2", L2, "Makine besleme uzunluğu"),
-        ("U", U_sebeke, "Şebeke gerilimi"), ("kappa", kappa, "İletken iletkenliği"),
-        ("eps_max", eps_max, "İzin verilen gerilim düşümü"),
-    ]
-    eksik = [ad for _, deger, ad in ZORUNLU if not sayi_mi(deger)]
-    # sıfır veya negatif olamayacak alanlar
-    POZITIF = [("Kabin hızı", V), ("Makine verimi", eta), ("Kuyu yüksekliği", Hk),
-               ("Kuyu genişliği", kuyu_b), ("Kabin boyu", kabin_a),
-               ("Kabin genişliği", kabin_b),
-               ("Kolon hattı kesiti", S1), ("Makine besleme kesiti", S2),
-               ("Şebeke gerilimi", U_sebeke), ("İletken iletkenliği", kappa)]
-    gecersiz = [ad for ad, d in POZITIF if sayi_mi(d) and d <= 0]
-    if eksik or gecersiz:
-        parcalar = []
-        if eksik:
-            parcalar.append("eksik : " + ", ".join(eksik))
-        if gecersiz:
-            parcalar.append("sıfır veya negatif olamaz : " + ", ".join(gecersiz))
-        return {"no": no, "aktif": False,
-                "uyari": f"!!!   {no} NOLU ASANSÖR — girdi tamamlanmadı   ·   "
-                         + "   ·   ".join(parcalar) + "   !!!"}
+    _zh = _zorunlu_hatasi(no, {
+        "V": V, "eta": eta, "Hk": Hk, "kuyu_genisligi": kuyu_b,
+        "kabin_boyu": kabin_a, "kabin_genisligi": kabin_b,
+        "gr": gr, "Fmk": Fmk, "Fsh": Fsh,
+        "S1": S1, "L1": L1, "S2": S2, "L2": L2,
+        "U": U_sebeke, "kappa": kappa, "eps_max": eps_max})
+    if _zh:
+        return {"no": no, "aktif": False, "uyari": _zh}
 
     # ---------- Gk  (Tablo-11 → elle)
     #  Tablo-11 yalnız 450 - 2500 kg arasını kapsar.  Dışına çıkıldığında
@@ -589,16 +636,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # =========================================================
     # 3 -  KABİN AYDINLATMA HESABI      (TS EN 81-20)
     # =========================================================
-    ka = kabin_a / 1000
-    kb = kabin_b / 1000
-    hh = S["h_armatur"]
-    k_kabin = ka * kb / (hh * (ka + kb))
-    eta_kabin = T.ayd_verim(k_kabin, S["ayd_sutun"])
-    E_kabin = S["E_kabin"]
-    d = S["kirlenme_faktoru"]
-    T_kabin = E_kabin * ka * kb * d / eta_kabin if eta_kabin else None
-    OL_kabin = S["kabin_armatur_lm"]
-    Z_kabin = T_kabin / OL_kabin if sayi_mi(T_kabin) else None
+    ka, kb = kabin_a / 1000, kabin_b / 1000
+    hh, d = S["h_armatur"], S["kirlenme_faktoru"]
+    E_kabin, OL_kabin = S["E_kabin"], S["kabin_armatur_lm"]
+    k_kabin, eta_kabin, T_kabin, Z_kabin = _aydinlatma(ka, kb, E_kabin, OL_kabin, S)
     n_kabin = int(yukari_yuvarla(Z_kabin, 0)) if sayi_mi(Z_kabin) else None
 
     b3 = Bolum("3 -  KABİN AYDINLATMA HESABI", "TS EN 81-20")
@@ -629,14 +670,9 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # =========================================================
     # 4 -  KUYU AYDINLATMA HESABI       (TS EN 81-20)
     # =========================================================
-    qa = Hk
-    qb = kuyu_b / 1000
-    k_kuyu = qa * qb / (hh * (qa + qb))
-    eta_kuyu = T.ayd_verim(k_kuyu, S["ayd_sutun"])
-    E_kuyu = S["E_kuyu"]
-    T_kuyu = E_kuyu * qa * qb * d / eta_kuyu if eta_kuyu else None
-    OL_kuyu = S["kuyu_armatur_lm"]
-    Z_kuyu = T_kuyu / OL_kuyu if sayi_mi(T_kuyu) else None
+    qa, qb = Hk, kuyu_b / 1000
+    E_kuyu, OL_kuyu = S["E_kuyu"], S["kuyu_armatur_lm"]
+    k_kuyu, eta_kuyu, T_kuyu, Z_kuyu = _aydinlatma(qa, qb, E_kuyu, OL_kuyu, S)
     n1 = int(yukari_yuvarla(Z_kuyu, 0)) + S["kuyu_ek_armatur"] if sayi_mi(Z_kuyu) else None
     Dmax = S["kuyu_Dmax"]
     n2 = int(yukari_yuvarla((Hk - 1) / Dmax, 0)) + 1 if (sayi_mi(Dmax) and Dmax > 0) else 0
@@ -881,16 +917,10 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
                              "kutusunu işaretleyin   !!!"}
         return {"aktif": False, "mk_yok": True,
                 "uyari": "Makine dairesiz ( MRL ) sistem  —  bu hesap uygulanmaz."}
-    a = A / 1000
-    b = B / 1000
-    hh = S["h_armatur"]
-    k = a * b / (hh * (a + b))
-    eta = T.ayd_verim(k, S["ayd_sutun"])
-    E = S["E_makine_dairesi"]
-    d = S["kirlenme_faktoru"]
-    Tt = E * a * b * d / eta if eta else None
-    OL = S["kuyu_armatur_lm"]
-    Z = Tt / OL if sayi_mi(Tt) else None
+    a, b = A / 1000, B / 1000
+    hh, d = S["h_armatur"], S["kirlenme_faktoru"]
+    E, OL = S["E_makine_dairesi"], S["kuyu_armatur_lm"]
+    k, eta, Tt, Z = _aydinlatma(a, b, E, OL, S)
     n = int(yukari_yuvarla(Z, 0)) if sayi_mi(Z) else None
 
     bl = Bolum("MAKİNE DAİRESİ AYDINLATMA HESABI", "TS EN 81-20")

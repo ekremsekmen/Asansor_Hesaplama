@@ -25,10 +25,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from engine import avan as AV                               # noqa: E402
 from engine import tables as T                              # noqa: E402
 from engine import traffic as TR                            # noqa: E402
 
-DOSYA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "altin_trafik.json.gz")
+_KLASOR = os.path.dirname(os.path.abspath(__file__))
+DOSYA = os.path.join(_KLASOR, "altin_trafik.json.gz")
+DOSYA_AVAN = os.path.join(_KLASOR, "altin_avan.json.gz")
 
 
 def senaryolar():
@@ -77,6 +80,20 @@ def senaryolar():
                 liste.append(a)
             yield {"bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
                    "N": 11, "h": 3, "hizli1": 44, "hizli2": 3, "asansorler": liste}
+    # 4b) çoklu — ARA DEĞER kapılar ve elle süreler.
+    #  Bu senaryolar eskiden YOKTU:  Tablo-4 ( 1000 / 1200 mm ) ve Tablo-8
+    #  ( 700 mm ) ara değer uyarıları ile "imalatçı verisi" uyarısı çoklu
+    #  yolda hiç tetiklenmiyordu — kalkan o metinleri korumuyordu.
+    for kg1, kg2, mta, mtp in ((1000, 700, None, None), (1200, 1000, 2.6, None),
+                               (700, 1200, None, 1.15), (900, 1300, 2.4, 1.0)):
+        yield {"bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
+               "N": 11, "h": 3, "hizli1": 44, "hizli2": 3,
+               "asansorler": [
+                   {"P": 10, "kapi_genisligi": kg1, "kapi_tipi": "Teleskopik Otomatik",
+                    "manuel_ta": mta},
+                   {"P": 16, "kapi_genisligi": kg2, "kapi_tipi": "Teleskopik Otomatik",
+                    "manuel_tp": mtp}]}
+
     # 5) özdeş çoklu  ( tek yola düşer )  +  ek nüfus  +  hata yolları
     for n in (2, 3, 4):
         yield {"bina_tipi": "İş Merkezi (Çok Firmalı)", "bina_yuksekligi": 45,
@@ -104,6 +121,61 @@ def senaryolar():
         yield temel
 
 
+def avan_senaryolar():
+    """AVAN motoru — altı hesap bölümü, makine dairesi ve topraklama."""
+    ortak = {"temel_a": 26.55, "temel_b": 16.4, "mk_uzunluk": 3000,
+             "mk_genislik": 2500, "beta": 150, "cubuk_sayisi": 4}
+    # 1) kapasite × hız × verim × askı  ( motor gücü ve kuvvetler )
+    for kap in (6, 10, 16, 30):
+        for V in (0.63, 1.6, 2.5):
+            for eta, i_pal in ((0.85, 2), (0.50, 1), (0.60, 2)):
+                yield {"ortak": dict(ortak), "sabitler": {},
+                       "asansorler": [{"tanim": "A", "kapasite": kap, "V": V, "eta": eta,
+                                       "i_palanga": i_pal, "Hk": 32.85,
+                                       "kuyu_genisligi": 1800, "kabin_boyu": 1450,
+                                       "kabin_genisligi": 1300,
+                                       "makine_tipi": "Dişlisiz" if eta > 0.7 else "Dişli"}]}
+    # 2) kuyu yüksekliği  ( aydınlatma n1 / n2 ve gerilim düşümü )
+    for Hk in (6.5, 12, 21, 33, 48, 75):
+        for S1 in (4, 6, 16, 35):
+            yield {"ortak": dict(ortak), "sabitler": {},
+                   "asansorler": [{"tanim": "A", "kapasite": 13, "V": 1.6, "eta": 0.85,
+                                   "Hk": Hk, "kuyu_genisligi": 1800, "kabin_boyu": 1450,
+                                   "kabin_genisligi": 1300, "S1": S1, "S2": 4,
+                                   "makine_tipi": "Dişlisiz"}]}
+    # 3) elle ezmeler, toplam verim, makine dairesiz, çok asansör
+    yield {"ortak": dict(ortak, mk_yok=True), "sabitler": {},
+           "asansorler": [{"tanim": "MRL", "kapasite": 10, "V": 1.6, "eta": 0.85,
+                           "Hk": 30, "kuyu_genisligi": 1700, "kabin_boyu": 1400,
+                           "kabin_genisligi": 1100, "makine_tipi": "Dişlisiz"}]}
+    yield {"ortak": dict(ortak), "sabitler": {"kuyu_armatur_lm": 2600, "q_denge": 0.45},
+           "asansorler": [{"tanim": "özel", "kapasite": 16, "V": 2, "eta": 0.72,
+                           "toplam_verim": "Evet", "Hk": 40, "kuyu_genisligi": 2000,
+                           "kabin_boyu": 1700, "kabin_genisligi": 1300, "Nsc": 15,
+                           "Gk_elle": 1150, "makine_tipi": "Dişlisiz"}]}
+    yield {"ortak": dict(ortak), "sabitler": {},
+           "asansorler": [{"tanim": f"A{n}", "kapasite": k, "V": 1.6, "eta": 0.85,
+                           "Hk": 32.85, "kuyu_genisligi": 1800, "kabin_boyu": 1450,
+                           "kabin_genisligi": 1300, "makine_tipi": "Dişlisiz"}
+                          for n, k in enumerate((10, 16, 20, 25), 1)]}
+    # 4) hata yolları  ( pasif asansör mesajları da dondurulur )
+    for bozuk in ({"kapasite": None}, {"eta": 10}, {"Q_elle": 0}, {"Q_elle": 5000},
+                  {"Hk": -3}, {"kabin_genisligi": 2400}, {"V": None}, {"Nsc": -1},
+                  {"gr": 9999}, {"i_palanga": 9}):
+        temel = {"tanim": "A", "kapasite": 10, "V": 1.6, "eta": 0.85, "Hk": 32.85,
+                 "kuyu_genisligi": 1800, "kabin_boyu": 1450, "kabin_genisligi": 1300,
+                 "makine_tipi": "Dişlisiz"}
+        temel.update(bozuk)
+        yield {"ortak": dict(ortak), "sabitler": {}, "asansorler": [temel]}
+    # 5) topraklama ve makine dairesi uçları
+    for ta, tb, cs in ((10, 8, 0), (60, 40, 12), (26.55, 16.4, 4)):
+        yield {"ortak": dict(ortak, temel_a=ta, temel_b=tb, cubuk_sayisi=cs),
+               "sabitler": {}, "asansorler": [
+                   {"tanim": "A", "kapasite": 10, "V": 1.6, "eta": 0.85, "Hk": 32.85,
+                    "kuyu_genisligi": 1800, "kabin_boyu": 1450, "kabin_genisligi": 1300,
+                    "makine_tipi": "Dişlisiz"}]}
+
+
 def uret():
     kayit = []
     for i, g in enumerate(senaryolar()):
@@ -111,14 +183,24 @@ def uret():
     return kayit
 
 
-def yaz():
-    kayit = uret()
+def uret_avan():
+    kayit = []
+    for i, g in enumerate(avan_senaryolar()):
+        kayit.append({"no": i, "girdi": g, "cikti": AV.hesapla(json.loads(json.dumps(g)))})
+    return kayit
+
+
+def _yaz_bir(kayit, dosya, ad):
     ham = json.dumps(kayit, ensure_ascii=False, sort_keys=True, default=str, indent=1)
-    with gzip.open(DOSYA, "wt", encoding="utf-8") as f:
+    with gzip.open(dosya, "wt", encoding="utf-8") as f:
         f.write(ham)
-    print(f"  {len(kayit)} senaryo  ·  {len(ham)/1024:.0f} KB ham  ·  "
-          f"{os.path.getsize(DOSYA)/1024:.0f} KB sıkıştırılmış")
-    print(f"  → {DOSYA}")
+    print(f"  {ad:8} {len(kayit):4} senaryo  ·  {len(ham)/1024:6.0f} KB ham  ·  "
+          f"{os.path.getsize(dosya)/1024:5.0f} KB sıkıştırılmış  →  {os.path.basename(dosya)}")
+
+
+def yaz():
+    _yaz_bir(uret(), DOSYA, "TRAFİK")
+    _yaz_bir(uret_avan(), DOSYA_AVAN, "AVAN")
 
 
 if __name__ == "__main__":

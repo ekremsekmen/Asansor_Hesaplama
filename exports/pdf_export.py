@@ -10,7 +10,7 @@ import io
 import os
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -19,7 +19,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageTemplate,
                                 Paragraph, Spacer, Table, TableStyle)
 
-from engine.steps import tr, trn, sayi_mi
+from engine.steps import tr, trn
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts")
 
@@ -163,7 +163,9 @@ class _Belge(BaseDocTemplate):
                         self.width / k, self.height / k, id="ana")
         self.addPageTemplates([PageTemplate(id="std", frames=cerceve, onPage=self._sayfa)])
 
-    def _sayfa(self, cnv, doc):
+    #  reportlab'in onPage geri çağrısı ( canvas, doc ) imzasıyla çağrılır;
+    #  `doc` bu paftada kullanılmaz ama imzadan çıkarılamaz.
+    def _sayfa(self, cnv, doc):        # noqa: ARG002
         """
         PAFTA ÇERÇEVESİ  —  ofisin kendi Excel paftasındaki düzen:
         tüm hesap kalın bir çerçeve içinde, üstte tek başlık şeridi,
@@ -298,7 +300,7 @@ def _sonuc_kutusu(sonuc):
     return ogeler
 
 
-def _karar_kutusu(metin, uygun=True, olcutler=None, verdikt=None):
+def _karar_kutusu(metin, olcutler=None, verdikt=None, uygun=True):  # noqa: ARG001
     """
     Paftanın NİHAİ CEVABI  —  "Toplamda 1 adet 8 kişilik (630 kg), 1,00 m/s
     hızında asansör yapılması uygundur."
@@ -488,7 +490,6 @@ def _cetvel_tablosu(cetvel):
     veriler.append(["", _p("<b>ASANSÖRÜN KURULU GÜCÜ</b>", "n"), _p("=", "n"),
                     _p(trn(toplam, 0), "sag"), _p("W", "n"), ""])
     t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
-    n = len(veriler) - 1
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -548,9 +549,12 @@ def _kv_tablo(satirlar, genislikler=(70 * mm, 110 * mm), vurgu_son=False):
 TRAFIK_OLCEKLERI = tuple(round(1.0 - 0.02 * i, 2) for i in range(31))
 
 
-def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:
+def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
     """
     ASANSÖR TRAFİK HESABI paftası  —  her zaman TEK SAYFA.
+
+    ``proje`` eski çağrılarla uyumluluk için kabul edilir, PAFTAYA YAZILMAZ:
+    proje antedi paftada değil KAPAK sayfasındadır ( bkz. kapak_export ).
 
     Pafta SONUÇ ile biter.  İçerik A4'e sığmazsa yazı ve tablolar orantılı
     olarak küçültülür; hiçbir satır atılmaz, ikinci sayfaya taşma olmaz.
@@ -578,9 +582,6 @@ def _trafik_bas_ic(sonuc: dict, olcek: float):
     #   PAFTA        -> "ASANSÖR TRAFİK HESABI"
     #   PAFTA-COKLU  -> "ÇOKLU ASANSÖR TRAFİK HESABI"
     baslik = "ÇOKLU ASANSÖR TRAFİK HESABI" if coklu else "ASANSÖR TRAFİK HESABI"
-    alt = ("Farklı kapasitede asansör grubu  —  MMO/697 s.12   ( Excel : PAFTA-COKLU sayfası )"
-           if coklu else
-           "Tek asansör  —  MMO/697 s.11-17   ( Excel : PAFTA sayfası )")
     buf = io.BytesIO()
     doc = _Belge(buf, baslik,
                  "MMO / 697  “Asansör Avan Projesi Hazırlama Teknik Esasları”, 2. Baskı, Ocak 2020, s.11-17"
@@ -612,11 +613,11 @@ def _trafik_bas_ic(sonuc: dict, olcek: float):
     ic += [Spacer(1, 4 * mm)]
     _sonuc_metni = (o.get("sonuc") or sonuc.get("hata")
                     or "Hesap tamamlanamadı — girdileri kontrol edin.")
-    sk = _sonuc_kutusu({"baslik": "SONUÇ", "metin": _sonuc_metni,
-                        "uygun": not str(_sonuc_metni).startswith(("Kabul", "YETERSİZ", "HESAP"))})
+    #  Burada eskiden bir _sonuc_kutusu ÜRETİLİYOR ama sayfaya hiç
+    #  EKLENMİYORDU ( ölü nesne ).  Paftanın sonuç bloğu _karar_kutusu'dur.
     _uygun = not str(_sonuc_metni).startswith(("Kabul", "YETERSİZ", "HESAP"))
-    ic += _karar_kutusu(o.get("sonuc_cumlesi") or o.get("pafta_satiri"), _uygun,
-                        o.get("karar_olcutleri"), _sonuc_metni)
+    ic += _karar_kutusu(o.get("sonuc_cumlesi") or o.get("pafta_satiri"),
+                        o.get("karar_olcutleri"), _sonuc_metni, uygun=_uygun)
 
     #  TRAFİK PAFTASI TEK SAYFADIR.  Pafta SONUÇ ile biter: otomatik öneri
     #  tablosu ( bilgi amaçlıydı ) ve imza kutusu paftadan çıkarıldı — öneri
@@ -680,28 +681,6 @@ def _nufus_tablo(nufus, b):
     return t
 
 
-def _oneri_tablo(oneriler):
-    veriler = [[_p("<b>Seçenek (kabin — hız)</b>", "n"), _p("<b>Adet</b>", "n"),
-                _p("<b>Bekleme (sn)</b>", "n"), _p("<b>Sınıf</b>", "n"),
-                _p("<b>TR (sn)</b>", "n"), _p("<b>R (kişi/5dk)</b>", "n")]]
-    stil = []
-    for i, s in enumerate(oneriler, 1):
-        veriler.append([_p(s["secenek"], "n"), _p(str(s["adet"]), "sag"),
-                        _p(tr(s["Ieer"], 1), "sag"), _p(s["sinif"], "n"),
-                        _p(tr(s["TR"], 1), "sag"), _p(tr(s["R"], 1), "sag")])
-        if s.get("onerilen"):
-            stil.append(("LINEBELOW", (0, i), (-1, i), 0.6, SIYAH))
-    t = Table(veriler, colWidths=[_w(74 * mm), _w(14 * mm), _w(24 * mm), _w(30 * mm), _w(19 * mm), _w(19 * mm)], repeatRows=1)
-    t.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("FONTSIZE", (0, 0), (-1, -1), 7.6),
-    ] + stil))
-    return t
-
-
 def _imza_kutusu():
     t = Table([[_p("<b>Hesabı yapan</b><br/><br/><br/>", "n"),
                 _p("<b>Kontrol eden</b><br/><br/><br/>", "n"),
@@ -718,8 +697,9 @@ def _imza_kutusu():
 # =====================================================================
 #  AVAN HESAPLARI PDF
 # =====================================================================
-def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:
-    # ``proje`` eski çağrılarla uyumluluk için kabul edilir, paftaya yazılmaz.
+def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
+    #  ``proje`` eski çağrılarla uyumluluk için kabul edilir, paftaya yazılmaz —
+    #  proje antedi KAPAK sayfasındadır ( bkz. kapak_export ).
     buf = io.BytesIO()
     doc = _Belge(buf, "ASANSÖR AVAN PROJE HESAPLARI",
                  "MMO / 697  “Asansör Avan Projesi Hazırlama Teknik Esasları”, 2. Baskı, Ocak 2020, s.18-21"

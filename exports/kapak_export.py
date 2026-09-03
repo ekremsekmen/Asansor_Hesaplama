@@ -299,7 +299,7 @@ def _sayfaya_sigdir(c):
     c.scale(olcek, olcek)
 
 
-def pdf_bytes(kapak: Mapping[str, object] | None, proje: Mapping[str, object] | None = None) -> bytes:
+def pdf_bytes(kapak: Mapping[str, object] | None) -> bytes:
     """Kapağı tek sayfalı, temiz ve bağımsız PDF baytları olarak verir."""
     d = dict(kapak or {})
     if not _s(d.get("project_title")):

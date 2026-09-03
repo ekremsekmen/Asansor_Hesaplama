@@ -4,6 +4,7 @@ MMO/697 (2. Baskı, Ocak 2020), TS EN 81-20, ISO 8100-32:2020 ve IEC 60364-5-52
 kaynaklı tablolar.  Değerler ASANSOR_TRAFIK_HESABI_v2_1.xlsx ve
 ASANSOR AVAN HESAPLARI.xlsx dosyalarındaki tablolarla BİREBİR aynıdır.
 """
+from .steps import excel_round, sayi_mi
 
 # ---------------------------------------------------------------- TABLO - 1
 # Binada sürekli bulunan insan sayısı katsayıları (MMO/697 s.13)
@@ -108,7 +109,10 @@ TABLO_4 = {
 }
 #  MMO/697 Tablo-4'te basılı olan satırlar (ara değer üretilmemiş olanlar)
 TABLO_4_BASILI = (700, 800, 900, 1100, 1300)
-TABLO_4_ARA = (1000, 1200)
+#  Ara değerler ELLE YAZILMAZ, basılı satırlardan TÜRETİLİR — iki liste
+#  birbirinden ayrışamasın.  ( Eskiden ikisi de elle tutuluyordu ve
+#  TABLO_4_BASILI hiçbir yerde okunmuyordu. )
+TABLO_4_ARA = tuple(g for g in TABLO_4 if g not in TABLO_4_BASILI)
 KAPI_GENISLIKLERI = [700, 800, 900, 1000, 1100, 1200, 1300]
 
 
@@ -167,7 +171,7 @@ GECERLI_KAPASITELER = [6, 8, 10, 13, 15, 16, 20, 25, 30]
 def tablo7_yuk(P):
     if P is None:
         return None
-    return TABLO_7.get(P, P * 75 if isinstance(P, (int, float)) else None)
+    return TABLO_7.get(P, P * 75 if sayi_mi(P) else None)
 
 
 def tablo7_kaynagi(P):
@@ -196,7 +200,7 @@ def tablo7_kaynagi(P):
 #  için istediği 800 mm asgarisinin altındadır — program bunu ayrıca uyarır.
 TABLO_8 = {700: 1.3, 800: 1.2, 900: 1.1, 1000: 1.0, 1100: 1.0, 1200: 0.9, 1300: 0.9}
 TABLO_8_BASILI = (800, 900, 1000, 1100, 1200, 1300)
-TABLO_8_ARA = (700,)
+TABLO_8_ARA = tuple(g for g in TABLO_8 if g not in TABLO_8_BASILI)
 
 
 def tablo8_tp(genislik):
@@ -307,14 +311,6 @@ TABLO_11 = [(450, 500), (630, 650), (800, 800), (1000, 950), (1125, 1020),
             (1275, 1100), (1600, 1350), (2000, 1600), (2500, 1900)]
 
 
-def _excel_round(x, basamak=0):
-    """Excel ROUND — yarımı YUKARI (Python'un bankacı yuvarlaması DEĞİL)."""
-    import math
-    k = 10 ** basamak
-    y = x * k
-    return (math.floor(y + 0.5) if y >= 0 else math.ceil(y - 0.5)) / k
-
-
 def tablo11_Gk(Q):
     """Ara yükler doğrusal enterpolasyonla; sonuç 10 kg'a yuvarlanır (Excel ROUND)."""
     if Q is None:
@@ -322,13 +318,13 @@ def tablo11_Gk(Q):
     xs = [a for a, _ in TABLO_11]
     ys = [b for _, b in TABLO_11]
     if Q <= xs[0]:
-        return _excel_round(ys[0], -1)
+        return excel_round(ys[0], -1)
     if Q >= xs[-1]:
-        return _excel_round(ys[-1], -1)
+        return excel_round(ys[-1], -1)
     for i in range(len(xs) - 1):
         if xs[i] <= Q <= xs[i + 1]:
             y = ys[i] + (Q - xs[i]) * (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
-            return _excel_round(y, -1)
+            return excel_round(y, -1)
     return None
 
 
@@ -381,13 +377,6 @@ ARMATUR_ISIK_AKISI = [
     ("Flüoresan", "200 W", "2950 – 3220"), ("LED spot", "5 W", "300"),
 ]
 
-# --------------- MMO/697 §4.3 örnek referans değerleri
-MMO_ORNEK_REFERANS = [
-    {"Q": 450,  "P": 520, "Fmk": 350, "Fsh": 100, "Fmt": 150},
-    {"Q": 1125, "P": 800, "Fmk": 450, "Fsh": 100, "Fmt": 150},
-]
-
-
 # ================================================================
 #  ERİŞİLEBİLİRLİK  —  TS EN 81-70 / TS 9111
 # ================================================================
@@ -410,23 +399,21 @@ def erisilebilirlik_uyarilari(P, kapi_genisligi, on_ek=""):
     her bina erişilebilir olmak zorunda değildir, karar projecinindir.
     """
     u = []
-    if P is not None and isinstance(P, (int, float)) and P < ERISILEBILIR_ASGARI_KAPASITE:
+    if sayi_mi(P) and P < ERISILEBILIR_ASGARI_KAPASITE:
         u.append(f"{on_ek}⚠ {int(P)} kişi ({tablo7_yuk(P)} kg) — TS EN 81-70 Tip 1 kabini "
                  "yalnız tek tekerlekli sandalye kullanıcısına yeter, refakatçi sığmaz. "
                  "TS 9111 / Erişilebilirlik Yönetmeliği'nin aradığı 1100 × 1400 mm kabin "
                  "için asgari 8 kişi (630 kg) seçilmelidir.")
-    if (kapi_genisligi is not None and isinstance(kapi_genisligi, (int, float))
-            and kapi_genisligi < ERISILEBILIR_ASGARI_KAPI):
+    if sayi_mi(kapi_genisligi) and kapi_genisligi < ERISILEBILIR_ASGARI_KAPI:
         u.append(f"{on_ek}⚠ Net kapı genişliği {int(kapi_genisligi)} mm — TS EN 81-70 "
                  "erişilebilir asansörde asgari 800 mm ister.")
     return u
 
 
 def erisilebilir_mi(P, kapi_genisligi=None):
-    if not isinstance(P, (int, float)) or P < ERISILEBILIR_ASGARI_KAPASITE:
+    if not sayi_mi(P) or P < ERISILEBILIR_ASGARI_KAPASITE:
         return False
-    if (isinstance(kapi_genisligi, (int, float))
-            and kapi_genisligi < ERISILEBILIR_ASGARI_KAPI):
+    if sayi_mi(kapi_genisligi) and kapi_genisligi < ERISILEBILIR_ASGARI_KAPI:
         return False
     return True
 

@@ -1319,8 +1319,12 @@ async function indirProjeDwg(){
     const a = document.createElement('a'); a.href=u; a.download=ad;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(u),3000);
+    /*  DXF BİR EKSİKLİK DEĞİLDİR.  Çizim yalnız LINE + TEXT içerir; DWG'nin
+        taşıyıp DXF'in taşıyamayacağı hiçbir şey yok ve AutoCAD DXF'i doğrudan
+        açar.  Eski metin "bulunamadı" diye başlayıp kullanıcıya bir şey
+        kaçırdığını düşündürüyordu. */
     const bicim = sadeceDxf
-      ? '  —  bu bilgisayarda DWG dönüştürücü bulunamadı, ZIP içinde DXF var (AutoCAD birebir açar).'
+      ? '  —  ZIP içinde DXF var; AutoCAD birebir açar (DWG isterseniz açıp Farklı Kaydet demeniz yeterli).'
       : '  —  ZIP içinde hem DWG hem DXF var.';
     if(tasti){
       const u = 'DİKKAT: pafta sayısı proje formatının çerçevesine sığmadı, '

@@ -263,6 +263,35 @@ def calistir():
     r.kontrol("öneri tablosunda tam bir öneri var",
               sum(1 for x in s["oneriler"] if x.get("onerilen")) == 1)
 
+    #  v2.8 — ÖNERİ TABLOSUNDA ŞARTLI KABUL GERÇEKTEN HESAPLANIYOR.
+    #  Burada eskiden "Şartlı kabul" ve "Kriteri aşıyor" dalları vardı ama
+    #  ÇALIŞAMIYORLARDI:  adet zaten MAX[taşıma; TR/Izul] seçildiği için
+    #  Ieer ≤ Izul her zaman doğru.  Şartlı kabulün gerçek karşılığı
+    #  "taahhütnameyle DAHA AZ asansör yeterdi" sorusudur.
+    #  Yükseltilmiş Konut:  Izul = 80 sn,  şartlı kabul sınırı = 120 sn
+    _so = TR.hesapla_tek(g(hizli1=90))
+    _oz, _on = _so["ozet"], _so["oneriler"]
+    r.kontrol("şartlı sınır standarttan gevşek", _oz["esik_sartli"] > _oz["Izul"])
+    r.kontrol("her seçenek uygulanan sınırı sağlıyor",
+              all(x["Ieer"] <= _oz["Izul"] + 1e-9 for x in _on))
+    r.kontrol("'Kriteri aşıyor' satırı hiç oluşmuyor",
+              not any("aşıyor" in x["sinif"] for x in _on))
+    _sart = [x for x in _on if x.get("adet_sartli")]
+    r.kontrol("en az bir seçenekte şartlı kabul avantajı var", bool(_sart))
+    r.kontrol("şartlı adet uygulanan adetten KÜÇÜK",
+              all(x["adet_sartli"] < x["adet"] for x in _sart))
+    r.kontrol("şartlı adet sınıf metnine yazılıyor",
+              all("şartlı kabulle" in x["sinif"] for x in _sart))
+    r.kontrol("şartlı adet şartlı sınırı sağlıyor",
+              all(x["TR"] / x["adet_sartli"] <= _oz["esik_sartli"] + 1e-9 for x in _sart))
+    #  Taahhütname yalnız BEKLEME süresini gevşetir — taşıma kapasitesi ölçütü durur
+    r.kontrol("şartlı adet taşıma kapasitesini de sağlıyor",
+              all(x["adet_sartli"] * x["R"] >= _oz["B"] * _oz["k"] - 1e-9 for x in _sart))
+    #  Şartlı sınırı OLMAYAN bina tipinde ( Hastane ) alan hiç dolmamalı
+    _hs = TR.hesapla_tek(g(bina_tipi="Hastane", hizli1=60, hizli2=None, manuel_k=None))
+    r.kontrol("şartlı sınırı olmayan tipte adet_sartli boş",
+              all(x.get("adet_sartli") is None for x in (_hs.get("oneriler") or [])))
+
     # ---------------------------------------------------- çoklu asansör
     c = dict(bina_tipi="Konut", bina_yuksekligi=39.98, yapi_yuksekligi=43, N=11,
              hizli1=44, hizli2=3, h=3,

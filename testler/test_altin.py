@@ -22,8 +22,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from engine import avan as AV                               # noqa: E402
 from engine import traffic as TR                            # noqa: E402
-from testler.altin_uret import DOSYA, senaryolar            # noqa: E402
+from testler.altin_uret import (DOSYA, DOSYA_AVAN,          # noqa: E402
+                                avan_senaryolar, senaryolar)
 from testler.ortak import Rapor                             # noqa: E402
 
 
@@ -41,21 +43,27 @@ def _duz(x, on=""):
 
 def calistir():
     r = Rapor("TEST 7 — ALTIN ÇIKTI (refactor kalkanı)")
-    if not os.path.isfile(DOSYA):
-        r.atla(f"Altın dosya yok — 'python3 testler/altin_uret.py' ile üretin ({DOSYA})")
-        return r
-    with gzip.open(DOSYA, "rt", encoding="utf-8") as f:
+    _karsilastir(r, DOSYA, senaryolar, TR.hesapla, "trafik")
+    _karsilastir(r, DOSYA_AVAN, avan_senaryolar, AV.hesapla, "avan")
+    return r
+
+
+def _karsilastir(r, dosya, uretici, motor, etiket):
+    if not os.path.isfile(dosya):
+        r.atla(f"{etiket}: altın dosya yok — 'python3 testler/altin_uret.py' ile üretin")
+        return
+    with gzip.open(dosya, "rt", encoding="utf-8") as f:
         altin = json.load(f)
 
-    simdi = list(senaryolar())
-    if not r.esit("senaryo sayısı değişmemiş", len(simdi), len(altin)):
-        return r
+    simdi = list(uretici())
+    if not r.esit(f"{etiket}: senaryo sayısı değişmemiş", len(simdi), len(altin)):
+        return
 
     for kayit, g in zip(altin, simdi):
         no = kayit["no"]
-        if not r.esit(f"senaryo {no}: girdi aynı", kayit["girdi"], g):
+        if not r.esit(f"{etiket} {no}: girdi aynı", kayit["girdi"], g):
             continue
-        yeni = json.loads(json.dumps(TR.hesapla(json.loads(json.dumps(g))),
+        yeni = json.loads(json.dumps(motor(json.loads(json.dumps(g))),
                                      ensure_ascii=False, sort_keys=True, default=str))
         eski = kayit["cikti"]
         if yeni == eski:
@@ -67,11 +75,11 @@ def calistir():
         for yol in sorted(set(a) | set(b)):
             if a.get(yol, "<yok>") != b.get(yol, "<yok>"):
                 farklar.append(f"{yol}:  {a.get(yol,'<yok>')!r}  →  {b.get(yol,'<yok>')!r}")
-        r.kontrol(f"senaryo {no} ({g.get('bina_tipi')}, N={g.get('N')}, "
+        r.kontrol(f"{etiket} senaryo {no} "
+                  f"({g.get('bina_tipi') or 'avan'}, "
                   f"{len(g.get('asansorler') or [])} asansör)", False,
                   "\n         ".join(farklar[:4])
                   + (f"\n         … ve {len(farklar)-4} fark daha" if len(farklar) > 4 else ""))
-    return r
 
 
 if __name__ == "__main__":

@@ -138,7 +138,13 @@ def calistir():
         import pypdfium2 as pdfium
     except ImportError:
         pdfium = None
+        #  SESSİZ ATLAMA OLMAZ.  Bu kütüphane yokken PDF metin kontrolleri
+        #  hiç çalışmıyor ve kimse haberdar olmuyordu — 96 kontrol boşta
+        #  duruyordu.  Eksikse en azından söylensin.
+        r.atla("pypdfium2 kurulu değil — PDF metin içeriği kontrolleri atlandı "
+               "(python3 -m pip install pypdfium2)")
 
+    _pypdf_uyarisi = []          # atlama uyarısı bir kez basılsın
     for ad, icerik in pdfler.items():
         yol = os.path.join(GECICI, f"{ad}.pdf")
         open(yol, "wb").write(icerik)
@@ -179,7 +185,10 @@ def calistir():
                       str(m.get("/Title", "")).startswith(BEKLENEN_BASLIK[ad]),
                       f"→ {m.get('/Title')!r}")
         except ImportError:
-            pass
+            if not _pypdf_uyarisi:
+                r.atla("pypdf kurulu değil — PDF üstveri kontrolleri atlandı "
+                       "(python3 -m pip install pypdf)")
+                _pypdf_uyarisi.append(True)
 
     #  PROJE ANTEDİ PAFTADA DEĞİL, KAPAKTADIR.
     #  Kapak sayfası eklendiğinde proje adı / işveren / mühendis bilgisi
@@ -499,7 +508,7 @@ def calistir():
                            lambda m: chr(int(m.group(1), 16)), t)
 
         _kapak = KPK.pdf_bytes({"project_title": "ÇAĞDAŞ ŞİRKETİ Öİ",
-                                "owner": "Türkçe Ğüzel A.Ş."}, PROJE)
+                                "owner": "Türkçe Ğüzel A.Ş."})
         _paftalar = [("Kapak", _kapak),
                      ("Trafik", PE.trafik_pdf(TR.hesapla(GC), PROJE)),
                      ("Avan", PE.avan_pdf(AV.hesapla(AV_VERI), PROJE))]
@@ -906,8 +915,13 @@ def calistir():
         if not _dwg_adi:
             r.kontrol("CAD: DWG yoksa sebebi kullanıcıya yazılıyor",
                       bool(_sebep) and "DXF" in str(_sebep), f"→ {_sebep}")
+            #  BAŞLIK METNİNE DEĞİL, İÇERİĞE bakılır:  kullanıcıya söylenen
+            #  sebebin OKUBENI'ye gerçekten yazılması önemlidir, başlığın
+            #  kelimesi değil.  ( Eskiden "DWG NEDEN YOK" dizgesi sabit
+            #  aranıyordu ve başlık yumuşatılınca test kırılıyordu. )
+            _oku = _z.read("OKUBENI.txt").decode("utf-8")
             r.kontrol("CAD: OKUBENI sebebi taşıyor",
-                      "DWG NEDEN YOK" in _z.read("OKUBENI.txt").decode("utf-8"))
+                      str(_sebep).strip()[:60] in _oku, f"→ {_oku[:120]!r}")
         else:
             r.kontrol("CAD: DWG boş değil", _z.getinfo(_dwg_adi).file_size > 10_000)
         #  KAYNAK PAFTALAR pakette olmalı:  çizimde bir tuhaflık görülürse
