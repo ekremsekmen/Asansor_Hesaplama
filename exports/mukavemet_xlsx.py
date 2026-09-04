@@ -21,9 +21,9 @@ import os
 
 import openpyxl
 
-from engine import mukavemet as MK
-from engine import mukavemet_girdi as MG
-from engine import mukavemet_tablolari as MT
+from engine.uygulama import mukavemet as MK
+from engine.uygulama import mukavemet_girdi as MG
+from engine.uygulama import mukavemet_tablolari as MT
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SABLON = os.path.join(KOK, "templates", "MUKAVEMET_HESABI.xlsx")
@@ -231,6 +231,13 @@ def _standarda_uydur(wb, g):
     #  yuvarlı olduğu için burada da standardın formülü yazılır — yoksa
     #  pafta ile kitap binde ikilik bir farkla ayrışırdı.
     ws["AB39"] = _omega_formulu("Z71", str(MT.OMEGA_RM_ALT))
+
+    #  ⑧  Sığınma açıklıklarının iki alt sınırı  —  EN 81-20 m.5.2.5.7.3 ve
+    #  m.5.2.5.8.2 a) 2).  Kitap 1200 / 150 mm ister;  standartta bu sayılar
+    #  yoktur.  Kabin üstü sınırı seçilen sığınma hacminin yüksekliğidir
+    #  ( P639 = 1,00 m ), ray dibi sınırı ise Şekil 7'den 0,10 m'dir.
+    ws["AD636"] = "=P639*1000"
+    ws["AD647"] = MK.SIGINMA["min_ray_alt"]
 
     #  Paten balata boyunun kitapta hücresi yok — teslim kopyasına not düşülür
     #  ki projeci hangi değerin kullanıldığını görsün.

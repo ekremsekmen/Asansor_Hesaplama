@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import avan as AV
+from engine.avan import hesap as AV
 from exports import hucre_haritasi as H          # noqa: E402
 from exports import xlsx_export as XE            # noqa: E402
 from exports import xlsx_import as XI            # noqa: E402
@@ -279,8 +279,8 @@ def calistir():
     import warnings
 
     import main as _MM
-    from engine import mukavemet as _MK
-    from engine import mukavemet_girdi as _MG
+    from engine.uygulama import mukavemet as _MK
+    from engine.uygulama import mukavemet_girdi as _MG
     from exports import mukavemet_xlsx as _MX
 
     warnings.filterwarnings("ignore")

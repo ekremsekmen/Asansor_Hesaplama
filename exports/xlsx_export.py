@@ -20,8 +20,8 @@ import os
 
 import openpyxl
 
-from engine import avan as E_AVAN
-from engine import traffic as E_TRF
+from engine.avan import hesap as E_AVAN
+from engine.avan import trafik as E_TRF
 from . import hucre_haritasi as H
 from .sablon_denetim import dogrula
 

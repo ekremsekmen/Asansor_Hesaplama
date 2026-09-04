@@ -15,11 +15,12 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl                                            # noqa: E402
-from engine import avan as AV, traffic as TR               # noqa: E402
+from engine.avan import hesap as AV
+from engine.avan import trafik as TR               # noqa: E402
 from exports import hucre_haritasi as H                    # noqa: E402
 from exports import kapak_export as KPK
 from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
-from main import XLSX_TUR                               # noqa: E402
+from api.avan import XLSX_TUR                           # noqa: E402
 from testler.ortak import Rapor, hata_hucresi_ara, yeniden_hesapla, soffice_yolu  # noqa: E402
 
 # Geçici dosyalar sistemin temp klasörüne yazılır — proje klasörü kirlenmez
@@ -89,7 +90,7 @@ def calistir():
         #  yazıyordu.  Program motor akımından seçtiği kademeyi hücreye
         #  yazmalı ki indirilen Excel ile ekrandaki pafta ayrışmasın.
         if ad == "avan":
-            import engine.avan as _AV
+            from engine.avan import hesap as _AV
             _hes = _AV.hesapla(AV_VERI)
             _bek = {h["no"]: (h["ozet"]["motor_sigorta"] if h.get("aktif") else None)
                     for h in (_hes.get("asansorler") or []) if h}
@@ -421,7 +422,7 @@ def calistir():
     #  olmalıdır" gibi ) şablonda yoktur, dolayısıyla ekranda reddedilen bir
     #  hesap indirilen dosyada SORUNSUZ görünüyordu.
     import json as _json
-    import main as _M
+    from api import avan as _M
     _hatali = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
                             "yapi_yuksekligi": "43", "N": "11", "h": "3",
                             "hizli1": "44", "hizli2": "3",
@@ -481,7 +482,7 @@ def calistir():
     #  seçilmelidir" basıyordu — EKRANDA hesap doğru görünürken.
     #  Testler bunu göremiyordu çünkü hepsi düz ( eski ) girdi biçimini
     #  kullanıyordu;  bu kontrol GERÇEK arayüz biçiminden geçer.
-    import main as _M
+    from api import avan as _M
     for _adet, _bek_adet in ((1, None), (3, 3)):
         _ui = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
                             "yapi_yuksekligi": "43", "N": "11", "h": "3",
@@ -1070,9 +1071,9 @@ def calistir():
     # ================================================================
     #  UYGULAMA PROJESİ  —  MUKAVEMET ÇIKTILARI
     # ================================================================
-    import main as _MM
-    from engine import mukavemet as _MK
-    from engine import mukavemet_girdi as _MG
+    from api import uygulama as _MM
+    from engine.uygulama import mukavemet as _MK
+    from engine.uygulama import mukavemet_girdi as _MG
     from exports import mukavemet_xlsx as _MX
 
     _muk = _MK.hesapla()
@@ -1127,7 +1128,7 @@ def calistir():
                   "11-Muk. Hesapları" in _wb.sheetnames
                   and "Askı Tipleri" in _wb.sheetnames)
         #  TESLİM EDİLEN KİTAP PAFTAYLA ÇELİŞMEMELİ.
-        #  Program standart gereği kaynak kitabın altı hesabından ayrılıyor;
+        #  Program standart gereği kaynak kitabın yedi hesabından ayrılıyor;
         #  kitap olduğu gibi verilseydi aynı projenin iki belgesi birbirini
         #  yalanlardı ( pafta "uygun değil" derken Excel "uygundur" ).
         #  Teslim kopyasında o FORMÜLLER düzeltilir — aşağıda gerçekten
@@ -1146,6 +1147,13 @@ def calistir():
                   f"→ {str(_duz['Q380'].value)[:90]}")
         r.kontrol("teslim kopyasında ω ray çeliğine bağlı",
                   "B131" in str(_duz["AD354"].value), f"→ {str(_duz['AD354'].value)[:90]}")
+        r.esit("teslim kopyasında kabin üstü sınırı sığınma yüksekliğinden",
+               _duz["AD636"].value, "=P639*1000")
+        r.esit("teslim kopyasında ray dibi açıklığı 100 mm",
+               _duz["AD647"].value, 100)
+        _sb = _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]
+        r.esit("kaynak kitapta bu sınırlar 1200 / 150 idi",
+               [_sb["AD636"].value, _sb["AD647"].value], [1200, 150])
         r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",
                   _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]["Q97"].value == 30,
                   "→ şablon değişmiş;  doğrulama testleri dayanağını kaybeder")
@@ -1200,7 +1208,7 @@ def calistir():
         r.esit(f"uygulama-{_ad} ucu dosya döndürüyor", _y.media_type, _tur)
 
     #  UYGULAMA PROJESİ PAFTASI  —  mukavemet + elektrik + topraklama
-    from engine import uygulama as _UY
+    from engine.uygulama import hesap as _UY
     _uy = _UY.hesapla({"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45})
     _upd = PE.uygulama_pdf(_uy, PROJE)
     r.kontrol("uygulama PDF üretildi", len(_upd) > 30_000, f"→ {len(_upd)} bayt")

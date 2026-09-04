@@ -23,8 +23,8 @@ import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import mukavemet as MK                       # noqa: E402
-from engine import mukavemet_tablolari as MT             # noqa: E402
+from engine.uygulama import mukavemet as MK                       # noqa: E402
+from engine.uygulama import mukavemet_tablolari as MT             # noqa: E402
 from testler.ortak import Rapor                          # noqa: E402
 
 KAYNAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -225,8 +225,8 @@ def calistir():
 
 
 def _sapmalar(r):
-    """Standart gereği Excel'den ayrıldığımız dört nokta gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 6)
+    """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 7)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         r.kontrol(f"sapma '{ad[:34]}' standart maddesi yazılı",
                   bool(madde) and ("81-20" in madde or "81-50" in madde),
@@ -236,7 +236,7 @@ def _sapmalar(r):
     r.esit("① Dt/dh asgari oranı", MK.SABIT["Dt_dh_asgari"], 40)
 
     #  ② karşı ağırlık rayı σ(My)  →  Wx
-    from engine import mukavemet_tablolari as _MT
+    from engine.uygulama import mukavemet_tablolari as _MT
     s = MK.hesapla()
     p = _MT.ray("50 x 50 x 5", "Wx")
     _M = MK._moment(s["_h"]["AP572"], 3000)
@@ -250,7 +250,7 @@ def _sapmalar(r):
               _yakin(s["_h"]["AY335"], _bek), f"→ {s['_h']['AY335']!r} ≠ {_bek!r}")
 
     #  ⑤ ω ray çeliğine bağlı  ( EN 81-50 m.5.10.3 )
-    from engine import mukavemet_tablolari as _MTb
+    from engine.uygulama import mukavemet_tablolari as _MTb
     r.kontrol("⑤ Rm = 370 eğrisi Excel tablosunun tamamını üretiyor",
               all(abs(_MTb.omega_en8150(x, 370) - _MTb.omega(x)) <= 0.006
                   for x in range(_MTb.OMEGA_LAMBDA_MIN, _MTb.OMEGA_LAMBDA_MAX + 1)))
@@ -302,6 +302,44 @@ def _sapmalar(r):
               _yakin(s["_h"]["Z379"],
                      MK._flans(s["_h"]["AY321"],
                                MK._ray_ozellik("89 x 62 x 15,88"), 2 * 17)))
+
+    #  ⑧ sığınma açıklıklarının alt sınırları  ( EN 81-20 m.5.2.5.7 / 5.2.5.8 )
+    _S = MK.SIGINMA
+    r.esit("⑧ ray dibi açıklığı  ( m.5.2.5.8.2 a) 2) · Şekil 7 )",
+           _S["min_ray_alt"], 100)
+    r.esit("⑧ kuyu dibi - kabin  ( m.5.2.5.8.2 a) )", _S["min_kuyu_tabani"], 500)
+    r.esit("⑧ etek açıklığı  ( m.5.2.5.8.2 a) 1) )", _S["min_etek"], 100)
+    r.esit("⑧ kuyuya sabit parça  ( m.5.2.5.8.2 b) )", _S["min_regulator"], 300)
+    r.esit("⑧ kabin üstü donanım  ( m.5.2.5.7.2 a) )", _S["min_revizyon"], 500)
+    r.esit("⑧ ilave kılavuzlu yol  ( m.5.2.5.6.2 )", _S["min_ust_paten"], 100)
+    r.esit("⑧ sığınma hacimleri  ( Çiz.3 / Çiz.4 tip 2 )",
+           [sorted(_S["ust_hacim"]), sorted(_S["dip_hacim"])],
+           [[0.5, 0.7, 1.0], [0.5, 0.7, 1.0]])
+    r.kontrol("⑧ artık ayrı bir min_kabin_ustu sabiti yok",
+              "min_kabin_ustu" not in _S, f"→ {sorted(_S)}")
+
+    _b10 = [b for b in s["bolumler"] if b["baslik"].startswith("10")][0]
+    _sinir = {}
+    for a in _b10["adimlar"]:
+        _ac = str(a.get("aciklama") or "")
+        if "( en az" in _ac and "mm )" in _ac:
+            _sinir[_ac.split("  ( en az")[0]] = float(
+                _ac.split("en az")[1].split("mm")[0].strip().replace(".", ""))
+    r.esit("⑧ kabin üstü sınırı sığınma yüksekliğinden okunuyor",
+           _sinir.get("c.2 - Kabin üstü / kuyu tavanının en alt kısmı arası"),
+           _S["ust_hacim"][2] * 1000)
+    r.esit("⑧ ray dibi sınırı pafta metnine de yansıyor",
+           _sinir.get("a.2 - Kılavuz raylar / kabinin en alt kısmı arası"), 100.0)
+    r.kontrol("⑧ sınıra eşit ölçü UYGUN sayılıyor  ( 'en az' )",
+              all(("≥" in str(a.get("aciklama") or "")) or
+                  ("mm  >  " not in str(a.get("aciklama") or ""))
+                  for a in _b10["adimlar"]),
+              "→ '>' karşılaştırması kalmış")
+    r.kontrol("⑧ bölüm notu payların ofis kabulü olduğunu söylüyor",
+              any("kabulleridir" in x for x in _b10["aciklamalar"]))
+    r.kontrol("⑧ bölüm notu açıklıkların standarttan geldiğini söylüyor",
+              any("m.5.2.5.7 ve m.5.2.5.8" in x for x in _b10["aciklamalar"]),
+              f"→ {_b10['aciklamalar']}")
     return r
 
 

@@ -94,7 +94,8 @@ def _proje_oku(wb):
     if not p:
         p = {"proje_adi": ozellik.title or "", "isveren": ozellik.subject or "",
              "pafta_no": ozellik.category or "", "tarih": "",
-             "muhendis": (ozellik.creator or "") if ozellik.creator != H.IMZA else ""}
+             "muhendis": (ozellik.creator or "")
+             if ozellik.creator not in H.IMZALAR else ""}
     return {k: (p.get(k) or "") for k in H.PROJE_ALANLARI}
 
 

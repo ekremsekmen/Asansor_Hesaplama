@@ -154,7 +154,13 @@ def avan_asansor_sayfasi(no: int) -> str:
 #  ofis şablonunun düzenine hiç dokunulmaz, bilgi de dosyayla taşınır.
 # =====================================================================
 PROJE_ALANLARI = ("proje_adi", "isveren", "pafta_no", "tarih", "muhendis")
-IMZA = "Asansör Avan Hesaplama Programı"
+IMZA = "Asansör Proje Programı"
+
+#  ESKİ İMZALAR.  Program adı değişti;  daha önce üretilmiş dosyaların
+#  "creator" alanında eski ad yazıyor.  İçe aktarma bunları da PROGRAM
+#  imzası sayar — yoksa eski bir dosya geri yüklendiğinde program adı
+#  mühendis adı sanılıp kapağa yazılırdı.
+IMZALAR = (IMZA, "Asansör Avan Hesaplama Programı")
 
 # =====================================================================
 #  EVET / HAYIR KUTULARI

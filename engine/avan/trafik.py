@@ -7,8 +7,8 @@ ASANSOR_TRAFIK_HESABI_v2_1.xlsx dosyasındaki
   · ÇOKLU ASANSÖR  sayfası  ->  hesapla_coklu()    (çıktı: PAFTA-COKLU)
 formüllerinin birebir Python karşılığıdır.
 """
-from . import tables as T
-from .steps import (Bolum, veri, hesap, tr, trn, yukari_yuvarla,
+from engine.avan import tablolar as T
+from engine.ortak.steps import (Bolum, veri, hesap, tr, trn, yukari_yuvarla,
                     excel_round, sayi_mi)
 
 

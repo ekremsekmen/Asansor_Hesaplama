@@ -22,9 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl                                          # noqa: E402
 
-from engine import mukavemet as MK                       # noqa: E402
-from engine import mukavemet_girdi as MG                 # noqa: E402
-from engine import mukavemet_tablolari as MT             # noqa: E402
+from engine.uygulama import mukavemet as MK                       # noqa: E402
+from engine.uygulama import mukavemet_girdi as MG                 # noqa: E402
+from engine.uygulama import mukavemet_tablolari as MT             # noqa: E402
 from testler.ortak import (Rapor, hata_hucresi_ara,      # noqa: E402
                            soffice_yolu, yeniden_hesapla)
 

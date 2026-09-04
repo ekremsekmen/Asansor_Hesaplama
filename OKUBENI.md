@@ -10,7 +10,7 @@ olarak veren yerel program.  Açılışta hangi projenin hazırlanacağı seçil
 
 **Mukavemet tarafı avandan ayrıdır** — tabloları ve kabulleri kendi kaynağından
 gelir. Elektrik ve topraklama hesapları ise avan projesindekilerin **aynısıdır**;
-kopyalanmadı, aynı motor çağrılıyor ( `engine/avan.py` ). Sekme şeridi moda göre
+kopyalanmadı, aynı motor çağrılıyor ( `engine/avan/hesap.py` ). Sekme şeridi moda göre
 değişir, yalnız **Sabitler / Ofis Standardı** iki modda da durur — ofis standardı
 ikisinde de aynıdır.
 
@@ -44,6 +44,42 @@ verir. İkisini birden basmak paftada iki farklı motor gücü gösterirdi.
 
 Hesap motorları, ofisin mevcut Excel dosyalarındaki **her formülün birebir
 Python karşılığıdır** — değerler hücre hücre karşılaştırılarak doğrulanmıştır.
+
+**Sürüm 3.0** — **uygulama projesi eklendi.**
+
+Program artık iki proje türü hazırlıyor. Açılışta hangisi olduğu seçiliyor;
+sekme şeridi, girdiler ve çıktılar ona göre değişiyor.
+
+| | Ne geldi |
+|---|---|
+| **Mukavemet** | 10 bölüm: motor gücü · makine konstrüksiyonu · kabin alanı · askı halatları · regülatör halatı · tahrik yeteneği ( 4 yük durumu ) · kabin kılavuz rayları ( C.2.1 / C.2.2 / C.2.3 ) · karşı ağırlık rayları · kuyu tabanı yükleri · sığınma alanları |
+| **Elektrik ve topraklama** | Kabin ve kuyu aydınlatması, kurulu güç cetveli, gerilim düşümü, makine dairesi aydınlatması, temel topraklama. **Avan motoru çağrılıyor** — kopyalanmadı |
+| **Ortak girdi köprüsü** | Kabin ölçüleri, beyan yükü, hız, kuyu boyu, motor gücü, askı oranı, ray profili **bir kez** giriliyor; elektrik tarafına kendiliğinden geçiyor |
+| **Çıktılar** | Uygulama projesi PDF ( bütün bölümler tek paftada ) · Excel ( kaynak çalışma kitabı ) · CAD · revizyon akışı |
+
+**Kaynak Excel'de yedi hata bulundu ve TS EN 81-20 / TS EN 81-50'ye göre
+düzeltildi** — dördü hesabı olduğundan **iyi** gösteriyordu. Ayrıntısı 6.
+bölümdeki tabloda; hepsi kodda `EXCEL_FARKLARI` altında standart maddesiyle
+kayıtlı ve her biri için "gerçekten uygulanıyor mu" testi var.
+
+**Teslim edilen Excel de düzeltiliyor.** Program kitaptan ayrıldığı için, kitap
+olduğu gibi verilseydi aynı projenin iki belgesi birbirini yalanlardı. Teslim
+kopyasında ilgili **formüller** düzeltiliyor ( değerler değil ), kitap kendi
+kendini hesaplamaya devam ediyor. Doğrulama paketi ikisinin **hücre hücre aynı**
+olduğunu denetliyor. Şablon dosyasına dokunulmuyor.
+
+**Kod avan ve uygulama diye ayrıldı** — hesap motorları ( `engine/avan` ·
+`engine/uygulama` ), HTTP uçları ( `api/avan.py` · `api/uygulama.py` ) ve arayüz
+betikleri ( `avan.js` · `uygulama.js` ) ayrı dosyalarda. Ortak olan yalnız
+gerçekten ortak olanlar ( bkz. 9. bölüm ). Ayrıştırmadan önce ve sonra doğrulama
+paketi **aynı sayıyı** verdi — o gün 24.592 kontrol, tek bir hesap sonucu
+değişmedi. ( Paket sonradan büyüdü;  bugünkü sayı 6. bölümdedir. )
+
+**Doğrulama paketi 7 testten 11'e çıktı.** Yenileri: mukavemet tabloları ·
+mukavemet motoru · mukavemet ↔ Excel ( girdi uzayı taraması ) · uygulama
+projesi ( ortak girdi köprüsü ).
+
+---
 
 **Sürüm 2.0** — **tekli / çoklu ayrımı kalktı.  Yöntemi artık veri belirliyor.**
 
@@ -371,20 +407,20 @@ kaldığınız yerden devam edersiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**26.500'ün üzerinde kontrolün tamamı geçmiştir.**
+**24.609 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **746 / 746** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, mukavemet paftası ve çalışma kitabı | **341 / 341** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon | **316 / 316** |
-| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.437 / 4.437** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **368 / 368** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon, yerleşim taşması | **328 / 328** |
+| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.461 / 4.461** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
-| **8 · Mukavemet tabloları** | 14 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.013 / 1.013** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + beş sapmanın uygulandığının kanıtı + girdi reddi | **208 / 208** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan 25 hücre ayrı denetlenir | **11.101 / 11.101** |
+| **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.019 / 1.019** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **sekiz sapmanın uygulandığının kanıtı** + girdi reddi | **225 / 225** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan 30 hücre ayrı denetlenir | **10.794 / 10.794** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları | **91 / 91** |
 
 ### Test 1 neden güçlü bir kanıt?
@@ -430,9 +466,9 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki dört noktada kitap standarttan sapıyor — program
+noktasıdır. Aşağıdaki sekiz noktada kitap standarttan sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
-( `engine/mukavemet.EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
+( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
 
 | # | Konu | Standart | Kitabın yaptığı | Programın yaptığı |
 |---|---|---|---|---|
@@ -443,6 +479,7 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | ⑤ | ω burkulma katsayısı | **EN 81-50 m.5.10.3** — ω, λ **ve Rm**'e bağlıdır | Tek tablo kullanır; o tablo yalnız **Rm = 370** eğrisidir ve ray çeliğinden bağımsız uygulanır | Rm 370 ve 520 eğrileri, arada doğrusal ara değer |
 | ⑥ | Acil frenlemede μ | **EN 81-50 m.5.11.2.3.2** — μ = 0,1/(1+v/10), v **halat** hızı | Bağıntıya **kabin** hızını koyar | v = kabin hızı × askı oranı |
 | ⑦ | Nps · Npr | **EN 81-50 m.5.12.2** — tesisin askı düzenine bağlı | Hesap sayfasına **sabit** 1 ve 0 yazar | Girdi; palangalı sistemde uyarı verilir |
+| ⑧ | İki sığınma açıklığı | **EN 81-20 m.5.2.5.7.3** ve **m.5.2.5.8.2 a) 2)** | Kabin üstü **1200 mm**, ray dibi **150 mm** — ikisi de standartta yok | Kabin üstü = sığınma hacminin yüksekliği ( **1000 mm** ), ray dibi = Şekil 7 ( **100 mm** ) |
 
 **①'in pratik sonucu:** kitabın kendi örneğinde tahrik kasnağı 240 mm, halat
 6,5 mm → oran **36,9**. Kitap 30 eşiğiyle "uygun" der; **standardın 40 eşiğine
@@ -478,8 +515,22 @@ hızı ve 2:1 askı için standart μ = 0,083 verir — bu ancak v = 2 m/s ( hal
 hızı ) ile çıkar. Kabin hızı kullanmak μ'yü, dolayısıyla e^(f·α) sınırını
 büyütür ve tahrik yeteneğini olduğundan iyi gösterir.
 
-② ve ④'te kitap **emniyetli tarafta** ama yanlış; **③ · ⑤ · ⑥ · ⑦'de
-emniyetsiz tarafta** — hesabı olduğundan iyi gösteriyor.
+**⑧'in etkisi.** Kitabın 150 mm'si, m.5.2.5.8.2 a) 1)'deki **yatay**
+0,15 m sınırının düşey sınır sanılmasından geliyor görünüyor; standardın
+Şekil 7'si raya yatay Xₕ ≤ 0,15 m uzaklıktaki karkas parçaları, paten ve
+güvenlik tertibatı için **0,10 m** verir ( Xₕ = 0,30 m'de 0,30 m,
+Xₕ ≥ 0,50 m'de 0,50 m ). Kabin üstündeki 1200 mm'nin ise standartta
+karşılığı yok: m.5.2.5.7.3, ayakta durulabilen alanın üzerindeki serbest
+yüksekliği **seçilen sığınma hacminin yüksekliğine** bağlar — çömelmiş
+duruşta ( Çizelge 3 ) **1,00 m**. Program bu sınırı artık ayrı bir sabit
+olarak değil, doğrudan sığınma hacminden okur.
+
+Ayrıca kitap ölçüleri `>` ile karşılaştırıyordu; standart **"en az"** dediği
+için sınıra **eşit** ölçü de uygundur — program `≥` kullanır.
+
+② · ④ · ⑧'de kitap **emniyetli tarafta** ama yanlış — ⑧ standarda uygun bir
+projeyi haksız yere reddeder, kuyu boyunu gereksiz büyütür. **③ · ⑤ · ⑥ ·
+⑦'de emniyetsiz tarafta** — hesabı olduğundan iyi gösteriyor.
 
 ### Teslim edilen Excel de düzeltilir
 
@@ -498,7 +549,8 @@ Doğrulama paketi hem şablonun değişmediğini hem de teslim kopyasının paft
 > şunlardır: `11!Q97` ( 30 → 40 ) · `11!AO312` ( 0 → `=AH293` ) · `11!AU575`
 > ( sütun 7 → 6 ) · `11!AK190` ( `C61` → `C61*B100` ) · `11!AH105/AH106`
 > ( sabit → girdi ) · `11!Q380·Q385·Q477·Q482·Q538·Q596` ( `1+2*` → `ℓ+2*` ) ·
-> `11!AD354` ve `AB39` ( ω tablosu → EN 81-50 formülü ).
+> `11!AD354` ve `AB39` ( ω tablosu → EN 81-50 formülü ) · `11!AD636`
+> ( 1200 → `=P639*1000` ) · `11!AD647` ( 150 → 100 ).
 
 #### Kitapta ayrıca bulunanlar
 
@@ -535,6 +587,38 @@ hepsi **birebir tutuyor**:
 - Birleşik gerilmeler σm + (Fv+k3·Maux)/A ve σk + 0,9·σm
 - **Halat emniyet katsayısı** 12 ( ≥ 3 halat ) / 16 ( 2 halat ) — m.5.5.2.2
 - **Sehim** 0,7·F·L³/(48·E·I), Fy ↔ Ix eşleşmesi
+- **Sığınma hacimleri** Çizelge 3 / Çizelge 4 tip 2 ( çömelmiş )
+  0,50 × 0,70 × 1,00 m · **açıklıklar** m.5.2.5.7.2 ( 0,50 m ) ·
+  m.5.2.5.8.2 ( 0,50 · 0,10 · 0,30 m ) · Şekil 7 ( Xₕ ≤ 0,15 m → 0,10 m )
+- **0,035·v²** — TS EN 81-20'de açıklığın değil, kabinin **en üst konumunun**
+  tanımındadır ( Çizelge 2 ). Program kuyu ölçülerini anma konumundan aldığı
+  için terimi sınıra ekler; eşitsizlik cebirsel olarak aynıdır.
+
+#### ISO 8100 ve 2026 revizyonu
+
+Hesaplar **TS EN 81-20 / EN 81-50**'ye göre yapılır. Aynı kurallar
+**ISO 8100-1 / ISO 8100-2:2019** olarak da yayımlanmıştır — bu iki parça
+EN 81-20/50:2014'ün **birebir aynısıdır** ( "identical adoption" ), yani
+oradan bakmak aynı sayıları verir. ISO 8100-**32** ise trafik planlamasıdır,
+mukavemetle ilgisi yoktur.
+
+**EN ISO 8100-1/-2:2026** yayımlandı; **36 aylık** geçiş süresi işliyor, yani
+TS EN 81-20/50 bugün hâlâ geçerli. Avrupa Asansör Birliği'nin ( ELA ) 144
+sayfalık karşılaştırma belgesine göre programın yaptığı hesaplarda değişen:
+
+| Konu | 2026 revizyonunda |
+|---|---|
+| **D/d ≥ 40** ( ① ) | **Değişmedi** — ISO 4344 halatlarında yorulma deneyi yapılmadan eski kural aynen geçerli |
+| **Halat emniyet katsayısı** | ISO 4344 halatları için **"gereklilikler değişmedi"** ( m.4.5.2.2.2 ) |
+| **Ray hesabı** ( Ek C → **Ek B** ) | Bazı burkulma bağıntılarına **ω eklendi**; birleşik gerilme hesabı tamamlandı; **k3·Maux yerine Faux** yazıldı |
+| **Tahrik** | ISO 8100-2 m.4.11 + Çizelge 1'e taşındı; klasik çelik halatta *"küçük değişiklikler"* |
+| **Sığınma hacimleri** | Çizelge 3'e **diz çökmüş** duruş eklendi; kuyu-eşik boşluğu 0,15 → **0,12 m** |
+| **Makine dairesi çalışma yüksekliği** | 2,10 → **2,00 m** |
+
+Yani ⑤ ( ω ) ve ⑧ ( ray hesabındaki k3 ) için yaptığımız düzeltmelerin yönü
+2026 revizyonunda da doğrulanıyor; ① ve Sf ise hiç değişmiyor. Yeni sürüm
+esas olarak **yeni askı türlerini** ( elastomer kaplı halat, karbon elyaf
+kayış ) ve SIL devrelerini getiriyor — programın kapsamı dışında.
 
 ### Doğrulama paketi — kendiniz çalıştırabilirsiniz
 
@@ -557,7 +641,7 @@ macOS'ta programın kendi Python'unu kullanmak için `./.venv/bin/python3 testle
 | **5 · Arayüz** | Tarayıcıda tüm sekmeler, canlı hesap, aktarım, indirme düğmeleri, kalıcılık, dar ekran, Excel'den geri yükleme. |
 | **6 · Geri yükleme** | Her senaryoyu XLSX'e yazıp geri okur; girdilerin birebir döndüğünü doğrular. Excel'de elle düzenlenmiş dosya ve bozuk dosya senaryoları dâhil. |
 | **7 · Altın çıktı** | Önceki sürümün tüm çıktısı sıkıştırılmış olarak saklanır; her koşuda satır satır karşılaştırılır. Refactor sırasında **hiçbir sayı sessizce değişemez**. |
-| **8 · Mukavemet tabloları** | `engine/mukavemet_tablolari.py` içindeki her değeri kaynak Excel'e karşı doğrular. Tablolar makineyle aktarıldı; bir sütun kayması hiçbir hesap testinde görünmezdi — bu test **aktarmanın kendisini** denetler. |
+| **8 · Mukavemet tabloları** | `engine/uygulama/mukavemet_tablolari.py` içindeki her değeri kaynak Excel'e karşı doğrular. Tablolar makineyle aktarıldı; bir sütun kayması hiçbir hesap testinde görünmezdi — bu test **aktarmanın kendisini** denetler. |
 | **9 · Mukavemet motoru** | Excel'in kendi örneğindeki 100 sonuç hücresi; ayrıca geçersiz girdi yolları ve profil / hız / kanal varyantları. |
 | **10 · Mukavemet ↔ Excel** | **Girdi uzayını** tarar: 78 farklı girdi bileşimi kaynak kitaba yazılır, LibreOffice 1115 formülü yeniden hesaplar, motorun ürettiği 166 değer hücre hücre karşılaştırılır. |
 | **11 · Uygulama projesi** | **Ortak girdi köprüsünü** denetler: her ortak alan tek tek oynatılır ve elektrik sonucunun gerçekten değiştiği doğrulanır. Köprü sessizce kopabilir ( bir alan adı değişir, biri `None` kalır ) ve hiçbir hesap testi bunu göremez — iki motor da kendi içinde tutarlı çalışmaya devam eder. Ayrıca mukavemet sonucunun birlikte koşarken **kirlenmediği** kanıtlanır. |
@@ -633,7 +717,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 ### Uygulama projesi — mukavemet
 
 - **Kaynak kitaptan ayrılan dört nokta** 6. bölümdeki tabloda sayılıdır; her
-  biri kodda `engine/mukavemet.EXCEL_FARKLARI` içinde standart maddesiyle
+  biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
   birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.
 - **Paten balatası uzunluğu ( ℓ )** flanş eğilmesine girer ( EN 81-50 m.5.10.5 ).
@@ -643,7 +727,14 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 - **Sığınma alanı payları** ( kabin gövde yüksekliği 2400, kabin üstü kotu 2100,
   revizyon kutusu 500, etek 400 / 950, ray altı 270 mm ) kaynak kitabın **ofis
   kabulüdür — TS EN 81-20 sayısı değildir.** Farklı kabin imalatında
-  `engine/mukavemet.py` içindeki `SIGINMA` sözlüğünden güncellenmelidir.
+  `engine/uygulama/mukavemet.py` içindeki `SIGINMA` sözlüğünden güncellenmelidir.
+  Buna karşılık aynı sözlükteki **asgari açıklıklar** ( 100 · 500 · 500 · 100 ·
+  100 · 300 mm ve sığınma hacimleri ) doğrudan **TS EN 81-20 m.5.2.5.7 /
+  m.5.2.5.8**'dendir — her satırın karşısında madde numarası yazılıdır ve
+  ofis kabulü olarak değiştirilmemelidir. Ray dibi açıklığı, parçanın raya
+  **yatay Xₕ ≤ 0,15 m** uzaklıkta olduğu kabulüyle Şekil 7'den 0,10 m alınır;
+  daha uzaktaki parçalar için sınır 0,30 m ( Xₕ = 0,30 ) ve 0,50 m
+  ( Xₕ ≥ 0,50 ) olur.
 - **Motor verimi η = 0,92**, **sürtünme yükü Gs = 0**, **ST 37 emniyet gerilmesi
   σem = 130 N/mm²**, **yan yatak mesnet payı 335 mm** de kitabın kabulleridir;
   hepsi `SABIT` sözlüğünde, yanlarında Excel hücre adresiyle durur.
@@ -655,7 +746,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   **bilerek ayrıdır** — 320 kg satırı burada vardır, avanın Tablo-11'inde yoktur.
 - Uygulama projesi **tek asansör** içindir. Grup projesinde her asansör için
   ayrı koşturulup ayrı pafta alınır.
-- **Elektrik hesapları avan motorunun aynısıdır** ( `engine/avan.py` ) — avan
+- **Elektrik hesapları avan motorunun aynısıdır** ( `engine/avan/hesap.py` ) — avan
   projesindeki bütün sınırlar burada da geçerlidir: topraklama TT sistem,
   UL = 50 V, IΔn = 300 mA kabulüyle hesaplanır ve **tesis tamamlandıktan sonra
   ölçümle doğrulanmalıdır**; L1 gerçek kablo güzergâhıdır, kuyu yüksekliğine
@@ -712,63 +803,104 @@ değiştirilemez.
 
 ## 9. Klasör yapısı
 
+**Avan projesi ile uygulama projesi her katmanda ayrıdır** — hesap motoru, API
+uçları ve arayüz betikleri ayrı dosyalarda. Ortak olan yalnız gerçekten ortak
+olan şeyler: adım yapısı, sayı biçimi, çizim yardımcıları ve indirme.
+
 ```
 AVAN HESAPLAMA PROGRAMI/
 ├── baslat.command          ← macOS: çift tıklayın
 ├── baslat.bat              ← Windows: çift tıklayın
-├── main.py                 ← sunucu ve uçlar
+├── main.py                 ← sunucu kabuğu:  uygulamayı kurar, uç paketlerini
+│                              bağlar, ana sayfa · Excel yükleme · sağlık
 ├── requirements.txt
 ├── OKUBENI.md              ← bu dosya
+│
+├── engine/                 ← HESAP MOTORLARI  ( arayüzden ve sunucudan bağımsız )
+│   ├── ortak/
+│   │   └── steps.py        ← işlem adımı yapısı, Türkçe sayı biçimi
+│   ├── avan/               ─────────────────────────────── AVAN PROJESİ
+│   │   ├── tablolar.py     ← MMO/697 + ISO + IEC tabloları
+│   │   ├── trafik.py       ← trafik hesabı ( tek + çoklu )
+│   │   └── hesap.py        ← avan hesapları
+│   └── uygulama/           ─────────────────────────── UYGULAMA PROJESİ
+│       ├── mukavemet_tablolari.py ← ISO 7465 · TS 12385-5 · EN 81-50
+│       ├── mukavemet_girdi.py     ← 65 girdinin sözleşmesi ( TEK KAYNAK )
+│       ├── mukavemet.py           ← 10 bölümlük mukavemet hesabı
+│       ├── girdi.py               ← ek girdiler + ORTAK GİRDİ KÖPRÜSÜ
+│       └── hesap.py               ← mukavemet + elektrik orkestratörü
+│
+├── api/                    ← HTTP UÇLARI
+│   ├── ortak.py            ← sayı çevirme · belirsiz yazım denetimi ·
+│   │                          proje kimliği · dosya adı · indirme yanıtı
+│   ├── avan.py             ← trafik · avan · kapak ve çıktıları  ( 10 uç )
+│   └── uygulama.py         ← mukavemet + elektrik ve çıktıları  (  5 uç )
+│
+├── exports/                ← BELGE ÜRETİMİ
+│   ├── hucre_haritasi.py   ← girdi alanı ↔ Excel hücresi eşlemesi (TEK KAYNAK)
+│   ├── xlsx_export.py      ← avan şablonunu dolduran XLSX çıktısı
+│   ├── xlsx_import.py      ← avan Excel'inden geri yükleme ( revizyon )
+│   ├── mukavemet_xlsx.py   ← mukavemet kitabını doldurur, STANDARDA UYDURUR
+│   │                          ve geri okur
+│   ├── pdf_export.py       ← baskıya hazır PDF  ( trafik · avan · uygulama )
+│   ├── dxf_export.py       ← CAD çıktısı  ( ortak )
+│   └── kapak_export.py     ← avan proje kapağı
+│
+├── static/                 ← ARAYÜZ.  Yükleme sırası önemli:
+│   ├── index.html
+│   ├── style.css
+│   ├── ortak.js            ← biçimleme · sekme şeridi ve MOD anahtarı ·
+│   │                          çizim yardımcıları · indirme · kalıcılık ·
+│   │                          Excel'den proje açma · açılış ekranı
+│   ├── avan.js             ← trafik · avan · ofis standardı · tablolar
+│   └── uygulama.js         ← mukavemet + elektrik  ·  en sonda kur() çağrısı
+│
 ├── testler/                ← doğrulama paketi
 │   ├── calistir.py         ← hepsini çalıştırır
-│   ├── test_excel_uyumu.py
-│   ├── test_kenar_durum.py
-│   ├── test_dayaniklilik.py
-│   ├── test_ciktilar.py
-│   ├── test_arayuz.py
-│   ├── test_geri_yukleme.py
-│   ├── test_altin.py             ← altın çıktı kalkanı
-│   ├── altin_uret.py             ← altın çıktıyı yeniden üretir
-│   ├── test_mukavemet_tablolari.py
-│   ├── test_mukavemet.py
+│   ├── test_excel_uyumu.py · test_kenar_durum.py · test_dayaniklilik.py
+│   ├── test_ciktilar.py · test_arayuz.py · test_geri_yukleme.py
+│   ├── test_altin.py       ← altın çıktı kalkanı
+│   ├── altin_uret.py       ← altın çıktıyı yeniden üretir
+│   ├── test_mukavemet_tablolari.py · test_mukavemet.py
 │   ├── test_mukavemet_excel.py
-│   └── test_uygulama.py
-├── engine/
-│   ├── tables.py           ← MMO/697 + ISO + IEC tabloları        ┐
-│   ├── traffic.py          ← trafik hesabı (tek + çoklu)          │ AVAN
-│   ├── avan.py             ← avan hesapları                       ┘
-│   ├── mukavemet_tablolari.py ← ISO 7465 · TS 12385-5 · EN 81-50  ┐
-│   ├── mukavemet_girdi.py  ← 64 girdinin sözleşmesi ( TEK KAYNAK )│ UYGULAMA
-│   ├── mukavemet.py        ← 10 bölümlük mukavemet hesabı         │
-│   ├── uygulama_girdi.py   ← ek girdiler + ORTAK GİRDİ KÖPRÜSÜ    │
-│   ├── uygulama.py         ← iki motoru birleştiren orkestratör   ┘
-│   └── steps.py            ← işlem adımı yapısı, Türkçe sayı biçimi ( ortak )
-├── exports/
-│   ├── hucre_haritasi.py   ← girdi alanı ↔ Excel hücresi eşlemesi (TEK KAYNAK)
-│   ├── xlsx_export.py      ← şablonu dolduran XLSX çıktısı
-│   ├── xlsx_import.py      ← Excel'den geri yükleme (revizyon)
-│   ├── mukavemet_xlsx.py   ← mukavemet kitabını doldurur ve geri okur
-│   ├── dxf_export.py       ← CAD çıktısı
-│   └── pdf_export.py       ← baskıya hazır PDF ( trafik · avan · mukavemet )
+│   └── test_uygulama.py    ← ortak girdi köprüsü
+│
 ├── templates/              ← OFİSİN KENDİ EXCEL ŞABLONLARI
-│   ├── ASANSOR_AVAN_HESAPLARI.xlsx
-│   ├── ASANSOR_TRAFIK_HESABI_v2_1.xlsx
-│   └── MUKAVEMET_HESABI.xlsx       ← uygulama projesi
-├── fonts/                  ← PDF için Türkçe karakter destekli yazı tipi
-└── static/                 ← arayüz (HTML / CSS / JS)
+│   ├── ASANSOR_TRAFIK_HESABI_v2_1.xlsx  ┐ avan
+│   ├── ASANSOR_AVAN_HESAPLARI.xlsx      ┘
+│   └── MUKAVEMET_HESABI.xlsx            ← uygulama projesi
+└── fonts/                  ← PDF için Türkçe karakter destekli yazı tipi
 ```
+
+### İki proje neyi paylaşır, neyi paylaşmaz
+
+| Paylaşılan | Niçin |
+|---|---|
+| `engine/ortak/steps.py` | Hesap adımlarının yapısı ve sayı biçimi — iki pafta da aynı dilde konuşsun |
+| `pdf_export.py` çizim yardımcıları | İki paftanın aynı programdan çıktığı belli olsun |
+| `api/ortak.py` | Sayı okuma ve belirsiz yazım denetimi tek yerde kalsın |
+| `dxf_export.py` | CAD yerleşimi hesaptan bağımsız |
+| **Avanın elektrik motoru** | Uygulama projesindeki aydınlatma · kurulu güç · gerilim düşümü · topraklama, avanın `engine/avan/hesap.py`'sini **çağırır**. Kopyalanmaz — iki kopya zamanla ayrışır |
+
+| Paylaşılmayan | Niçin |
+|---|---|
+| Hesap tabloları | Mukavemet kendi kaynağından gelir; kabin alanı tablosu bile bilerek ayrıdır |
+| Çalışma kitapları | Her proje kendi Excel'iyle teslim edilir |
+| Proje kapağı | Uygulama projesi kapağı MMO'nun ayrı kitabına aittir |
+| Sekme şeridi ve girdi formları | Moda göre ayrılır; yalnız Sabitler / Ofis Standardı ikisinde de durur |
 
 ### Şablonu güncellemek
 Excel dosyalarınızda **biçim, açıklama veya sayfa düzeni** değişirse
 `templates/` içindeki dosyaların üzerine yazmanız yeterlidir — XLSX çıktısı
 kendiliğinden yeni şablonu kullanır.
 
-**Formül veya tablo değeri** değişirse `engine/tables.py` (tablo değerleri) ya da
-`engine/traffic.py` / `engine/avan.py` (formüller) de güncellenmelidir; aksi
+**Formül veya tablo değeri** değişirse `engine/avan/tablolar.py` (tablo değerleri)
+ya da `engine/avan/trafik.py` / `engine/avan/hesap.py` (formüller) de
+güncellenmelidir; aksi
 hâlde ekrandaki sonuç ile XLSX çıktısı ayrışır.
 
 **Mukavemet kitabı** ( `MUKAVEMET_HESABI.xlsx` ) hem şablon hem de doğrulama
-kaynağıdır. Üzerine yeni bir sürüm yazarsanız `python3 testler/calistir.py 8 9 10`
+kaynağıdır. Üzerine yeni bir sürüm yazarsanız `python3 testler/calistir.py 8 9 10 11`
 komutu, tablo ve formüllerin hâlâ tutup tutmadığını **tek seferde** söyler:
 tablolar aktarımıyla, motor da 78 senaryoda kitabın kendi hesabıyla
 karşılaştırılır. Tutmuyorsa ne değiştiğini hücre adresiyle bildirir.

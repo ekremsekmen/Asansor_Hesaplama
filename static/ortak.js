@@ -1,0 +1,920 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ASANSÖR PROJE PROGRAMI  —  ORTAK ARAYÜZ
+
+   İki proje türünün de kullandığı kısım:  genel durum, biçimleme,
+   sekme şeridi ve MOD anahtarı, çizim yardımcıları, indirme, kalıcılık,
+   Excel'den proje açma, açılış ekranı.
+
+   Yükleme sırası ÖNEMLİDİR:   ortak.js → avan.js → uygulama.js
+   kur() en sonda, uygulama.js'in ardından çağrılır.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   ASANSÖR AVAN HESAPLAMA PROGRAMI  —  arayüz
+   ═══════════════════════════════════════════════════════════════════ */
+let SEC = {};                 // sunucudan gelen seçenekler / tablolar
+let SON = {t:null, c:null, a:null, m:null};
+let TRAFIK_ADET = 1;          // 1 → tek hesap (adet hesaplanır) · 2-4 → grup kontrolü
+let AVAN_EK = 0;              // avanda TRAFİK GRUBUNA girmeyen asansör adedi (yük/sedye)
+let AVAN_OTO = {};            // kapasite/hızı trafikten OTOMATİK gelen asansörler
+let AVAN_TRF = {};            // her asansöre en son YANSITILAN trafik değeri
+/*  İSTEK SIRA SAYACI.  Ekran her tuş vuruşunda hesap ister; ağ gecikmesiyle
+    ESKİ bir isteğin yanıtı YENİSİNDEN SONRA gelebilir.  Sayaç olmadan geç gelen
+    eski yanıt ekranı ve avana aktarılan kapasite/hızı geri alıyordu — kullanıcı
+    16 kişilik yazmışken sonuç 8 kişilik kalıyordu.  Yalnız EN SON istek çizer. */
+const ISTEK = {trafik: 0, avan: 0, mukavemet: 0};
+/*  PROGRAM İKİ MODLUDUR.  Açılış ekranında seçilen mod, sekme şeridinin hangi
+    adımları göstereceğini belirler:
+        'avan'      →  trafik · avan · kapak  ( + başvuru sekmeleri )
+        'uygulama'  →  mukavemet
+    İkisi AYRI hesaplardır; ortak girdi yoktur, karışmasınlar diye şerit de
+    ayrılır.  MUK: mukavemet girdi sözleşmesi ( /api/mukavemet/alanlar ). */
+let MOD = 'avan';
+let MUK = null;
+let MUK_DURAK = [];
+const $  = id => document.getElementById(id);
+const el = (t,s,h)=>{const e=document.createElement(t); if(s)e.className=s; if(h!=null)e.innerHTML=h; return e;};
+
+/* ---------------------------------------------------------- biçimleme */
+function tr(x, d=2){
+  if(x===null||x===undefined||x==='') return '—';
+  if(typeof x==='string') return x;
+  if(!isFinite(x)) return '—';
+  return Number(x).toLocaleString('tr-TR',{minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function trn(x, d=2){
+  if(x===null||x===undefined||x==='') return '—';
+  if(typeof x==='string') return x;
+  if(!isFinite(x)) return '—';
+  return Math.abs(x-Math.round(x))<1e-9 ? tr(Math.round(x),0) : tr(x,d);
+}
+/*  TIRNAKLAR DA KAÇIRILIR.  Bu işlev yalnız metin içeriğinde değil,
+    value="${kacis(...)}" gibi ÖZNİTELİK içinde de kullanılıyor;  çift tırnak
+    kaçırılmayınca özniteliği erken kapatıyordu:  ek nüfus açıklamasına
+    `Daire "A" bloğu` yazıp yeniden açınca alanda yalnız `Daire ` kalıyordu.  */
+const kacis = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+function durum(msg, hata){
+  const d=$('durum'); d.textContent=msg; d.className='durum gorunur'+(hata?' hata':'');
+  clearTimeout(d._t); d._t=setTimeout(()=>d.className='durum',2600);
+}
+
+/* ---------------------------------------------------------- sekmeler */
+/* Trafik hesabı TEK sekmedir; asansör adedine göre iki gövdeden biri
+   gösterilir:  1 asansör → #s-trafik (adet hesaplanır),
+                2-4       → #s-coklu  (grup kontrolü).
+   İkisi de "trafik" sekmesine aittir. */
+function sekmeGoster(ad){
+  document.querySelectorAll('.sekme').forEach(x=>
+    x.classList.toggle('etkin', x.dataset.sekme===ad));
+  document.querySelectorAll('.sayfa').forEach(s=>s.hidden=true);
+  //  Trafik ARTIK TEK GÖVDEDİR ( #s-coklu ) — 1..4 asansör aynı formda
+  //  tanımlanır, yöntemi program veriden çıkarır.
+  $('s-' + (ad==='trafik' ? 'coklu' : ad)).hidden=false;
+  window.scrollTo({top:0,behavior:'instant'});
+}
+/*  Şeritte yalnız seçili modun adımları durur.  Gizlenen sekmenin sayfası da
+    kapatılır — yoksa moddan moda geçişte iki formu birden gösterebiliyordu. */
+function modAyarla(m){
+  MOD = (m === 'uygulama') ? 'uygulama' : 'avan';
+  document.body.dataset.mod = MOD;
+  //  Bir sekme birden çok moda ait olabilir ( "avan uygulama" ) — ofis
+  //  standardı iki hesapta da kullanılır, moda göre saklanmaz.
+  document.querySelectorAll('.sekme[data-mod]').forEach(b=>{
+    b.hidden = !b.dataset.mod.split(/\s+/).includes(MOD);
+  });
+  //  Başlık ve kaynak şeridi de moda uyar — hangi projede olduğu üst
+  //  şeritten okunabilmeli, ekran görüntüsü alındığında da belli olsun.
+  const ad = $('ust_ad'), kaynak = $('ust_kaynak');
+  if(ad) ad.textContent = MOD === 'uygulama'
+    ? 'ASANSÖR UYGULAMA PROJESİ — MUKAVEMET'
+    : 'ASANSÖR AVAN HESAPLAMA PROGRAMI';
+  if(kaynak) kaynak.innerHTML = MOD === 'uygulama'
+    ? 'TS EN 81-20 &nbsp;·&nbsp; TS EN 81-50 &nbsp;·&nbsp; TS 12385-5 &nbsp;·&nbsp; ISO 7465<br>'
+      + 'MMO 208/4 &nbsp;·&nbsp; MMO 208/7'
+    : 'MMO/697, 2. Baskı, Ocak 2020 &nbsp;·&nbsp; TS EN 81-20 &nbsp;·&nbsp; ISO 8100-32:2020<br>'
+      + 'IEEE Std 80 &nbsp;·&nbsp; IEC 60364-5-52 &nbsp;·&nbsp; BYKHY md.4';
+}
+document.querySelectorAll('.sekme').forEach(b=>b.onclick=()=>sekmeGoster(b.dataset.sekme));
+function katla(bas, hedef){
+  bas.classList.toggle('kapali');
+  $(hedef).style.display = bas.classList.contains('kapali') ? 'none' : '';
+}
+
+/* ---------------------------------------------------------- kurulum */
+async function kur(){
+  SEC = await (await fetch('/api/secenekler')).json();
+  const opts=(a,f)=>a.map(v=>`<option value="${f?f(v):v}">${f?f(v):v}</option>`).join('');
+  $('c_bina_tipi').innerHTML = opts(SEC.bina_tipleri);
+  $('c_manuel_V').innerHTML = '<option value="">Tablo-2 minimumu</option>' +
+      SEC.hizlar.map(v=>`<option value="${v}">${tr(v)} m/s</option>`).join('');
+
+  cokluAsansorleriKur();
+  avanAsansorleriKur();
+  sabitFormuKur();
+  sabitATablosu();
+  tablolariKur();
+
+  /*  Hangi hesabın yeniden koşacağını MOD belirler.  Sabitler / Ofis
+      Standardı sekmesi İKİ MODA DA aittir:  uygulama projesindeyken oradaki
+      bir değişiklik uygulama hesabını tetiklemeli — yoksa kullanıcı armatür
+      ışık akısını değiştirir, ekranda hiçbir şey olmazdı. */
+  const _girdiOlayi = e => {
+    if(e.target.closest('#s-proje')){ yaz(); return; }
+    if(MOD === 'uygulama' || e.target.closest('#s-mukavemet')){
+      mukavemetPlanla(e.target); return;
+    }
+    planla(e.target);
+  };
+  document.body.addEventListener('input', _girdiOlayi);
+  document.body.addEventListener('change', _girdiOlayi);
+
+  birakAlaniniKur();
+  oku();
+  cokluKolonlariGoster();
+  avanKartlariGoster();
+  adetDugmeleriKur();
+  mkYokUygula();
+  ofisTazele();
+  etiketleriGuncelle();
+  sablonDurumu();
+  hesaplaHepsi();
+}
+
+let zaman=null;
+function planla(hedef){
+  if(hedef && hedef.closest('#s-proje')){ yaz(); return; }
+  /*  Kullanıcı kapasite / hız alanına dokunduysa o asansör artık "otomatik"
+      değildir: değeri korunur ve kartı kendiliğinden kapanmaz. */
+  if(hedef && hedef.id){
+    const m = /^a_(kapasite|Q_elle|V)([1-4])$/.exec(hedef.id);
+    if(m) delete AVAN_OTO[m[2]];
+  }
+  etiketleriGuncelle();
+  clearTimeout(zaman);
+  zaman=setTimeout(()=>{ yaz(); hesaplaHepsi(); }, 220);
+}
+
+function etiketleriGuncelle(){
+  ofisTazele();
+  temelCevresi();
+  [['c','c_bina_tipi']].forEach(([p,id])=>{
+    const bt=$(id).value||'';
+    let l1='⑤ —', l2='⑥ (bu bina tipinde gerekmiyor — boş bırakın)';
+    if(bt==='Konut'){ l1='⑤ Daire sayısı (bağımsız bölüm adedi)';
+      l2='⑥ Daire başına DİĞER oda sayısı (ilk yatak odası hariç)'; }
+    else if(bt.startsWith('İş Merkezi')||bt.startsWith('Kamu')){ l1='⑤ Toplam çalışma alanı (m²)  →  12 m² = 1 kişi'; }
+    else if(bt.startsWith('Otel')||bt==='Hastane'){ l1='⑤ Toplam yatak sayısı'; }
+    else if(bt==='Katlı Otopark'){ l1='⑤ Özel amaçlı araç adedi'; l2='⑥ Ticari amaçlı araç adedi'; }
+    else { l1='⑤ Bu bina tipinde hızlı giriş yok — ek nüfus kalemlerini kullanın'; }
+    $(p+'_l_hizli1').innerHTML=l1; $(p+'_l_hizli2').innerHTML=l2;
+  });
+}
+
+/* ---------------------------------------------------------- çizim: ortak */
+function adimTablosu(adimlar){
+  let h='<div class="kaydir"><table class="hesap">';
+  for(const a of adimlar){
+    if(a.tip==='metin'){ h+=`<tr class="baslik-satir"><td colspan="6">${kacis(a.deger)}</td></tr>`; continue; }
+    if(a.tip==='hesap'){
+      h+=`<tr class="formul"><td colspan="6">${kacis(a.formul)}</td></tr>`
+       + `<tr class="islem"><td></td><td class="islem" colspan="2">${kacis(a.islem)}</td>`
+       + `<td class="deger">${kacis(a.metin)}</td><td class="birim">${kacis(a.birim)}</td>`
+       + `<td class="kaynak">${kacis(a.kaynak)}</td></tr>`;
+      continue;
+    }
+    h+=`<tr><td class="sembol">${kacis(a.sembol)}</td><td class="aciklama">${kacis(a.aciklama)}</td>`
+     + `<td class="esit">=</td><td class="deger">${kacis(a.metin)}</td>`
+     + `<td class="birim">${kacis(a.birim)}</td><td class="kaynak">${kacis(a.kaynak)}</td></tr>`;
+  }
+  return h+'</table></div>';
+}
+function cetvelTablosu(c){
+  let t=0, h='<div class="kaydir"><table class="veri"><tr><th>Lin</th><th>Sorti</th><th style="text-align:right">Gücü</th><th>Birim</th><th>Sigorta A</th></tr>';
+  c.forEach(x=>{t+=x.guc; h+=`<tr><td>${x.lin}</td><td>${kacis(x.sorti)}</td><td class="sag">${trn(x.guc,0)}</td><td>${x.birim}</td><td>${x.sigorta}</td></tr>`;});
+  return h+`<tr class="toplam"><td></td><td>ASANSÖRÜN KURULU GÜCÜ</td><td class="sag">${trn(t,0)}</td><td>W</td><td></td></tr></table></div>`;
+}
+/* Yöntem açıklamalarını başlığın yanındaki ( ! ) dairesine toplar; üzerine
+   gelince açılır, dokunmatik ekranda tıklayınca kalır.  Uyarılar buraya
+   girmez — onlar açıkta durur.  Paftada bu metinler yine tam basılır. */
+function bilgiSimgesi(metinler, sinif){
+  const liste=(Array.isArray(metinler)?metinler:[metinler])
+    .filter(x=>x!==null&&x!==undefined&&String(x).trim()!=='');
+  if(!liste.length) return '';
+  return `<span class="bilgi${sinif?' '+sinif:''}" tabindex="0" role="button"`
+    + ` aria-label="Açıklamayı göster" onclick="bilgiAc(this,event)">`
+    + `<span class="bilgi-im">!</span><span class="bilgi-balon">`
+    + liste.map(x=>`<p>${kacis(String(x))}</p>`).join('')
+    + `</span></span>`;
+}
+/* Balon fixed konumlandırılır; yoksa kartların overflow'u kırpıyor.
+   Ekranın sağına / altına taşacaksa kendini içeri alır. */
+function bilgiKonumla(e){
+  const balon=e.querySelector('.bilgi-balon'); if(!balon) return;
+  balon.style.maxWidth=Math.min(430,window.innerWidth-24)+'px';
+  balon.style.left='0px'; balon.style.top='0px';
+  const r=e.getBoundingClientRect(), b=balon.getBoundingClientRect();
+  let x=r.left-8, y=r.bottom+8;
+  if(x+b.width > window.innerWidth-12) x=window.innerWidth-12-b.width;
+  if(x<12) x=12;
+  if(y+b.height > window.innerHeight-12) y=Math.max(12, r.top-8-b.height);
+  balon.style.left=Math.round(x)+'px'; balon.style.top=Math.round(y)+'px';
+}
+function bilgiAc(e, olay){
+  if(olay) olay.stopPropagation();
+  const acik=e.classList.contains('acik');
+  document.querySelectorAll('.bilgi.acik').forEach(x=>x.classList.remove('acik'));
+  if(!acik){ e.classList.add('acik'); bilgiKonumla(e); }
+}
+function _bilgiHedef(ev){
+  const t=ev.target;
+  return (t && t.closest) ? t.closest('.bilgi') : null;
+}
+document.addEventListener('mouseover',ev=>{const e=_bilgiHedef(ev); if(e) bilgiKonumla(e);}, true);
+document.addEventListener('focusin',ev=>{const e=_bilgiHedef(ev); if(e) bilgiKonumla(e);});
+document.addEventListener('click',()=>document.querySelectorAll('.bilgi.acik')
+  .forEach(x=>x.classList.remove('acik')));
+document.addEventListener('keydown',ev=>{
+  if(ev.key!=='Escape') return;
+  document.querySelectorAll('.bilgi.acik').forEach(x=>x.classList.remove('acik'));
+  /* Esc'ten sonra tarayıcı odağı :focus-visible'a yükseltiyor ve balon açık
+     kalıyordu; kapatırken odağı da bırakıyoruz. */
+  const o=document.activeElement;
+  if(o && o.classList && o.classList.contains('bilgi')) o.blur();
+});
+addEventListener('scroll',()=>{const a=document.querySelector('.bilgi.acik');
+  if(a) bilgiKonumla(a);}, true);
+addEventListener('resize',()=>document.querySelectorAll('.bilgi.acik')
+  .forEach(x=>x.classList.remove('acik')));
+
+function bolumCiz(b){
+  //  "ekran_notlari":  paftaya basılmayan ama ekranda kalması gereken
+  //  açıklamalar ( bkz. engine/avan.py — topraklama kontrolü ).
+  const bilgi = [...(b.aciklamalar||[]), ...(b.ekran_notlari||[])];
+  let h=`<div class="serit"><span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
+      + `<span class="kaynak">${kacis(b.kaynak||'')}</span></div>`;
+  if(b.adimlar&&b.adimlar.length) h+=adimTablosu(b.adimlar);
+  if(b.cetvel&&b.cetvel.length) h+=cetvelTablosu(b.cetvel);
+  if(b.sonuc) h+=`<div class="sonuc-kutu ${b.sonuc.uygun?'ok':'hata'}"><span class="et">${kacis(b.sonuc.baslik)}</span><span>${kacis(b.sonuc.metin)}</span></div>`
+    + (b.sonuc.alt||[]).map(x=>`<div class="notlar"><div>${kacis(x)}</div></div>`).join('');
+  if(b.notlar&&b.notlar.length) h+='<div class="notlar">'+b.notlar.map(n=>`<div>${kacis(n)}</div>`).join('')+'</div>';
+  return h;
+}
+const kutu = (et,dg,bi,sinif='') => `<div class="k ${sinif}"><div class="et">${et}</div><div class="dg2">${dg}</div><div class="bi">${bi||''}</div></div>`;
+
+/* ═══════════════ OFİS STANDARDI  —  HESAP BAZINDA GRUPLU ═══════════════
+   Sabitler iki ayrı yerde tutulur ve öyle kalmalıdır:
+
+     sb_*  →  Excel'in SABİTLER sayfasındaki B bölümüne yazılır
+     of_*  →  Excel'de SABİTLER'de karşılığı YOKTUR; GİRİŞ sayfasının kendi
+              girdi hücrelerine yazılır  ( bkz. engine/avan.py OFIS_VARSAYILAN )
+
+   Ama KULLANICI için bu ayrımın hiçbir anlamı yok; onun sorusu "bu sabit
+   hangi hesaba giriyor".  Bu yüzden ekranda tek panel var ve alanlar
+   HESABA göre gruplanıyor.  Kimlik ön ekleri ( sb_ / of_ ) değişmediği için
+   dışa aktarma ve geri yükleme tarafı bundan etkilenmez. */
+const SABIT_ETIKET = {
+  //  sb_*  ( Excel: SABİTLER sayfası )
+  i_palanga:['i — Palanga ( askı ) katsayısı','Doğrudan askı 1 / Palangalı 2'],
+  q_denge:['q — Denge faktörü','karşı ağırlığın dengelediği yük oranı'],
+  n_ray:['n — Kabin kılavuz ray sayısı','kabin daima iki raya oturur'],
+  gf:['gf — Gezici kablo ( flexbil ) birim kütlesi (kg/m)',''],
+  Fmt:['Fmt — Montör ağırlığı (kg)','kuyu üstü yükünde'],
+  kabin_armatur_W:['Kabin armatürü gücü (W)','LED spot'],
+  kabin_armatur_lm:['Kabin armatürü ışık akısı (lm)','5 W LED ≈ 300 lm'],
+  kabin_ustu_armatur:['Kabin üstü armatür adedi','kurulu güce eklenir'],
+  kuyu_armatur_W:['Kuyu armatürü gücü (W)','flüoresan'],
+  kuyu_armatur_lm:['Kuyu armatürü ışık akısı (lm)','ofis teamülü 2600 lm'],
+  kuyu_Dmax:['Kuyu armatürü azami aralığı (m)','0 = kontrol kapalı'],
+  priz_adedi:['Priz adedi',''], priz_gucu:['Priz başına güç (W)',''],
+  cosfi:['cosφ — Güç katsayısı','hat akımı hesabında'],
+  UL:['UL — İzin verilen temas gerilimi (V)','TT sistem'],
+  IDn:['IΔn — Kaçak akım rölesi (A)','300 mA = 0,30 A'],
+  lc:['lç — Çubuk topraklayıcı boyu (m)',''],
+  ayd_sutun:['Aydınlatma verimi sütunu (1-10)','Tablo-2 yansıma çifti'],
+  //  of_*  ( Excel: GİRİŞ sayfasının girdi hücreleri )
+  U:['U — Şebeke gerilimi (V)','fazlar arası'],
+  kappa:['κ — İletken iletkenliği','bakır 56 m/Ω·mm²'],
+  eps_max:['εmax — İzin verilen gerilim düşümü (%)','yönetmelik sınırı'],
+  gr:['gr — Kılavuz ray birim kütlesi (kg/m)','ofis ray profili'],
+  Fmk:['Fmk — Makine ağırlığı (kg)',''],
+  Fsh:['Fsh — Makine sehpası ağırlığı (kg)',''],
+  S1:['S1 — Kolon hattı kesiti (mm²)',''],
+  S2:['S2 — Makine besleme kesiti (mm²)',''],
+  L2:['L2 — Makine besleme uzunluğu (m)','pano – makine arası'],
+  kablo_tipi:['Kablo tipi','paftaya metin olarak yazılır'],
+  L1_pay:['L1 payı (m)','L1 = kuyu yüksekliği Hk + bu pay'],
+  beta:['β — Toprak özgül direnci (Ω·m)','zemin etüdü varsa o değeri yazın'],
+  cubuk_sayisi:['Is — Çubuk topraklayıcı adedi','paralel bağlı çubuk sayısı'],
+  goz_araligi:['Karelaj gözü (m)','şerit boyu temel ölçülerinden türetilirken kullanılır'],
+  sigorta_katsayisi:['Motor sigortası kalkış katsayısı','sigorta = bu katsayı × motor akımı, standart kademeye yuvarlanır'],
+};
+
+/*  Her sabitin HANGİ HESABA girdiği.  [ başlık, açıklama, alanlar ]
+    alan = "sb:anahtar" ya da "of:anahtar" */
+const SABIT_GRUP = [
+  //  Kat yüksekliği ve kapı tipi burada DEĞİL — her projede değişirler,
+  //  trafik hesabı sekmesinde girilirler.
+  ['① MOTOR GÜCÜ VE KUVVETLER', 'MMO/697 s.18-21 — motor gücü, karşı ağırlık, ray ve kuyu dibi kuvvetleri',
+   ['sb:q_denge', 'of:gr', 'sb:n_ray', 'sb:gf', 'of:Fmk', 'of:Fsh', 'sb:Fmt']],
+  ['② AYDINLATMA', 'kabin · kuyu · makine dairesi aydınlatma hesapları',
+   ['sb:kabin_armatur_W', 'sb:kabin_armatur_lm', 'sb:kabin_ustu_armatur',
+    'sb:kuyu_armatur_W', 'sb:kuyu_armatur_lm', 'sb:kuyu_Dmax', 'sb:ayd_sutun']],
+  ['③ KURULU GÜÇ VE GERİLİM DÜŞÜMÜ', 'IEC 60364-5-52 — kurulu güç, hat akımı, kablo ve gerilim düşümü',
+   ['of:U', 'of:kappa', 'of:eps_max', 'sb:cosfi', 'sb:priz_adedi', 'sb:priz_gucu',
+    'of:S1', 'of:S2', 'of:L2', 'of:L1_pay', 'of:kablo_tipi', 'of:sigorta_katsayisi']],
+  ['④ TEMEL TOPRAKLAMA', 'IEEE Std 80 · BYKHY — temel ve çubuk topraklayıcı',
+   ['of:beta', 'of:cubuk_sayisi', 'of:goz_araligi', 'sb:lc', 'sb:UL', 'sb:IDn']],
+];
+
+function sabitFormuKur(){
+  const yedek = new Set(SEC.sabit_b_yedek || []);
+  const B = SEC.sabit_b || {}, C = SEC.ofis_varsayilan || {};
+  const deger = (kaynak, k) => (kaynak === 'sb' ? B[k] : C[k]);
+  let h = '', basilan = new Set();
+
+  SABIT_GRUP.forEach(([baslik, aciklama, alanlar]) => {
+    const gecerli = alanlar.filter(x => {
+      const [kaynak, k] = x.split(':');
+      return !yedek.has(k) && deger(kaynak, k) !== undefined;
+    });
+    if(!gecerli.length) return;
+    h += `<div class="bolum-bas">${baslik}${aciklama ? ` <span class="ipucu">— ${aciklama}</span>` : ''}</div>`;
+    gecerli.forEach(x => {
+      const [kaynak, k] = x.split(':');
+      basilan.add(k);
+      const [et, ip] = SABIT_ETIKET[k] || [k, ''];
+      const d = String(deger(kaynak, k)).replace('.', ',');
+      const girdi = (k === 'kapi_tipi')
+        ? `<select id="of_${k}" class="girdi">${(SEC.kapi_tipleri||[])
+             .map(v=>`<option value="${v}"${v===C[k]?' selected':''}>${v}</option>`).join('')}</select>`
+        : `<input id="${kaynak}_${k}" class="girdi" value="${d}">`;
+      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>${girdi}</div>`;
+    });
+  });
+
+  /*  Gruplara yazılmamış bir sabit kalırsa SESSİZCE kaybolmasın — yeni bir
+      sabit eklenip SABIT_GRUP güncellenmezse burada görünür. */
+  const artan = [];
+  Object.keys(B).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['sb',k]); });
+  Object.keys(C).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['of',k]); });
+  if(artan.length){
+    h += `<div class="bolum-bas">DİĞER <span class="ipucu">— henüz bir hesap grubuna yazılmadı</span></div>`;
+    artan.forEach(([kaynak,k])=>{
+      const [et,ip] = SABIT_ETIKET[k] || [k,''];
+      const d = String(deger(kaynak,k)).replace('.',',');
+      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>
+            <input id="${kaynak}_${k}" class="girdi" value="${d}"></div>`;
+    });
+  }
+
+  //  Panelde görünmeyen alanlar ( SABIT_B_YEDEK — askı oranı ) kart
+  //  başlığındaki ( ! ) balonunda anlatılır; ekranı kalabalıklaştıran
+  //  bilgi bandına gerek yok.
+  $('sabit_b_form').innerHTML = h;
+}
+
+function ofisSifirla(){ sabitleriSifirla(); }
+
+/* Şablon durumu — yanlış / eski Excel konmuşsa kullanıcı XLSX indirmeyi
+   denemeden önce görsün.  Hesap ve PDF bundan etkilenmez. */
+async function sablonDurumu(){
+  const k=$('sablon_durumu'); if(!k) return;
+  let d;
+  try{ d = await (await fetch('/api/sablon')).json(); }
+  catch(e){ k.innerHTML=`<div class="uyari sari">Şablon durumu okunamadı: ${kacis(e.message)}</div>`; return; }
+  let h='';
+  if(d.uygun){
+    h+=`<div class="uyari yesil"><b>Her iki şablon da doğrulandı.</b>
+        XLSX çıktısı ofisin kendi paftasını üretecek.</div>`;
+  }else{
+    h+=`<div class="uyari kirmizi"><b>ŞABLON UYUŞMUYOR.</b> Bu dosyalarla
+        <b>XLSX üretilmez</b> — sessizce yanlış pafta vermektense hiç vermemek doğrudur.
+        Doğru şablonu <code>templates/</code> klasörüne koyun.
+        <b>Hesap ve PDF çıktısı etkilenmez</b>, motor Excel'den bağımsızdır.</div>`;
+  }
+  (d.sablonlar||[]).forEach(s=>{
+    h+=`<div class="serit"><span>${kacis(s.baslik)}</span>
+        <span class="kaynak">${s.uygun?'doğrulandı':'uyuşmuyor'}</span></div>
+        <div class="notlar" style="margin:8px 0 12px">
+          <div><b>Dosya:</b> ${kacis(s.dosya)} &nbsp;·&nbsp; ${s.sayfa_sayisi} sayfa</div>
+          <div><b>Parmak izi ( md5 ):</b> <code>${kacis(s.md5||'—')}</code></div>`;
+    if(!s.uygun){
+      h+=`<div class="uyari kirmizi" style="margin-top:8px"><b>${s.hatalar.length} sorun:</b><ul style="margin:6px 0 0 18px">`
+        + s.hatalar.slice(0,12).map(x=>`<li>${kacis(x)}</li>`).join('')
+        + (s.hatalar.length>12?`<li>… ve ${s.hatalar.length-12} sorun daha</li>`:'')
+        + `</ul></div>`;
+    }
+    h+='</div>';
+  });
+  h+=`<div class="yardim" style="margin-top:4px">Komut satırından da bakabilirsiniz:
+      <code>python3 araclar/sablon_denetle.py</code> — saniyeler sürer.
+      Tam doğrulama ( LibreOffice ile yeniden hesaplatma ) için
+      <code>python3 testler/calistir.py</code>.</div>`;
+  k.innerHTML=h;
+}
+
+/*  ŞERİT BOYU  —  artık GİRDİ değil, TÜRETİLEN değerdir.
+    Avan aşamasında elektrik projesinin topraklama planı çizilmemiş olur;
+    ofiste de temel için yalnız UZUNLUK ve GENİŞLİK giriliyor.  Uygulamadaki
+    kural: band temelin çevresini KAPALI RİNG olarak dolaşır, gözler
+    20 × 20 m'yi geçmeyecek şekilde enine bağ atılır.  Buradan:
+
+        L  =  2·( a + b )  +  enine bağlar
+
+    Hesabı MOTOR yapar ( engine/avan.py · serit_boyu_tahmin ); burada yalnız
+    sonucu yer tutucuda gösteririz — iki yerde iki ayrı formül bulunmasın.
+    Alan boş bırakılırsa türetilen değer kullanılır; topraklama planı
+    çizildiğinde plandaki gerçek boy yazılır ve o değer türetileni ezer. */
+
+/* Temel çevresi — L ( şerit boyu ) için KARŞILAŞTIRMA bilgisi.
+   Kural değildir: şeridin temelde nasıl dolaştığı projeye göre değişir,
+   bazen çevreden kısa ( yalnız bir bölüm ), bazen enine bağlarla uzun olur.
+   Yalnız "yazdığım sayı mantıklı mı" diye bakabilmek için gösterilir. */
+function temelCevresi(){
+  const e=$('a_temel_cevre'); if(!e) return;
+  const a=sayiOku(v('a_temel_a')), b=sayiOku(v('a_temel_b'));
+  e.textContent = (a>0 && b>0)
+    ? `Karşılaştırma için: bu temelin çevresi 2·( ${tr(a)} + ${tr(b)} ) = ${tr(2*(a+b))} m.`
+    : '';
+}
+
+/* Şerit boyu yer tutucusu — motorun türettiği değeri ve açılımını gösterir.
+   Böylece "boş bıraktım, ne kullanıldı" sorusu ekrandan cevaplanır. */
+function seritGoster(r){
+  const e = $('a_serit_L'); if(!e) return;
+  const oz = (r && r.ozet) || {};
+  const L = oz.serit_L, ring = oz.serit_L_ring, na = oz.serit_L_na, nb = oz.serit_L_nb;
+  const not = $('a_serit_tahmin');
+  if(!(typeof L === 'number' && isFinite(L)) || oz.serit_L_kaynak !== 'türetilen'){
+    e.placeholder = 'temel ölçülerinden türetilir';
+    if(not) not.textContent = '';
+    return;
+  }
+  e.placeholder = `${tr(L)}   ( temel ölçülerinden )`;
+  if(not){
+    const a = sayiOku(v('a_temel_a')), b = sayiOku(v('a_temel_b'));
+    const bag = [];
+    if(na) bag.push(`${na} × ${tr(b)}`);
+    if(nb) bag.push(`${nb} × ${tr(a)}`);
+    not.textContent = `Kullanılan: ring ${tr(ring)} m`
+      + (bag.length ? `  +  enine bağ ${bag.join(' + ')}` : '  ·  enine bağ gerekmiyor')
+      + `  =  ${tr(L)} m`;
+  }
+}
+
+/* Türkçe / İngilizce ondalık ayracını kabul eden basit okuyucu ( yalnız
+   ekranda gösterim için; hesabın kendisi sunucuda ayrıştırılır ). */
+function sayiOku(x){
+  const s=String(x||'').trim().replace(/\s/g,'');
+  if(!s) return NaN;
+  const sv=s.lastIndexOf(','), sn=s.lastIndexOf('.');
+  let t=s;
+  if(sv>=0 && sn>=0) t = sv>sn ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  else if(sv>=0) t = s.replace(',','.');
+  const f=parseFloat(t);
+  return isFinite(f) ? f : NaN;
+}
+
+/* Q ve Gk artık GİRDİ değil, TÜRETİLEN değerdir:
+     Q  = kapasiteden ( Tablo-7 ),  Gk = anma yükünden ( Tablo-11 ).
+   Ana kartta salt okunur gösterilir; tablo dışına çıkmak gerekirse
+   katlanır bölümdeki "Q elle" / "Gk elle" alanları kullanılır ve bu
+   satırlar o zaman GİRİLEN değeri gösterir — yani her zaman hesapta
+   kullanılan değer görünür. */
+function turetilenGoster(r){
+  const liste = (r && r.asansorler) || [];
+  for(let i=1;i<=4;i++){
+    const oz = (liste[i-1] || {}).ozet || null;
+    const q = $('a_Q_goster'+i), g = $('a_Gk_goster'+i);
+    if(q){
+      q.value = (oz && oz.Q!=null) ? trn(oz.Q,0)
+              : (v('a_Q_elle'+i) || (SEC.tablo_7||{})[v('a_kapasite'+i)] || '');
+    }
+    if(g){
+      g.value = (oz && oz.Gk!=null) ? trn(oz.Gk,0) : (v('a_Gk_elle'+i) || '');
+    }
+    //  L1 yer tutucusu HESAPLANAN değeri gösterir: "42,00  ( Hk + 3,50 )".
+    //  Böylece "kuyu yüksekliğinden mi geliyor" sorusu ekrandan cevaplanır.
+    const l1 = $('a_L1'+i);
+    if(l1){
+      const pay = sayiOku((($('of_L1_pay')||{}).value) || (SEC.ofis_varsayilan||{}).L1_pay);
+      const hk  = sayiOku(v('a_Hk'+i));
+      const hes = (oz && oz.L1!=null) ? oz.L1 : ((hk>0 && pay>=0) ? hk+pay : NaN);
+      l1.placeholder = isFinite(hes)
+        ? `${tr(hes)}   ( Hk + ${tr(pay)} )` : 'Hk + ofis payı';
+    }
+  }
+}
+
+/* Katlanır "manuel değerler" bölümü kapalıyken de elle girilmiş bir değer
+   olduğu görünsün — gizlenen bir ezme sessiz kalmamalı. */
+function manuelRozet(){
+  [['c_manuel_rozet', ['c_manuel_V','c_manuel_k']]].forEach(([rozet, alanlar])=>{
+    const r=$(rozet); if(!r) return;
+    const n = alanlar.filter(id=>v(id)!=='').length;
+    r.textContent = n ? `${n} elle` : '';
+    r.className = 'ozel-rozet' + (n ? ' dolu' : '');
+  });
+}
+
+/* Asansör kartında ofis standardından SAPAN alan sayısı — katlanır bölüm
+   kapalıyken de görünsün diye başlıkta rozet olarak yazılır. */
+function ozelRozet(i){
+  const r = $('a_ozel_rozet'+i); if(!r) return;
+  const alanlar = ['Q_elle','Gk_elle','gr','Fmk','Fsh','S1','S2','L2',
+                   'kablo_tipi','L1','q_denge'];
+  const n = alanlar.filter(k=>v('a_'+k+i)!=='').length;
+  r.textContent = n ? `${n} özel` : '';
+  r.className = 'ozel-rozet' + (n ? ' dolu' : '');
+}
+
+/* Ofis varsayılanı olan alanların YER TUTUCUSU her zaman güncel değeri
+   gösterir: kullanıcı panelde ray kütlesini değiştirdiğinde asansör
+   kartındaki boş alan da yeni değeri "hayalet" olarak gösterir. */
+function ofisTazele(){
+  document.querySelectorAll('.ofis-alan').forEach(e=>{
+    const k = e.dataset.ofis; if(!k) return;
+    const kaynak = $('of_'+k);
+    const deger = kaynak ? kaynak.value.trim() : '';
+    if(e.tagName==='SELECT'){
+      const ilk = e.options[0];
+      if(ilk && ilk.value==='') ilk.textContent = deger ? `ofis standardı ( ${deger} )` : 'ofis standardı';
+    }else{
+      e.placeholder = deger || 'ofis standardı';
+    }
+  });
+  for(let i=1;i<=4;i++) ozelRozet(i);
+  manuelRozet();
+}
+
+function sabitleriSifirla(){
+  //  İki kaynak da sıfırlanır: sb_* ( SABİTLER sayfası ) + of_* ( GİRİŞ hücreleri )
+  Object.entries(SEC.sabit_b||{}).forEach(([k,val])=>{
+    const e=$('sb_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
+  });
+  Object.entries(SEC.ofis_varsayilan||{}).forEach(([k,val])=>{
+    const e=$('of_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
+  });
+  ofisTazele(); planla(); durum('Ofis standardının tamamı varsayılana döndürüldü');
+}
+function sabitATablosu(){
+  const ET={gn:['gn','Yerçekimi ivmesi','m/s²','MMO/697 s.18 — TS EN 81-20'],
+    tampon_katsayi:['—','Tampon altı zemin kuvvet katsayısı','—','MMO/697 §2.3.3.1-2  F = 4·gn·(P+Q)'],
+    k1_hizli:['k1','Darbe faktörü — V > 1,00 m/s','—','MMO/697 Çizelge-1'],
+    k1_orta:['k1','Darbe faktörü — 0,63 < V ≤ 1,00 m/s','—','MMO/697 Çizelge-1'],
+    k1_yavas:['k1','Darbe faktörü — 0,15 < V ≤ 0,63 m/s','—','MMO/697 Çizelge-1'],
+    motor_sabiti:['—','Motor gücü denklem sabiti','kg·m/s','MMO/697 §2.4'],
+    palanga_verim_dususu:['Δη','Palangalı sistemde verim düşüşü','—','MMO/697 §2.4'],
+    kirlenme_faktoru:['d','Aydınlatmada kirlenme (bakım) faktörü','—','Aydınlatma tekniği teamülü'],
+    E_makine_dairesi:['E','Aydınlatma şiddeti — makine dairesi','lüx','TS EN 81-20'],
+    E_kabin:['E','Aydınlatma şiddeti — kabin','lüx','TS EN 81-20'],
+    E_kuyu:['E','Aydınlatma şiddeti — kuyu','lüx','TS EN 81-20'],
+    kuyu_ek_armatur:['—','Kuyu aydınlatmasına eklenen armatür','adet','Kuyu dibi + kuyu üstü'],
+    h_armatur:['h','Armatür ile çalışma düzlemi arası yükseklik','m','Bölge indeksi k hesabında'],
+    ray_dusumu:['—','Ray uzunluğu düşümü','m','I = Hk − 0,20'],
+    flexbil_sabiti:['—','Flexbil uzunluğu sabiti','m','Flexbil boyu = Hk / 2 + 3']};
+  let h='<tr><th>Sembol</th><th>Büyüklük</th><th style="text-align:right">Değer</th><th>Birim</th><th>Kaynak</th></tr>';
+  Object.entries(SEC.sabit_a).forEach(([k,val])=>{
+    const [s,b,bi,kay]=ET[k]||[k,k,'',''];
+    h+=`<tr><td><b>${s}</b></td><td>${b}</td><td class="sag">${trn(val,3)}</td><td>${bi}</td><td style="font-size:11px;color:#98A2AE">${kay}</td></tr>`;
+  });
+  $('sabit_a_tablo').innerHTML=h;
+}
+
+/* ek nüfus satırları */
+function ekNufusEkle(p, veri){
+  const liste=$(p+'_eknufus_liste');
+  const d=el('div','satir i3'); d.style.marginBottom='8px';
+  d.innerHTML=`<div class="alan" style="margin:0"><input class="girdi en-ac" placeholder="Açıklama" value="${kacis(veri?.aciklama||'')}"></div>
+    <div class="alan" style="margin:0"><input class="girdi en-mi" placeholder="Miktar" value="${kacis(veri?.miktar??'')}"></div>
+    <div class="alan" style="margin:0;display:flex;gap:6px"><select class="girdi en-ka" style="flex:1">
+      ${SEC.nufus_kalemleri.map(k=>`<option value="${k}"${veri?.kalem===k?' selected':''}>${k}</option>`).join('')}</select>
+      <button class="dg kucuk" onclick="this.closest('.satir').remove();planla()">×</button></div>`;
+  liste.appendChild(d);
+  if(!veri) planla();
+}
+function ekNufusTopla(p){
+  const kok = $(p+'_eknufus_liste');
+  if(!kok) return [];                      //  tek gövde kalktı: 't' listesi yok
+  return [...kok.querySelectorAll('.satir')].map(r=>({
+    aciklama:r.querySelector('.en-ac').value, miktar:r.querySelector('.en-mi').value,
+    kalem:r.querySelector('.en-ka').value })).filter(x=>x.miktar!=='');
+}
+/* Adet değişince ek nüfus kalemleri de taşınır — karma yapıda bunlar
+   nüfusun tamamını belirlediği için kaybolmaları hesabı bozardı. */
+
+/* Avan sekmesi trafik sonucuyla karşılaştırılır: kapasite / hız / kuyu
+   yüksekliği tutarsızlığı uyarı olarak görünür.  Çoklu hesap varsa o,
+   yoksa tek hesap esas alınır — aktarım düğmesiyle aynı öncelik. */
+function trafikKoprusu(){
+  const al = x => (x && !x.hata && x.avan_koprusu
+                   && (x.avan_koprusu.asansorler||[]).length) ? x.avan_koprusu : null;
+  /*  Tek hesap yolu kaldı — hangi yöntemin kullanıldığı sonucun içindedir. */
+  return al(SON.c);
+}
+
+/* ---------------------------------------------------------- indir */
+async function indir(uc){
+  durum('Dosya hazırlanıyor…');
+  //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI ve
+  //  ( XLSX'te ) dosya özellikleri için kullanır — paftanın içeriği değişmez.
+  const govde = uc==='kapak-pdf'
+    ? {kapak:kapakGirdi()}
+    : uc.startsWith('trafik')
+    ? {kapak:kapakGirdi(), girdiler:trafikGirdi()}
+    : uc.startsWith('uygulama')
+    ? {kapak:mukavemetKimlik(), girdiler:mukavemetGirdi(), sabitler:ofisSabitleri()}
+    : {kapak:kapakGirdi(), girdiler:avanGirdi()};
+  try{
+    const r = await fetch('/api/indir/'+uc, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(govde)});
+    // Sunucu dosya yerine JSON döndürdüyse bu bir hata iletisidir — bozuk dosya indirme
+    const tur = r.headers.get('Content-Type')||'';
+    if(tur.includes('application/json')){
+      const h = await r.json();
+      durum(h.hata || 'Dosya üretilemedi', true);
+      alert(h.hata || 'Dosya üretilemedi');
+      return;
+    }
+    if(!r.ok) throw new Error('sunucu hatası '+r.status);
+    const cd = r.headers.get('Content-Disposition')||'';
+    let ad = 'cikti'; const m = cd.match(/filename\*=UTF-8''(.+)$/);
+    if(m) ad = decodeURIComponent(m[1]);
+    const b = await r.blob(), u = URL.createObjectURL(b);
+    const a = document.createElement('a'); a.href=u; a.download=ad; document.body.appendChild(a); a.click();
+    a.remove(); setTimeout(()=>URL.revokeObjectURL(u),3000);
+    durum('İndirildi: '+ad);
+  }catch(e){ durum('İndirme başarısız: '+e.message, true); }
+}
+
+/* ---------------------------------------------------------- kalıcılık */
+const ANAHTAR='avan_program_v1';
+function tumGirdiler(){
+  const o={};
+  document.querySelectorAll('input,select').forEach(e=>{
+    //  "_goster" alanları TÜRETİLMİŞTİR ( Q, Gk ) — girdi değildir, kaydedilmez;
+    //  her hesapta yeniden doldurulurlar.
+    if(!e.id || e.id.indexOf('_goster') >= 0) return;
+    o[e.id] = e.type==='checkbox' ? e.checked : e.value;
+  });
+  o.__eknufus_c = ekNufusTopla('c');
+  o.__muk_durak = MUK_DURAK.slice();
+  o.__trafik_adet = TRAFIK_ADET;
+  o.__avan_ek = AVAN_EK;
+  o.__avan_oto = AVAN_OTO;
+  o.__avan_trf = AVAN_TRF;
+  return o;
+}
+function yaz(){ try{ localStorage.setItem(ANAHTAR, JSON.stringify(tumGirdiler())); }catch(e){} }
+function oku(){
+  let o; try{ o=JSON.parse(localStorage.getItem(ANAHTAR)||'null'); }catch(e){ o=null; }
+  if(o) uygula(o);
+}
+/* Bir alana değer yazar.
+   Açılır listelerde ondalık ayracı farkı olabilir: Excel'den "1,6" gelir ama
+   seçeneğin değeri "1.6"dır.  Bu durumda sayısal karşılaştırma ile eşleştirilir;
+   aksi hâlde seçim boş kalır ve hesap sessizce yapılamaz. */
+function alanaYaz(e, val){
+  if(e.type==='checkbox'){ e.checked = !!val; return; }
+  const s = (val===null||val===undefined) ? '' : String(val);
+  if(e.tagName!=='SELECT'){ e.value = s; return; }
+  const secenekler = [...e.options].map(o=>o.value);
+  if(secenekler.includes(s)){ e.value = s; return; }
+  const sayi = parseFloat(s.replace(',','.'));
+  if(isFinite(sayi)){
+    const esles = secenekler.find(o=>{
+      const x = parseFloat(o); return isFinite(x) && Math.abs(x-sayi) < 1e-9; });
+    if(esles !== undefined){ e.value = esles; return; }
+  }
+  e.value = secenekler.includes('') ? '' : s;
+}
+
+/*  Yeni proje yüklenmeden önce ilgili bölüm TEMİZLENİR.
+    uygula() yalnız GELEN alanları yazar; dosyada olmayan alanlar önceki
+    projeden kalıyordu.  Tek asansörlük bir dosya, formda duran eski 2. ve 3.
+    kolonlar yüzünden 10+16+20 kişilik üçlü grup olarak hesaplanabiliyordu.   */
+function bolumuTemizle(tur){
+  const bosalt = id => { const e=$(id); if(e) alanaYaz(e, ''); };
+  if(tur==='tek' || tur==='coklu'){
+    for(let i=1;i<=4;i++){
+      ['P','kg','kt','V','durak','h','bodrum','mta','mtk','mtg','mtp']
+        .forEach(k=>bosalt('c_'+k+i));
+    }
+    ['bodrum','manuel_k','manuel_V'].forEach(k=>bosalt('c_'+k));
+    const l=$('c_eknufus_liste'); if(l) l.innerHTML='';
+  }
+  if(tur==='mukavemet' && MUK){
+    //  Dosyada BOŞ kalan alanlar, önceki projeden kalma değerle karışmasın:
+    //  bölüm önce varsayılanlarına döner.
+    for(const gr of MUK.gruplar) for(const f of gr.alanlar){
+      if(f.tur==='liste') continue;
+      const e=$(M_ID(f.anahtar)); if(!e) continue;
+      if(e.type === 'checkbox') e.checked = !!f.varsayilan;
+      else alanaYaz(e, f.varsayilan===null||f.varsayilan===undefined ? '' : mSayi(f.varsayilan));
+    }
+  }
+  if(tur==='avan'){
+    for(let i=1;i<=4;i++){
+      ['tanim','kapasite','Q_elle','V','eta','Hk','kuyu_genisligi','kabin_boyu',
+       'kabin_genisligi','Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2',
+       'kablo_tipi','i_palanga','q_denge'].forEach(k=>bosalt('a_'+k+i));
+      const tv=$('a_toplam_verim'+i); if(tv) tv.checked=false;
+    }
+    ['temel_a','temel_b','serit_L','mk_uzunluk','mk_genislik'].forEach(k=>bosalt('a_'+k));
+    //  Yüklenen avan değerleri trafikle EZİLMESİN:  bu asansörler artık
+    //  "otomatik" değildir ( bkz. avanDoldur ).
+    AVAN_OTO = {};
+  }
+}
+
+function uygula(o){
+  if(o.__tur) bolumuTemizle(o.__tur);
+  Object.entries(o).forEach(([k,val])=>{
+    if(k.startsWith('__')) return;
+    const e=$(k); if(!e) return;
+    alanaYaz(e, val);
+  });
+  // Ek nüfus listeleri yalnız o bölüm gerçekten verilmişse yeniden kurulur;
+  // böylece kısmi yükleme (yalnız trafik ya da yalnız avan) diğerini bozmaz.
+  //  Eski projelerde ek nüfus 't' ( tek gövde ) altında saklanmış olabilir;
+  //  tek gövde kalktığı için 'c' boşsa oradan taşınır.
+  ['c','t'].forEach(p=>{
+    if(!(('__eknufus_'+p) in o)) return;
+    const liste = o['__eknufus_'+p] || [];
+    if(p==='t' && (o.__eknufus_c || []).length) return;
+    $('c_eknufus_liste').innerHTML='';
+    liste.forEach(s=>ekNufusEkle('c', s));
+  });
+  /* Asansör adedi: kaydedilmişse ondan, yoksa dolu çoklu kolon sayısından
+     türetilir — Excel'den geri yüklemede doğru gövde açılsın. */
+  let adet = parseInt(o.__trafik_adet, 10);
+  if(!(adet>=1 && adet<=4)){
+    const dolu=[1,2,3,4].filter(i=>$('c_P'+i) && $('c_P'+i).value!=='').length;
+    adet = dolu>1 ? dolu : TRAFIK_ADET;
+  }
+  TRAFIK_ADET = Math.max(1, Math.min(4, adet));
+  /* Trafik grubu dışı asansör adedi: kaydedilmişse ondan, yoksa Excel'den
+     gelen "kullan" kutularından türetilir ( eski dosyalar için ). */
+  let ek = parseInt(o.__avan_ek, 10);
+  if(!(ek>=0 && ek<=3)){
+    const etkin=[1,2,3,4].filter(i=>$('a_aktif'+i) && $('a_aktif'+i).checked).length;
+    ek = Math.max(0, etkin - TRAFIK_ADET);
+  }
+  AVAN_EK = Math.max(0, Math.min(3, ek));
+  /*  Durak listesi bir FORM ALANI DEĞİL, dizidir;  Object.entries döngüsü
+      onu yakalayamaz.  Form henüz kurulmamışsa ( kullanıcı avan modundayken
+      proje açtıysa ) değer yine de saklanır ve mukavemetGeriYukle() onu
+      form ayağa kalkarken yerine oturtur. */
+  if(Array.isArray(o.__muk_durak) && o.__muk_durak.length){
+    MUK_DURAK = o.__muk_durak.slice(0, (MUK && MUK.durak_azami) || 20).map(mSayi);
+    if($('m_durak_kutu')) mDurakCiz();
+  }
+  AVAN_OTO = (o.__avan_oto && typeof o.__avan_oto==='object') ? {...o.__avan_oto} : {};
+  AVAN_TRF = (o.__avan_trf && typeof o.__avan_trf==='object') ? {...o.__avan_trf} : {};
+  cokluKolonlariGoster();
+  avanKartlariGoster();
+  adetDugmeleriKur();
+  mkYokUygula();
+  ofisTazele();
+  etiketleriGuncelle();
+}
+
+/* ------------------------------------------------ Excel'den proje aç
+   Programın ürettiği XLSX girdileri de taşır.  Revizyonda proje
+   klasöründeki Excel'i yükleyip yalnız değişen değeri düzeltmek yeter. */
+const TUR_ADI = {tek:'1 · Trafik Hesabı  ( tek asansör )',
+                 coklu:'1 · Trafik Hesabı  ( asansör grubu )',
+                 avan:'2 · Avan Hesapları',
+                 mukavemet:'Uygulama Projesi · Mukavemet Hesabı'};
+
+async function xlsxYukle(dosyalar){
+  const liste=[...(dosyalar||[])].filter(f=>/\.xlsx$/i.test(f.name));
+  if(!liste.length){ durum('Yalnız .xlsx dosyası yüklenebilir', true); return; }
+  //  Özet, kullanıcının o an baktığı bölümde görünmeli
+  const ozet=$(MOD==='uygulama' ? 'm_yukleme_ozeti' : 'yukleme_ozeti');
+  ozet.innerHTML='';
+  const basarili=[];
+  for(const f of liste){
+    durum('Yükleniyor: '+f.name);
+    try{
+      const b64 = await new Promise((coz,red)=>{
+        const fr=new FileReader();
+        fr.onload=()=>coz(String(fr.result).split(',')[1]);
+        fr.onerror=()=>red(new Error('dosya okunamadı'));
+        fr.readAsDataURL(f);
+      });
+      const r = await fetch('/api/xlsx-yukle',{method:'POST',
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify({icerik:b64})});
+      const veri = await r.json();
+      if(!r.ok || veri.hata){ throw new Error(veri.hata||('sunucu hatası '+r.status)); }
+
+      const uygulanacak = {...veri.alanlar, __tur: veri.tur};
+      if(veri.tur === 'mukavemet') uygulanacak.__muk_durak = veri.muk_durak || [];
+      if(veri.ek_nufus_hedef) uygulanacak['__eknufus_'+veri.ek_nufus_hedef] = veri.ek_nufus||[];
+      uygula(uygulanacak);
+      basarili.push({ad:f.name, tur:veri.tur, ozet:veri.ozet});
+    }catch(e){
+      ozet.innerHTML += `<div class="uyari kirmizi" style="margin-top:10px">
+        <b>${kacis(f.name)}</b><br>${kacis(e.message)}</div>`;
+    }
+  }
+  if(basarili.length){
+    yaz();
+    //  Uygulama projesinde avan hesapları koşturulmaz — orada asansör bile
+    //  tanımlı olmayabilir;  koşarsa boş sonuçla ekranı kirletir.
+    if(MOD === 'uygulama' || basarili.every(b=>b.tur === 'mukavemet')) await hesapMukavemet();
+    else await hesaplaHepsi();
+    ozet.innerHTML = `<div class="yuklendi">
+      <b>${basarili.length} dosya yüklendi</b>
+      ${basarili.map(b=>`<div class="satir2">▪ ${kacis(b.ad)} → <b>${TUR_ADI[b.tur]||b.tur}</b> &nbsp;(${kacis(b.ozet)})</div>`).join('')}
+      <div class="satir2" style="margin-top:6px">Değişen girdiyi ilgili sekmede düzeltip
+      güncel PDF / XLSX'i yeniden indirebilirsiniz.</div></div>` + ozet.innerHTML;
+    durum(basarili.length+' dosya yüklendi');
+  }
+}
+
+function birakAlaniniKur(){
+  _birakma('birak_alani', 'xlsx_ac');
+  _birakma('m_birak_alani', 'm_xlsx_ac');
+}
+function _birakma(alanId, secId){
+  const a=$(alanId); if(!a) return;
+  a.onclick=()=>$(secId).click();
+  ['dragenter','dragover'].forEach(o=>a.addEventListener(o,e=>{
+    e.preventDefault(); e.stopPropagation(); a.classList.add('uzerinde'); }));
+  ['dragleave','drop'].forEach(o=>a.addEventListener(o,e=>{
+    e.preventDefault(); e.stopPropagation(); a.classList.remove('uzerinde'); }));
+  a.addEventListener('drop',e=>xlsxYukle(e.dataTransfer.files));
+  // Sayfanın herhangi bir yerine bırakılan dosya tarayıcıda açılmasın
+  ['dragover','drop'].forEach(o=>window.addEventListener(o,e=>{
+    if(!a.contains(e.target)) e.preventDefault(); }));
+}
+function projeKaydet(){
+  const ad='Asansor - avan projesi.avan';
+  const b=new Blob([JSON.stringify(tumGirdiler(),null,1)],{type:'application/json'});
+  const u=URL.createObjectURL(b), a=document.createElement('a');
+  a.href=u; a.download=ad; a.click(); setTimeout(()=>URL.revokeObjectURL(u),3000);
+  durum('Proje kaydedildi: '+ad);
+}
+function projeAc(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  const fr=new FileReader();
+  fr.onload=()=>{ try{ uygula(JSON.parse(fr.result)); yaz(); hesaplaHepsi(); durum('Proje açıldı: '+f.name); }
+    catch(e){ durum('Dosya okunamadı', true); } };
+  fr.readAsText(f); ev.target.value='';
+}
+function hepsiniTemizle(){
+  if(!confirm('Tüm girdiler silinecek. Emin misiniz?')) return;
+  localStorage.removeItem(ANAHTAR); location.reload();
+}
+function ornekYukle(){
+  const O={c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43', c_N:'11', c_h:'3',
+    c_hizli1:'44', c_hizli2:'3',
+    c_P1:'10', c_kg1:'900', c_kt1:'Teleskopik Otomatik',
+    c_P2:'16', c_kg2:'1100', c_kt2:'Teleskopik Otomatik', c_P3:'', c_P4:'',
+    /*  Ofis varsayılanı olan alanlar ( U, κ, εmax, β, çubuk adedi, ray, makine,
+        sehpa, kesitler, kablo, L1, Nsç ) BİLEREK boş bırakıldı — örnek proje
+        de gerçek kullanımdaki gibi bunları ofis standardından alır.
+        Şerit boyu da boş: ofiste yalnız temel uzunluğu ve genişliği girilir,
+        band boyu bunlardan türetilir. */
+    a_temel_a:'26,55', a_temel_b:'16,4', a_serit_L:'',
+    a_mk_yok:true, a_mk_uzunluk:'0', a_mk_genislik:'0',
+    a_aktif1:true, a_tanim1:'İnsan', a_kapasite1:'10', a_V1:'1.6', a_eta1:'0,85', a_Hk1:'38,50',
+    a_makine_tipi1:'Dişlisiz', a_i_palanga1:'2', a_toplam_verim1:false,
+    a_kuyu_genisligi1:'1800', a_kabin_boyu1:'1450', a_kabin_genisligi1:'1300',
+    a_aktif2:true, a_tanim2:'Sedye + Yük', a_kapasite2:'16', a_V2:'1.6', a_eta2:'0,85', a_Hk2:'38,50',
+    a_makine_tipi2:'Dişlisiz', a_i_palanga2:'2', a_toplam_verim2:false,
+    a_kuyu_genisligi2:'2650', a_kabin_boyu2:'1350', a_kabin_genisligi2:'2100',
+    a_aktif3:false, a_aktif4:false, __eknufus_c:[],
+    /* Ofisin Excel örneği 10 + 16 kişilik İKİ asansörlük bir gruptur —
+       trafik adedi 2, avanda trafik dışı asansör yok. */
+    __trafik_adet:2, __avan_ek:0};
+  uygula(O); yaz(); hesaplaHepsi();
+  durum('Örnek proje yüklendi — Excel dosyanızdaki değerler');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AÇILIŞ EKRANI
+   Program açıldığında hangi projenin hazırlanacağı seçilir.  Şimdilik
+   yalnız "Avan Proje" hazır;  uygulama projesi bölümü sonra eklenecek.
+   ═══════════════════════════════════════════════════════════════════════ */
+function uygulamaAc(hangi){
+  modAyarla(hangi);
+  document.body.classList.remove('giriste');
+  window.scrollTo(0, 0);
+  if(MOD === 'uygulama'){
+    sekmeGoster('mukavemet');
+    mukavemetKur();
+    durum('Uygulama projesi — mukavemet hesabı.');
+  }else{
+    sekmeGoster('trafik');
+    durum('Avan proje — 1 · Trafik Hesabı ile başlayabilirsiniz.');
+  }
+}
+
+function anaEkran(){
+  document.body.classList.add('giriste');
+  window.scrollTo(0, 0);
+}

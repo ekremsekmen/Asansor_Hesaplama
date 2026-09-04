@@ -19,7 +19,9 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl                                          # noqa: E402
-from engine import avan as AV, tables as T, traffic as TR  # noqa: E402
+from engine.avan import hesap as AV
+from engine.avan import tablolar as T
+from engine.avan import trafik as TR  # noqa: E402
 from exports import xlsx_export as X                     # noqa: E402
 from testler.ortak import Rapor, yeniden_hesapla, soffice_yolu, hata_hucresi_ara  # noqa: E402
 

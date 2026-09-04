@@ -603,7 +603,7 @@ def dwg_uret(dxf_baytlari, surum="ACAD2018"):
 
 
 def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False):
-    satir = [f"{dosya_adi}   —   Asansör Avan Hesaplama Programı", "",
+    satir = [f"{dosya_adi}   —   Asansör Proje Programı", "",
              "PAKETİN İÇİNDEKİLER", ""]
     if dwg_var:
         satir.append(f"  {dosya_adi}.dwg    AutoCAD çizimi ( doğrudan açılır )")

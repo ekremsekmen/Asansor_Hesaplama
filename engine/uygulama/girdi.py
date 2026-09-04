@@ -28,9 +28,9 @@ Not:  ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β �
 zaten "Sabitler / Ofis Standardı" sekmesinden gelir;  o da ikinci kez
 sorulmaz.
 """
-from engine import mukavemet as MK
-from engine import mukavemet_girdi as MG
-from engine import mukavemet_tablolari as MT
+from engine.uygulama import mukavemet as MK
+from engine.uygulama import mukavemet_girdi as MG
+from engine.uygulama import mukavemet_tablolari as MT
 
 MK_VERIM = MK.SABIT["motor_verimi"]
 

@@ -26,7 +26,7 @@ import os
 
 import openpyxl
 
-from engine import tables as T
+from engine.avan import tablolar as T
 
 from . import hucre_haritasi as H
 

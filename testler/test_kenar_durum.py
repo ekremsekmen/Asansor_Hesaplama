@@ -10,8 +10,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import avan as AV, tables as T, traffic as TR   # noqa: E402
-from engine.steps import excel_round, tavana_yuvarla, yukari_yuvarla, tr as TRS  # noqa: E402
+from engine.avan import hesap as AV
+from engine.avan import tablolar as T
+from engine.avan import trafik as TR   # noqa: E402
+from engine.ortak.steps import excel_round, tavana_yuvarla, yukari_yuvarla, tr as TRS  # noqa: E402
 from testler.ortak import Rapor                              # noqa: E402
 
 TEMEL = dict(bina_tipi="Konut", bina_yuksekligi=39.98, yapi_yuksekligi=43, N=11,
@@ -1170,7 +1172,7 @@ def calistir():
 
     #  3) BELİRSİZ SAYI  —  "1.200" bin iki yüz mü, bir virgül iki mi?
     #     Sessizce 1,2 okunuyordu: 1.200 daireli binada asansör adedi 41 → 2.
-    import main as _M
+    from api import ortak as _M
     for _ham in ("1.200", "1,200", "2.500", "12.345", "1,000", "100,000", "-1.500"):
         r.kontrol(f"belirsiz sayı reddediliyor: {_ham!r}", _M._sayi(_ham) is None)
         r.kontrol(f"belirsiz olarak işaretleniyor: {_ham!r}", _M.belirsiz_sayi_mi(_ham))

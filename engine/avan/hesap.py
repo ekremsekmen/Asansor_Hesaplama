@@ -12,8 +12,8 @@ ASANSÖR AVAN PROJE HESAPLARI
 sayfalarının birebir Python karşılığıdır.
 """
 import math
-from . import tables as T
-from .steps import (Bolum, veri, hesap, metin, tr, trn,
+from engine.avan import tablolar as T
+from engine.ortak.steps import (Bolum, veri, hesap, metin, tr, trn,
                     yukari_yuvarla, tavana_yuvarla, sayi_mi)
 
 

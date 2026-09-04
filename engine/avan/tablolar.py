@@ -4,7 +4,7 @@ MMO/697 (2. Baskı, Ocak 2020), TS EN 81-20, ISO 8100-32:2020 ve IEC 60364-5-52
 kaynaklı tablolar.  Değerler ASANSOR_TRAFIK_HESABI_v2_1.xlsx ve
 ASANSOR AVAN HESAPLARI.xlsx dosyalarındaki tablolarla BİREBİR aynıdır.
 """
-from .steps import excel_round, sayi_mi
+from engine.ortak.steps import excel_round, sayi_mi
 
 # ---------------------------------------------------------------- TABLO - 1
 # Binada sürekli bulunan insan sayısı katsayıları (MMO/697 s.13)

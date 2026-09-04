@@ -22,8 +22,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import avan as AV                               # noqa: E402
-from engine import traffic as TR                            # noqa: E402
+from engine.avan import hesap as AV                               # noqa: E402
+from engine.avan import trafik as TR                            # noqa: E402
 from testler.altin_uret import (DOSYA, DOSYA_AVAN,          # noqa: E402
                                 avan_senaryolar, senaryolar)
 from testler.ortak import Rapor                             # noqa: E402

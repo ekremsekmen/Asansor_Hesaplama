@@ -26,10 +26,10 @@ kontrol ), böylece ekran, PDF ve XLSX katmanları ortak kalır.
 """
 import math
 
-from engine import mukavemet_girdi as MG
-from engine import mukavemet_tablolari as MT
-from engine.steps import Bolum, hesap, kontrol, veri
-from engine.steps import metin, tr, trn
+from engine.uygulama import mukavemet_girdi as MG
+from engine.uygulama import mukavemet_tablolari as MT
+from engine.ortak.steps import Bolum, hesap, kontrol, veri
+from engine.ortak.steps import metin, tr, trn
 
 # =====================================================================
 #  KAYNAK EXCEL'DEN BİLEREK AYRILAN NOKTALAR
@@ -96,6 +96,22 @@ EXCEL_FARKLARI = (
      "ℓ = paten balatasının uzunluğu ( girdi ).  Boş bırakılırsa ray "
      "tablosundaki balata yarı genişliğinden ( 2·b ) türetilir.",
      ("Z379", "Z384", "Z476", "Z481", "Z537", "Z595")),
+    ("Sığınma açıklıklarının iki alt sınırı",
+     "TS EN 81-20 m.5.2.5.7.3  /  m.5.2.5.8.2 a) 2)",
+     "Kabin üstü serbest yüksekliğini 1200 mm, ray dibi açıklığını 150 mm "
+     "ister.  Standartta bu iki sayı yoktur;  150 mm, m.5.2.5.8.2 a) 1)'deki "
+     "YATAY 0,15 m'nin düşey sınır sanılmasından gelmiş görünüyor.",
+     "Kabin üstü:  m.5.2.5.7.3 ayakta durulabilen alanın üzerindeki serbest "
+     "yüksekliği seçilen sığınma hacminin yüksekliğine bağlar — çömelmiş "
+     "duruşta ( Çizelge 3 ) 1,00 m.  Ray dibi:  m.5.2.5.8.2 a) 2) ve Şekil 7, "
+     "raya yatay XH ≤ 0,15 m uzaklıktaki karkas / paten / güvenlik tertibatı "
+     "için 0,10 m verir.\n"
+     "        Excel'in iki sayısı da standarttan KATI taraftadır;  yani "
+     "emniyetsiz bir tasarımı geçirmez, ama standarda uygun bir projeyi "
+     "haksız yere reddeder ( kuyu boyunu gereksiz büyütür ).\n"
+     "        Ayrıca karşılaştırma '>' idi;  standart 'en az' dediği için "
+     "sınıra eşit ölçü de uygundur — '≥' yapıldı.",
+     ()),
 )
 
 #  Testlerin okuduğu düz küme
@@ -168,22 +184,38 @@ SIGINMA = {
     "etek_kotu":             950,
     "ray_alt_payi":          270,
     "regulator_payi":        300,
-    #  EN 81-20 Çizelge 3  —  çömelmiş duruş sığınma hacmi  [m]
+    #  EN 81-20 Çizelge 3 / Çizelge 4  —  çömelmiş duruş sığınma hacmi  [m]
     "ust_hacim":            (0.7, 0.5, 1.0),
     "dip_hacim":            (0.5, 0.7, 1.0),
-    #  EN 81-20 asgari açıklıklar  [mm]
-    "min_ust_paten":         100,
-    "min_kabin_ustu":       1200,
-    "min_revizyon":          500,
-    "min_kuyu_tabani":       500,
-    "min_etek":              100,
-    "min_ray_alt":           150,
-    "min_regulator":         300,
+    #  ---------------------------------------------------------------
+    #  TS EN 81-20 asgari açıklıklar  [mm].  Her satırın karşısındaki
+    #  madde numarası standardın kendi metnindendir.
+    #  ---------------------------------------------------------------
+    "min_ust_paten":         100,   # m.5.2.5.6.2  ilave kılavuzlu yol   0,10 m
+    #  m.5.2.5.7.3:  kabin üstünde ayakta durulabilen her alanın üzerindeki
+    #  serbest yükseklik, seçilen sığınma hacminin yüksekliği kadardır —
+    #  çömelmiş duruşta ( Çizelge 3, tip 2 ) 1,00 m.  Ayrı bir sabit
+    #  tutulmaz;  doğrudan  ust_hacim[2]  okunur.
+    "min_revizyon":          500,   # m.5.2.5.7.2 a) kabin üstü donanım  0,50 m
+    "min_kuyu_tabani":       500,   # m.5.2.5.8.2 a) kuyu dibi - kabin   0,50 m
+    "min_etek":              100,   # m.5.2.5.8.2 a) 1) etek            0,10 m
+    #  m.5.2.5.8.2 a) 2) + Şekil 7:  raya yatay XH ≤ 0,15 m uzaklıktaki
+    #  karkas parçaları, paten ve güvenlik tertibatı için asgari düşey
+    #  açıklık 0,10 m'dir.  ( Şekil 7 eğrisi:  0,15 m → 0,10 m ·
+    #  0,30 m → 0,30 m ·  0,50 m ve ötesi → 0,50 m. )
+    "min_ray_alt":           100,
+    "min_regulator":         300,   # m.5.2.5.8.2 b) kuyuya sabit parça  0,30 m
 }
 
 
 def _bosluk(v):
-    """EN 81-20 m.5.7.1.1  —  ( 0,1 + 0,035·v² ) m  →  mm."""
+    """0,10 m ilave kılavuzlu yol + 0,035·v² sıçrama payı  →  mm.
+
+    TS EN 81-20'de 0,035·v² açıklığın değil, kabinin en üst konumunun
+    tanımındadır ( Çizelge 2 );  0,10 m ise m.5.2.5.6.2'nin ilave kılavuzlu
+    yoludur.  Kuyu ölçüleri anma konumundan alındığı için ikisi burada
+    tek sınırda toplanır — eşitsizlik cebirsel olarak aynıdır.
+    """
     return (0.1 + 0.035 * v * v) * 1000
 
 
@@ -1271,8 +1303,10 @@ def _siginma(g, o):
     satir = [
         ("b - Üst paten / rayın üst ucu arası",
          K["min_ust_paten"], SK - K["kabin_yuksekligi"] - K["paten_payi"] - K["tavan_payi"]),
+        #  m.5.2.5.7.3 — sınır, seçilen sığınma hacminin yüksekliğidir;
+        #  ikisi ayrışmasın diye tek yerden okunur.
         ("c.2 - Kabin üstü / kuyu tavanının en alt kısmı arası",
-         K["min_kabin_ustu"], SK - K["kabin_ust_donanim"] - K["tavan_payi"]),
+         K["ust_hacim"][2] * 1000, SK - K["kabin_ust_donanim"] - K["tavan_payi"]),
         ("a - Revizyon kutusu / kuyu tavanının en alt kısmı arası",
          K["min_revizyon"],
          SK - K["kabin_ust_donanim"] - K["revizyon_payi"] - K["tavan_payi"]),
@@ -1293,7 +1327,7 @@ def _siginma(g, o):
     ad = [veri("", "En üst durak ( son kat ) yüksekliği", SK, "mm", "GİRİŞ", 0),
           hesap("Serbest boşluk = ( 0,1 + 0,035 × v² ) × 1000",
                 f"( 0,1 + 0,035 × {tr(v)}² ) × 1000", bosluk, "mm",
-                "EN 81-20 m.5.7.1.1"),
+                "TS EN 81-20 Çiz.2 + m.5.2.5.6.2"),
           metin("Kabin tavanı üzerindeki sığınma alanları  ( m.5.2.5.7 ) :",
                 vurgu=True)]
     _kay(o, AD638=bosluk)
@@ -1303,11 +1337,12 @@ def _siginma(g, o):
         if i == 5:
             ad.append(metin("Kuyu boşluğundaki sığınma alanları  ( m.5.2.5.8 ) :",
                             vurgu=True))
-        uygun = asgari < hesaplanan
+        #  Standart "en az" der:  sınıra eşit ölçü de uygundur.
+        uygun = hesaplanan >= asgari
         uygunlar.append(uygun)
         ad.append(veri("", etiket + "  ( en az " + trn(asgari, 0) + " mm )",
                        hesaplanan, "mm", "", 0))
-        ad.append(kontrol(f"{trn(hesaplanan, 0)} mm  >  {trn(asgari, 0)} mm", uygun))
+        ad.append(kontrol(f"{trn(hesaplanan, 0)} mm  ≥  {trn(asgari, 0)} mm", uygun))
 
     #  Sığınma hacimleri  ( EN 81-20 Çizelge 3 — çömelmiş duruş )
     ust_h = (SK - K["kabin_ust_donanim"] - K["tavan_payi"]) / 1000.0
@@ -1333,7 +1368,16 @@ def _siginma(g, o):
         "Kabin gövde yükseklikleri, etek ve revizyon kutusu payları ( 2400 · "
         "2100 · 500 · 400 · 950 · 270 · 150 mm ) kaynak Excel'in kabulleridir; "
         "TS EN 81-20 sayısı değildir. Farklı kabin imalatında SIGINMA "
-        "sözlüğünden güncellenmelidir."]
+        "sözlüğünden güncellenmelidir.",
+        "Buna karşılık asgari açıklıklar ( 100 · 1000 · 500 · 500 · 100 · "
+        "100 · 300 mm ) doğrudan TS EN 81-20 m.5.2.5.7 ve m.5.2.5.8'dendir. "
+        "Ray dibi açıklığı, parça raya yatay XH ≤ 0,15 m uzaklıkta olduğu "
+        "kabulüyle Şekil 7'den 0,10 m alınır; daha uzaktaki parçalar için "
+        "sınır 0,30 m ( XH = 0,30 ) ve 0,50 m ( XH ≥ 0,50 ) olur.",
+        "Serbest boşluğa eklenen 0,035 × v² terimi TS EN 81-20'de açıklığın "
+        "değil, kabinin EN ÜST KONUMUNUN tanımındadır ( Çizelge 2 ). Burada "
+        "kuyu ölçüleri anma konumundan alındığı için aynı eşitsizlik, terim "
+        "sınıra eklenerek yazılmıştır — cebirsel olarak birebir aynıdır."]
     return b
 
 

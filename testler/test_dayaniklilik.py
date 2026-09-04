@@ -13,10 +13,15 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import avan as AV, traffic as TR          # noqa: E402
+from engine.avan import hesap as AV
+from engine.avan import trafik as TR          # noqa: E402
 from testler.ortak import Rapor                        # noqa: E402
 
 import main as UYGULAMA                                # noqa: E402
+#  Uçlar iki pakete ayrıldı ( api/avan.py · api/uygulama.py ), ortak
+#  yardımcılar api/ortak.py'ye taşındı.  Test onları oradan alır.
+from api import avan as UC_AVAN                        # noqa: E402
+from api import ortak as UC_ORTAK                      # noqa: E402
 
 BASE = os.environ.get("AVAN_TEST_URL", "http://127.0.0.1:8760")
 
@@ -38,8 +43,8 @@ def calistir():
                        ("1.234,56", 1234.56), ("  3  ", 3), ("", None),
                        ("abc", None), (None, None), ("-2,5", -2.5),
                        ("0,075", 0.075), (12, 12), (3.0, 3)):
-        r.esit(f"_sayi({metin!r})", UYGULAMA._sayi(metin), bek)
-    r.kontrol("_sayi(True) sayı sayılmaz", UYGULAMA._sayi(True) in (None, 1))
+        r.esit(f"_sayi({metin!r})", UC_ORTAK._sayi(metin), bek)
+    r.kontrol("_sayi(True) sayı sayılmaz", UC_ORTAK._sayi(True) in (None, 1))
 
     # ------------------------------------------------ motor: her kötü değer her alanda
     ALANLAR = ("bina_yuksekligi", "yapi_yuksekligi", "N", "hizli1", "hizli2", "h",
@@ -53,7 +58,7 @@ def calistir():
             veri = dict(TEMEL)
             veri[alan] = kotu
             try:
-                g = UYGULAMA._trafik_girdi({"girdiler": veri})
+                g = UC_AVAN._trafik_girdi({"girdiler": veri})
                 s = TR.hesapla_tek(g)
                 if not isinstance(s, dict):
                     cokme += 1
@@ -66,14 +71,14 @@ def calistir():
     # bina tipi ve kapı tipi metin alanları
     for kotu in ("", None, "Konut ", "konut", "<b>x</b>", "Yok", 5, ["Konut"]):
         try:
-            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, bina_tipi=kotu)})
+            g = UC_AVAN._trafik_girdi({"girdiler": dict(TEMEL, bina_tipi=kotu)})
             s = TR.hesapla_tek(g)
             r.kontrol(f"bina_tipi={kotu!r} anlamlı hata", isinstance(s, dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"bina_tipi={kotu!r} çökme", False, f"→ {e}")
     for kotu in ("", None, "Teleskopik", "yok", 7):
         try:
-            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, kapi_tipi=kotu)})
+            g = UC_AVAN._trafik_girdi({"girdiler": dict(TEMEL, kapi_tipi=kotu)})
             r.kontrol(f"kapi_tipi={kotu!r} çökmedi", isinstance(TR.hesapla_tek(g), dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"kapi_tipi={kotu!r} çökme", False, f"→ {e}")
@@ -87,7 +92,7 @@ def calistir():
                 [{"P": "10", "durak": "-3"}], [{"P": "10", "V": "9"}],
                 [{"P": "10", "h": "0"}], [{"P": "99"}]):
         try:
-            g = UYGULAMA._trafik_girdi({"girdiler": dict(C, asansorler=asl)})
+            g = UC_AVAN._trafik_girdi({"girdiler": dict(C, asansorler=asl)})
             r.kontrol(f"çoklu asansorler={str(asl)[:38]} çökmedi",
                       isinstance(TR.hesapla_coklu(g), dict))
         except Exception as e:                                      # noqa: BLE001
@@ -107,7 +112,7 @@ def calistir():
     for alan in AVAN_ALAN:
         for kotu in KOTU_DEGERLER:
             try:
-                v = UYGULAMA._avan_girdi({"girdiler": {"ortak": O,
+                v = UC_AVAN._avan_girdi({"girdiler": {"ortak": O,
                                                        "asansorler": [dict(A, **{alan: kotu})],
                                                        "sabitler": {}}})
                 s = AV.hesapla(v)
@@ -124,7 +129,7 @@ def calistir():
     for alan in O:
         for kotu in KOTU_DEGERLER:
             try:
-                v = UYGULAMA._avan_girdi({"girdiler": {"ortak": dict(O, **{alan: kotu}),
+                v = UC_AVAN._avan_girdi({"girdiler": {"ortak": dict(O, **{alan: kotu}),
                                                        "asansorler": [A], "sabitler": {}}})
                 AV.hesapla(v)
             except Exception as e:                                  # noqa: BLE001
@@ -137,7 +142,7 @@ def calistir():
     for alan in AV.SABIT_B_VARSAYILAN:
         for kotu in ("", "abc", "0", "-1", "999999"):
             try:
-                v = UYGULAMA._avan_girdi({"girdiler": {"ortak": O, "asansorler": [A],
+                v = UC_AVAN._avan_girdi({"girdiler": {"ortak": O, "asansorler": [A],
                                                        "sabitler": {alan: kotu}}})
                 AV.hesapla(v)
             except Exception as e:                                  # noqa: BLE001
@@ -152,7 +157,7 @@ def calistir():
                [{"kalem": "DOĞRUDAN KİŞİ — Tablo-1 dışı", "miktar": "1000000"}],
                [{"kalem": "KONUT — Diğer oda", "miktar": "1"}] * 30):
         try:
-            g = UYGULAMA._trafik_girdi({"girdiler": dict(TEMEL, ek_nufus=ek)})
+            g = UC_AVAN._trafik_girdi({"girdiler": dict(TEMEL, ek_nufus=ek)})
             r.kontrol(f"ek_nufus={str(ek)[:34]} çökmedi", isinstance(TR.hesapla_tek(g), dict))
         except Exception as e:                                      # noqa: BLE001
             r.kontrol(f"ek_nufus={str(ek)[:34]} çökme", False, f"→ {e}")
@@ -188,7 +193,8 @@ def calistir():
     req = urllib.request.Request(BASE + "/", method="GET")
     with urllib.request.urlopen(req, timeout=30) as c:
         html = c.read().decode()
-    r.kontrol("ana sayfa yüklendi", "<title>" in html and "app.js" in html)
+    r.kontrol("ana sayfa yüklendi", "<title>" in html
+              and all(x in html for x in ("ortak.js", "avan.js", "uygulama.js")))
 
     # bozuk gövdeler — 500 dönmemeli
     for govde in ({}, {"mod": "tek"}, {"girdiler": {}}, {"mod": "yok", "girdiler": {}},
@@ -309,21 +315,21 @@ def calistir():
     #  ÖZELLİKLERİNE geçer;  paftanın İÇERİĞİ değişmez.
     _KP = {"project_title": "ÇAĞDAŞ KONUTLARI B BLOK", "owner": "Örnek Yapı A.Ş.",
            "sheet_no": "EL-04", "elec_name": "Ekrem", "elec_surname": "Sekmen"}
-    _pk = UYGULAMA._proje_kimligi({"kapak": _KP})
+    _pk = UC_ORTAK._proje_kimligi({"kapak": _KP})
     r.esit("kapak → proje adı", _pk["proje_adi"], "ÇAĞDAŞ KONUTLARI B BLOK")
     r.esit("kapak → işveren", _pk["isveren"], "Örnek Yapı A.Ş.")
     r.esit("kapak → pafta no", _pk["pafta_no"], "EL-04")
     r.esit("kapak → mühendis", _pk["muhendis"], "Ekrem Sekmen")
     r.kontrol("dosya adı proje adıyla başlıyor",
-              UYGULAMA._dosya_adi(_pk, "Avan Hesaplari", "xlsx")
+              UC_ORTAK._dosya_adi(_pk, "Avan Hesaplari", "xlsx")
               .startswith("ÇAĞDAŞ KONUTLARI B BLOK"))
     #  kapak gönderilmezse ( eski istemci / boş kapak ) eski davranış sürer
     r.esit("kapaksız istek eski adı verir",
-           UYGULAMA._dosya_adi(UYGULAMA._proje_kimligi({}), "Avan Hesaplari", "xlsx"),
+           UC_ORTAK._dosya_adi(UC_ORTAK._proje_kimligi({}), "Avan Hesaplari", "xlsx"),
            "Asansor - Avan Hesaplari.xlsx")
     #  dosya adına yol ayracı / üst dizin sızmamalı
-    _kotu = UYGULAMA._dosya_adi(
-        UYGULAMA._proje_kimligi({"kapak": {"project_title": "../../etc/passwd"}}),
+    _kotu = UC_ORTAK._dosya_adi(
+        UC_ORTAK._proje_kimligi({"kapak": {"project_title": "../../etc/passwd"}}),
         "Avan Hesaplari", "xlsx")
     r.kontrol("dosya adında yol ayracı yok",
               "/" not in _kotu and ".." not in _kotu, f"→ {_kotu}")

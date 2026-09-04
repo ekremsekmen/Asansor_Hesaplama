@@ -20,7 +20,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageTemplate,
                                 Paragraph, Spacer, Table, TableStyle)
 
-from engine.steps import tr, trn
+from engine.ortak.steps import tr, trn
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts")
 
@@ -170,7 +170,7 @@ class _Belge(BaseDocTemplate):
         super().__init__(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
                          topMargin=28 * mm, bottomMargin=22 * mm,
                          title=baslik, author="",
-                         subject=alt_baslik, creator="Asansör Avan Hesaplama Programı", **kw)
+                         subject=alt_baslik, creator="Asansör Proje Programı", **kw)
         self.ust_baslik, self.alt_baslik = ust_baslik, alt_baslik
         self.olcek = k = float(olcek) if olcek else 1.0
         cerceve = Frame(self.leftMargin / k, self.bottomMargin / k,

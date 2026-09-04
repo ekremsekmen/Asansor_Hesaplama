@@ -18,10 +18,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import avan as AV                          # noqa: E402
-from engine import mukavemet as MK                     # noqa: E402
-from engine import uygulama as UY                      # noqa: E402
-from engine import uygulama_girdi as UG                # noqa: E402
+from engine.avan import hesap as AV                          # noqa: E402
+from engine.uygulama import mukavemet as MK                     # noqa: E402
+from engine.uygulama import hesap as UY                      # noqa: E402
+from engine.uygulama import girdi as UG                # noqa: E402
 from testler.ortak import Rapor                        # noqa: E402
 
 #  Topraklama ve kolon hattı olmadan elektrik bölümlerinin bir kısmı boş kalır

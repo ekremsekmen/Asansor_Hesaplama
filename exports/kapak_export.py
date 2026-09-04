@@ -322,9 +322,9 @@ def pdf_bytes(kapak: Mapping[str, object] | None) -> bytes:
     out = io.BytesIO()
     c = canvas.Canvas(out, pagesize=A4, pageCompression=1)
     c.setTitle(_s(d.get("project_title")))
-    c.setAuthor(_s(d.get("mech_name") or "Asansör Avan Hesaplama Programı"))
+    c.setAuthor(_s(d.get("mech_name") or "Asansör Proje Programı"))
     c.setSubject("Asansör avan proje kapağı")
-    c.setCreator("Asansör Avan Hesaplama Programı")
+    c.setCreator("Asansör Proje Programı")
     #  SAYFAYI DOLDUR  —  kapak çizimi 455 x 642 pt'lik bir kutuya yerleşiktir
     #  ( 160,5 x 226,5 mm ).  Hesap paftaları ise A4'ün 12 mm kenar boşluğuyla
     #  186 x 273 mm'lik alanı doldurur.  Kapak, o paftaların yanına dizildiğinde

@@ -22,10 +22,10 @@ AVANIN 1. VE 2. BÖLÜMÜ ALINMAZ:
   · Kuvvet hesapları — mukavemet bölüm 9 kuyu tabanı yüklerini TS EN 81-20
     m.5.2.1.8'e göre, ray kuvvetlerini de bölüm 7-8'de ayrıntılı verir.
 """
-from engine import avan as E_AVAN
-from engine import mukavemet as E_MUK
-from engine import tables as T
-from engine import uygulama_girdi as UG
+from engine.avan import hesap as E_AVAN
+from engine.uygulama import mukavemet as E_MUK
+from engine.avan import tablolar as T
+from engine.uygulama import girdi as UG
 
 #  Avanın uygulama projesine giren bölümleri  ( 0-tabanlı sıra )
 ELEKTRIK_BOLUMLERI = (2, 3, 4, 5)          # kabin ayd. · kuyu ayd. · TAS · ε

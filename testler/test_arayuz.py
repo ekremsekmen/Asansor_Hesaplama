@@ -80,7 +80,8 @@ def calistir():
         pg.goto(BASE, wait_until="networkidle")
         pg.wait_for_timeout(800)
 
-        r.kontrol("sayfa başlığı doğru", "Avan" in pg.title(), f"→ {pg.title()!r}")
+        r.kontrol("sayfa başlığı doğru", "Asansör Proje" in pg.title(),
+                  f"→ {pg.title()!r}")
 
         # ---------------------------------------------------------------
         #  AÇILIŞ EKRANI  ( 2.6 )

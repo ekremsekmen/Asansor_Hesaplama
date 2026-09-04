@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Asansör Avan Hesaplama Programı</title>
+<title>Asansör Proje Programı</title>
 <link rel="stylesheet" href="/static/style.css?v=2.7">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23123E6B'/><path d='M9 7h14v18H9z' fill='none' stroke='%23fff' stroke-width='2'/><path d='M16 7v18M12 12l0 8M20 12l0 8' stroke='%23fff' stroke-width='1.6'/></svg>">
 </head>
@@ -80,7 +80,7 @@
     <button class="sekme" data-sekme="avan" data-mod="avan">2 · Avan Hesapları</button>
     <button class="sekme" data-sekme="proje" data-mod="avan">3 · Proje Kapağı</button>
     <!--  UYGULAMA PROJESİ ADIMLARI  —  avan sekmeleriyle aynı şeritte durur,
-          moda göre biri gizlenir  ( bkz. app.js · modAyarla ).            -->
+          moda göre biri gizlenir  ( bkz. ortak.js · modAyarla ).            -->
     <button class="sekme" data-sekme="mukavemet" data-mod="uygulama" hidden>1 · Uygulama Hesapları</button>
     <!--  BAŞVURU SEKMELERİ  —  işlem adımı değil, gerektikçe bakılır;
           bu yüzden şeridin sağ ucuna itilir ( .sekme-ayrac ).            -->
@@ -573,6 +573,10 @@
 </main>
 
 <div class="durum" id="durum"></div>
-<script src="/static/app.js?v=2.7"></script>
+<!--  Yükleme sırası önemli:  ortak → avan → uygulama.
+      kur() en sonda, uygulama.js içinden çağrılır.            -->
+<script src="/static/ortak.js?v=3.0"></script>
+<script src="/static/avan.js?v=3.0"></script>
+<script src="/static/uygulama.js?v=3.0"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@ AVANDAN AYRIDIR.  Avan tarafındaki tablolar ( engine/tables.py ) MMO/697
 avan kitabından gelir; buradakiler bu Excel'in kendi tablolarıdır ve
 bilerek ayrı tutulmuştur ( bkz. engine/mukavemet_tablolari.py ).
 """
-from engine import mukavemet_tablolari as MT
+from engine.uygulama import mukavemet_tablolari as MT
 
 #  Kabin durak yüksekliklerinin Excel'deki yeri:  G12:G34  ( 20 durak +
 #  3 boş satır ).  Motor bunları tek tek değil, liste olarak alır.

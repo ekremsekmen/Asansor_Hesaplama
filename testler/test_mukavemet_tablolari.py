@@ -18,8 +18,8 @@ import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import mukavemet_girdi as MG                  # noqa: E402
-from engine import mukavemet_tablolari as MT              # noqa: E402
+from engine.uygulama import mukavemet_girdi as MG                  # noqa: E402
+from engine.uygulama import mukavemet_tablolari as MT              # noqa: E402
 from testler.ortak import Rapor                           # noqa: E402
 
 KAYNAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
