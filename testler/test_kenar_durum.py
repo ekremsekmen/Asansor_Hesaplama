@@ -73,8 +73,8 @@ def calistir():
     for V, bek in ((0.63, 10), (1, 7), (1.6, 6), (1.75, 5.8875), (2, 5.7),
                    (2.5, 5.5), (3, 5.25), (3.5, 5), (5, 4.5), (6, 4.3)):
         r.esit(f"Tablo-6 tg(V={V})", T.tablo6_tg(V), bek)
-    r.esit("1,75 m/s ara değer notu", T.tg_kaynagi(1.75), "Tablo-6 (ara değer — enterpolasyon)")
-    r.esit("1,60 m/s tablo değeri", T.tg_kaynagi(1.6), "Tablo-6")
+    r.esit("1,75 m/s ara değer notu", T.tg_kaynagi(1.75), "MMO/697 Tablo-6 (ara değer — enterpolasyon)")
+    r.esit("1,60 m/s tablo değeri", T.tg_kaynagi(1.6), "MMO/697 Tablo-6")
 
     # ---------------------------------------------------- Tablo-4 / Tablo-8
     r.esit("Tablo-4 900 Merkezden", T.tablo4_ta_tk(900, "Merkezden Açılan Oto."), (2.3, 2.9))
@@ -87,8 +87,8 @@ def calistir():
             bek = tuple((T.TABLO_4[alt][kt][j] + T.TABLO_4[ust][kt][j]) / 2 for j in (0, 1))
             r.esit(f"Tablo-4 {ara} {kt[:9]} = ({alt}+{ust})/2", T.tablo4_ta_tk(ara, kt), bek)
     r.esit("Tablo-4 1000 kabin içi = (5+6)/2", T.tablo4_ta_tk(1000, "Kabin İçi Oto. Kat K.Ç."), (5.5, 5.5))
-    r.esit("1000 mm ara değer notu", T.tablo4_kaynagi(1000), "Tablo-4 (ara değer — enterpolasyon)")
-    r.esit("900 mm tablo değeri", T.tablo4_kaynagi(900), "Tablo-4")
+    r.esit("1000 mm ara değer notu", T.tablo4_kaynagi(1000), "MMO/697 Tablo-4 (ara değer — enterpolasyon)")
+    r.esit("900 mm tablo değeri", T.tablo4_kaynagi(900), "MMO/697 Tablo-4")
     #  700 mm ISO tablosunun dışında — 800→900 eğiminden dış değerleme
     r.esit("Tablo-8 tp(700) dış değer", T.tablo8_tp(700), 1.3)
     r.esit("Tablo-8 tp(700) = 800 + (800−900)", T.tablo8_tp(700),
@@ -220,12 +220,115 @@ def calistir():
     r.kontrol("kamuda manuel k kabul edilir",
               TR.hesapla_tek(g(bina_tipi="Kamu Binaları", manuel_k=0.13))["ozet"]["k"] == 0.13)
 
+    # ==================================================================
+    #  v2.8 — KİTAP DENETİMİ:  motor tabloları MMO/697 ile BİREBİR mi?
+    #
+    #  Bu, doğrulama zincirinin eskiden EKSİK olan halkasıdır.  Diğer testler
+    #  "Python ≡ Excel ≡ testlerdeki beklenen değer" der;  üçü de aynı
+    #  aktarımdan geldiği için bir tablo kitaptan YANLIŞ aktarılmışsa üçü de
+    #  aynı yanlışı taşır ve hiçbir test görmez.
+    #  Aşağıdaki değerler kitabın ( MMO/697, 2. Baskı, Ocak 2020 ) basılı
+    #  tablolarından İKİNCİ KEZ, bağımsız olarak yazılmıştır — ikisinden
+    #  birinde yazım hatası olursa test söyler.
+    # ==================================================================
+    for _ad, _bek in (("KONUT — İlk yatak odası", 2), ("KONUT — Diğer oda", 1),
+                      ("OTEL — Yatak", 1), ("İŞ MERKEZİ — Çalışma alanı", 1 / 12),
+                      ("HASTANE — Yatak", 3), ("RESMİ BİNA — Çalışma alanı", 1 / 12),
+                      ("OTOPARK — Ticari araç", 1.5), ("OTOPARK — Özel araç", 1)):
+        r.esit(f"kitap T1 · {_ad}", T.TABLO_1[_ad]["katsayi"], _bek)
+
+    for _grup, _ara in (("Konut", ((2, 9, 1), (10, 14, 1.6), (15, 19, 2.0), (20, 30, 2.5))),
+                        ("Büro ve İş Merkezi", ((2, 5, 1), (6, 10, 1.6), (11, 15, 2.0), (16, 19, 2.5))),
+                        ("Otel", ((2, 6, 1), (7, 10, 1.6), (11, 15, 2.0), (16, 19, 2.5)))):
+        for _alt, _ust, _bek in _ara:
+            for _d in (_alt, _ust):
+                r.esit(f"kitap T2 · {_grup} {_d} durak", T.tablo2_min_hiz(_grup, _d), _bek)
+
+    _T4 = {700: {"Teleskopik Otomatik": (2.5, 3.0), "Merkezden Açılan Oto.": (2.0, 2.5),
+                 "Kabin İçi Oto. Kat K.Ç.": (5.0, 5.0)},
+           800: {"Teleskopik Otomatik": (2.5, 3.0), "Merkezden Açılan Oto.": (2.0, 2.5),
+                 "Kabin İçi Oto. Kat K.Ç.": (5.0, 5.0)},
+           900: {"Teleskopik Otomatik": (2.5, 3.8), "Merkezden Açılan Oto.": (2.3, 2.9),
+                 "Kabin İçi Oto. Kat K.Ç.": (5.0, 5.0)},
+           1100: {"Teleskopik Otomatik": (3.0, 4.0), "Merkezden Açılan Oto.": (2.5, 3.5),
+                  "Kabin İçi Oto. Kat K.Ç.": (6.0, 6.0)},
+           1300: {"Teleskopik Otomatik": (3.7, 5.0), "Merkezden Açılan Oto.": (2.7, 3.7)}}
+    for _kg, _satir in _T4.items():
+        for _tip, (_ta, _tk) in _satir.items():
+            _p = T.tablo4_ta_tk(_kg, _tip)
+            r.esit(f"kitap T4 · {_kg} {_tip} ta", _p[0], _ta)
+            r.esit(f"kitap T4 · {_kg} {_tip} tk", _p[1], _tk)
+
+    for _V, _bek in ((0.63, 10.0), (1.0, 7.0), (1.6, 6.0), (2.0, 5.7),
+                     (2.5, 5.5), (3.5, 5.0), (5.0, 4.5), (6.0, 4.3)):
+        r.esit(f"kitap T6 · V={_V}", T.tablo6_tg(_V), _bek)
+
+    for _P, _bek in ((6, 450), (8, 630), (10, 800), (13, 1000), (16, 1275),
+                     (20, 1600), (25, 2000), (30, 2500)):
+        r.esit(f"kitap T7 · {_P} kişi", T.tablo7_yuk(_P), _bek)
+
+    for _tip, (_s, _y) in (("Konut", (0.075, 0.10)), ("Otel", (0.12, 0.15)),
+                           ("İş Merkezi", (0.15, 0.17)), ("Hastane", (0.10, 0.20)),
+                           ("Otopark", (0.10, 0.20))):
+        r.esit(f"kitap T9 · {_tip} standart", T.TABLO_9[_tip]["Standart"], _s)
+        r.esit(f"kitap T9 · {_tip} yükseltilmiş", T.TABLO_9[_tip]["Yükseltilmiş"], _y)
+
+    for _ad, (_sa, _st, _yu) in (
+            ("Konut", (120, 100, 80)), ("Karma Binalar (İşyeri ve Konut)", (60, 50, 30)),
+            ("İş Merkezi (Tek Firmalı)", (60, 50, 40)), ("İş Merkezi (Çok Firmalı)", (50, 40, 30)),
+            ("Otel (3* ve altı)", (60, 50, 40)), ("Otel (4* ve üzeri)", (50, 40, 30)),
+            ("Kamu Binaları", (None, 40, 30)), ("Hastane", (None, 40, 30)),
+            ("Poliklinik Binaları ve Yaşlı Bakım Ev.", (60, 50, 40)),
+            ("Katlı Otopark", (60, 50, 40))):
+        r.esit(f"kitap T10 · {_ad} şartlı", T.TABLO_10[_ad]["sartli"], _sa)
+        r.esit(f"kitap T10 · {_ad} standart", T.TABLO_10[_ad]["standart"], _st)
+        r.esit(f"kitap T10 · {_ad} yükseltilmiş", T.TABLO_10[_ad]["yukseltilmis"], _yu)
+
+    for _Q, _bek in ((100, 0.37), (180, 0.58), (225, 0.70), (300, 0.90), (375, 1.10),
+                     (400, 1.17), (450, 1.30), (525, 1.45), (600, 1.60), (630, 1.66),
+                     (675, 1.75), (750, 1.90), (800, 2.00), (825, 2.05), (900, 2.20),
+                     (975, 2.35), (1000, 2.40), (1050, 2.50), (1125, 2.65), (1200, 2.80),
+                     (1250, 2.90), (1275, 2.95), (1350, 3.10), (1425, 3.25), (1500, 3.40),
+                     (1600, 3.56), (2000, 4.20), (2500, 5.00)):
+        r.esit(f"kitap T11 · {_Q} kg", T.kabin_azami_alan(_Q), _bek)
+
+    #  Kitabın KENDİ örnek hesabı ( s.53 ):  H, S ve TR değerleri
+    r.esit("kitap örneği · H(9 kat, 15 kişi)", round(T.tablo3_H(9, 15), 1), 8.8)
+    r.esit("kitap örneği · S(9 kat, 15 kişi)", round(T.tablo5_S(9, 15), 2), 7.46)
+    r.esit("kitap örneği · H(9 kat, 6 kişi)", round(T.tablo3_H(9, 6), 2), 8.16)
+    r.esit("kitap örneği · S(9 kat, 6 kişi)", round(T.tablo5_S(9, 6), 2), 4.56)
+    #  TR = 2·H·tv + (S+1)·ts + 2·p·tp
+    _tv = 3 / 1.6
+    #  450 kg asansörü — kitabın verdiği sonuçla BİREBİR ( tp = 2,2 doğrulanır )
+    r.esit("kitap örneği · TR2 = 103,567 s",
+           round(2 * 8.16 * _tv + (4.56 + 1) * (2.3 + 2.9 + 6 - _tv) + 2 * 4.8 * 2.2, 3), 103.567)
+    #  1125 kg asansörü — KİTAPTA ARİTMETİK HATA VAR.  Kitap TR1 = 149,9955 s
+    #  yazar; kendi verdiği H = 8,8 · S = 7,46 · ts = 10,425 · p = 12 · tp = 2,2
+    #  ile doğru sonuç 173,9955 s'dir ( fark tam 24,0 s = 2·12·1,0 ).  Kitabın
+    #  R1 = 24 değeri de hatalı TR1'den türer ( doğrusu 20,7 ) ve aynı sayfada
+    #  Reş "337,9" yazılmıştır ( doğrusu 37,9 ).  Program DOĞRU aritmetiği
+    #  uygular;  bu kontrol o farkı kalıcı olarak kayda geçirir.
+    _tr1 = round(2 * 8.8 * _tv + (7.46 + 1) * (2.5 + 3.8 + 6 - _tv) + 2 * 12 * 2.2, 4)
+    r.esit("kitap örneği · TR1 doğru aritmetikle", _tr1, 173.9955)
+    r.esit("kitabın bastığı TR1 ile fark tam 24,0 s", round(_tr1 - 149.9955, 4), 24.0)
+
     # ---------------------------------------------------- Tablo-7 15 kişi
     r.esit("15 kişi tabloda açık", T.TABLO_7[15], 1125)
     r.esit("15 kişi kaynağı ayrı", T.tablo7_kaynagi(15), "MMO örneği s.53-54 (Tablo-7 dışı)")
-    r.esit("16 kişi normal kaynak", T.tablo7_kaynagi(16), "Tablo-7")
+    r.esit("16 kişi normal kaynak", T.tablo7_kaynagi(16), "MMO/697 Tablo-7")
     #  v2.8 — Tablo-7'de OLMAYAN bir kapasiteye kaynak olarak "Tablo-7" yazmak,
     #  olmayan bir tablo satırına atıf yapmaktır ( 7 kişi → 525 kg ).
+    #  v2.8 — KAYNAK ADI TEK ANLAMLI OLMALIDIR.  Paftada ISO 8100-32:2020'nin
+    #  "Tablo 6"sı ( tp ) ile MMO/697'nin "Tablo-6"sı ( tg ) yan yana basılıyor;
+    #  çıplak "Tablo-6" hangisi olduğunu söylemiyordu.
+    r.kontrol("MMO tabloları tam adıyla yazılıyor",
+              all(x.startswith("MMO/697 Tablo") for x in
+                  (T.tablo4_kaynagi(900), T.tg_kaynagi(1.6), T.tablo7_kaynagi(16))))
+    r.kontrol("ISO tablosu ISO adıyla yazılıyor",
+              T.tablo8_kaynagi(900).startswith("ISO 8100-32:2020"))
+    r.kontrol("tp kaynağı MMO tablosuna atfedilmiyor",
+              "MMO" not in T.tablo8_kaynagi(900))
+
     r.kontrol("tablo dışı kapasite Tablo-7 diye gösterilmez",
               T.tablo7_kaynagi(7) != "Tablo-7" and "DIŞI" in T.tablo7_kaynagi(7))
     r.kontrol("tablo dışı büyük kapasite de gösterilmez",
@@ -346,6 +449,38 @@ def calistir():
     r.kontrol("tek: boş durak sorunsuz geçer", _dg(None).get("hata") is None)
     r.esit("tek: durak girilse de N değişmez", _dg(12)["ozet"]["N"], 11)
 
+    #  v2.8 — FİZİKSEL OLARAK İMKÂNSIZ TÜREYEN DEĞERLER.
+    #  Süreleri tek tek denetlemek yetmiyordu:  ta=tk=tg=tp=0,1 s ( izin verilen
+    #  tam alt sınır ) her biri geçerliyken ts = −1,57 s üretiyor, TR 129→28 sn
+    #  düşüyor ve 2 yerine 1 asansör yetiyor deniyordu.
+    _sf = TR.hesapla_tek(g(manuel_ta=0.1, manuel_tk=0.1, manuel_tg=0.1, manuel_tp=0.1))
+    r.kontrol("ts negatif çıkarsa hesap durur", "ts" in (_sf.get("hata") or ""),
+              f"→ {_sf.get('hata')}")
+    r.kontrol("makul elle süreler hâlâ geçiyor",
+              TR.hesapla_tek(g(manuel_ta=2.5, manuel_tk=3.0)).get("hata") is None)
+    #  Asansöre özel kat yüksekliği de ortak h ile aynı sınırlara tabidir
+    #  ( h = −3 m ile −33 m seyahat mesafesi ve "kriter karşılanıyor" çıkıyordu ).
+    for _h, _gecerli in ((-3, False), (0, False), (15, False), (2.8, True)):
+        _c = TR.hesapla_coklu(dict(c, asansorler=[
+            dict(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik", h=_h),
+            dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik")]))
+        r.kontrol(f"asansöre özel h={_h} {'kabul' if _gecerli else 'red'}",
+                  (_c.get("hata") is None) == _gecerli, f"→ {_c.get('hata')}")
+
+    #  v2.8 — BÖLGELİ HİZMET UYARISI.  Grup kontrolü bütün asansörlerin aynı
+    #  talebe hizmet ettiğini varsayar; farklı katlara çıkıyorlarsa bu varsayım
+    #  kırılır ve program bunu SÖYLEMİYORDU.
+    _bz = TR.hesapla_coklu(dict(c, N=11, asansorler=[
+        dict(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik", durak=12),
+        dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik", durak=3)]))
+    r.kontrol("farklı bölgede uyarı çıkıyor",
+              any("FARKLI KATLARA" in u for u in _bz.get("uyarilar") or []))
+    _ay = TR.hesapla_coklu(dict(c, asansorler=[
+        dict(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"),
+        dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik")]))
+    r.kontrol("aynı bölgede uyarı ÇIKMIYOR",
+              not any("FARKLI KATLARA" in u for u in _ay.get("uyarilar") or []))
+
     tek1 = TR.hesapla_tek(g(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"))
     cok1 = TR.hesapla_coklu(dict(c, asansorler=[dict(P=10, kapi_genisligi=900,
                                                      kapi_tipi="Teleskopik Otomatik")]))
@@ -361,6 +496,68 @@ def calistir():
               abs(a["P_kurulu"] - (a["g_motor"] + a["g_kuyu"] + a["g_kabin"] + a["g_priz"])) < 1e-9)
     r.kontrol("ε = ε1 + ε2", abs(a["eps"] - (a["eps1"] + a["eps2"])) < 1e-9)
     r.kontrol("kuyu armatürü = MAX(n1, n2)", a["n_kuyu"] == max(a["n1_kuyu"], a["n2_kuyu"]))
+
+    #  v2.8 — MOTOR:  AĞIR ÇALIŞMA YÖNÜ.  Karşı ağırlık q·Q dengeler; dolu kabin
+    #  yukarı ( 1−q )·Q, boş kabin aşağı q·Q dengesiz yük üretir.  Program yalnız
+    #  ( 1−q ) yönünü hesaplıyordu:  q = 0,55'te 5,5 kW seçiyor, gereken 7,5 kW.
+    #  q = 0,50'de iki yön eşittir — kitabın Q/2 formülüyle birebir aynı sonuç.
+    def _mot(q_):
+        return AV.hesapla_asansor(dict(kapasite=10, Q_elle=800, V=1, eta=0.85,
+                                       i_palanga=2, q_denge=q_, Hk=20,
+                                       kuyu_genisligi=1800, kabin_boyu=1400,
+                                       kabin_genisligi=1100, makine_tipi="Dişlisiz"),
+                                  {"mk_yok": True}, AV.sabitler(None), 1)["ozet"]
+    r.esit("q=0,50'de kitapla aynı ( Q/2 )", round(_mot(0.50)["N_hes"], 6),
+           round(0.5 * 800 * 1 / (102 * 0.75), 6))
+    for _q in (0.55, 0.60, 0.65):
+        _o = _mot(_q)
+        r.kontrol(f"q={_q}: ağır yön hesaplanıyor",
+                  abs(_o["N_hes"] - _q * 800 / (102 * 0.75)) < 1e-9,
+                  f"→ N={_o['N_hes']}")
+    for _q in (0.40, 0.45, 0.50):
+        _o = _mot(_q)
+        r.kontrol(f"q={_q}: hafif yön değişmedi",
+                  abs(_o["N_hes"] - (1 - _q) * 800 / (102 * 0.75)) < 1e-9)
+
+    #  v2.8 — KABİN ALANI  ( MMO/697 Tablo-11 = TS EN 81-20, YOLCU asansörü ).
+    #  DİKKAT:  kitapta Tablo-11'in hemen ardından Tablo-12 ( hidrolik YÜK
+    #  asansörü ) gelir ve değerleri çok daha büyüktür ( 450 kg → 1,84 m² ).
+    #  Yolcu asansöründe geçerli olan Tablo-11'dir:  450 kg → 1,30 m².
+    r.esit("Tablo-11 450 kg", T.kabin_azami_alan(450), 1.30)
+    r.esit("Tablo-11 630 kg", T.kabin_azami_alan(630), 1.66)
+    r.esit("Tablo-11 1275 kg", T.kabin_azami_alan(1275), 2.95)
+    r.esit("Tablo-11 2500 kg", T.kabin_azami_alan(2500), 5.00)
+    r.esit("2500 kg üstü +0,16 m²/100 kg", round(T.kabin_azami_alan(3000), 4), 5.80)
+    r.kontrol("Tablo-12 ( yük asansörü ) değeri KULLANILMIYOR",
+              abs(T.kabin_azami_alan(450) - 1.84) > 0.4)
+
+    def _kabin(P, en, boy):
+        return [x for x in (AV.hesapla_asansor(
+            dict(kapasite=P, V=1.6, eta=0.85, Hk=20, kuyu_genisligi=max(en, boy) + 400,
+                 kabin_boyu=en, kabin_genisligi=boy, makine_tipi="Dişlisiz"),
+            {"mk_yok": True}, AV.sabitler(None), 1).get("uyarilar") or [])
+            if "KABİN ALANI" in x]
+    #  TS EN 81-70 standart kabinleri yanlış alarm üretmemeli
+    for _ad, _P, _a, _b in (("Tip 1", 6, 1000, 1250), ("Tip 2", 8, 1100, 1400),
+                            ("Tip 3", 16, 2000, 1400)):
+        r.kontrol(f"{_ad} kabini temiz geçiyor", not _kabin(_P, _a, _b))
+    r.kontrol("aşırı kabin alanı uyarı üretiyor", bool(_kabin(6, 2000, 2000)))
+
+    #  v2.8 — YANLIŞ KAYNAK GÖSTERİMİ.  MMO/697 trafik, kuvvet, motor gücü ve
+    #  kabin boyutlarını kapsar;  AYDINLATMA / TOPRAKLAMA / GERİLİM DÜŞÜMÜ
+    #  bölümleri kitapta YOKTUR.  Kitabın Tablo-4'ü kapı süreleri, Tablo-11'i
+    #  ise beyan yükü ↔ kabin alanı tablosudur — boş kabin kütlesi vermez.
+    #  Paftada bunlara "MMO/697 Tablo-4 / Tablo-11" demek yanlış atıftır.
+    _oz = AV.hesapla_asansor(AS, ORT, AV.sabitler(None), 1)
+    _gk = next(x for x in _oz["bolumler"][1]["adimlar"] if x.get("sembol") == "Gk")
+    _ol = next(x for x in _oz["bolumler"][3]["adimlar"] if x.get("sembol") == "ØL")
+    _eta = next(x for x in _oz["bolumler"][0]["adimlar"] if x.get("sembol") == "η")
+    for _ad, _adim in (("Gk", _gk), ("ØL", _ol), ("η", _eta)):
+        _k = str(_adim["kaynak"])
+        r.kontrol(f"{_ad} kaynağı MMO tablosuna atfedilmiyor",
+                  not any(x in _k for x in ("Tablo-4", "Tablo-11", "s.21")), f"→ {_k!r}")
+    r.kontrol("Gk kaynağı ofis tablosu olduğunu söylüyor",
+              "fis" in T.GK_KAYNAGI and "dışı" in T.GK_KAYNAGI)
 
     #  v2.8 — ARMATÜR IŞIK AKISI TABLO-4'TEN GELİR VE KAYNAĞI PAFTADA YAZAR.
     #  Kuyu / makine dairesi varsayılanı eskiden kaynağı belirsiz 2600 lm idi
@@ -383,9 +580,12 @@ def calistir():
             b = AV.hesapla_asansor(AS, ORT, S_, 1)["bolumler"][bolum]
         return next(x for x in b["adimlar"] if x.get("sembol") == "ØL")["kaynak"]
 
+    #  KAYNAK "MMO/697 Tablo-4" DEĞİLDİR:  kitapta aydınlatma bölümü yoktur ve
+    #  Tablo-4 kapı süreleri tablosudur.  Varsayılan ofis armatür tablosundan gelir.
     for bolum, ad in ((2, "kabin"), (3, "kuyu"), ("mk", "mk.dairesi")):
-        r.kontrol(f"{ad}: varsayılan ØL kaynağı Tablo-4 diyor",
-                  "Tablo-4" in _ol_kaynagi(None, bolum))
+        _k = _ol_kaynagi(None, bolum)
+        r.kontrol(f"{ad}: varsayılan ØL kaynağı ofis tablosu diyor",
+                  "fis" in _k and "Tablo-4" not in _k, f"→ {_k!r}")
     for bolum, ad in ((3, "kuyu"), ("mk", "mk.dairesi")):
         r.kontrol(f"{ad}: elle girilen ØL kaynağı imalatçı diyor",
                   "imalatçı" in _ol_kaynagi({"kuyu_armatur_lm": 2600}, bolum))
@@ -826,11 +1026,30 @@ def calistir():
     #  kayan noktada kademenin bir kıl payı üstüne düşebilir; motor_sec toleranslı
     #  seçtiği hâlde kontrol katı olunca program KENDİ seçtiği motoru reddediyor,
     #  pafta "Nsç = 15,00  ≥  N = 15,00  →  UYGUN DEĞİL" basıyordu.
-    _kil = av(as_ek={"kapasite": 16, "V": 1.6, "eta": 0.6, "i_palanga": 1,
-                     "q_denge": 0.55, "Nsc": None})["asansorler"][0]["ozet"]
-    r.kontrol("kıl payı üstteki N kademeyi bulur", _kil["Nsc"] == 15.0)
-    r.kontrol("otomatik seçim kendi kendini reddetmez", _kil["motor_uygun"] is True)
+    #  MEKANİZMAYI sınar, şanslı bir senaryoyu değil:  kademenin kıl payı
+    #  üstündeki bir N için seçim ile kontrol AYNI eşiği kullanmalıdır.
     r.esit("tolerans tek yerde", T.MOTOR_TOLERANS, 1e-9)
+    for _kademe in (5.5, 15.0, 37.0):
+        _N = _kademe + T.MOTOR_TOLERANS / 2          # kıl payı üstü
+        _sec = T.motor_sec(_N)
+        r.esit(f"{_kademe} kW: kıl payı üstteki N kademeyi bulur", _sec, _kademe)
+        r.kontrol(f"{_kademe} kW: seçim ile kontrol aynı eşiği kullanır",
+                  _sec >= _N - T.MOTOR_TOLERANS)
+        r.kontrol(f"{_kademe} kW: gerçekten küçük kademe reddedilir",
+                  not (_kademe >= _kademe * 1.5 - T.MOTOR_TOLERANS))
+    #  DEĞİŞMEZ:  otomatik seçilen motor HİÇBİR girdide kendi kendini reddetmez
+    _red = []
+    for _P in T.GECERLI_KAPASITELER:
+        for _V in (0.63, 1.6, 2.5):
+            for _q in (0.40, 0.50, 0.60):
+                _o = AV.hesapla_asansor(
+                    dict(kapasite=_P, V=_V, eta=0.85, i_palanga=2, q_denge=_q, Hk=25,
+                         kuyu_genisligi=2400, kabin_boyu=1100, kabin_genisligi=1000,
+                         makine_tipi="Dişlisiz"), {"mk_yok": True}, AV.sabitler(None), 1)
+                if _o.get("aktif") and _o["ozet"]["motor_uygun"] is not True:
+                    _red.append((_P, _V, _q, _o["ozet"]["N_hes"], _o["ozet"]["Nsc"]))
+    r.kontrol("otomatik seçim hiçbir girdide kendini reddetmiyor", not _red,
+              f"→ {_red[:3]}")
 
     #  girdileri_coz — XLSX'e yazılacak çözülmüş girdi
     c = AV.girdileri_coz({"ortak": dict(O_ORT), "asansorler": [dict(O_AS)],

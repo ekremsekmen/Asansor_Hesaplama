@@ -21,6 +21,7 @@ import os
 import openpyxl
 
 from engine import avan as E_AVAN
+from engine import traffic as E_TRF
 from . import hucre_haritasi as H
 from .sablon_denetim import dogrula
 
@@ -81,6 +82,11 @@ def trafik_xlsx(mod: str, g: dict, proje: dict = None) -> bytes:
     wb = openpyxl.load_workbook(TRAFIK_SABLON)
 
     if mod == "tek":
+        #  EKRAN NEYİ HESAPLADIYSA DOSYAYA DA O YAZILIR.  Arayüz girdileri
+        #  `asansorler` listesinde gönderir; HESAPLAMA sayfası ise DÜZ alanları
+        #  ( P / kapı / süreler / adet ) okur.  Bu eşlemeyi motorun kendisi
+        #  yapar — burada ikinci bir kopya tutulursa ikisi ayrışır.
+        g = E_TRF.tekil_girdi(g) or g
         ws = wb[H.TEK_SAYFA]
         for anahtar, adres in H.TEK.items():
             _yaz(ws, adres, g.get(anahtar))

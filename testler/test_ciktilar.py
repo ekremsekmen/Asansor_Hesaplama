@@ -366,6 +366,54 @@ def calistir():
     r.kontrol("şablonla XLSX yeniden üretilebiliyor",
               XE.trafik_xlsx("tek", GT)[:2] == b"PK")
 
+    #  v2.8 — PDF GENİŞLİK ÇARPANI İSTEK BAŞINA AYRI OLMALIDIR.
+    #  Modül globaliyken, trafik paftası küçültülürken ( çarpan 1/0,9 )
+    #  aynı anda üretilen AVAN paftasının tabloları da genişliyor ve sayfanın
+    #  sağından taşıyordu.  Ölçüm:  eski kodda avan üretimi 1,0 ile 1,25
+    #  arasında 11 ayrı çarpan görüyordu.  ( PDF baytları zaman damgası
+    #  taşıdığı için byte karşılaştırması bu hatayı GÖSTERMEZ. )
+    import threading as _th
+    _gorulen, _kilit = set(), _th.Lock()
+
+    def _izle():
+        for _ in range(60):
+            with _kilit:
+                _gorulen.add(PE._OLCEK.gen)
+
+    def _olcekle():
+        for _ in range(60):
+            PE._OLCEK.gen = 1.25          # başka iş parçacığı bunu görmemeli
+    _i1, _i2 = _th.Thread(target=_izle), _th.Thread(target=_olcekle)
+    _i1.start(); _i2.start(); _i1.join(); _i2.join()
+    r.esit("PDF genişlik çarpanı iş parçacığına özel", _gorulen, {1.0})
+    r.esit("çarpan varsayılanı 1.0", PE._OLCEK.gen, 1.0)
+
+    #  v2.8 — ARAYÜZÜN GÖNDERDİĞİ BİÇİMLE XLSX ÜRETİMİ.
+    #  Arayüz girdileri `asansorler` listesinde yollar; HESAPLAMA sayfası ise
+    #  DÜZ alanları ( P / kapı / süreler / adet ) okur.  Eşleme yalnız hesap
+    #  yolunda yapıldığı için indirilen tek-asansör Excel'inde bu hücreler BOŞ
+    #  kalıyor, Excel paftaya "HESAP HATASI: ⑨ kapı genişliği listeden
+    #  seçilmelidir" basıyordu — EKRANDA hesap doğru görünürken.
+    #  Testler bunu göremiyordu çünkü hepsi düz ( eski ) girdi biçimini
+    #  kullanıyordu;  bu kontrol GERÇEK arayüz biçiminden geçer.
+    import main as _M
+    for _adet, _bek_adet in ((1, None), (3, 3)):
+        _ui = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
+                            "yapi_yuksekligi": "43", "N": "11", "h": "3",
+                            "hizli1": "44", "hizli2": "3", "bodrum": "2",
+                            "asansorler": [{"P": "10", "kapi_genisligi": "900",
+                                            "kapi_tipi": "Merkezden Açılan Oto."}] * _adet}}
+        _g = _M._trafik_girdi(_ui)
+        _s = TR.hesapla(_g)
+        r.esit(f"arayüz biçimi {_adet} asansör → tek yol", _s.get("yol"), "tek")
+        _ws = openpyxl.load_workbook(io.BytesIO(
+            XE.trafik_xlsx(_s["yol"], _g, {})))[H.TEK_SAYFA]
+        for _k, _bek in (("P", 10), ("kapi_genisligi", 900),
+                         ("kapi_tipi", "Merkezden Açılan Oto."),
+                         ("h", 3), ("bodrum", 2), ("manuel_adet", _bek_adet)):
+            r.esit(f"{_adet} asansör · XLSX {H.TEK[_k]} ({_k})",
+                   _ws[H.TEK[_k]].value, _bek)
+
     #  v2.8 — ŞABLONUN SABİTLER B DEĞERLERİ MOTORLA AYNI OLMALIDIR.
     #  Kullanıcı bir sabiti boş bırakırsa xlsx_export o hücreye HİÇBİR ŞEY
     #  yazmaz; Excel şablonun kendi değeriyle hesaplar.  İkisi ayrışırsa

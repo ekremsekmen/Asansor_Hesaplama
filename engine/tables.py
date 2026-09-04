@@ -127,7 +127,11 @@ def tablo4_ta_tk(genislik, kapi_tipi):
 
 
 def tablo4_kaynagi(genislik):
-    return "Tablo-4 (ara değer — enterpolasyon)" if genislik in TABLO_4_ARA else "Tablo-4"
+    #  KAYNAK TAM ADIYLA YAZILIR:  paftada ISO 8100-32:2020'nin "Tablo 6"sı ile
+    #  MMO/697'nin "Tablo-6"sı yan yana basılıyor;  çıplak "Tablo-6" hangisi
+    #  olduğunu söylemez.  Bu yüzden MMO tabloları her yerde "MMO/697 Tablo-N".
+    return ("MMO/697 Tablo-4 (ara değer — enterpolasyon)" if genislik in TABLO_4_ARA
+            else "MMO/697 Tablo-4")
 
 
 # ---------------------------------------------------------------- TABLO - 6
@@ -151,7 +155,8 @@ def tablo6_tg(V):
 
 
 def tg_kaynagi(V):
-    return "Tablo-6 (ara değer — enterpolasyon)" if V in (1.75, 3) else "Tablo-6"
+    return ("MMO/697 Tablo-6 (ara değer — enterpolasyon)" if V in (1.75, 3)
+            else "MMO/697 Tablo-6")
 
 
 # ---------------------------------------------------------------- TABLO - 7
@@ -183,10 +188,10 @@ def tablo7_kaynagi(P):
     if P in TABLO_7_ORNEK:
         return "MMO örneği s.53-54 (Tablo-7 dışı)"
     if P in TABLO_7:
-        return "Tablo-7"
+        return "MMO/697 Tablo-7"
     if P is None:
         return "—"                   # kapasite girilmemiş; pafta zaten hata basar
-    return "Tablo-7 DIŞI — Q = P × 75 kg kabulü"
+    return "MMO/697 Tablo-7 DIŞI — Q = P × 75 kg kabulü"
 
 
 # ---------------------------------------------------------------- TABLO - 8
@@ -306,17 +311,28 @@ def ayd_verim(k, sutun=2):
         return None
 
 
-# --------------- TABLO 11 — Anma yüküne göre ORTALAMA boş kabin kütlesi
-TABLO_11 = [(450, 500), (630, 650), (800, 800), (1000, 950), (1125, 1020),
+# --------------- ANMA YÜKÜNE GÖRE ORTALAMA BOŞ KABİN KÜTLESİ  ( ofis tablosu )
+#  DİKKAT:  Bu tablo MMO/697'nin Tablo-11'i DEĞİLDİR.  Kitabın Tablo-11'i
+#  "TS EN 81-20'ye göre kullanılabilir kabin alanı / beyan yükü" tablosudur
+#  ( ör. 450 kg → en fazla 1,84 m² ) ve boş kabin kütlesi vermez.
+#  Aşağıdaki Gk değerleri ofisin imalatçı deneyiminden gelir; paftada kaynağı
+#  da öyle yazılır.  ( Eskiden "Tablo-11" diye gösteriliyordu — yanlış atıf. )
+GK_TABLOSU = [(450, 500), (630, 650), (800, 800), (1000, 950), (1125, 1020),
             (1275, 1100), (1600, 1350), (2000, 1600), (2500, 1900)]
+
+
+#  Geriye dönük ad ( şablon denetimi ve testler bu adı kullanır )
+TABLO_11 = GK_TABLOSU
+
+GK_KAYNAGI = "Ofis tablosu — ortalama boş kabin kütlesi ( MMO/697 dışı )"
 
 
 def tablo11_Gk(Q):
     """Ara yükler doğrusal enterpolasyonla; sonuç 10 kg'a yuvarlanır (Excel ROUND)."""
     if Q is None:
         return None
-    xs = [a for a, _ in TABLO_11]
-    ys = [b for _, b in TABLO_11]
+    xs = [a for a, _ in GK_TABLOSU]
+    ys = [b for _, b in GK_TABLOSU]
     if Q <= xs[0]:
         return excel_round(ys[0], -1)
     if Q >= xs[-1]:
@@ -325,6 +341,45 @@ def tablo11_Gk(Q):
         if xs[i] <= Q <= xs[i + 1]:
             y = ys[i] + (Q - xs[i]) * (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
             return excel_round(y, -1)
+    return None
+
+
+# --------------- MMO/697 Tablo-11  ( = TS EN 81-20 )
+#  BEYAN YÜKÜNE GÖRE KABİNİN KULLANILABİLİR EN BÜYÜK ALANI, m²  —  YOLCU asansörü.
+#
+#  DİKKAT:  Kitapta ARDIŞIK İKİ tablo vardır ve karıştırılması kolaydır
+#  ( OCR'da başlıklar tablolardan SONRA gelir ):
+#      Tablo-11  yolcu asansörü               450 kg →  1,30 m²   ← BU
+#      Tablo-12  hidrolik YÜK asansörü        450 kg →  1,84 m²
+#  Bu program yolcu asansörü hesaplar; Tablo-11 geçerlidir.
+#
+#  Kitap dipnotları:
+#      1) 100 kg  — bir kişilik asansör için en küçük
+#      2) 180 kg  — iki kişilik asansör için en küçük
+#      3) 2500 kg üzerinde her 100 kg ilave yük başına 0,16 m² eklenir
+#      ara yük değerleri için alan lineer enterpolasyonla bulunur
+KABIN_AZAMI_ALAN = [
+    (100, 0.37), (180, 0.58), (225, 0.70), (300, 0.90), (375, 1.10), (400, 1.17),
+    (450, 1.30), (525, 1.45), (600, 1.60), (630, 1.66), (675, 1.75), (750, 1.90),
+    (800, 2.00), (825, 2.05), (900, 2.20), (975, 2.35), (1000, 2.40), (1050, 2.50),
+    (1125, 2.65), (1200, 2.80), (1250, 2.90), (1275, 2.95), (1350, 3.10),
+    (1425, 3.25), (1500, 3.40), (1600, 3.56), (2000, 4.20), (2500, 5.00),
+]
+
+
+def kabin_azami_alan(Q):
+    """Beyan yükü Q ( kg ) için kabinin kullanılabilir en büyük alanı ( m² )."""
+    if not sayi_mi(Q) or Q <= 0:
+        return None
+    xs = [a for a, _ in KABIN_AZAMI_ALAN]
+    ys = [b for _, b in KABIN_AZAMI_ALAN]
+    if Q <= xs[0]:
+        return ys[0]
+    if Q >= xs[-1]:                       # 2500 kg üstü: her 100 kg'a +0,16 m²
+        return ys[-1] + 0.16 * (Q - xs[-1]) / 100.0
+    for i in range(len(xs) - 1):
+        if xs[i] <= Q <= xs[i + 1]:
+            return ys[i] + (Q - xs[i]) * (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
     return None
 
 
@@ -367,7 +422,14 @@ def kablo_iz_sinir(kesit):
     return KABLO_IZ[max(altlar)], False
 
 
-# --------------- TABLO 4 (AVAN) — Armatür ışık akıları
+# --------------- ARMATÜR IŞIK AKILARI  ( ofis tablosu — MMO/697 DIŞI )
+#  DİKKAT:  Bu tablo MMO/697'de YOKTUR.  Kitap trafik, kuvvet, motor gücü ve
+#  kabin boyutlarını kapsar;  aydınlatma / topraklama / gerilim düşümü gibi
+#  ELEKTRİK hesapları kitapta hiç yer almaz ( "ışık akısı", "lümen", "armatür"
+#  sözcükleri kitapta geçmez ).  Kitabın Tablo-4'ü KAPI AÇILMA-KAPANMA
+#  ZAMANLARI tablosudur ve bu değerlerle ilgisi yoktur.
+#  Aydınlatma hesabının dayanağı TS EN 81-20 asgari aydınlatma şiddetleri +
+#  lümen yöntemi + imalatçı katalog değerleridir.
 ARMATUR_ISIK_AKISI = [
     ("Akkor telli", "15 W", "120 – 135"), ("Akkor telli", "25 W", "215 – 240"),
     ("Akkor telli", "40 W", "340 – 480"), ("Akkor telli", "60 W", "620 – 805"),
@@ -442,9 +504,12 @@ BODRUM_NOTU = (
 # ================================================================
 #  MAKİNE TİPİ  ve  ASKI ( PALANGA ) ORANI
 # ================================================================
-#  MMO/697 s.21, makine verimini iki değerle verir:
+#  MAKİNE VERİMİ  ( η )  —  OFİS KABULÜ, MMO/697'DE TABLO YOKTUR.
 #        Dişlisiz  η = 0,85          Dişli  η = 0,50
-#  ve §2.4'te "Palangalı sistemlerde verim %10 az alınacaktır" der; yani
+#  Kitabın §2.4 (s.21) motor gücü bölümü YALNIZ formülü ve şu cümleyi verir:
+#  "Palangalı sistemlerde verim %10 az alınacaktır."  Verim DEĞERLERİ kitapta
+#  bulunmaz;  yukarıdaki iki sayı ofisin imalatçı deneyiminden gelir.
+#  Δη = 0,10 kuralı ise kitaptandır; yani
 #  askı oranı verime Δη = 0,10 olarak girer:
 #        dişli   1:1 → 0,50      dişli   2:1 → 0,40
 #        dişlisiz 1:1 → 0,85     dişlisiz 2:1 → 0,75
@@ -455,14 +520,14 @@ BODRUM_NOTU = (
 #  dişlisizlerde daha üstü.  Toplam verim girilecekse palanga cezası TEKRAR
 #  UYGULANMAMALIDIR (çift sayılır); program bunun için ayrı bir seçenek sunar.
 MAKINE_TIPLERI = {
-    "Dişlisiz": 0.85,     # MMO/697 s.21
-    "Dişli":    0.50,     # MMO/697 s.21
+    "Dişlisiz": 0.85,     # ofis kabulü
+    "Dişli":    0.50,     # ofis kabulü
 }
 ASKI_ORANLARI = {"1:1": 1, "2:1": 2}
 
 
 def makine_verimi(makine_tipi):
-    """MMO/697 s.21 — makine tipine göre η.  Tanınmayan tip için None."""
+    """Makine tipine göre η ( ofis kabulü ).  Tanınmayan tip için None."""
     return MAKINE_TIPLERI.get(makine_tipi)
 
 

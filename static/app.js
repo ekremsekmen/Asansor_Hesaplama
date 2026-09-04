@@ -7,6 +7,11 @@ let TRAFIK_ADET = 1;          // 1 → tek hesap (adet hesaplanır) · 2-4 → g
 let AVAN_EK = 0;              // avanda TRAFİK GRUBUNA girmeyen asansör adedi (yük/sedye)
 let AVAN_OTO = {};            // kapasite/hızı trafikten OTOMATİK gelen asansörler
 let AVAN_TRF = {};            // her asansöre en son YANSITILAN trafik değeri
+/*  İSTEK SIRA SAYACI.  Ekran her tuş vuruşunda hesap ister; ağ gecikmesiyle
+    ESKİ bir isteğin yanıtı YENİSİNDEN SONRA gelebilir.  Sayaç olmadan geç gelen
+    eski yanıt ekranı ve avana aktarılan kapasite/hızı geri alıyordu — kullanıcı
+    16 kişilik yazmışken sonuç 8 kişilik kalıyordu.  Yalnız EN SON istek çizer. */
+const ISTEK = {trafik: 0, avan: 0};
 const $  = id => document.getElementById(id);
 const el = (t,s,h)=>{const e=document.createElement(t); if(s)e.className=s; if(h!=null)e.innerHTML=h; return e;};
 
@@ -397,9 +402,11 @@ async function hesaplaHepsi(){
     aynı tipte mi diye bakıp PAFTA ya da PAFTA-COKLU yolunu kendisi seçer
     ( engine.traffic.hesapla ).  Dönen sonuçta `yol` ve `pafta` alanları var. */
 async function hesapTrafik(){
+  const sira = ++ISTEK.trafik;
   try{
     const r = await (await fetch('/api/trafik',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({girdiler:trafikGirdi()})})).json();
+    if(sira !== ISTEK.trafik) return;          // daha yeni bir istek var — bu yanıt eski
     SON.c=r; SON.t=r; ciz('c_sonuc', r, r.yol||'tek');
     sekmeRozeti('trafik', !!r.hata, (r.uyarilar||[]).length);
     const rz=$('c_std_rozet');
@@ -408,9 +415,11 @@ async function hesapTrafik(){
   }catch(e){ $('c_sonuc').innerHTML=`<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`; }
 }
 async function hesapAvan(){
+  const sira = ++ISTEK.avan;
   try{
     const r = await (await fetch('/api/avan',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({girdiler:avanGirdi()})})).json();
+    if(sira !== ISTEK.avan) return;            // daha yeni bir istek var — bu yanıt eski
     SON.a=r; cizAvan(r); turetilenGoster(r); seritGoster(r);
     sekmeRozeti('avan', !!r.hata, (r.uyarilar||[]).length);
   }catch(e){ $('a_sonuc').innerHTML=`<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`; }

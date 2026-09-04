@@ -52,14 +52,15 @@ SABIT_B_VARSAYILAN = {
     "kabin_armatur_lm": 300,
     "kabin_ustu_armatur": 1,
     "kuyu_armatur_W": 40,    # Flüoresan
-    #  MMO/697 Tablo-4 ( bkz. tables.ARMATUR_ISIK_AKISI ):  Flüoresan 40 W = 2100 lm.
+    #  Ofis armatür tablosu ( bkz. tables.ARMATUR_ISIK_AKISI ):  Flüoresan 40 W = 2100 lm.
+    #  Bu değer MMO/697'de YOKTUR — kitapta aydınlatma bölümü yoktur.
     #  Burada eskiden kaynağı belirsiz bir "ofis teamülü" olarak 2600 lm duruyordu;
     #  pafta ØL satırına kaynak olarak yalnız "SABİTLER B" yazdığı için tablodan
     #  sapıldığı GÖRÜNMÜYORDU.  2600 daha az armatür verir — yani emniyetsiz
     #  taraftır: saha ölçümünde TS EN 81-20'nin 50 lüksü tutmayabilir.  Varsayılan
     #  tabloya çekildi;  farklı bir armatür kullanılacaksa alan doldurulur ve pafta
     #  kaynağı "GİRİŞ — imalatçı verisi" olarak yazar ( bkz. _armatur_kaynagi ).
-    "kuyu_armatur_lm": 2100, # MMO/697 Tablo-4 — Flüoresan 40 W
+    "kuyu_armatur_lm": 2100, # Flüoresan 40 W — ofis armatür tablosu
     "kuyu_Dmax": 7,          # Armatürler arası azami aralık, m (0 = kontrol kapalı)
     "priz_adedi": 3,
     "priz_gucu": 300,        # W
@@ -188,14 +189,15 @@ def sabitler(ozel=None):
 
 
 #  ARMATÜR IŞIK AKISININ KAYNAĞI  —  paftada GÖRÜNMELİDİR.
-#  Varsayılan ( W, lm ) çiftleri MMO/697 Tablo-4'ten alınmıştır.  Kullanıcı
+#  Varsayılan ( W, lm ) çiftleri OFİS ARMATÜR TABLOSUNDAN gelir ( MMO/697'de
+#  aydınlatma bölümü yoktur ).  Kullanıcı
 #  gücü ya da ışık akısını elle girdiyse artık tablo değeri değildir; paftaya
 #  bunu yazmak, imalatçı referansının belgeye girmesini de sağlar.
 def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
     ozel = set(S.get("_ozel") or ())
     if ozel & {w_anahtar, lm_anahtar}:
         return "GİRİŞ — imalatçı verisi ( marka-model paftada belirtilmelidir )"
-    return "MMO/697 Tablo-4"
+    return "Ofis armatür tablosu"
 
 
 #  ELLE GİRİLEN FİZİKSEL BÜYÜKLÜKLERİN SINIRLARI
@@ -493,7 +495,16 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                          + ".  Verim sıfır ya da negatif olamaz: η değerini düzeltin ya da "
                            "imalatçının TOPLAM sistem verimini giriyorsanız "
                            "'Girilen η toplam sistem verimidir' kutusunu işaretleyin.   !!!"}
-    N_hes = (1 - q) * Q * V / (S["motor_sabiti"] * eta_p)
+    #  AĞIR ÇALIŞMA YÖNÜ.  Karşı ağırlık q·Q kadarını dengeler:
+    #      dolu kabin YUKARI  →  dengesiz yük = ( 1 − q )·Q
+    #      boş  kabin AŞAĞI   →  dengesiz yük =        q ·Q   ( karşı ağırlık ağır )
+    #  Motor İKİSİNİN BÜYÜĞÜNE göre seçilir.  MMO/697 s.21 formülü Q/2 ile
+    #  çalışır, yani q = 0,50 kabulüdür ve orada iki yön EŞİTTİR — bu genelleme
+    #  kitapla birebir aynı sonucu verir.  Fark yalnız q > 0,50 girildiğinde
+    #  çıkar:  program eskiden HAFİF yönü hesaplıyor ve motoru olduğundan küçük
+    #  seçiyordu ( q = 0,55 · 800 kg · 1 m/s · 2:1'de 5,5 kW yerine 7,5 kW gerekir ).
+    dengesiz = max(1 - q, q)
+    N_hes = dengesiz * Q * V / (S["motor_sabiti"] * eta_p)
 
     #  Nsç — SEÇİLEN motor gücü.  Elle girilmemişse hesaplanan güçten büyük
     #  ilk STANDART anma gücü seçilir ( IEC 60072 kademeleri ).  Böylece
@@ -527,10 +538,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
              i_pal, "—", i_kaynak, 0),
         veri("η", "Makine verimi", eta, "—",
              "GİRİŞ — toplam sistem verimi" if toplam_verim
-             else (f"GİRİŞ  ( {makine_tipi} — MMO/697 s.21 )" if makine_tipi else "GİRİŞ")),
+             else (f"GİRİŞ  ( {makine_tipi} — ofis kabulü )" if makine_tipi else "GİRİŞ")),
         veri("η′", eta_p_aciklama, eta_p, "—", eta_p_kaynak),
-        hesap("N   =   ( 1 − q ) · Q · V   /   ( 102 · η′ )",
-              f"=   ( 1 − {tr(q)} ) · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )",
+        hesap(("N   =   ( 1 − q ) · Q · V   /   ( 102 · η′ )" if (1 - q) >= q
+               else "N   =   q · Q · V   /   ( 102 · η′ )        ( boş kabin aşağı — ağır yön )"),
+              (f"=   ( 1 − {tr(q)} ) · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"
+               if (1 - q) >= q else
+               f"=   {tr(q)} · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"),
               N_hes, "kW", "hesaplanan"),
         veri("Nsç", "SEÇİLEN motor gücü", Nsc, "kW", Nsc_kaynak),
     ]
@@ -548,7 +562,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         mmo_eta = T.makine_verimi(makine_tipi)
         if mmo_eta is not None and sayi_mi(eta) and abs(eta - mmo_eta) > 1e-9:
             b1["notlar"] = [
-                f"η, {makine_tipi} makine için MMO/697 s.21'de verilen {tr(mmo_eta)} "
+                f"η, {makine_tipi} makine için ofis kabulü olan {tr(mmo_eta)} "
                 f"değerinden farklı girilmiştir ( {tr(eta)} ). Kaynağı paftada "
                 "belirtilmelidir."]
     b1["sonuc"] = {"baslik": "KONTROL      Nsç  ≥  N",
@@ -578,7 +592,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     b2["adimlar"] = [
         metin("ORTAK BÜYÜKLÜKLER"),
         veri("gn", "Yerçekimi ivmesi", gn, "m/s²", "SABİTLER A"),
-        veri("Gk", "Boş kabin kütlesi", Gk, "kg", "GİRİŞ" if sayi_mi(Gk_elle) else "Tablo-11", 0),
+        veri("Gk", "Boş kabin kütlesi", Gk, "kg",
+             "GİRİŞ" if sayi_mi(Gk_elle) else T.GK_KAYNAGI, 0),
         veri("gf", "Gezici kablo ( flexbil ) birim kütlesi", S["gf"], "kg/m", "SABİTLER B"),
         hesap("Gf   =   gf · ( Hk / 2  +  3 )",
               f"=   {tr(S['gf'])}  ·  ( {tr(Hk)} / 2  +  3 )", Gf, "kg", "gezici kablo kütlesi"),
@@ -623,14 +638,27 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         "( kitabın §4.3 örnek hesabı bu terimi ihmal etmiştir ).",
         "Karşı ağırlıkta paraşüt ( fren ) bulunması hâlinde PK dikkate alınır.",
     ]
+    #  Fp — MMO/697 s.20 tanımı:  "bir kılavuz rayda bulunan tüm konsolların
+    #  kuvvetiyle itme ( betonun çekilmesinin veya binanın normal oturması
+    #  nedeniyle )".  Halat ya da kompanzasyon kuvveti DEĞİLDİR — not eskiden
+    #  öyle yazıyordu.  Kitap "seyir yüksekliği 40 m'yi geçmeyen durumlar için
+    #  Fp ihmal edilebilir" der;  burada SEYİR yerine kılavuz ray uzunluğu
+    #  ( Lr = Hk − 0,20 ) karşılaştırılır — Lr seyirden büyük olduğu için not
+    #  daha ERKEN çıkar, yani emniyetli taraftadır.  Karşılaştırılan büyüklük
+    #  notun içinde açıkça yazılır.
+    _FP_NOT = ("Fp — kılavuz ray konsollarının, betonun çekilmesi ya da binanın "
+               "oturması nedeniyle uyguladığı itme kuvveti ( MMO/697 s.20 ). "
+               "Kitap, SEYİR YÜKSEKLİĞİ 40 m'yi geçmiyorsa Fp'nin ihmal "
+               "edilebileceğini söyler; program ölçüt olarak kılavuz ray "
+               "uzunluğunu ( Lr = Hk − 0,20 ) kullanır — seyirden büyük olduğu "
+               "için emniyetli taraftadır.")
     if sayi_mi(Lr) and Lr > 40:
-        b2["notlar"] = ["Kılavuz ray uzunluğu 40 m'yi aşıyor "
-                        f"( Lr = {tr(Lr)} m ) — halat / kompanzasyon kuvveti Fp uygulama "
-                        "projesinde ayrıca hesaplanmalıdır  ( MMO/697 s.20 )."]
+        b2["notlar"] = [f"Kılavuz ray uzunluğu 40 m'yi aşıyor ( Lr = {tr(Lr)} m ) — "
+                        "PR ve PK'ya Fp terimi EKLENMEMİŞTİR; uygulama projesinde "
+                        "konsol adedi ve klips kuvvetiyle ayrıca hesaplanmalıdır. "
+                        + _FP_NOT]
     else:
-        b2["aciklamalar"].append(
-            "Kılavuz ray uzunluğu 40 m'yi aşarsa halat / kompanzasyon kuvveti Fp uygulama "
-            "projesinde ayrıca hesaplanır  ( MMO/697 s.20 ).")
+        b2["aciklamalar"].append(_FP_NOT)
     bolumler.append(b2)
 
     # =========================================================
@@ -855,6 +883,21 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  Kabin kuyunun içine girer — genişlik karşılaştırması fizikseldir.
     #  Aradaki boşluk kapı tipine, karşı ağırlık ve ray konumuna göre değişir,
     #  bu yüzden asgari boşluk dayatılmaz; yalnız "kabin ≥ kuyu" reddedilir.
+    #  KABİN ALANI BEYAN YÜKÜNE UYGUN OLMALIDIR  ( MMO/697 Tablo-11 = TS EN 81-20 ).
+    #  Aşırı büyük kabin, beyan yükünün üstünde yüklenmeye izin verir; tablo bunu
+    #  sınırlar ( ör. 450 kg → en fazla 1,84 m² ).  Hesabı DURDURMAZ:  avan
+    #  aşamasında kabin ölçüleri yaklaşıktır, karar projecinindir.
+    _azami = T.kabin_azami_alan(Q)
+    if all(sayi_mi(x) and x > 0 for x in (kabin_a, kabin_b)) and sayi_mi(_azami):
+        _alan = (kabin_a / 1000) * (kabin_b / 1000)
+        if _alan > _azami + 1e-9:
+            ikaz.append(
+                f"KABİN ALANI BEYAN YÜKÜNE GÖRE BÜYÜK : {trn(Q,0)} kg için MMO/697 "
+                f"Tablo-11 ( TS EN 81-20 ) en fazla {tr(_azami)} m² verir; girilen "
+                f"kabin {trn(kabin_a,0)} × {trn(kabin_b,0)} mm = {tr(_alan)} m². "
+                "Beyan yükünü büyütün ya da kabini küçültün — aksi hâlde kabin, "
+                "beyan yükünün üstünde yüklenebilir.")
+
     if all(sayi_mi(x) and x > 0 for x in (kuyu_b, kabin_b)) and kabin_b >= kuyu_b:
         ikaz.append(
             f"KABİN KUYUYA SIĞMIYOR : kabin genişliği {trn(kabin_b,0)} mm, kuyu "
@@ -1097,7 +1140,14 @@ def _trafik_tutarlilik(trafik, asansorler_girdi):
         return u
     ham_a = asansorler_girdi if isinstance(asansorler_girdi, list) else []
     a_sayi = len([a for a in ham_a if isinstance(a, dict)])
-    t_sayi = len(t_list)
+    #  GERÇEK ADET  —  API köprüsü asansör listesini arayüz sınırına ( 4 ) keser
+    #  ( main._trafik_koprusu ).  Adet karşılaştırması kesilmiş listeye bakınca,
+    #  trafik 27 asansör gerektirdiğinde uyarı "4 adet veriyor" diyordu.
+    #  Doğru sayı köprüde `adet` alanında zaten taşınıyor.
+    _adet = trafik.get("adet")
+    t_sayi = int(_adet) if (isinstance(_adet, (int, float))
+                            and not isinstance(_adet, bool)
+                            and _adet > len(t_list)) else len(t_list)
 
     #  ADET  —  avan adedi trafik grubundan AZ olamaz: gruptaki her asansörün
     #  elektrik hesabı da yapılmalıdır.  FAZLASI ise olağandır ( trafik

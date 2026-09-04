@@ -135,6 +135,10 @@ class _BelirsizListesi(threading.local):
 
 
 _BELIRSIZ = _BelirsizListesi()
+#  BELİRSİZLİKTEN BAŞKA SEBEPLE REDDEDİLEN GİRDİLER ( negatif miktar, seçilmemiş
+#  kalem, şablon sınırını aşan satır … ).  Ayrı tutulur çünkü belirsiz-sayı
+#  açıklaması ( "binlik ayracı mı ondalık mı" ) bunlar için YANLIŞ olur.
+_RED = _BelirsizListesi()
 
 
 def _temiz(d: dict, sayisal: tuple, on_ek: str = "") -> dict:
@@ -148,15 +152,19 @@ def _temiz(d: dict, sayisal: tuple, on_ek: str = "") -> dict:
 
 
 def _belirsiz_hata():
-    """Belirsiz yazılmış sayı varsa açık hata metni, yoksa None."""
-    if not _BELIRSIZ:
-        return None
-    liste = "  ·  ".join(sorted(set(_BELIRSIZ.kalemler))[:6])
-    return ("HESAP HATASI: Belirsiz sayı yazımı  —  " + liste +
-            "   ·   Bu yazımda binlik ayracı mı ondalık ayracı mı olduğu "
-            "anlaşılmıyor ( Türkçede 1.200 = bin iki yüz, 1,200 = bir virgül iki; "
-            "program ikisini de ondalık kabul ediyor ). Binlik ayracı KULLANMAYIN: "
-            "bin iki yüz için 1200, bir virgül iki için 1,2 yazın.")
+    """Reddedilen girdi varsa açık hata metni, yoksa None."""
+    if _BELIRSIZ:
+        liste = "  ·  ".join(sorted(set(_BELIRSIZ.kalemler))[:6])
+        return ("HESAP HATASI: Belirsiz sayı yazımı  —  " + liste +
+                "   ·   Bu yazımda binlik ayracı mı ondalık ayracı mı olduğu "
+                "anlaşılmıyor ( Türkçede 1.200 = bin iki yüz, 1,200 = bir virgül iki; "
+                "program ikisini de ondalık kabul ediyor ). Binlik ayracı KULLANMAYIN: "
+                "bin iki yüz için 1200, bir virgül iki için 1,2 yazın.")
+    if _RED:
+        return ("HESAP HATASI: Girdi kabul edilmedi  —  "
+                + "  ·  ".join(sorted(set(_RED.kalemler))[:6])
+                + "   ·   Satırı düzeltin ya da kaldırın; sessizce yok sayılmaz.")
+    return None
 
 TRAFIK_SAYISAL = ("bina_yuksekligi", "yapi_yuksekligi", "N", "hizli1", "hizli2", "h", "P",
                   "kapi_genisligi", "bodrum", "manuel_k", "manuel_V", "manuel_ta",
@@ -169,6 +177,46 @@ AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "kapasite", "Q_elle", "V", "eta", "Hk", "kuyu_genisligi", "kabin_boyu",
                    "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
                    "S1", "L1", "S2", "L2")
+
+
+#  EK NÜFUS SATIRLARI  —  BOZUK GİRDİ SESSİZCE SİLİNMEZ.
+#  Eskiden okunamayan miktar ( "1.200", "abc" ) satırı hesaptan tamamen
+#  çıkarıyordu:  1200 yazınca 11 asansör, 1.200 yazınca 2 asansör çıkıyor ve
+#  aradaki fark hiçbir yerde söylenmiyordu.  Belirsiz yazım zaten _BELIRSIZ
+#  listesine düşer ( ekran ve indirme aynı kapıdan geçer ); geri kalan bozuk
+#  ya da negatif satırlar için açık hata üretilir.
+EK_NUFUS_AZAMI = 11          # şablondaki satır adedi ( bkz. hucre_haritasi )
+
+
+def _ek_nufus_oku(ham):
+    """Ek nüfus satırlarını okur.  Bozuk satırlar `_BELIRSIZ` üzerinden bildirilir."""
+    satirlar = []
+    for i, s in enumerate(_sozluk_listesi(ham), 1):
+        kalem, ham_miktar = s.get("kalem"), s.get("miktar")
+        if not kalem and (ham_miktar in (None, "")):
+            continue                                  # tümüyle boş satır — yok say
+        if belirsiz_sayi_mi(ham_miktar):
+            _BELIRSIZ.append(f"ek nüfus {i}. satır miktarı = {str(ham_miktar).strip()}")
+            continue
+        miktar = _sayi(ham_miktar)
+        if not kalem:
+            _RED.append(f"ek nüfus {i}. satırında Tablo-1 kalemi seçilmemiş")
+            continue
+        if miktar is None:
+            _RED.append(f"ek nüfus {i}. satır miktarı sayı değil "
+                        f"( {str(ham_miktar).strip()[:20]!r} )")
+            continue
+        if miktar < 0:
+            _RED.append(f"ek nüfus {i}. satır miktarı negatif ( {miktar} ) — "
+                    "nüfus eksiltilemez")
+            continue
+        satirlar.append({"aciklama": s.get("aciklama"), "miktar": miktar, "kalem": kalem})
+    #  ŞABLON SINIRI:  fazlası Excel'e yazılamaz, sessizce düşerdi.
+    if len(satirlar) > EK_NUFUS_AZAMI:
+        _RED.append(f"ek nüfus satır adedi {len(satirlar)} — Excel şablonu en fazla "
+                    f"{EK_NUFUS_AZAMI} satır taşır; kalemleri birleştirin")
+        return satirlar[:EK_NUFUS_AZAMI]
+    return satirlar
 
 
 def _sozluk_listesi(x):
@@ -187,15 +235,12 @@ def _trafik_girdi(veri: dict):
     kapi_tipi` girdileri geriye dönük uyumluluk için hâlâ kabul edilir:
     liste boşsa düz alanlardan TEK asansörlük bir liste kurulur.
     """
-    _BELIRSIZ.clear()
+    _BELIRSIZ.clear(); _RED.clear()
     veri = veri if isinstance(veri, dict) else {}
     ham = veri.get("girdiler")
     ham = ham if isinstance(ham, dict) else {}
     g = _temiz(ham, TRAFIK_SAYISAL)
-    g["ek_nufus"] = [{"aciklama": s.get("aciklama"), "miktar": _sayi(s.get("miktar")),
-                      "kalem": s.get("kalem")}
-                     for s in _sozluk_listesi(ham.get("ek_nufus"))
-                     if s.get("kalem") and _sayi(s.get("miktar")) is not None]
+    g["ek_nufus"] = _ek_nufus_oku(ham.get("ek_nufus"))
     liste = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ")
              for i, a in enumerate(_sozluk_listesi(ham.get("asansorler")), 1)
              if _sayi(a.get("P")) is not None][:4]
@@ -209,7 +254,7 @@ def _trafik_girdi(veri: dict):
 
 
 def _avan_girdi(veri: dict):
-    _BELIRSIZ.clear()
+    _BELIRSIZ.clear(); _RED.clear()
     veri = veri if isinstance(veri, dict) else {}
     v = veri.get("girdiler")
     v = v if isinstance(v, dict) else {}

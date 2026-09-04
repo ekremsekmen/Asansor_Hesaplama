@@ -158,6 +158,25 @@ def avan_senaryolar():
                            "Hk": 32.85, "kuyu_genisligi": 1800, "kabin_boyu": 1450,
                            "kabin_genisligi": 1300, "makine_tipi": "Dişlisiz"}
                           for n, k in enumerate((10, 16, 20, 25), 1)]}
+    # 3b) DENGE FAKTÖRÜ SÜPÜRMESİ.  q > 0,50'de ağır çalışma yönü boş kabin
+    #  aşağıdır ( q·Q ); program eskiden yalnız ( 1−q ) yönünü hesaplıyordu.
+    #  Senaryolarda q hep ≤ 0,50 olduğu için kalkan bu hatayı KORUMUYORDU.
+    for q in (0.40, 0.45, 0.50, 0.55, 0.60, 0.70):
+        for kap in (10, 20):
+            yield {"ortak": dict(ortak), "sabitler": {},
+                   "asansorler": [{"tanim": f"q{q}", "kapasite": kap, "V": 1.6,
+                                   "eta": 0.85, "i_palanga": 2, "q_denge": q,
+                                   "Hk": 32.85, "kuyu_genisligi": 1800,
+                                   "kabin_boyu": 1450, "kabin_genisligi": 1300,
+                                   "makine_tipi": "Dişlisiz"}]}
+    # 3c) KABİN ALANI  —  Tablo-11 sınırının altı ve üstü
+    for kap, a, b in ((6, 1000, 1250), (6, 2000, 2000), (8, 1100, 1400), (16, 2000, 1400)):
+        yield {"ortak": dict(ortak), "sabitler": {},
+               "asansorler": [{"tanim": "alan", "kapasite": kap, "V": 1.6, "eta": 0.85,
+                               "Hk": 25, "kuyu_genisligi": max(a, b) + 400,
+                               "kabin_boyu": a, "kabin_genisligi": b,
+                               "makine_tipi": "Dişlisiz"}]}
+
     # 4) hata yolları  ( pasif asansör mesajları da dondurulur )
     for bozuk in ({"kapasite": None}, {"eta": 10}, {"Q_elle": 0}, {"Q_elle": 5000},
                   {"Hk": -3}, {"kabin_genisligi": 2400}, {"V": None}, {"Nsc": -1},

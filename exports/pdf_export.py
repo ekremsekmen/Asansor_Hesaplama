@@ -7,6 +7,7 @@ akışını birebir izler:  başlık → girdi satırları → denklem → sayı
 yerine konmuş hâli → sonuç → kontrol → notlar.
 """
 import io
+import threading
 import os
 
 from reportlab.lib import colors
@@ -77,11 +78,24 @@ SARI_AC = colors.white
 #  uygulanmazsa ortada dar bir sütun hâlinde kalır ve sayfanın iki yanı boş
 #  gider.  Bu çarpan tabloları da aynı oranda genişletir; ölçekten sonra
 #  tam A4 yazı alanına otururlar.
-_GEN = 1.0
+#
+#  İSTEK BAŞINA AYRI DEĞER:  FastAPI'de `def` uç noktalar bir iş parçacığı
+#  havuzunda koşar, yani İKİ İNDİRME AYNI ANDA çalışabilir.  Bu çarpan modül
+#  düzeyinde tek bir sayı olarak tutulunca, trafik paftası küçültülürken
+#  ( _GEN = 1/0,9 ) aynı anda üretilen AVAN paftasının tabloları da o oranda
+#  genişliyor ve sayfanın sağından taşıyordu.  Ölçüldü:  eş zamanlı üretilen
+#  25 avan PDF'inin 25'i de tek başına üretilenden FARKLI çıkıyordu.
+#  ( main.py'deki belirsiz-sayı listesi ile aynı çözüm. )
+class _Olcek(threading.local):
+    def __init__(self):
+        self.gen = 1.0
+
+
+_OLCEK = _Olcek()
 
 
 def _w(x):
-    return x * _GEN
+    return x * _OLCEK.gen
 
 
 def _c(x):
@@ -91,7 +105,7 @@ def _c(x):
     çıkardı.  Genişlik çarpanı ile bölerek son kalınlığın istenen değerde
     kalması sağlanır.
     """
-    return x * _GEN
+    return x * _OLCEK.gen
 
 
 S = {
@@ -568,12 +582,11 @@ def trafik_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
 
 def _trafik_bas(sonuc: dict, olcek: float):
     """Paftayı verilen ölçekle basar; ( bayt, sayfa adedi ) döner."""
-    global _GEN
-    _GEN = 1.0 / (olcek or 1.0)
+    _OLCEK.gen = 1.0 / (olcek or 1.0)
     try:
         return _trafik_bas_ic(sonuc, olcek)
     finally:
-        _GEN = 1.0
+        _OLCEK.gen = 1.0
 
 
 def _trafik_bas_ic(sonuc: dict, olcek: float):
