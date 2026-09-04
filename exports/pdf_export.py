@@ -831,3 +831,146 @@ def _avan_ozet_tablo(sonuc):
             stil.append(("SPAN", (1, r), (len(aktif), r)))
     t.setStyle(TableStyle(stil))
     return t
+
+
+# =====================================================================
+#  MUKAVEMET HESAPLARI PDF          ( UYGULAMA PROJESİ — avandan ayrı )
+# =====================================================================
+def mukavemet_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
+    """Mukavemet paftası.
+
+    ``proje`` eski çağrılarla uyumluluk için kabul edilir, paftaya yazılmaz —
+    proje antedi KAPAK sayfasındadır ( bkz. kapak_export ).
+
+    Bölümler engine/mukavemet.py'den olduğu gibi gelir;  avan paftasıyla aynı
+    çizim yardımcıları kullanılır, böylece iki çıktının biçimi ayrışmaz.
+    """
+    buf = io.BytesIO()
+    doc = _Belge(buf, "ASANSÖR MUKAVEMET HESAPLARI",
+                 "TS EN 81-20   ·   TS EN 81-50   ·   TS 12385-5   ·   ISO 7465"
+                 "   ·   MMO 208/4   ·   MMO 208/7")
+    ic = []
+    if not sonuc.get("aktif"):
+        ic += _uyari_kutusu(list(sonuc.get("hata") or ["Hesap yapılamadı."]), hata=True)
+        doc.build(ic)
+        buf.seek(0)
+        return buf.read()
+
+    if sonuc.get("uyarilar"):
+        ic += _uyari_kutusu(sonuc["uyarilar"])
+
+    ust = _baslik_seridi("ASANSÖR MUKAVEMET HESAPLARI", "UYGULAMA PROJESİ")
+    for i, b in enumerate(sonuc.get("bolumler") or []):
+        ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
+
+    ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "on hesap bölümü")
+    ozet_bas.spaceBefore = 6 * mm
+    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _mukavemet_ozet(sonuc),
+                         Spacer(1, 5 * mm), _imza_kutusu()])]
+    doc.build(ic)
+    buf.seek(0)
+    return buf.read()
+
+
+def _mukavemet_ozet(sonuc):
+    """Bölüm bölüm sonuç + kuyu tabanına aktarılan yükler."""
+    o = sonuc.get("ozet") or {}
+    satirlar = []
+    for b in (sonuc.get("bolumler") or []):
+        s = b.get("sonuc") or {}
+        satirlar.append((b.get("baslik", ""), s.get("metin", "—")))
+    satirlar += [
+        ("N — Hesaplanan motor gücü", f"{tr(o.get('N_hesap'))} kW"),
+        ("Kullanılabilir kabin alanı", f"{tr(o.get('kabin_alani'))} m²"
+                                       f"   ·   {trn(o.get('kabin_kisi'), 0)} kişi"),
+        ("Sf — Halat güvenlik katsayısı", tr(o.get("Sf"))),
+        ("Kılavuz ray boyu", f"{tr(o.get('ray_boyu'))} m"),
+        ("FKR — Kabin raylarına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
+        ("FAR — Ağırlık raylarına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
+        ("Fkt — Kabin tamponlarına gelen kuvvet", f"{trn(o.get('Fkt'), 0)} N"),
+        ("Fat — Ağırlık tamponlarına gelen kuvvet", f"{trn(o.get('Fat'), 0)} N"),
+        ("GENEL SONUÇ", "UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR."),
+    ]
+    return _kv_tablo(satirlar, genislikler=(105 * mm, 75 * mm), vurgu_son=True)
+
+
+# =====================================================================
+#  UYGULAMA PROJESİ PDF        ( mukavemet + elektrik + topraklama )
+# =====================================================================
+def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:    # noqa: ARG001
+    """Uygulama projesinin tüm hesap bölümleri tek paftada.
+
+    Bölümler engine/uygulama.py'den numaralanmış olarak gelir;  mukavemet ve
+    elektrik hesapları aynı çizim yardımcılarını kullanır, biçim ayrışmaz.
+    """
+    buf = io.BytesIO()
+    doc = _Belge(buf, "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
+                 "TS EN 81-20   ·   TS EN 81-50   ·   TS 12385-5   ·   ISO 7465"
+                 "   ·   MMO 208/4   ·   MMO 208/7   ·   IEEE Std 80"
+                 "   ·   IEC 60364-5-52")
+    ic = []
+    if not sonuc.get("aktif"):
+        ic += _uyari_kutusu(list(sonuc.get("hata") or ["Hesap yapılamadı."]), hata=True)
+        doc.build(ic)
+        buf.seek(0)
+        return buf.read()
+
+    if sonuc.get("uyarilar"):
+        ic += _uyari_kutusu(sonuc["uyarilar"])
+
+    #  Mukavemet ve elektrik bölümleri ayrı şeritlerle açılır ki paftada
+    #  hangi ailenin nerede bittiği görünsün.
+    muk_sayi = int(sonuc.get("mukavemet_bolum_sayisi") or 0)
+    for i, b in enumerate(sonuc.get("bolumler") or []):
+        ust = None
+        if i == 0:
+            ust = _baslik_seridi("MUKAVEMET HESAPLARI", "UYGULAMA PROJESİ")
+        elif i == muk_sayi:
+            ust = _baslik_seridi("ELEKTRİK VE TOPRAKLAMA HESAPLARI",
+                                 "UYGULAMA PROJESİ")
+            ust.spaceBefore = 6 * mm
+        ic += _bolum(b, ust=ust, sayfa=SAYFA_ALANI)
+
+    ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", f"{len(sonuc.get('bolumler') or [])} hesap bölümü")
+    ozet_bas.spaceBefore = 6 * mm
+    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc),
+                         Spacer(1, 5 * mm), _imza_kutusu()])]
+    doc.build(ic)
+    buf.seek(0)
+    return buf.read()
+
+
+def _uygulama_ozet(sonuc):
+    o = sonuc.get("ozet") or {}
+    satirlar = [(b.get("baslik", ""), (b.get("sonuc") or {}).get("metin", "—"))
+                for b in (sonuc.get("bolumler") or [])]
+    satirlar += [
+        ("N — Hesaplanan motor gücü", f"{tr(o.get('N_hesap'))} kW"),
+        ("Kullanılabilir kabin alanı", f"{tr(o.get('kabin_alani'))} m²"
+                                       f"   ·   {trn(o.get('kabin_kisi'), 0)} kişi"),
+        ("Sf — Halat güvenlik katsayısı", tr(o.get("Sf"))),
+        ("Kılavuz ray boyu", f"{tr(o.get('ray_boyu'))} m"),
+        ("FKR — Kabin raylarına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
+        ("FAR — Ağırlık raylarına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
+        ("Fkt — Kabin tamponlarına gelen kuvvet", f"{trn(o.get('Fkt'), 0)} N"),
+        ("Fat — Ağırlık tamponlarına gelen kuvvet", f"{trn(o.get('Fat'), 0)} N"),
+    ]
+    if o.get("elektrik_var"):
+        satirlar += [
+            ("Kabin armatür sayısı", f"{trn(o.get('n_kabin'), 0)} adet"),
+            ("Kuyu armatür sayısı", f"{trn(o.get('n_kuyu'), 0)} adet"),
+            ("Asansörün kurulu gücü", f"{trn(o.get('P_kurulu'), 0)} W"),
+            ("ε — Toplam gerilim düşümü",
+             f"{tr(o.get('eps'), 3)} %   —   "
+             + ("UYGUN" if o.get("eps_uygun") else "UYGUN DEĞİL")),
+            ("I — Hat akımı / Iz",
+             f"{tr(o.get('I'), 1)} / {trn(o.get('Iz'), 1)} A   —   "
+             + ("UYGUN" if o.get("akim_uygun") else "UYGUN DEĞİL")),
+        ]
+    if o.get("Re") is not None:
+        satirlar.append(("Re — Temel topraklama direnci",
+                         f"{tr(o.get('Re'), 3)} Ω   —   "
+                         + ("UYGUN" if o.get("topraklama_uygun") else "UYGUN DEĞİL")))
+    satirlar.append(("GENEL SONUÇ",
+                     "UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR."))
+    return _kv_tablo(satirlar, genislikler=(105 * mm, 75 * mm), vurgu_son=True)

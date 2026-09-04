@@ -38,15 +38,15 @@
         <span class="gk-alt">Trafik hesabı · avan hesapları · proje kapağı<br>PDF, Excel ve CAD çıktısı</span>
       </button>
 
-      <button type="button" class="giris-kart pasif" id="gk_uygulama" onclick="uygulamaAc('uygulama')">
-        <span class="gk-rozet">YAKINDA</span>
+      <button type="button" class="giris-kart" id="gk_uygulama" onclick="uygulamaAc('uygulama')">
+        <span class="gk-rozet ok">HAZIR</span>
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 21h18M5 21V8l7-5 7 5v13"/>
           <path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/>
         </svg>
         <span class="gk-ad">UYGULAMA PROJESİ</span>
-        <span class="gk-alt">Bu bölüm hazırlanıyor —<br>daha sonra eklenecek</span>
+        <span class="gk-alt">Mukavemet hesapları<br>TS EN 81-20 · TS EN 81-50 · MMO 208</span>
       </button>
     </div>
 
@@ -62,11 +62,11 @@
         <path d="M16 3v26M10 10v12M22 10v12" stroke="#fff" stroke-width="1.7"/>
         <path d="M13 8l3-3 3 3M13 24l3 3 3-3" stroke="#FFC65C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>ASANSÖR AVAN HESAPLAMA PROGRAMI</span>
+      <span id="ust_ad">ASANSÖR AVAN HESAPLAMA PROGRAMI</span>
     </div>
     <button type="button" class="ust-dugme" id="dg_ana_ekran" onclick="anaEkran()"
             title="Proje seçim ekranına dön">← Ana ekran</button>
-    <div class="kaynak">
+    <div class="kaynak" id="ust_kaynak">
       MMO/697, 2. Baskı, Ocak 2020 &nbsp;·&nbsp; TS EN 81-20 &nbsp;·&nbsp; ISO 8100-32:2020<br>
       IEEE Std 80 &nbsp;·&nbsp; IEC 60364-5-52 &nbsp;·&nbsp; BYKHY md.4
     </div>
@@ -76,14 +76,17 @@
 <nav class="sekmeler">
   <div class="sekmeler-ic">
     <!--  İŞLEM ADIMLARI  ( soldan sağa, sırayla )  -->
-    <button class="sekme etkin" data-sekme="trafik">1 · Trafik Hesabı</button>
-    <button class="sekme" data-sekme="avan">2 · Avan Hesapları</button>
-    <button class="sekme" data-sekme="proje">3 · Proje Kapağı</button>
+    <button class="sekme etkin" data-sekme="trafik" data-mod="avan">1 · Trafik Hesabı</button>
+    <button class="sekme" data-sekme="avan" data-mod="avan">2 · Avan Hesapları</button>
+    <button class="sekme" data-sekme="proje" data-mod="avan">3 · Proje Kapağı</button>
+    <!--  UYGULAMA PROJESİ ADIMLARI  —  avan sekmeleriyle aynı şeritte durur,
+          moda göre biri gizlenir  ( bkz. app.js · modAyarla ).            -->
+    <button class="sekme" data-sekme="mukavemet" data-mod="uygulama" hidden>1 · Uygulama Hesapları</button>
     <!--  BAŞVURU SEKMELERİ  —  işlem adımı değil, gerektikçe bakılır;
           bu yüzden şeridin sağ ucuna itilir ( .sekme-ayrac ).            -->
     <span class="sekme-ayrac"></span>
-    <button class="sekme yan ayrik" data-sekme="sabitler">Sabitler / Ofis Standardı</button>
-    <button class="sekme yan" data-sekme="tablolar">Tablolar</button>
+    <button class="sekme yan ayrik" data-sekme="sabitler" data-mod="avan uygulama">Sabitler / Ofis Standardı</button>
+    <button class="sekme yan" data-sekme="tablolar" data-mod="avan">Tablolar</button>
   </div>
 </nav>
 
@@ -428,6 +431,82 @@
       </div>
     </div>
     <div><div class="kart"><div id="a_sonuc"></div></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ UYGULAMA PROJESİ · MUKAVEMET ═══════════════════ -->
+<section id="s-mukavemet" class="sayfa" hidden>
+  <div class="ikili">
+    <div class="sol">
+      <div class="kart">
+        <div class="kart-bas"><span>PROJE KİMLİĞİ</span>
+          <span class="kaynak">dosya adı ve belge özellikleri</span></div>
+        <div class="kart-ic">
+          <div class="yardim">Bu üç alan yalnız <b>indirilen dosyanın adında</b> ve
+            belge özelliklerinde kullanılır; paftanın hesap içeriğini değiştirmez.
+            Uygulama projesi kapağı MMO'nun ayrı kitabına aittir — avan kapağı
+            buraya basılmaz.</div>
+          <div class="satir i2">
+            <div class="alan"><label>Proje adı</label>
+              <input id="mk_proje_adi" class="girdi" placeholder="Asansör"></div>
+            <div class="alan"><label>İşveren</label>
+              <input id="mk_isveren" class="girdi"></div>
+          </div>
+          <div class="alan"><label>Pafta no</label>
+            <input id="mk_pafta_no" class="girdi"></div>
+        </div>
+      </div>
+      <div class="kart">
+        <div class="kart-bas"><span>REVİZYON — EXCEL'DEN AÇ</span>
+          <span class="kaynak">girdiler dosyanın içindedir</span></div>
+        <div class="kart-ic">
+          <div class="yardim">Programın ürettiği <b>mukavemet çalışma kitabını</b>
+            ( ya da elinizdeki özgün kitabı ) buraya bırakın — "Veri Girişi"
+            sayfasındaki bütün girdiler forma oturur.</div>
+          <div id="m_birak_alani" class="birak">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div><b>Excel dosyasını buraya sürükleyin</b></div>
+            <div class="ipucu">ya da tıklayıp seçin</div>
+          </div>
+          <input type="file" id="m_xlsx_ac" accept=".xlsx" style="display:none"
+                 onchange="xlsxYukle(event.target.files); event.target.value=''">
+          <div id="m_yukleme_ozeti"></div>
+        </div>
+      </div>
+      <div class="kart">
+        <div class="kart-bas"><span>UYGULAMA PROJESİ GİRDİLERİ</span>
+          <span class="kaynak">mukavemet · elektrik · topraklama</span></div>
+        <div class="kart-ic">
+          <div class="uyari mavi" style="margin:0 0 12px">
+            Bu bölüm <b>uygulama projesine</b> aittir, avandan ayrıdır: mukavemet
+            tabloları ve kabulleri kendi kaynağından gelir. Hücre adresi yazılı
+            alanlar <b>MUKAVEMET_HESABI.xlsx</b> "Veri Girişi" sayfasıyla birebir
+            eşleşir. Ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β )
+            <b>Sabitler / Ofis Standardı</b> sekmesinden gelir.</div>
+          <div id="m_form"></div>
+        </div>
+      </div>
+      <div class="kart">
+        <div class="kart-bas"><span>ÇIKTILAR</span>
+          <span class="kaynak">pafta · çalışma kitabı · CAD</span></div>
+        <div class="kart-ic">
+          <div class="yardim">PDF <b>bütün hesapları</b> tek paftada verir
+            ( mukavemet + elektrik + topraklama ). <b>Excel</b> çıktısı uygulama
+            projesinin kendi çalışma kitabıdır ( <b>MUKAVEMET_HESABI.xlsx</b> ) —
+            girdileriniz "Veri Girişi" sayfasına yazılır, formüller yerinde kalır,
+            dosya açıldığında Excel kendi hesabını yapar. CAD çıktısı paftayı ofis
+            tip proje formatına yerleştirir.</div>
+          <div class="dugmeler">
+            <button class="dg ana" onclick="indir('uygulama-pdf')">Uygulama Projesi PDF</button>
+            <button class="dg" onclick="indir('uygulama-xlsx')">Uygulama Projesi Excel</button>
+            <button class="dg" id="dg_uygulama_dwg" onclick="indir('uygulama-dwg')">Uygulama CAD (DWG/DXF)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div><div class="kart"><div id="m_sonuc"></div></div></div>
   </div>
 </section>
 

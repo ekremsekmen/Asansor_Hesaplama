@@ -25,6 +25,9 @@ from fastapi.staticfiles import StaticFiles
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from engine import avan as E_AVAN            # noqa: E402
+from engine import mukavemet_girdi as E_MGR  # noqa: E402
+from engine import uygulama as E_UYG         # noqa: E402
+from engine import uygulama_girdi as E_UGR   # noqa: E402
 from engine import tables as E_TAB           # noqa: E402
 from engine import traffic as E_TRF          # noqa: E402
 #  CAD çıktısı ezdxf + pdfminer.six ister.  Bunlar kurulu değilse PROGRAM
@@ -37,6 +40,7 @@ except Exception as _dxf_hata:                   # noqa: BLE001
 else:
     _DXF_HATA = None
 from exports import kapak_export as X_KAPAK  # noqa: E402
+from exports import mukavemet_xlsx as X_MXLS  # noqa: E402
 from exports import pdf_export as X_PDF      # noqa: E402
 from exports import sablon_denetim as X_DEN
 from exports import xlsx_export as X_XLS     # noqa: E402
@@ -331,6 +335,99 @@ def secenekler():
     }
 
 
+# ------------------------------------------------- uygulama projesi: mukavemet
+@app.get("/api/uygulama/alanlar")
+def uygulama_alanlari():
+    """Formun kendini üretmesi için girdi sözleşmesi.
+
+    Mukavemet alanları + elektrik hesaplarının mukavemette KARŞILIĞI OLMAYAN
+    alanları.  Ortak girdiler burada BİR KEZ geçer ( bkz. uygulama_girdi ).
+    """
+    veri = E_UGR.arayuz_alanlari()
+    veri["ortak_kopru"] = [{"mukavemet": ad, "anahtar": a, "avan": av}
+                           for ad, a, av in E_UGR.ORTAK_KOPRU]
+    return veri
+
+
+def _mukavemet_girdi(veri: dict):
+    """Arayüzden gelen ham metinleri sözleşmenin beklediği türlere çevirir.
+
+    Seçim alanları LİSTEDEKİ değere eşlenir:  arayüz her şeyi metin olarak
+    yollar, oysa seçeneklerin çoğu sayıdır ( 800 · 1,6 · 370 ).  Eşleme
+    burada yapılmazsa motorun doğrulaması "geçersiz seçim" der.
+    """
+    _BELIRSIZ.clear(); _RED.clear()
+    v = (veri or {}).get("girdiler")
+    v = v if isinstance(v, dict) else {}
+    g = {}
+    #  Elektrik hesaplarının ek alanları  ( kuyu genişliği · kesitler ·
+    #  temel ölçüleri · makine dairesi ).  Onay kutusu mantıksal, geri kalanı
+    #  serbest sayıdır;  boş bırakılabilir — hesap eksikliği kendisi bildirir.
+    for anahtar, _et, _b2, tur2, _s2, _v2 in E_UGR.EK_ALANLAR:
+        if anahtar not in v:
+            continue
+        ham = v[anahtar]
+        if tur2 == "onay":
+            g[anahtar] = ham if isinstance(ham, bool) else str(ham).lower() in (
+                "1", "true", "evet", "on")
+            continue
+        if belirsiz_sayi_mi(ham):
+            _BELIRSIZ.append(f"{_et} = {str(ham).strip()}")
+        g[anahtar] = _sayi(ham)
+    for anahtar, _h, etiket, _b, tur, secenekler, _var in E_MGR.ALANLAR:
+        if tur == "hesap" or anahtar not in v:
+            continue
+        ham = v[anahtar]
+        if tur == "liste":
+            liste = []
+            for x in (ham if isinstance(ham, list) else []):
+                if x is None or str(x).strip() == "":
+                    continue
+                if belirsiz_sayi_mi(x):
+                    _BELIRSIZ.append(f"{etiket}: {str(x).strip()}")
+                liste.append(_sayi(x))
+            g[anahtar] = liste
+            continue
+        if belirsiz_sayi_mi(ham):
+            _BELIRSIZ.append(f"{etiket} = {str(ham).strip()}")
+        if secenekler is None:
+            g[anahtar] = _sayi(ham) if tur == "sayi" else ham
+            continue
+        #  Seçenek listesi:  önce birebir, sonra sayısal eşleşme aranır
+        if ham in secenekler:
+            g[anahtar] = ham
+            continue
+        sayi = _sayi(ham)
+        esles = next((o for o in secenekler
+                      if isinstance(o, (int, float)) and not isinstance(o, bool)
+                      and sayi is not None and abs(o - sayi) < 1e-9), None)
+        g[anahtar] = esles if esles is not None else (
+            ham if str(ham).strip() != "" else None)
+    #  Ofis standardı ( Sabitler sekmesi ) — elektrik ve topraklama hesapları
+    #  buradan besleniyor;  avan tarafındaki ile aynı biçimde alınır.
+    sb = (veri or {}).get("sabitler")
+    g["_ofis"] = {k: _sayi(x) for k, x in sb.items()} if isinstance(sb, dict) else {}
+    return g
+
+
+@app.post("/api/uygulama")
+def api_uygulama(veri: dict = Body(...)):
+    """Uygulama projesinin tamamı — mukavemet + elektrik + topraklama."""
+    try:
+        g = _mukavemet_girdi(veri)
+        belirsiz = _belirsiz_hata()
+        if belirsiz:
+            return JSONResponse({"aktif": False, "hata": [belirsiz]}, status_code=200)
+        s = E_UYG.hesapla(g)
+        #  "_h" motorun Excel hücre haritasıdır — doğrulama testleri içindir,
+        #  arayüzün işine yaramaz ve yanıtı gereksiz büyütür.
+        s.pop("_h", None)
+        return JSONResponse(json.loads(json.dumps(s, default=str)))
+    except Exception as e:                                    # noqa: BLE001
+        return JSONResponse({"aktif": False, "hata": [f"HESAP HATASI: {e}"]},
+                            status_code=200)
+
+
 @app.post("/api/trafik")
 def api_trafik(veri: dict = Body(...)):
     try:
@@ -574,6 +671,80 @@ def indir_proje_dwg(veri: dict = Body(...)):
         return _uretilemedi(e)
 
 
+def _uygulama_sonucu(veri):
+    """Girdileri okuyup uygulama hesabını koşturur.  ( sonuc , hata_yaniti )"""
+    g = _mukavemet_girdi(veri)
+    belirsiz = _belirsiz_hata()
+    if belirsiz:
+        return None, JSONResponse({"hata": belirsiz}, status_code=200)
+    s = E_UYG.hesapla(g)
+    if not s.get("aktif"):
+        return None, JSONResponse(
+            {"hata": "HESAP HATASI: " + "  ·  ".join(s.get("hata") or [])},
+            status_code=200)
+    return s, None
+
+
+@app.post("/api/indir/uygulama-pdf")
+def indir_uygulama_pdf(veri: dict = Body(...)):
+    try:
+        s, yanit = _uygulama_sonucu(veri)
+        if yanit is not None:
+            return yanit
+        _p = _proje_kimligi(veri)
+        return _indir(X_PDF.uygulama_pdf(s, _p),
+                      _dosya_adi(_p, "Uygulama Projesi Hesaplari", "pdf"),
+                      "application/pdf")
+    except Exception as e:                                    # noqa: BLE001
+        return _uretilemedi(e)
+
+
+@app.post("/api/indir/uygulama-xlsx")
+def indir_uygulama_xlsx(veri: dict = Body(...)):
+    """MUKAVEMET çalışma kitabı, kullanıcının girdileriyle doldurulmuş hâlde."""
+    try:
+        #  Hesap durduran girdiyle XLSX üretilmez:  formüller #YOK / #SAYI/0!
+        #  dolu bir dosya teslim etmek, hatayı gizlemekten başka işe yaramaz.
+        s, yanit = _uygulama_sonucu(veri)
+        if yanit is not None:
+            return yanit
+        _p = _proje_kimligi(veri)
+        return _indir(X_MXLS.mukavemet_xlsx(s["girdi"], _p),
+                      _dosya_adi(_p, "Mukavemet Hesaplari", "xlsx"),
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except FileNotFoundError as e:
+        return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
+    except Exception as e:                                    # noqa: BLE001
+        return _uretilemedi(e)
+
+
+@app.post("/api/indir/uygulama-dwg")
+def indir_uygulama_dwg(veri: dict = Body(...)):
+    """Uygulama projesi paftası — ofis tip proje formatına yerleştirilmiş CAD."""
+    if X_DXF is None:
+        return JSONResponse(
+            {"hata": "HESAP HATASI: CAD çıktısı için gereken kitaplıklar kurulu değil "
+                     f"( {_DXF_HATA} ).  Programı kapatıp {_BASLATICI} dosyasını "
+                     "yeniden çalıştırın; eksik kitaplıklar kendiliğinden kurulur."},
+            status_code=200)
+    try:
+        s, yanit = _uygulama_sonucu(veri)
+        if yanit is not None:
+            return yanit
+        #  Uygulama projesinin kapağı MMO'nun AYRI kitabındadır — avan kapağı
+        #  buraya basılmaz;  pakette yalnız hesap paftası olur.
+        paftalar = [("Uygulama Projesi", X_PDF.uygulama_pdf(s))]
+        ad = _dosya_adi(_proje_kimligi(veri), "Uygulama Projesi", "zip")
+        paket, sebep, tasti = X_DXF.proje_paketi(paftalar, os.path.splitext(ad)[0])
+        yanit = _indir(paket, ad, "application/zip")
+        notlar = (["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
+        if notlar:
+            yanit.headers["X-Avan-Not"] = ",".join(notlar)
+        return yanit
+    except Exception as e:                                    # noqa: BLE001
+        return _uretilemedi(e)
+
+
 @app.post("/api/indir/kapak-pdf")
 def indir_kapak_pdf(veri: dict = Body(...)):
     """Hesap motorundan bağımsız, tek sayfalık avan proje kapağı."""
@@ -608,6 +779,28 @@ def api_xlsx_yukle(veri: dict = Body(...)):
         return JSONResponse({"hata": "Dosya boş veya çok küçük."}, status_code=422)
     if len(icerik) > 25 * 1024 * 1024:
         return JSONResponse({"hata": "Dosya çok büyük (en fazla 25 MB)."}, status_code=422)
+    #  MUKAVEMET ÇALIŞMA KİTABI  ( uygulama projesi ).  Avan içe aktarıcısı
+    #  bu dosyayı tanımaz;  önce o denetlenir, yoksa "tanınmayan dosya"
+    #  hatası verirdi.  Dönen yapı avanınkiyle aynıdır — arayüzün uygula()
+    #  işlevi ikisini de aynı yoldan işler.
+    try:
+        if X_MXLS.mukavemet_dosyasi_mi(icerik):
+            g = X_MXLS.xlsx_oku(icerik)
+            alanlar, durak = {}, []
+            for anahtar, _h, _e, _b, tur, _s2, _v in E_MGR.ALANLAR:
+                if anahtar not in g:
+                    continue
+                if tur == "liste":
+                    durak = [str(x) for x in g[anahtar]]
+                    continue
+                alanlar[f"m_{anahtar}"] = g[anahtar]
+            return JSONResponse({
+                "tur": "mukavemet", "alanlar": alanlar, "muk_durak": durak,
+                "proje": {}, "ozet": f"Mukavemet hesabı — {len(durak)} durak, "
+                                     f"{len(alanlar)} girdi geri yüklendi."})
+    except Exception as e:                                    # noqa: BLE001
+        return JSONResponse({"hata": f"Mukavemet dosyası okunamadı: {e}"},
+                            status_code=422)
     try:
         return JSONResponse(X_IMP.xlsx_oku(icerik))
     except X_IMP.YuklemeHatasi as e:

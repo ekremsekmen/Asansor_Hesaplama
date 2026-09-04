@@ -331,8 +331,8 @@ html,body{max-width:100%;overflow-x:hidden}
 /*  Ekranı yazdırırken ( ! ) daireleri kaybolur ama içindeki açıklamalar
     küçük not olarak basılır — kâğıtta bilgi eksilmesin.                 */
 @media print{
-  .bilgi{display:block;width:auto;height:auto;margin:5px 0 0;border:none;
-         background:none;opacity:1;cursor:auto;vertical-align:baseline}
+    .bilgi{display:block;width:auto;height:auto;margin:5px 0 0;border:none;
+      background:none;opacity:1;cursor:auto}
   .bilgi-im{display:none}
   .bilgi-balon{position:static;opacity:1;visibility:visible;transform:none;
     max-width:none;width:auto;padding:0;border:none;box-shadow:none;background:none;

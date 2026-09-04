@@ -602,6 +602,22 @@ SIGORTA_NOTU = (
     "( IEC 60269 gG ). AVAN değeridir: kesin seçim kalkış yöntemine, sürücü "
     "tipine ve kablo koordinasyonuna göre uygulama projesinde yapılır.")
 
+#  AYNI NOTUN UYGULAMA PROJESİ KARŞILIĞI.  Avan metni "kesin seçim uygulama
+#  projesinde yapılır" der;  uygulama paftasında bu cümle kendi kendisiyle
+#  çelişir — okuyucunun elindeki BELGE zaten uygulama projesidir.
+SIGORTA_NOTU_UYGULAMA = (
+    "Motor koruma cihazı anma akımı, motor anma akımının kalkış katsayısı "
+    "( ofis standardı, varsayılan 1,25 ) katından büyük ilk standart kademedir "
+    "( IEC 60269 gG ). Kesin seçim kalkış yöntemine, sürücü tipine ve kablo "
+    "koordinasyonuna göre imalatçı verisiyle doğrulanmalıdır."
+)
+
+#  Gerilim düşümü notunun uygulama projesi karşılığı  ( aynı sebep ).
+GERILIM_UC_NOKTA_NOTU_UYGULAMA = (
+    "Aydınlatma ve priz devrelerinde izin verilen gerilim düşümü %1,5'tir; "
+    "uç noktalara kadar olan düşüm devre bazında ayrıca kontrol edilmelidir."
+)
+
 
 def sigorta_sec(I_anma, katsayi=1.25):
     """

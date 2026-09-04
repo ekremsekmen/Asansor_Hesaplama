@@ -26,6 +26,10 @@ TESTLER = [
     ("5", "Arayüz", "testler.test_arayuz", False),
     ("6", "Geri yükleme", "testler.test_geri_yukleme", False),
     ("7", "Altın çıktı", "testler.test_altin", False),
+    ("8", "Mukavemet tabloları", "testler.test_mukavemet_tablolari", False),
+    ("9", "Mukavemet motoru", "testler.test_mukavemet", False),
+    ("10", "Mukavemet ↔ Excel", "testler.test_mukavemet_excel", True),
+    ("11", "Uygulama projesi", "testler.test_uygulama", False),
 ]
 
 

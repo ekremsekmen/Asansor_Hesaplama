@@ -271,6 +271,96 @@ def calistir():
               not any(k.startswith("k_elec") or k.startswith("k_mech")
                       for k in _d["alanlar"]))
 
+
+    # ================================================================
+    #  MUKAVEMET  —  gidiş-dönüş  ( uygulama projesi )
+    # ================================================================
+    import base64
+    import warnings
+
+    import main as _MM
+    from engine import mukavemet as _MK
+    from engine import mukavemet_girdi as _MG
+    from exports import mukavemet_xlsx as _MX
+
+    warnings.filterwarnings("ignore")
+    if not _MX.sablon_var():
+        r.atla("Mukavemet şablonu yok — geri yükleme denenmedi")
+        return r
+
+    #  Girdi uzayının farklı köşelerinden senaryolar:  her biri XLSX'e yazılıp
+    #  geri okunacak ve HEM GİRDİ HEM SONUÇ birebir aynı çıkmalı.
+    _senaryolar = [
+        ("varsayılan", {}),
+        ("küçük kabin", {"beyan_yuku": 450, "kabin_agirligi": 500,
+                         "kabin_genisligi": 1000, "kabin_derinligi": 1250,
+                         "kapi_genisligi": 800}),
+        ("büyük kabin", {"beyan_yuku": 2000, "kabin_agirligi": 1400,
+                         "kabin_genisligi": 2000, "kabin_derinligi": 2200,
+                         "kabin_ray_profili": "127 x 89 x 16",
+                         "agirlik_ray_profili": "90 x 75 x 16"}),
+        ("1:1 askı · sertleştirilmiş kanal",
+         {"aski_orani": 1, "kanal_isleme": "Sertleştirilmiş",
+          "kanal_sekli": "Yarım Daire Kanal", "halat_capi": 10}),
+        ("arka ağırlık · pik döküm",
+         {"agirlik_yeri": "Arka", "agirlik_malzemesi": "Pik Döküm",
+          "agirlik_ray_arasi": 1400, "guvenlik_tertibati": "Ani Frenlemeli"}),
+        ("2 durak", {"durak_yukseklikleri": [2800, 3100],
+                     "son_kat_yuksekligi": 3100, "seyir_mesafesi": 2.8}),
+        ("20 durak", {"durak_yukseklikleri": [3000] * 19 + [4200],
+                      "son_kat_yuksekligi": 4200, "seyir_mesafesi": 57}),
+        ("ondalıklı değerler", {"beyan_hizi": 1.6, "reg_surtunme": 0.25,
+                                "acil_frenleme_a": 1.25, "halat_capi": 6.5}),
+    ]
+    for _ad, _ek in _senaryolar:
+        _once = _MK.hesapla(_ek)
+        if not r.kontrol(f"[muk] {_ad} senaryosu geçerli", _once["aktif"],
+                         f"→ {_once.get('hata')}"):
+            continue
+        _xl = _MX.mukavemet_xlsx(_once["girdi"])
+        _geri = _MX.xlsx_oku(_xl)
+        #  Girdi karşılaştırması:  formülle üretilen üç alan hariç hepsi
+        for _a, _h, _et, _b, _t, _s2, _v in _MG.ALANLAR:
+            if _t == "hesap":
+                continue
+            _bek = _once["girdi"][_a]
+            _bul = _geri.get(_a)
+            if _t == "liste":
+                r.esit(f"[muk] {_ad} · {_et}", list(_bul or []), list(_bek))
+                continue
+            r.esit(f"[muk] {_ad} · {_et} ({_h})", _bul, _bek)
+        #  Sonuç karşılaştırması:  aynı girdi, aynı hesap
+        _sonra = _MK.hesapla(_geri)
+        r.kontrol(f"[muk] {_ad} · geri yüklenen hesap koşuyor", _sonra["aktif"],
+                  f"→ {_sonra.get('hata')}")
+        if _sonra["aktif"]:
+            r.esit(f"[muk] {_ad} · özet birebir aynı", _sonra["ozet"], _once["ozet"])
+            r.esit(f"[muk] {_ad} · Excel hücre haritası aynı",
+                   _sonra["_h"], _once["_h"])
+
+    #  Arayüzün gördüğü uç:  dosya → form alanları
+    _xl = _MX.mukavemet_xlsx(_MK.hesapla({"beyan_yuku": 1000,
+                                          "kabin_agirligi": 900})["girdi"])
+    r.kontrol("mukavemet dosyası tanınıyor", _MX.mukavemet_dosyasi_mi(_xl))
+    _y = _MM.api_xlsx_yukle({"icerik": base64.b64encode(_xl).decode()})
+    import json as _js
+    _d = _js.loads(_y.body)
+    r.esit("içe aktarma türü", _d.get("tur"), "mukavemet")
+    r.esit("form alanı m_beyan_yuku", _d["alanlar"].get("m_beyan_yuku"), 1000)
+    r.esit("form alanı m_kabin_agirligi", _d["alanlar"].get("m_kabin_agirligi"), 900)
+    r.esit("durak listesi ayrı taşınıyor", len(_d.get("muk_durak") or []), 8)
+    r.kontrol("hesaplanan alanlar forma GERİ YAZILMIYOR",
+              not any(k in _d["alanlar"] for k in
+                      ("m_karsi_agirlik", "m_kuyu_boyu", "m_halat_arasi")),
+              f"→ {[k for k in _d['alanlar'] if 'agirlik' in k]}")
+
+    #  Avan / trafik dosyaları mukavemet sanılmamalı  ( ve tersi )
+    r.kontrol("trafik dosyası mukavemet sanılmıyor",
+              not _MX.mukavemet_dosyasi_mi(XE.trafik_xlsx("tek", _gt)))
+    _ay = _js.loads(_MM.api_xlsx_yukle(
+        {"icerik": base64.b64encode(XE.trafik_xlsx("tek", _gt)).decode()}).body)
+    r.esit("trafik dosyası hâlâ trafik olarak açılıyor", _ay.get("tur"), "tek")
+
     return r
 
 

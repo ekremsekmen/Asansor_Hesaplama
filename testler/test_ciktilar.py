@@ -1066,6 +1066,163 @@ def calistir():
         for _a in _adlar:
             r.kontrol(f"CAD: {_a} boş değil", _z.getinfo(_a).file_size > 0)
 
+
+    # ================================================================
+    #  UYGULAMA PROJESİ  —  MUKAVEMET ÇIKTILARI
+    # ================================================================
+    import main as _MM
+    from engine import mukavemet as _MK
+    from engine import mukavemet_girdi as _MG
+    from exports import mukavemet_xlsx as _MX
+
+    _muk = _MK.hesapla()
+    _mpdf = PE.mukavemet_pdf(_muk, PROJE)
+    r.kontrol("mukavemet PDF üretildi", len(_mpdf) > 20_000, f"→ {len(_mpdf)} bayt")
+    _mm = _metin(_mpdf)
+    for _ara in ("ASANSÖR MUKAVEMET HESAPLARI", "TS EN 81-50",
+                 "MOTOR GÜCÜNÜN HESAPLANMASI", "TAHRİK YETENEĞİNİN",
+                 "KILAVUZ RAYLARININ", "SIĞINMA ALANLARI", "SONUÇ ÖZETİ",
+                 "Hesabı yapan"):
+        r.kontrol(f"mukavemet PDF: {_ara}", _ara in _mm)
+    #  Sayılar paftaya GERÇEKTEN basılıyor mu — boş şablon "geçti" sayılmasın
+    for _ara in ("4,81", "17,63", "21.326", "58.860"):
+        r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
+                  f"→ paftada yok")
+
+    #  Hesap durduran girdide de GEÇERLİ belge çıkmalı, sebebi yazmalı
+    _mbos = PE.mukavemet_pdf(_MK.hesapla({"kabin_agirligi": None}), PROJE)
+    r.kontrol("hatalı girdide de PDF üretiliyor", len(_mbos) > 1000)
+    r.kontrol("hatalı girdide PDF sebebi yazıyor",
+              "boş bırakılamaz" in _metin(_mbos), f"→ {_metin(_mbos)[:120]!r}")
+
+    #  XLSX:  şablonun kendisi, girdilerle doldurulmuş
+    if _MX.sablon_var():
+        _mx = _MX.mukavemet_xlsx({"beyan_yuku": 630, "kabin_agirligi": 600})
+        r.kontrol("mukavemet XLSX üretildi", len(_mx) > 100_000)
+        import openpyxl as _op
+        _wb = _op.load_workbook(io.BytesIO(_mx))
+        _ws = _wb["Veri Girişi"]
+        r.esit("XLSX: beyan yükü yazıldı", _ws["C59"].value, 630)
+        r.esit("XLSX: kabin ağırlığı yazıldı", _ws["C75"].value, 600)
+        r.kontrol("XLSX: hesaplanan hücreler FORMÜL kaldı",
+                  str(_ws["C80"].value).startswith("=")
+                  and str(_ws["F80"].value).startswith("="),
+                  f"→ C80={_ws['C80'].value!r}  F80={_ws['F80'].value!r}")
+        r.kontrol("XLSX: açılışta yeniden hesap açık", _wb.calculation.fullCalcOnLoad)
+        #  Proje kimliği dosya ÖZELLİKLERİNE yazılıyor mu  ( şablonda hücresi yok )
+        _mp = _op.load_workbook(io.BytesIO(
+            _MX.mukavemet_xlsx({}, {"proje_adi": "Yıldız Konutları",
+                                    "isveren": "ÇAĞDAŞ İnşaat",
+                                    "pafta_no": "MK-01"}))).properties
+        r.esit("XLSX: proje adı özelliklere yazıldı", _mp.title, "Yıldız Konutları")
+        r.esit("XLSX: işveren özelliklere yazıldı", _mp.subject, "ÇAĞDAŞ İnşaat")
+        r.esit("XLSX: pafta no özelliklere yazıldı", _mp.category, "MK-01")
+        #  UYGULAMA PROJESİNDEN AVAN KİTABI ÇIKMAZ.  İki çalışma kitabı iki
+        #  ayrı projeye aittir:  MUKAVEMET_HESABI.xlsx uygulama projesinin,
+        #  ASANSOR_AVAN_HESAPLARI.xlsx avan projesinin kitabıdır.  Elektrik
+        #  hesapları uygulama tarafında ekranda ve paftada verilir.
+        r.kontrol("uygulama projesinde avan kitabı ucu yok",
+                  not hasattr(_MM, "indir_uygulama_elektrik_xlsx"))
+        r.kontrol("XLSX: hesap sayfaları duruyor",
+                  "11-Muk. Hesapları" in _wb.sheetnames
+                  and "Askı Tipleri" in _wb.sheetnames)
+        #  TESLİM EDİLEN KİTAP PAFTAYLA ÇELİŞMEMELİ.
+        #  Program standart gereği kaynak kitabın altı hesabından ayrılıyor;
+        #  kitap olduğu gibi verilseydi aynı projenin iki belgesi birbirini
+        #  yalanlardı ( pafta "uygun değil" derken Excel "uygundur" ).
+        #  Teslim kopyasında o FORMÜLLER düzeltilir — aşağıda gerçekten
+        #  düzeltildiği ve kitabın kendi hesabının motorla aynı çıktığı
+        #  denetlenir.
+        _duz = _op.load_workbook(io.BytesIO(
+            _MX.mukavemet_xlsx(_MK.hesapla()["girdi"])))["11-Muk. Hesapları"]
+        r.esit("teslim kopyasında Dt/dh eşiği 40", _duz["Q97"].value, 40)
+        r.esit("teslim kopyasında Durum 2 xQ = xc", _duz["AO312"].value, "=AH293")
+        r.kontrol("teslim kopyasında σ(My) Wx sütununa bakıyor",
+                  ",6,0)" in str(_duz["AU575"].value), f"→ {_duz['AU575'].value}")
+        r.kontrol("teslim kopyasında μ halat hızıyla",
+                  "B100" in str(_duz["AK190"].value), f"→ {_duz['AK190'].value}")
+        r.kontrol("teslim kopyasında flanş paydasında ℓ var",
+                  "(1+2*" not in str(_duz["Q380"].value).replace(" ", ""),
+                  f"→ {str(_duz['Q380'].value)[:90]}")
+        r.kontrol("teslim kopyasında ω ray çeliğine bağlı",
+                  "B131" in str(_duz["AD354"].value), f"→ {str(_duz['AD354'].value)[:90]}")
+        r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",
+                  _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]["Q97"].value == 30,
+                  "→ şablon değişmiş;  doğrulama testleri dayanağını kaybeder")
+
+        #  LibreOffice ile yeniden hesaplandığında motorla aynı sonucu vermeli
+        if soffice_yolu():
+            _kk = os.path.join(GECICI, "muk_cikti")
+            _gg = os.path.join(GECICI, "muk_girdi")
+            os.makedirs(_gg, exist_ok=True)
+            _yol = os.path.join(_gg, "muk.xlsx")
+            with open(_yol, "wb") as _f:
+                _f.write(_MX.mukavemet_xlsx({"beyan_yuku": 630, "kabin_agirligi": 600}))
+            yeniden_hesapla([_yol], _kk)
+            _cy = os.path.join(_kk, "muk.xlsx")
+            if os.path.exists(_cy):
+                _s = _MK.hesapla({"beyan_yuku": 630, "kabin_agirligi": 600})
+                _cws = _op.load_workbook(_cy, data_only=True)["11-Muk. Hesapları"]
+                r.kontrol("XLSX: Excel motorla aynı motor gücünü buluyor",
+                          abs((_cws["AQ23"].value or 0) - _s["ozet"]["N_hesap"]) < 1e-6,
+                          f"→ Excel {_cws['AQ23'].value!r}, motor {_s['ozet']['N_hesap']!r}")
+                #  DÜZELTİLMİŞ KİTABIN HER HÜCRESİ MOTORLA AYNI OLMALI —
+                #  standart gereği saptığımız hücreler DÂHİL.  İki belge
+                #  arasında tek bir sayı bile ayrışmamalı.
+                _ayri = []
+                for _h, _v in sorted(_s["_h"].items()):
+                    _e = _cws[_h].value
+                    if _e is None or isinstance(_e, str):
+                        continue
+                    try:
+                        if abs(float(_v) - float(_e)) > 1e-6 * max(
+                                abs(float(_v)), abs(float(_e)), 1.0):
+                            _ayri.append((_h, _v, _e))
+                    except (TypeError, ValueError):
+                        pass
+                r.kontrol("teslim edilen Excel paftayla BİREBİR aynı", not _ayri,
+                          f"→ ayrışan {len(_ayri)} hücre: {_ayri[:3]}")
+                _hh = [h for h in hata_hucresi_ara(_cy)
+                       if h.startswith("11-Muk.") or h.startswith("Askı Tipleri")]
+                r.kontrol("XLSX: hesap sayfalarında hata hücresi yok", not _hh,
+                          f"→ {_hh[:3]}")
+            else:
+                r.kontrol("XLSX yeniden hesaplanabildi", False)
+    else:
+        r.atla("Mukavemet şablonu yok — XLSX çıktısı denenmedi")
+
+    #  İndirme uçları
+    _mg = {a[0]: (list(a[6]) if a[4] == "liste" else a[6])
+           for a in _MG.ALANLAR if a[4] != "hesap"}
+    for _ad, _fn, _tur in (("pdf", _MM.indir_uygulama_pdf, "application/pdf"),
+                           ("xlsx", _MM.indir_uygulama_xlsx, XLSX_TUR)):
+        _y = _fn({"girdiler": _mg, "kapak": {"proje_adi": "DENEME"}})
+        r.esit(f"uygulama-{_ad} ucu dosya döndürüyor", _y.media_type, _tur)
+
+    #  UYGULAMA PROJESİ PAFTASI  —  mukavemet + elektrik + topraklama
+    from engine import uygulama as _UY
+    _uy = _UY.hesapla({"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45})
+    _upd = PE.uygulama_pdf(_uy, PROJE)
+    r.kontrol("uygulama PDF üretildi", len(_upd) > 30_000, f"→ {len(_upd)} bayt")
+    _um = _metin(_upd)
+    for _ara in ("ASANSÖR UYGULAMA PROJESİ HESAPLARI", "MUKAVEMET HESAPLARI",
+                 "ELEKTRİK VE TOPRAKLAMA HESAPLARI", "KABİN AYDINLATMA",
+                 "KURULU GÜÇ CETVELİ", "GERİLİM DÜŞÜMÜ", "TOPRAKLAYICI",
+                 "SONUÇ ÖZETİ", "Hesabı yapan"):
+        r.kontrol(f"uygulama PDF: {_ara}", _ara in _um)
+    r.kontrol("uygulama PDF elektrik sayılarını taşıyor",
+              "6.105" in _um, "→ kurulu güç paftada yok")
+    _ubos = PE.uygulama_pdf(_UY.hesapla({"kabin_agirligi": None}), PROJE)
+    r.kontrol("hatalı girdide uygulama PDF'i sebebini yazıyor",
+              "boş bırakılamaz" in _metin(_ubos))
+
+    #  Hesap durduran girdide DOSYA DEĞİL, açık hata dönmeli
+    _yh = _MM.indir_uygulama_xlsx({"girdiler": dict(_mg, kabin_agirligi=None)})
+    r.kontrol("hatalı girdide XLSX yerine hata dönüyor",
+              _yh.media_type != XLSX_TUR
+              and "boş bırakılamaz" in _yh.body.decode("utf-8"),
+              f"→ {_yh.media_type}")
+
     return r
 
 

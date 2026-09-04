@@ -84,10 +84,10 @@ def calistir():
 
         # ---------------------------------------------------------------
         #  AÇILIŞ EKRANI  ( 2.6 )
-        #  Program artık doğrudan hesap ekranına düşmüyor:  önce hangi
-        #  projenin hazırlanacağı seçiliyor.  Şimdilik yalnız "Avan Proje"
-        #  hazır;  uygulama projesi sonra eklenecek ve seçilince uygulamayı
-        #  AÇMAMALI — yarım bir bölüme girilmiş olmasın.
+        #  Program doğrudan hesap ekranına düşmez:  önce hangi projenin
+        #  hazırlanacağı seçilir.  İki mod da hazırdır ve ŞERİTLERİ AYRIDIR —
+        #  avan sekmeleri uygulama modunda, mukavemet sekmesi avan modunda
+        #  görünmemelidir;  yoksa iki ayrı hesap birbirine karışır.
         # ---------------------------------------------------------------
         pg.on("dialog", lambda d: d.dismiss())
         r.kontrol("açılışta proje seçim ekranı görünüyor", pg.is_visible("#giris"))
@@ -96,18 +96,248 @@ def calistir():
         r.esit("açılışta iki seçenek var",
                pg.eval_on_selector_all(".giris-kart", "e=>e.length"), 2)
         r.kontrol("avan seçeneği hazır işaretli", "HAZIR" in (pg.inner_text("#gk_avan") or ""))
-        r.kontrol("uygulama projesi 'yakında' işaretli",
-                  "YAKINDA" in (pg.inner_text("#gk_uygulama") or ""))
+        r.kontrol("uygulama projesi hazır işaretli",
+                  "HAZIR" in (pg.inner_text("#gk_uygulama") or ""))
+
+        #  --- uygulama projesi ( mukavemet ) ---
         pg.click("#gk_uygulama")
+        pg.wait_for_timeout(2000)
+        r.kontrol("uygulama projesi açılıyor",
+                  (not pg.is_visible("#giris"))
+                  and pg.is_visible('.sekme[data-sekme="mukavemet"]'))
+        r.kontrol("uygulama modunda avan sekmeleri gizli",
+                  not pg.is_visible('.sekme[data-sekme="avan"]')
+                  and not pg.is_visible('.sekme[data-sekme="trafik"]'))
+        #  Sabitler / Ofis Standardı İKİ MODA DA aittir:  elektrik ve
+        #  topraklama hesapları oradaki değerleri kullanır.
+        r.kontrol("uygulama modunda Sabitler sekmesi görünür",
+                  pg.is_visible('.sekme[data-sekme="sabitler"]'))
+        r.kontrol("ortak girdi köprüsü formda yazılı",
+                  "Ortak girdiler bir kez girilir" in pg.inner_text("#m_form"))
+        r.kontrol("başlık uygulama projesini gösteriyor",
+                  "UYGULAMA" in pg.inner_text("#ust_ad"),
+                  f"→ {pg.inner_text('#ust_ad')!r}")
+        r.esit("uygulama formu 10 grup üretti",
+               pg.eval_on_selector_all("#m_form .bolum-bas", "e=>e.length"), 10)
+        r.esit("varsayılan durak sayısı", pg.evaluate("MUK_DURAK.length"), 8)
+
+        #  DURAK DÜĞMELERİ ALTTAKİ ALANIN ÜSTÜNE TAŞMAMALI.
+        #  Bir kez taştılar:  trafikteki 31×29 px SABİT KARE ".adet-dg"
+        #  sınıfıyla yazılmışlardı, uzun Türkçe metin kutuya sığmayıp
+        #  "Son kat yüksekliği" etiketinin üzerine biniyordu.  Ölçü hem geniş
+        #  hem dar ekranda alınır — dar ekranda düğmeler alt alta sarar.
+        for _ad, _en in (("geniş ekran", 1440), ("dar ekran", 380)):
+            pg.set_viewport_size({"width": _en, "height": 950})
+            pg.wait_for_timeout(400)
+            _o = pg.evaluate("""() => {
+                const q = id => document.getElementById(id);
+                const kutu = e => e.getBoundingClientRect();
+                const ekle = q('m_durak_ekle'), sil = q('m_durak_sil');
+                const et = [...document.querySelectorAll('#m_form label')]
+                    .find(l => l.textContent.includes('Son kat yüksekliği'));
+                const alt = Math.max(kutu(ekle).bottom, kutu(sil).bottom);
+                return {bosluk: Math.round(kutu(et).top - alt),
+                        tasan: ekle.scrollWidth > ekle.clientWidth + 1
+                            || sil.scrollWidth > sil.clientWidth + 1,
+                        yukseklik: Math.round(kutu(ekle).height),
+                        genislik: Math.round(kutu(ekle).width)};
+            }""")
+            r.kontrol(f"durak düğmeleri alttaki alana taşmıyor ( {_ad} )",
+                      _o["bosluk"] >= 0, f"→ {_o['bosluk']} px örtüşme")
+            r.kontrol(f"durak düğmesi metni kutusuna sığıyor ( {_ad} )",
+                      not _o["tasan"], f"→ {_o}")
+            r.kontrol(f"durak düğmesi tek satır ( {_ad} )",
+                      _o["yukseklik"] <= 42, f"→ {_o['yukseklik']} px yüksek")
+        pg.set_viewport_size({"width": 1440, "height": 1000})
         pg.wait_for_timeout(400)
-        r.kontrol("hazır olmayan bölüm uygulamayı açmıyor", pg.is_visible("#giris"))
-        pg.click("#gk_avan")
-        pg.wait_for_timeout(400)
-        r.kontrol("avan seçilince uygulama açılıyor",
-                  (not pg.is_visible("#giris")) and pg.is_visible('.sekme[data-sekme="avan"]'))
+        #  VARSAYILAN PROJE ASKI HALATINDAN KALIR:  TS EN 81-20 m.5.5.2.1
+        #  tahrik kasnağı / halat oranını en az 40 ister, kaynak Excel'in
+        #  örneğinde 240 / 6,5 = 36,9.  Beklenen davranış budur.
+        r.kontrol("uygulama hesabı koştu", pg.evaluate("SON.m && SON.m.aktif"),
+                  f"→ {pg.evaluate('SON.m && SON.m.hata')}")
+        _kalan = pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
+                             "b.sonuc.uygun===false).map(b=>b.baslik)")
+        r.esit("varsayılanda yalnız askı halatı kalıyor", len(_kalan), 1)
+        r.kontrol("kalan bölüm askı halatları", _kalan and "ASKI HALAT" in _kalan[0],
+                  f"→ {_kalan}")
+        #  Standarda uyan kasnakla hepsi geçmeli
+        pg.fill("#m_tahrik_kasnak_capi", "280")
+        pg.fill("#m_saptirma_kasnak_capi", "280")
+        pg.wait_for_timeout(1500)
+        r.kontrol("kasnak 280 mm olunca bütün bölümler uygun",
+                  pg.evaluate("SON.m.ozet.tumu_uygun === true"),
+                  f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
+        r.esit("on dört hesap bölümü çizildi",
+               pg.eval_on_selector_all("#m_sonuc .serit", "e=>e.length") >= 14, True)
+        #  Ekranda gerçekten SAYI var mı — boş tablo "geçti" sayılmasın
+        r.kontrol("motor gücü ekrana yazıldı",
+                  "4,81" in pg.inner_text("#m_sonuc"),
+                  f"→ {pg.inner_text('#m_sonuc')[:120]!r}")
+
+        #  Girdi değişince yeniden hesaplanmalı ve sonuç DÖNMELİ
+        pg.select_option("#m_kabin_ray_profili", "50 x 50 x 5")
+        pg.wait_for_timeout(1400)
+        r.kontrol("küçük ray profili uygunsuz sonuç veriyor",
+                  pg.evaluate("SON.m.ozet.tumu_uygun === false"))
+        r.kontrol("takılan bölüm kılavuz raylar",
+                  pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
+                              "b.sonuc.uygun===false).map(b=>b.baslik).join('|')")
+                  .find("KILAVUZ RAY") >= 0)
+        pg.select_option("#m_kabin_ray_profili", "89 x 62 x 15,88")
+        pg.wait_for_timeout(1400)
+        r.kontrol("geri alınınca kılavuz ray bölümü yeniden uygun",
+                  pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
+                              "b.sonuc.uygun===false && "
+                              "b.baslik.includes('KILAVUZ RAY')).length === 0"),
+                  f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
+
+        #  Durak düzenleyici + türetilen alanlar
+        pg.click("#m_durak_ekle")
+        pg.wait_for_timeout(1400)
+        r.esit("durak eklendi", pg.evaluate("MUK_DURAK.length"), 9)
+        r.esit("seyir mesafesi kendiliğinden güncellendi",
+               pg.input_value("#m_seyir_mesafesi"), "24,75")
+        pg.click("#m_durak_sil")
+        pg.wait_for_timeout(1400)
+        r.esit("durak silindi", pg.evaluate("MUK_DURAK.length"), 8)
+        r.esit("seyir mesafesi geri döndü",
+               pg.input_value("#m_seyir_mesafesi"), "21")
+
+        #  Boş zorunlu alan → hesap durmalı, sebebi ekranda yazmalı
+        pg.fill("#m_kabin_agirligi", "")
+        pg.wait_for_timeout(1400)
+        r.kontrol("boş kabin ağırlığı hesabı durduruyor",
+                  pg.evaluate("SON.m.aktif === false"))
+        r.kontrol("hata ekranda görünüyor",
+                  "boş bırakılamaz" in pg.inner_text("#m_sonuc"),
+                  f"→ {pg.inner_text('#m_sonuc')[:140]!r}")
+        pg.fill("#m_kabin_agirligi", "700")
+        pg.wait_for_timeout(1400)
+        r.kontrol("düzeltilince hesap geri geliyor",
+                  pg.evaluate("SON.m.aktif === true"))
+        #  Standarda uyan kasnak korunuyor — testin geri kalanı temiz koşsun
+        r.kontrol("kasnak 280 mm hâlâ yerinde",
+                  pg.input_value("#m_tahrik_kasnak_capi") == "280")
+
+        #  Çıktı düğmeleri:  varlıkları YETMEZ, gerçekten dosya dönmeli
+        #  Girdi formundaki durak düğmeleri de ".dugmeler .dg" — çıktı
+        #  düğmeleri form DIŞINDA olanlardır.
+        r.esit("uygulama çıktı düğmeleri",
+               pg.eval_on_selector_all(
+                   "#s-mukavemet .dugmeler .dg",
+                   "e=>e.filter(x=>!x.closest('#m_form')).map(x=>x.textContent.trim())"),
+               ["Uygulama Projesi PDF", "Uygulama Projesi Excel",
+                "Uygulama CAD (DWG/DXF)"])
+        _ind = pg.evaluate("""async () => {
+            const dene = async uc => {
+              const r = await fetch('/api/indir/'+uc, {method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({kapak: kapakGirdi(), girdiler: mukavemetGirdi()})});
+              const b = await r.arrayBuffer();
+              return {tur: (r.headers.get('Content-Type')||'').split(';')[0],
+                      boyut: b.byteLength};
+            };
+            return {pdf: await dene('uygulama-pdf'),
+                    xlsx: await dene('uygulama-xlsx')};
+        }""")
+        r.esit("arayüzden uygulama PDF iniyor", _ind["pdf"]["tur"], "application/pdf")
+        r.kontrol("inen PDF boş değil", _ind["pdf"]["boyut"] > 20_000,
+                  f"→ {_ind['pdf']['boyut']} bayt")
+        r.kontrol("arayüzden uygulama Excel iniyor",
+                  "spreadsheetml" in _ind["xlsx"]["tur"], f"→ {_ind['xlsx']['tur']}")
+        r.kontrol("inen Excel boş değil", _ind["xlsx"]["boyut"] > 100_000,
+                  f"→ {_ind['xlsx']['boyut']} bayt")
+
+        #  Proje kimliği dosya adına giriyor mu  ( avan kapağı BASILMAMALI )
+        pg.fill("#mk_proje_adi", "Güneş Apartmanı")
+        _ad = pg.evaluate("""async () => {
+            const r = await fetch('/api/indir/uygulama-pdf', {method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({kapak: mukavemetKimlik(),
+                                    girdiler: mukavemetGirdi(),
+                                    sabitler: ofisSabitleri()})});
+            const cd = r.headers.get('Content-Disposition')||'';
+            await r.arrayBuffer();
+            const m = cd.match(/filename\*=UTF-8''(.+)$/);
+            return m ? decodeURIComponent(m[1]) : null;
+        }""")
+        r.esit("proje adı dosya adına giriyor", _ad,
+               "Güneş Apartmanı - Uygulama Projesi Hesaplari.pdf")
+        r.kontrol("mukavemet indirmesi avan kapağını göndermiyor",
+                  pg.evaluate("Object.keys(mukavemetKimlik()).sort().join(',')")
+                  == "owner,project_title,sheet_no")
+
+        #  REVİZYON AKIŞI:  Excel al → formu boz → dosyayı geri yükle
+        pg.select_option("#m_beyan_yuku", "1000")
+        pg.fill("#m_kabin_agirligi", "950")
+        pg.click("#m_durak_ekle")
+        pg.wait_for_timeout(1600)
+        _once = pg.evaluate("({yuk: SON.m.girdi.beyan_yuku, "
+                            "ag: SON.m.girdi.kabin_agirligi, "
+                            "durak: MUK_DURAK.length, ray: SON.m.ozet.ray_boyu})")
+        _geri = pg.evaluate("""async () => {
+            const r = await fetch('/api/indir/uygulama-xlsx', {method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({kapak: mukavemetKimlik(),
+                                    girdiler: mukavemetGirdi(),
+                                    sabitler: ofisSabitleri()})});
+            const blob = await r.blob();
+            //  formu boz
+            document.getElementById('m_beyan_yuku').value = '450';
+            document.getElementById('m_kabin_agirligi').value = '500';
+            mDurakSil(); mDurakSil();
+            await new Promise(x=>setTimeout(x, 1500));
+            const bozuk = {yuk: SON.m.girdi.beyan_yuku, durak: MUK_DURAK.length};
+            //  dosyayı geri yükle
+            await xlsxYukle([new File([blob], 'muk.xlsx',
+              {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})]);
+            await new Promise(x=>setTimeout(x, 2000));
+            return {bozuk, sonra: {yuk: SON.m.girdi.beyan_yuku,
+                    ag: SON.m.girdi.kabin_agirligi, durak: MUK_DURAK.length,
+                    ray: SON.m.ozet.ray_boyu},
+                    ozet: document.getElementById('m_yukleme_ozeti').textContent};
+        }""")
+        r.kontrol("form gerçekten bozulmuştu",
+                  _geri["bozuk"]["yuk"] == 450 and _geri["bozuk"]["durak"] != _once["durak"],
+                  f"→ {_geri['bozuk']}")
+        r.esit("Excel'den geri yükleme girdileri aynen döndürüyor",
+               _geri["sonra"], _once)
+        r.kontrol("yükleme özeti uygulama bölümünde görünüyor",
+                  "Mukavemet" in _geri["ozet"], f"→ {_geri['ozet'][:90]!r}")
+
+        #  Sayfa yenilenince girdiler duruyor mu  ( tarayıcıda saklama )
+        pg.reload(wait_until="networkidle")
+        pg.wait_for_timeout(600)
+        pg.click("#gk_uygulama")
+        pg.wait_for_timeout(2200)
+        r.esit("yenilemeden sonra beyan yükü duruyor",
+               pg.input_value("#m_beyan_yuku"), "1000")
+        r.esit("yenilemeden sonra durak sayısı duruyor",
+               pg.evaluate("MUK_DURAK.length"), _once["durak"])
+        r.esit("yenilemeden sonra proje adı duruyor",
+               pg.input_value("#mk_proje_adi"), "Güneş Apartmanı")
+        #  Testin geri kalanı temiz girdiyle koşsun
+        pg.evaluate("localStorage.removeItem(ANAHTAR)")
+        pg.reload(wait_until="networkidle")
+        pg.wait_for_timeout(600)
+        pg.click("#gk_uygulama")
+        pg.wait_for_timeout(2200)
+
         pg.click("#dg_ana_ekran")
         pg.wait_for_timeout(300)
         r.kontrol("ana ekran düğmesi seçim ekranına döndürüyor", pg.is_visible("#giris"))
+
+        #  --- avan moduna geçiş ---
+        pg.click("#gk_avan")
+        pg.wait_for_timeout(600)
+        r.kontrol("avan seçilince uygulama açılıyor",
+                  (not pg.is_visible("#giris")) and pg.is_visible('.sekme[data-sekme="avan"]'))
+        r.kontrol("avan modunda mukavemet sekmesi gizli",
+                  not pg.is_visible('.sekme[data-sekme="mukavemet"]'))
+        r.kontrol("başlık avan programına döndü",
+                  "AVAN" in pg.inner_text("#ust_ad"))
+        pg.click("#dg_ana_ekran")
+        pg.wait_for_timeout(300)
         pg.click("#gk_avan")
         pg.wait_for_timeout(300)
         r.kontrol("geri dönülüp yeniden girilebiliyor", not pg.is_visible("#giris"))
@@ -118,8 +348,11 @@ def calistir():
         #  "Sabitler" ve "Tablolar" birer adım değil, gerektikçe bakılan
         #  kaynaklardır — akışın ortasında değil, şeridin sağ ucundadırlar.
         # ---------------------------------------------------------------
+        #  Şeritte HER İKİ MODUN sekmeleri durur, moda ait olmayanlar
+        #  gizlenir;  sıra kontrolü GÖRÜNENLER üzerinden yapılır.
         r.esit("sekme sırası işlem sırası",
-               pg.eval_on_selector_all(".sekme", "e=>e.map(x=>x.dataset.sekme)"),
+               pg.eval_on_selector_all(
+                   ".sekme", "e=>e.filter(x=>!x.hidden).map(x=>x.dataset.sekme)"),
                ["trafik", "avan", "proje", "sabitler", "tablolar"])
         r.esit("açılışta 1. adım etkin",
                pg.eval_on_selector(".sekme.etkin", "e=>e.dataset.sekme"), "trafik")
@@ -143,7 +376,10 @@ def calistir():
         pg.wait_for_timeout(1800)
 
         # --- her sekme açılıyor ve içerik üretiyor
-        r.esit("sekme sayısı 5", pg.eval_on_selector_all(".sekme", "e=>e.length"), 5)
+        r.esit("avan modunda görünen sekme sayısı 5",
+               pg.eval_on_selector_all(".sekme", "e=>e.filter(x=>!x.hidden).length"), 5)
+        r.esit("şeritteki toplam sekme 6  ( + mukavemet )",
+               pg.eval_on_selector_all(".sekme", "e=>e.length"), 6)
         r.kontrol("ayrı 'çoklu' sekmesi kalmadı",
                   pg.query_selector('.sekme[data-sekme="coklu"]') is None)
         for sekme, ic_id in (("proje", None), ("trafik", None),
