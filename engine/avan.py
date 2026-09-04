@@ -402,7 +402,11 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     if L1_giris not in (None, "") and not (sayi_mi(L1_giris) and 0 < L1_giris <= 500):
         red.append(f"L1 — kolon hattı uzunluğu = {tr(L1_giris)} ( geçerli aralık "
                    "0 - 500 m ) → Hk + ofis payı kullanıldı")
-    if sayi_mi(L1_giris) and L1_giris > 0:
+    #  SINIR AŞILDIYSA GERÇEKTEN VARSAYILANA DÖNÜLÜR.  Buradaki koşul yukarıdaki
+    #  red mesajıyla AYNI olmalıdır;  eskiden yalnız "> 0" arıyordu:  L1 = 600 m
+    #  girildiğinde uyarı "Hk + ofis payı kullanıldı" diyor ama hesap yine 600
+    #  kullanıyordu — uyarı yalan söylüyordu.
+    if sayi_mi(L1_giris) and 0 < L1_giris <= 500:
         L1, L1_kaynak = L1_giris, "GİRİŞ"
     elif sayi_mi(Hk):
         L1 = Hk + S["L1_pay"]
@@ -512,7 +516,9 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     if Nsc_giris not in (None, "") and not (sayi_mi(Nsc_giris) and 0 < Nsc_giris <= 500):
         red.append(f"Nsç — seçilen motor gücü = {tr(Nsc_giris)} kW ( geçerli aralık "
                    "0 - 500 kW ) → standart kademeden otomatik seçildi")
-    if sayi_mi(Nsc_giris) and Nsc_giris > 0:
+    #  Koşul yukarıdaki red mesajıyla AYNI ( bkz. L1 ):  aralık dışı bir Nsç
+    #  "standart kademeden otomatik seçildi" denip yine kullanılıyordu.
+    if sayi_mi(Nsc_giris) and 0 < Nsc_giris <= 500:
         Nsc, Nsc_kaynak = Nsc_giris, "GİRİŞ — elle seçildi"
     else:
         Nsc = T.motor_sec(N_hes)

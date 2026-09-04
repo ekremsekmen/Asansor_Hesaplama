@@ -211,7 +211,17 @@ def coklu_asansor_alan(anahtar, no):
     return f"c_{kisa}{no}"
 
 
+#  Bu alanlar avan panelinden KALDIRILDI ve "Sabitler / Ofis Standardı"
+#  sekmesine taşındı;  arayüzdeki id'leri artık of_<ad>.  Harita hâlâ a_<ad>
+#  ürettiği için Excel'den okunan değerler HİÇBİR YERE yazılamıyordu:  dosyada
+#  U = 220 V yazsa bile geri yüklemede ofis varsayılanı ( 380 V ) devreye
+#  giriyor, ε %4,69 "UYGUN DEĞİL" iken %0,98 "UYGUN" oluyordu.
+OFIS_SEKMESI_ALANLARI = ("U", "kappa", "eps_max", "beta", "cubuk_sayisi")
+
+
 def avan_ortak_alan(anahtar):
+    if anahtar in OFIS_SEKMESI_ALANLARI:
+        return "of_" + anahtar
     return "a_" + anahtar
 
 
@@ -223,5 +233,16 @@ def sabit_alan(anahtar):
     return "sb_" + anahtar
 
 
+#  Kapak sekmesindeki alan id'leri  k_<ad>;  harita "p_" üretiyordu ve
+#  arayüz zaten `veri.proje`'yi hiç kullanmıyordu — proje adı / işveren
+#  geri yüklenmiyor, önceki projenin kimliği formda kalıyordu.
+#  `muhendis` ve `tarih` GERİ YÜKLENMEZ:  muhendis, kapaktaki ad + soyad
+#  alanlarının BİRLEŞİMİDİR ( bkz. main._proje_kimligi ) — tek alana geri
+#  yazmak "Ekrem Şekmen"i ad kutusuna koyardı.  tarih zaten boş üretiliyor.
+PROJE_ALAN_ESLESME = {"proje_adi": "k_project_title", "isveren": "k_owner",
+                      "pafta_no": "k_sheet_no"}
+
+
 def proje_alan(anahtar):
-    return "p_" + anahtar
+    """Geri yüklenecek kapak alanı;  yüklenmeyecekse None."""
+    return PROJE_ALAN_ESLESME.get(anahtar)

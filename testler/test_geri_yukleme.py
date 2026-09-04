@@ -208,6 +208,69 @@ def calistir():
     d2 = XI.xlsx_oku(XE.trafik_xlsx("tek", g1, PROJE))
     r.kontrol("ikinci tur aynı girdileri veriyor", d1["alanlar"] == d2["alanlar"])
 
+
+    # ==================================================================
+    #  v2.9 — GERİ YÜKLEMEDE VERİ KAYBI
+    #  Bu üç kontrol, gidiş-dönüşün "aynı alanlar" olmasının YETMEDİĞİNİ
+    #  gösteriyor:  alan adı arayüzde YOKSA değer hiçbir yere yazılamaz.
+    # ==================================================================
+    #  1) Elektrik / topraklama değerleri:  bu alanlar avan panelinden
+    #     "Sabitler / Ofis Standardı" sekmesine taşındı ( of_<ad> ), harita
+    #     hâlâ a_<ad> üretiyordu.  Dosyada U = 220 V yazsa bile geri yüklemede
+    #     ofis varsayılanı ( 380 V ) devreye giriyor, ε %4,69 "UYGUN DEĞİL"
+    #     iken %0,98 "UYGUN" oluyordu — uygunluk kararı TERSİNE dönüyordu.
+    _av = {"ortak": {"U": 220, "kappa": 35, "eps_max": 2, "temel_a": 26.55,
+                     "temel_b": 16.4, "beta": 300, "cubuk_sayisi": 8, "mk_yok": True},
+           "asansorler": [{"tanim": "A", "kapasite": 10, "V": 1.6, "eta": 0.85,
+                           "Hk": 32.85, "kuyu_genisligi": 1800, "kabin_boyu": 1450,
+                           "kabin_genisligi": 1300, "makine_tipi": "Dişlisiz"}],
+           "sabitler": {}}
+    _al = XI.xlsx_oku(XE.avan_xlsx(_av, PROJE))["alanlar"]
+    for _k, _bek in (("U", "220"), ("kappa", "35"), ("eps_max", "2"),
+                     ("beta", "300"), ("cubuk_sayisi", "8")):
+        r.esit(f"ofis alanı of_{_k} geri geliyor", _al.get("of_" + _k), _bek)
+        r.kontrol(f"{_k} artık a_ alanına yazılmıyor", ("a_" + _k) not in _al)
+    #  Aynı değerlerle hesap DEĞİŞMEMELİ
+    _sabit = {_k: float(str(_al["of_" + _k]).replace(",", "."))
+              for _k in ("U", "kappa", "eps_max", "beta", "cubuk_sayisi")}
+    _o1 = AV.hesapla(_av)
+    _o2 = AV.hesapla({"ortak": {"temel_a": 26.55, "temel_b": 16.4, "mk_yok": True},
+                      "asansorler": _av["asansorler"], "sabitler": _sabit})
+    r.esit("geri yüklemede ε değişmiyor",
+           round(_o2["asansorler"][0]["ozet"]["eps"], 6),
+           round(_o1["asansorler"][0]["ozet"]["eps"], 6))
+    r.esit("geri yüklemede uygunluk kararı değişmiyor",
+           _o2["asansorler"][0]["ozet"]["eps_uygun"], _o1["asansorler"][0]["ozet"]["eps_uygun"])
+    r.esit("geri yüklemede Re değişmiyor",
+           round(_o2["ozet"]["Re"], 6), round(_o1["ozet"]["Re"], 6))
+
+    #  2) Özdeş grup adedi:  HESAPLAMA sayfası ortak değerleri TEK kolonda
+    #     tutar, adet ayrı hücrededir.  Adet okunmadığı için 4 asansörlük
+    #     proje tek kolona düşüyor, sonuç "4 adet uygun değil"den
+    #     "11 adet gerekir"e kayıyordu.
+    _gt = {"bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
+           "N": 11, "h": 3, "hizli1": 300, "hizli2": 3, "P": 10,
+           "kapi_genisligi": 900, "kapi_tipi": "Teleskopik Otomatik", "manuel_adet": 4}
+    _d = XI.xlsx_oku(XE.trafik_xlsx("tek", _gt, PROJE))
+    r.esit("grup adedi geri geliyor", _d["alanlar"].get("__trafik_adet"), 4)
+    for _i in range(1, 5):
+        r.esit(f"özdeş kolon {_i} dolduruluyor",
+               _d["alanlar"].get(f"c_P{_i}"), "10")
+    _tek = XI.xlsx_oku(XE.trafik_xlsx("tek", dict(_gt, manuel_adet=None), PROJE))
+    r.esit("tek asansörde adet 1", _tek["alanlar"].get("__trafik_adet"), 1)
+    r.kontrol("tek asansörde 2. kolon boş kalıyor",
+              not _tek["alanlar"].get("c_P2"))
+
+    #  3) Proje kimliği:  yalnız `proje` altında dönüyor, arayüz kullanmıyordu;
+    #     yeni dosya açılınca ÖNCEKİ projenin adı kapakta kalıyordu.
+    r.esit("proje adı kapağa geri geliyor",
+           _d["alanlar"].get("k_project_title"), PROJE["proje_adi"])
+    r.esit("işveren kapağa geri geliyor", _d["alanlar"].get("k_owner"), PROJE["isveren"])
+    r.esit("pafta no kapağa geri geliyor", _d["alanlar"].get("k_sheet_no"), PROJE["pafta_no"])
+    r.kontrol("mühendis geri yüklenmiyor ( ad+soyad birleşimi )",
+              not any(k.startswith("k_elec") or k.startswith("k_mech")
+                      for k in _d["alanlar"]))
+
     return r
 
 

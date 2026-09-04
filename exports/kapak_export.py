@@ -84,23 +84,38 @@ def _wrapped(c, value, x0, x1, top, bottom, size=5.7, color=BLACK, padding=2.0):
         return
     words = text.split()
     width = x1 - x0 - padding * 2
-    font_size = size
-    lines = []
-    while font_size >= 4.3:
-        lines, current = [], ""
+    #  SATIR BÜTÇESİ KUTUNUN GERÇEK YÜKSEKLİĞİNDEN TÜRETİLİR.  Eskiden 2'ye
+    #  sabitlenmişti:  124 karakterlik normal bir adreste "İstanbul Türkiye
+    #  34758" bölümü çıktıdan SESSİZCE düşüyordu.  Kutu daha küçük puntoda
+    #  3 satır alabiliyor; yine sığmazsa kırpma artık GÖRÜNÜR ( … ).
+    yukseklik = abs(bottom - top)
+
+    def _sar(punto):
+        satirlar, current = [], ""
         for word in words:
             candidate = f"{current} {word}".strip()
-            if current and pdfmetrics.stringWidth(candidate, F, font_size) > width:
-                lines.append(current)
+            if current and pdfmetrics.stringWidth(candidate, F, punto) > width:
+                satirlar.append(current)
                 current = word
             else:
                 current = candidate
         if current:
-            lines.append(current)
-        if len(lines) <= 2:
-            break
+            satirlar.append(current)
+        return satirlar
+
+    def _azami(punto):
+        return max(1, int(yukseklik // (punto * 1.15)))
+
+    font_size = size
+    lines = _sar(font_size)
+    while font_size > 4.3 and len(lines) > _azami(font_size):
         font_size -= 0.2
-    lines = lines[:2] or [text]
+        lines = _sar(font_size)
+    if len(lines) > _azami(font_size):
+        #  En küçük puntoda bile sığmıyor — kırpıldığı ÇIKTIDA görünsün.
+        lines = lines[:_azami(font_size)]
+        lines[-1] = lines[-1].rstrip() + " …"
+    lines = lines or [text]
     line_height = font_size * 1.15
     baseline = _y((top + bottom) / 2) + (len(lines) - 1) * line_height / 2 - font_size * 0.33
     c.setFont(F, font_size)

@@ -46,6 +46,14 @@ def _metin(x):
     return str(x).strip()
 
 
+def _sayi_oku(x):
+    """Geri yüklenen metinden tam sayı; okunamazsa None."""
+    try:
+        return int(float(str(x).replace(",", ".").strip()))
+    except (TypeError, ValueError):
+        return None
+
+
 def _oku(ws, adres, anahtar=None):
     """
     Hücreyi arayüz değerine çevirir.  Evet/Hayır kutuları METİN olarak
@@ -156,10 +164,27 @@ def xlsx_oku(icerik: bytes) -> dict:
         ws = wb[H.TEK_SAYFA]
         for anahtar, adres in H.TEK.items():
             alan = H.tek_alan(anahtar)
-            if alan:                      # manuel_adet'in arayüzde karşılığı yok
+            if alan:                      # manuel_adet'in ayrı bir form alanı yok
                 alanlar[alan] = _oku(ws, adres)
+        #  GRUP ADEDİ GERİ YÜKLENİR.  HESAPLAMA sayfası ÖZDEŞ asansörlerin
+        #  ortak değerlerini tek kolonda tutar; adet ayrı bir hücrededir
+        #  ( manuel_adet ).  Bu adet okunmadığı için 4 asansörlük bir proje
+        #  tek kolona düşüyor, sonuç "4 adet uygun değil"den "11 adet gerekir"e
+        #  kayıyordu.  Adet arayüz sayacına ( __trafik_adet ) verilir ve
+        #  ÖZDEŞ oldukları için 2..n kolonları 1. kolondan çoğaltılır.
+        adet = _sayi_oku(_oku(ws, H.TEK["manuel_adet"]))
+        if adet and 2 <= adet <= 4:
+            alanlar["__trafik_adet"] = adet
+            for i in range(2, adet + 1):
+                for anahtar in H.TEK_ASANSOR_ALANLARI:
+                    kaynak = alanlar.get(H.coklu_asansor_alan(anahtar, 1))
+                    if kaynak not in (None, ""):
+                        alanlar[H.coklu_asansor_alan(anahtar, i)] = kaynak
+        else:
+            alanlar["__trafik_adet"] = 1
         ek_nufus = ("c", _ek_nufus_oku(ws, H.TEK_EK_NUFUS))
-        ozet = "Tek asansör trafik hesabı"
+        ozet = ("Tek asansör trafik hesabı" if alanlar["__trafik_adet"] == 1
+                else f"Trafik hesabı — {alanlar['__trafik_adet']} özdeş asansör")
 
     else:
         raise YuklemeHatasi(
@@ -167,7 +192,16 @@ def xlsx_oku(icerik: bytes) -> dict:
             "Beklenen sayfalardan biri bulunamadı "
             f"({H.TEK_SAYFA} / {H.COKLU_SAYFA} / {H.AVAN_SAYFA}).")
 
-    sonuc = {"tur": tur, "alanlar": alanlar, "proje": _proje_oku(wb), "ozet": ozet}
+    #  PROJE KİMLİĞİ FORMA DA YAZILIR.  Eskiden yalnız `proje` altında dönüyor
+    #  ve arayüz onu hiç kullanmıyordu:  yeni dosya açılınca ÖNCEKİ projenin
+    #  adı / işvereni kapakta kalıyor, sonraki çıktı yanlış kimlikle üretiliyordu.
+    proje = _proje_oku(wb)
+    for anahtar, deger in proje.items():
+        alan = H.proje_alan(anahtar)
+        if alan and deger not in (None, ""):
+            alanlar[alan] = deger
+
+    sonuc = {"tur": tur, "alanlar": alanlar, "proje": proje, "ozet": ozet}
     if ek_nufus:
         sonuc["ek_nufus_hedef"], sonuc["ek_nufus"] = ek_nufus
     return sonuc

@@ -69,12 +69,21 @@ def main(argv):
         print(f"  {isaret}  TEST {no}  {ad:<26} {gecti:>5} geçti  "
               f"{kaldi:>3} kaldı  {GRI}{sure:5.1f} sn{SIFIR}{ek}")
     print("─" * 68)
-    renk = YESIL if tk == 0 else KIRMIZI
+    #  ÇÖKEN TEST DE BAŞARISIZLIKTIR.  Bir test modülü istisna atınca
+    #  ( kaldi = 0 ) sayaç artmıyor, özet "0 başarısız" diyor ve çıkış kodu 0
+    #  oluyordu:  sürekli tümleştirme YEŞİL görünürken test hiç koşmamış
+    #  oluyordu.  `tamam` bayrağı yalnız ✔/✘ simgesinde kullanılıyordu.
+    coken = [no for no, _ad, tamam, _g, kaldi, _a, _s in sonuclar
+             if not tamam and kaldi == 0]
+    renk = YESIL if (tk == 0 and not coken) else KIRMIZI
     print(f"  {renk}TOPLAM : {tg} kontrol geçti, {tk} başarısız{SIFIR}"
           f"{f'  ({ta} bölüm atlandı)' if ta else ''}"
           f"   {GRI}· {time.time()-baslangic:.1f} sn{SIFIR}")
+    if coken:
+        print(f"  {KIRMIZI}✘ ÇALIŞTIRILAMAYAN TEST : {', '.join(coken)}"
+              f"   —   bu bir BAŞARISIZLIKTIR{SIFIR}")
     print("═" * 68 + "\n")
-    return 0 if tk == 0 else 1
+    return 0 if (tk == 0 and not coken) else 1
 
 
 if __name__ == "__main__":

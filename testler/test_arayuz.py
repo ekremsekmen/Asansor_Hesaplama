@@ -12,6 +12,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from exports import xlsx_export as XE           # noqa: E402
 from testler.ortak import Rapor      # noqa: E402
 
 BASE = os.environ.get("AVAN_TEST_URL", "http://127.0.0.1:8760")
@@ -1012,6 +1013,70 @@ def calistir():
         pg.wait_for_timeout(600)
         tasma = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
         r.kontrol("dar ekranda yatay taşma yok", tasma <= 2, f"→ {tasma} px taşma")
+
+        # ==============================================================
+        #  v2.9 — YÜKLEMEDE ÖNCEKİ PROJENİN ARTIKLARI
+        #  uygula() yalnız GELEN alanları yazıyordu;  dosyada olmayan alanlar
+        #  önceki projeden kalıyordu.  Tek asansörlük bir dosya, formda duran
+        #  eski 2. ve 3. kolonlar yüzünden ÜÇLÜ GRUP olarak hesaplanabiliyordu.
+        # ==============================================================
+        pg.set_viewport_size({"width": 1440, "height": 900})
+        pg.wait_for_timeout(400)
+        pg.evaluate("trafikAdedi(3)")
+        pg.wait_for_timeout(400)
+        for _i, (_P, _kg) in enumerate((("10", "900"), ("16", "1100"), ("20", "1100")), 1):
+            pg.select_option(f"#c_P{_i}", _P)
+            pg.select_option(f"#c_kg{_i}", _kg)
+        pg.wait_for_timeout(700)
+        _once = pg.evaluate("[1,2,3,4].map(i=>(document.getElementById('c_P'+i)||{}).value)")
+        r.kontrol("üç kolon dolduruldu", _once[:3] == ["10", "16", "20"], f"→ {_once}")
+
+        _tekx = os.path.join(_D, "tek_tek.xlsx")
+        with open(_tekx, "wb") as _f:
+            _f.write(XE.trafik_xlsx("tek", {
+                "bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
+                "N": 11, "h": 3, "hizli1": 44, "hizli2": 3, "P": 10,
+                "kapi_genisligi": 900, "kapi_tipi": "Teleskopik Otomatik"}, {}))
+        pg.set_input_files("#xlsx_ac", _tekx)
+        pg.wait_for_timeout(3000)
+        _sonra = pg.evaluate("[1,2,3,4].map(i=>(document.getElementById('c_P'+i)||{}).value)")
+        r.kontrol("tek asansörlük dosya eski kolonları temizliyor",
+                  not any(_sonra[1:]), f"→ {_sonra}")
+        r.esit("tek asansörlük dosyada adet 1", pg.evaluate("TRAFIK_ADET"), 1)
+
+        #  Avan dosyasındaki kapasite / hız, formdaki eski trafikle EZİLMEMELİ
+        _avx = os.path.join(_D, "avan_16.xlsx")
+        with open(_avx, "wb") as _f:
+            _f.write(XE.avan_xlsx({
+                "ortak": {"temel_a": 26.55, "temel_b": 16.4, "mk_yok": True},
+                "asansorler": [{"tanim": "A", "kapasite": 16, "V": 2.5, "eta": 0.85,
+                                "Hk": 32.85, "kuyu_genisligi": 2000, "kabin_boyu": 1700,
+                                "kabin_genisligi": 1300, "makine_tipi": "Dişlisiz"}],
+                "sabitler": {}}, {}))
+        pg.set_input_files("#xlsx_ac", _avx)
+        pg.wait_for_timeout(3500)
+        r.esit("yüklenen avan kapasitesi korunuyor",
+               pg.evaluate("(document.getElementById('a_kapasite1')||{}).value"), "16")
+        r.kontrol("yüklenen avan hızı korunuyor",
+                  pg.evaluate("(document.getElementById('a_V1')||{}).value")
+                  in ("2,5", "2.5"))
+
+        #  v2.9 — TIRNAK İÇEREN METİN KESİLMEMELİ.  kacis() yalnız & < >
+        #  kaçırıyordu;  value="${kacis(...)}" özniteliğinde çift tırnak
+        #  özniteliği erken kapatıyor, `Daire "A" bloğu` yazıp yeniden açınca
+        #  alanda yalnız `Daire ` kalıyordu.
+        pg.evaluate("""() => {
+            document.getElementById('c_eknufus_liste').innerHTML = '';
+            ekNufusEkle('c', {aciklama: 'Daire "A" bloğu & <ek>', miktar: '12',
+                              kalem: 'DOĞRUDAN KİŞİ — Tablo-1 dışı'});
+        }""")
+        pg.wait_for_timeout(400)
+        _ac = pg.evaluate(
+            "(document.querySelector('#c_eknufus_liste .en-ac')||{}).value")
+        r.esit("tırnak içeren açıklama korunuyor", _ac, 'Daire "A" bloğu & <ek>')
+        _mi = pg.evaluate(
+            "(document.querySelector('#c_eknufus_liste .en-mi')||{}).value")
+        r.esit("miktar korunuyor", _mi, "12")
 
         r.kontrol("konsol hatası yok", not konsol, f"→ {konsol[:4]}")
         tarayici.close()

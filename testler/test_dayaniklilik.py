@@ -214,11 +214,27 @@ def calistir():
                       {"girdiler": {"ortak": {}, "asansorler": []}, "proje": {}}):
             try:
                 kod, icerik, basliklar = istek(yol, govde)
-                r.kontrol(f"{yol} boş girdide çökmedi", kod == 200 and len(icerik) > 500)
-                if yol.endswith("pdf"):
-                    r.kontrol(f"{yol} geçerli PDF", icerik[:4] == b"%PDF")
+                r.kontrol(f"{yol} boş girdide çökmedi", kod == 200 and len(icerik) > 0,
+                          f"→ HTTP {kod}, {len(icerik)} bayt")
+                #  v2.9 — İKİ KABUL EDİLEBİLİR SONUÇ VAR:
+                #    (a) geçerli dosya          — hesap tamamsa
+                #    (b) düzgün JSON hata       — hesap reddedildiyse
+                #  Kabul EDİLMEYEN:  çökme ya da BOZUK dosya.  ( XLSX artık
+                #  hatalı hesapta üretilmiyor:  Excel şablonu Python'a özgü
+                #  denetimleri taşımadığı için reddedilen hesap dosyada
+                #  sorunsuz görünüyordu. )
+                _json_mu = icerik.lstrip()[:1] == b"{"
+                if _json_mu:
+                    import json as _j
+                    r.kontrol(f"{yol} hata gövdesi düzgün JSON",
+                              bool(_j.loads(icerik.decode("utf-8")).get("hata")),
+                              f"→ {icerik[:80]!r}")
+                elif yol.endswith("pdf"):
+                    r.kontrol(f"{yol} geçerli PDF",
+                              icerik[:4] == b"%PDF" and len(icerik) > 500)
                 else:
-                    r.kontrol(f"{yol} geçerli XLSX", icerik[:2] == b"PK")
+                    r.kontrol(f"{yol} geçerli XLSX",
+                              icerik[:2] == b"PK" and len(icerik) > 500)
             except Exception as e:                                  # noqa: BLE001
                 r.kontrol(f"{yol} boş girdi", False, f"→ {e}")
 

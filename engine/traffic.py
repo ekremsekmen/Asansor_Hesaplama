@@ -110,6 +110,26 @@ def _ts_hatasi(ts, ta, tk, tg, tv, on_ek=""):
             "kontrol edin ya da alanları boşaltıp tablo değerlerini kullanın.")
 
 
+#  ⑤ / ⑥ NÜFUS GİRDİLERİ  —  tek ve çoklu hesapta AYNI denetim.
+#  Üst sınır vardı ( "ondalık ayracı olarak virgül kullanın" ), ALT sınır yoktu:
+#  ⑥ diğer oda sayısına −1 girilince bir dairedeki kişi 2 + (−1) = 1 oluyor,
+#  nüfus 500'den 100'e düşüyor ve gereken asansör 4'ten 2'ye iniyordu — hatasız.
+#  Negatif oda / yatak / araç / alan diye bir şey yoktur.
+def _nufus_girdi_hatasi(bt, h1, h2, on_ek=""):
+    bt = bt or ""
+    for deger, ad in ((h1, "⑤"), (h2, "⑥")):
+        if sayi_mi(deger) and deger < 0:
+            return (f"HESAP HATASI: {on_ek}{ad} girdisi negatif ( {tr(deger)} ) — "
+                    "oda / yatak / araç adedi ya da çalışma alanı negatif olamaz.")
+    if ((bt == "Konut" and ((sayi_mi(h1) and h1 > 2000) or (sayi_mi(h2) and h2 > 20)))
+            or ((bt.startswith("Otel") or bt == "Hastane") and sayi_mi(h1) and h1 > 20000)
+            or (bt == "Katlı Otopark" and ((sayi_mi(h1) and h1 > 20000)
+                                           or (sayi_mi(h2) and h2 > 20000)))):
+        return (f"HESAP HATASI: {on_ek}⑤/⑥ değeri olağandışı — girdiyi kontrol edin "
+                "(ondalık ayracı olarak virgül kullanın).")
+    return None
+
+
 def _hesap_standardi(bina_yuksekligi, yapi_yuksekligi):
     """BYKHY md.4 — yüksek yapı ölçütü."""
     by = bina_yuksekligi or 0
@@ -559,8 +579,14 @@ def hesapla_tek(g: dict) -> dict:
         },
         "nufus": nufus_satirlari,
         "bolumler": [b1, b2, b3, b4, b5],
-        "oneriler": _oneri_tablosu(N, B, k, Izul, standart, sartli,
-                                   V_min, h, kg_, kt, P, ta, tk, tp, mtg, V),
+        #  ÖNERİ TABLOSU YALNIZ GEÇERLİ BİR HESAPTA ÜRETİLİR.
+        #  Tablo, kullanıcının kendi ta/tk/tg/tp değerlerini taban alır; bu
+        #  değerler reddedilmişse ( ör. ts < 0 ) tablonun tamamı o geçersiz
+        #  tabana dayanır.  Eskiden ana hesap dururken tablo "uygun / önerilen"
+        #  satırlar basmaya devam ediyordu.
+        "oneriler": ([] if hata else
+                     _oneri_tablosu(N, B, k, Izul, standart, sartli,
+                                    V_min, h, kg_, kt, P, ta, tk, tp, mtg, V)),
     }
 
 
@@ -630,12 +656,9 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
     if not sayi_mi(tg):
         return f"HESAP HATASI: V = {tr(V)} m/s için Tablo-6'da tg değeri yok. tg'yi elle girin."
     bt = g.get("bina_tipi") or ""
-    h1, h2 = g.get("hizli1"), g.get("hizli2")
-    if ((bt == "Konut" and ((sayi_mi(h1) and h1 > 2000) or (sayi_mi(h2) and h2 > 20)))
-            or ((bt.startswith("Otel") or bt == "Hastane") and sayi_mi(h1) and h1 > 20000)
-            or (bt == "Katlı Otopark" and ((sayi_mi(h1) and h1 > 20000) or (sayi_mi(h2) and h2 > 20000)))):
-        return ("HESAP HATASI: ⑤/⑥ değeri olağandışı — girdiyi kontrol edin "
-                "(ondalık ayracı olarak virgül kullanın).")
+    nufus_h = _nufus_girdi_hatasi(bt, g.get("hizli1"), g.get("hizli2"))
+    if nufus_h:
+        return nufus_h
     if not sayi_mi(b) or b <= 0:
         return "HESAP HATASI: Nüfus girilmedi — ⑤ (ve gerekiyorsa ⑥) kutusunu doldurun"
     if k_tipi is not None and not bt.startswith("Kamu") and sayi_mi(g.get("manuel_k")):
@@ -703,6 +726,12 @@ def _oneri_tablosu(N, B, k, Izul, standart, esik_sartli,
                 continue
             tv = h / V
             ts = ta + tk + tg - tv
+            #  ts FİZİKSEL BİR SÜREDİR.  Elle girilmiş ta/tk/tg değerleri kabinin
+            #  bir katı geçme süresinden küçük kalınca ts negatif çıkar; ana hesap
+            #  bunu reddediyordu ( bkz. _ts_hatasi ) ama öneri tablosu aynı
+            #  sürelerle "uygun" satırlar üretmeye devam ediyordu.
+            if ts <= 0:
+                continue
             TR = 2 * H * tv + (S + 1) * ts + 2 * (0.8 * kap) * tp
             if TR <= 0:
                 continue
@@ -829,6 +858,10 @@ def hesapla_coklu(g: dict) -> dict:
     durak_ortak = (N + 1 + Nb_ortak) if sayi_mi(N) else None
     V_grup_min = T.tablo2_min_hiz(hiz_grubu, durak_ortak) if (hiz_grubu and durak_ortak) else None
     manuel_V = g.get("manuel_V")
+    #  Ortak manuel hız da tek hesaptaki gibi GEÇERLİ LİSTEDEN olmalıdır.
+    if sayi_mi(manuel_V) and manuel_V not in T.GECERLI_HIZLAR:
+        return {"hata": "HESAP HATASI: Manuel hız geçersiz — listeden seçin "
+                        "(0,63 / 1 / 1,6 / 1,75 / 2 / 2,5 / 3 / 3,5 / 5 / 6 m/s)"}
     V_ortak = manuel_V if sayi_mi(manuel_V) else V_grup_min
 
     girisler = [a for a in (g.get("asansorler") or []) if sayi_mi(a.get("P"))]
@@ -865,7 +898,14 @@ def hesapla_coklu(g: dict) -> dict:
             hata = hata or "HESAP HATASI: Manuel V geçersiz — geçerli hız listesinden seçin"
             Vi = None
         else:
-            Vi = Vi_in if sayi_mi(Vi_in) else (Vmin_i if sayi_mi(Vmin_i) else V_ortak)
+            #  HIZ ÖNCELİĞİ  —  tek hesapla AYNI:
+            #     1) asansörün kendi V'si   2) ORTAK manuel hız
+            #     3) o asansörün Tablo-2 minimumu   4) grup Tablo-2 minimumu
+            #  Ortak manuel hız eskiden yalnız 3 ve 4 yoksa devreye giriyordu:
+            #  arayüzde 2,50 m/s seçiliyken iki asansör de 1,60 m/s hesaplanıyordu.
+            Vi = (Vi_in if sayi_mi(Vi_in)
+                  else manuel_V if sayi_mi(manuel_V)
+                  else Vmin_i if sayi_mi(Vmin_i) else V_ortak)
         if sayi_mi(Vi) and sayi_mi(Vmin_i) and Vi < Vmin_i:
             U.append(f"⚠ ASANSÖR-{i}: seçilen {tr(Vi)} m/s, Tablo-2 minimumu {tr(Vmin_i)} m/s "
                      "altındadır — bekleme kriteri esas alındı, gerekçeyi paftaya yazın.")
@@ -927,6 +967,7 @@ def hesapla_coklu(g: dict) -> dict:
     if sayi_mi(N) and N > 30:
         hata = (f"HESAP HATASI: N = {int(N)} > 30. MMO/697 Tablo-3 ve Tablo-5 en fazla 30 katı "
                 "kapsar; bu yükseklikte bölgeli (zoned) trafik hesabı gerekir.")
+    hata = hata or _nufus_girdi_hatasi(bina_tipi, g.get("hizli1"), g.get("hizli2"))
     if not sayi_mi(b) or b <= 0:
         hata = hata or "HESAP HATASI: Nüfus girilmedi — ⑤/⑥ kutularını doldurun"
     if not sayi_mi(k) or not (0 < k <= 1):

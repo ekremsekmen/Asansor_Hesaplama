@@ -28,7 +28,12 @@ function trn(x, d=2){
   if(!isFinite(x)) return '—';
   return Math.abs(x-Math.round(x))<1e-9 ? tr(Math.round(x),0) : tr(x,d);
 }
-const kacis = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/*  TIRNAKLAR DA KAÇIRILIR.  Bu işlev yalnız metin içeriğinde değil,
+    value="${kacis(...)}" gibi ÖZNİTELİK içinde de kullanılıyor;  çift tırnak
+    kaçırılmayınca özniteliği erken kapatıyordu:  ek nüfus açıklamasına
+    `Daire "A" bloğu` yazıp yeniden açınca alanda yalnız `Daire ` kalıyordu.  */
+const kacis = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 function durum(msg, hata){
   const d=$('durum'); d.textContent=msg; d.className='durum gorunur'+(hata?' hata':'');
@@ -236,8 +241,12 @@ function avanDoldur(){
     if(sp && t.P!=null && t.P!==''){
       const bos = (sp.value==='' && v('a_Q_elle'+i)==='');
       const trafikDegisti = ('P' in onceki) && String(onceki.P)!==String(t.P);
-      const ilkKez = !('P' in onceki);
-      if(bos || trafikDegisti || (ilkKez && v('a_Q_elle'+i)==='')){
+      /*  DOLU BİR ALAN İLK SENKRONDA EZİLMEZ.  Eskiden "ilk kez" durumunda
+          alan dolu olsa bile üzerine yazılıyordu;  Excel'den yüklenen
+          16 kişi / 2,50 m/s, formdaki eski trafik yüzünden 10 kişi / 1,60'a
+          dönüyordu.  Boş alan zaten `bos` ile dolduruluyor;  trafik gerçekten
+          değiştiyse `trafikDegisti` güncelliyor ve kullanıcı bilgilendiriliyor. */
+      if(bos || trafikDegisti){
         const eskiDeger = sp.value;
         if(yaz1(sp, t.P, i) && eskiDeger!=='' && eskiDeger!==sp.value) yansiyan++;
       }
@@ -247,8 +256,7 @@ function avanDoldur(){
     //  Kabin hızı
     if(sv && t.V!=null && t.V!==''){
       const trafikDegisti = ('V' in onceki) && String(onceki.V)!==String(t.V);
-      const ilkKez = !('V' in onceki);
-      if(sv.value==='' || trafikDegisti || ilkKez){
+      if(sv.value==='' || trafikDegisti){
         const eskiDeger = sv.value;
         if(yaz1(sv, t.V, i) && eskiDeger!=='' && eskiDeger!==sv.value) yansiyan++;
       }
@@ -1408,7 +1416,36 @@ function alanaYaz(e, val){
   e.value = secenekler.includes('') ? '' : s;
 }
 
+/*  Yeni proje yüklenmeden önce ilgili bölüm TEMİZLENİR.
+    uygula() yalnız GELEN alanları yazar; dosyada olmayan alanlar önceki
+    projeden kalıyordu.  Tek asansörlük bir dosya, formda duran eski 2. ve 3.
+    kolonlar yüzünden 10+16+20 kişilik üçlü grup olarak hesaplanabiliyordu.   */
+function bolumuTemizle(tur){
+  const bosalt = id => { const e=$(id); if(e) alanaYaz(e, ''); };
+  if(tur==='tek' || tur==='coklu'){
+    for(let i=1;i<=4;i++){
+      ['P','kg','kt','V','durak','h','bodrum','mta','mtk','mtg','mtp']
+        .forEach(k=>bosalt('c_'+k+i));
+    }
+    ['bodrum','manuel_k','manuel_V'].forEach(k=>bosalt('c_'+k));
+    const l=$('c_eknufus_liste'); if(l) l.innerHTML='';
+  }
+  if(tur==='avan'){
+    for(let i=1;i<=4;i++){
+      ['tanim','kapasite','Q_elle','V','eta','Hk','kuyu_genisligi','kabin_boyu',
+       'kabin_genisligi','Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2',
+       'kablo_tipi','i_palanga','q_denge'].forEach(k=>bosalt('a_'+k+i));
+      const tv=$('a_toplam_verim'+i); if(tv) tv.checked=false;
+    }
+    ['temel_a','temel_b','serit_L','mk_uzunluk','mk_genislik'].forEach(k=>bosalt('a_'+k));
+    //  Yüklenen avan değerleri trafikle EZİLMESİN:  bu asansörler artık
+    //  "otomatik" değildir ( bkz. avanDoldur ).
+    AVAN_OTO = {};
+  }
+}
+
 function uygula(o){
+  if(o.__tur) bolumuTemizle(o.__tur);
   Object.entries(o).forEach(([k,val])=>{
     if(k.startsWith('__')) return;
     const e=$(k); if(!e) return;
@@ -1477,7 +1514,7 @@ async function xlsxYukle(dosyalar){
       const veri = await r.json();
       if(!r.ok || veri.hata){ throw new Error(veri.hata||('sunucu hatası '+r.status)); }
 
-      const uygulanacak = {...veri.alanlar};
+      const uygulanacak = {...veri.alanlar, __tur: veri.tur};
       if(veri.ek_nufus_hedef) uygulanacak['__eknufus_'+veri.ek_nufus_hedef] = veri.ek_nufus||[];
       uygula(uygulanacak);
       basarili.push({ad:f.name, tur:veri.tur, ozet:veri.ozet});

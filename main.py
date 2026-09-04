@@ -422,7 +422,15 @@ def indir_trafik_xlsx(veri: dict = Body(...)):
         belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
-        mod = E_TRF.hesapla(g).get("yol", "tek")      # yöntemi veri belirler
+        #  HESAP HATALIYSA XLSX ÜRETİLMEZ.  PDF hatayı paftaya BASAR ( okunur bir
+        #  belge çıkar ), ama Excel şablonu yalnız girdi hücrelerini alır:
+        #  Python'a özgü denetimler ( ör. "durak adedi N+1 olmalıdır" ) şablonda
+        #  yoktur, dolayısıyla ekranda reddedilen bir hesap dosyada SORUNSUZ
+        #  görünür.  Ekran neyi reddediyorsa indirme de reddeder.
+        _s = E_TRF.hesapla(g)
+        if _s.get("hata"):
+            return JSONResponse({"hata": _s["hata"]}, status_code=200)
+        mod = _s.get("yol", "tek")                    # yöntemi veri belirler
         ek = "Trafik Hesabi (PAFTA)" if mod == "tek" else "Coklu Asansor Trafik (PAFTA-COKLU)"
         _p = _proje_kimligi(veri)
         return _indir(X_XLS.trafik_xlsx(mod, g, _p),
@@ -474,6 +482,14 @@ def indir_avan_xlsx(veri: dict = Body(...)):
         belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
         if belirsiz:
             return JSONResponse({"hata": belirsiz}, status_code=200)
+        #  Hesap hatalıysa XLSX üretilmez ( gerekçe: bkz. trafik-xlsx ).
+        #  Avan tarafında hata, asansör kartının "aktif" olmamasıyla bildirilir.
+        _s = E_AVAN.hesapla(g)
+        _pasif = [a.get("uyari") for a in (_s.get("asansorler") or [])
+                  if a and not a.get("aktif") and a.get("uyari")
+                  and "TANIMLANMAMIŞ" not in str(a.get("uyari"))]
+        if _s.get("hata") or _pasif:
+            return JSONResponse({"hata": _s.get("hata") or _pasif[0]}, status_code=200)
         _p = _proje_kimligi(veri)
         return _indir(X_XLS.avan_xlsx(g, _p),
                       _dosya_adi(_p, "Avan Hesaplari", "xlsx"), XLSX_TUR)

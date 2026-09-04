@@ -481,6 +481,45 @@ def calistir():
     r.kontrol("aynı bölgede uyarı ÇIKMIYOR",
               not any("FARKLI KATLARA" in u for u in _ay.get("uyarilar") or []))
 
+    #  v2.9 — ⑤/⑥ NEGATİF OLAMAZ.  Alt sınır yoktu:  ⑥ = −1 girilince bir
+    #  dairedeki kişi 2 + (−1) = 1 oluyor, nüfus 500'den 100'e düşüyor ve
+    #  gereken asansör 4'ten 2'ye iniyordu — hiçbir hata verilmeden.
+    r.kontrol("tek: ⑥ negatif reddedilir",
+              "negatif" in (TR.hesapla_tek(g(hizli1=100, hizli2=-1)).get("hata") or ""))
+    r.kontrol("tek: ⑤ negatif reddedilir",
+              "negatif" in (TR.hesapla_tek(g(hizli1=-5)).get("hata") or ""))
+    r.kontrol("tek: ⑥ = 0 hâlâ geçerli",
+              TR.hesapla_tek(g(hizli1=100, hizli2=0)).get("hata") is None)
+    r.kontrol("çoklu: ⑤ negatif reddedilir",
+              "negatif" in (TR.hesapla_coklu(dict(c, hizli1=-5)).get("hata") or ""))
+    r.kontrol("olağandışı üst sınır korundu",
+              "olağandışı" in (TR.hesapla_tek(g(hizli2=99)).get("hata") or ""))
+
+    #  v2.9 — ÖNERİ TABLOSU GEÇERSİZ HESAPTA ÜRETİLMEZ.  Tablo kullanıcının
+    #  kendi ta/tk/tg/tp değerlerini taban alır;  bunlar reddedilmişse ( ts < 0 )
+    #  tablonun tamamı geçersiz tabana dayanır.  Ana hesap dururken tablo
+    #  "uygun / önerilen" satırlar basmaya devam ediyordu.
+    _bozuk = TR.hesapla_tek(g(manuel_ta=0.1, manuel_tk=0.1, manuel_tg=0.1))
+    r.kontrol("hatalı hesapta öneri tablosu boş",
+              bool(_bozuk.get("hata")) and not (_bozuk.get("oneriler") or []))
+    r.kontrol("geçerli hesapta öneri tablosu dolu",
+              len(TR.hesapla_tek(g()).get("oneriler") or []) > 0)
+
+    #  v2.9 — ORTAK MANUEL HIZ ÇOKLUDA DA UYGULANIR.  Eskiden yalnız o asansörün
+    #  Tablo-2 minimumu YOKSA devreye giriyordu:  arayüzde 2,50 m/s seçiliyken
+    #  iki asansör de 1,60 m/s üzerinden hesaplanıyordu ( tekte çalışıyordu ).
+    _mv = TR.hesapla_coklu(dict(c, manuel_V=2.5))
+    r.kontrol("çoklu: ortak manuel V uygulanıyor",
+              all(a["V"] == 2.5 for a in _mv.get("asansorler") or []),
+              f"→ {[a['V'] for a in _mv.get('asansorler') or []]}")
+    r.kontrol("çoklu: geçersiz ortak V reddedilir",
+              "Manuel hız geçersiz" in (TR.hesapla_coklu(dict(c, manuel_V=9)).get("hata") or ""))
+    _kv = TR.hesapla_coklu(dict(c, manuel_V=2.5, asansorler=[
+        dict(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik", V=1.6),
+        dict(P=16, kapi_genisligi=1100, kapi_tipi="Teleskopik Otomatik")]))
+    r.esit("asansörün kendi V'si ortak hızı ezer", _kv["asansorler"][0]["V"], 1.6)
+    r.esit("kendi V'si olmayan ortak hızı alır", _kv["asansorler"][1]["V"], 2.5)
+
     tek1 = TR.hesapla_tek(g(P=10, kapi_genisligi=900, kapi_tipi="Teleskopik Otomatik"))
     cok1 = TR.hesapla_coklu(dict(c, asansorler=[dict(P=10, kapi_genisligi=900,
                                                      kapi_tipi="Teleskopik Otomatik")]))
@@ -615,6 +654,21 @@ def calistir():
     r.kontrol("Gk elle Tablo-11'i geçersiz kılar",
               AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Gk_elle=740)]}
                          )["asansorler"][0]["ozet"]["Gk"] == 740)
+    #  v2.9 — SINIR AŞILDIYSA GERÇEKTEN VARSAYILANA DÖNÜLÜR.  L1 = 600 m ya da
+    #  Nsç = 600 kW girildiğinde uyarı "varsayılan kullanıldı" diyor ama hesap
+    #  yine 600'ü kullanıyordu — uyarı yalan söylüyordu.
+    _l6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, L1=600)]}
+                     )["asansorler"][0]["ozet"]
+    r.kontrol("L1 aralık dışıysa varsayılana dönülüyor", _l6["L1"] != 600,
+              f"→ {_l6['L1']}")
+    r.esit("L1 geçerliyse kullanılıyor",
+           AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, L1=45)]}
+                      )["asansorler"][0]["ozet"]["L1"], 45)
+    _n6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Nsc=600)]}
+                     )["asansorler"][0]["ozet"]
+    r.kontrol("Nsç aralık dışıysa otomatik kademe seçiliyor", _n6["Nsc"] != 600,
+              f"→ {_n6['Nsc']}")
+
     r.kontrol("motor yetersizse UYGUN DEĞİL",
               AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Nsc=5)]}
                          )["asansorler"][0]["ozet"]["motor_uygun"] is False)

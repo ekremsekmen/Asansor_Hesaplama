@@ -19,6 +19,7 @@ from engine import avan as AV, traffic as TR               # noqa: E402
 from exports import hucre_haritasi as H                    # noqa: E402
 from exports import kapak_export as KPK
 from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
+from main import XLSX_TUR                               # noqa: E402
 from testler.ortak import Rapor, hata_hucresi_ara, yeniden_hesapla, soffice_yolu  # noqa: E402
 
 # Geçici dosyalar sistemin temp klasörüne yazılır — proje klasörü kirlenmez
@@ -365,6 +366,90 @@ def calistir():
               and os.path.getsize(XE.AVAN_SABLON) > 10_000)
     r.kontrol("şablonla XLSX yeniden üretilebiliyor",
               XE.trafik_xlsx("tek", GT)[:2] == b"PK")
+
+    #  v2.9 — KAPAK ADRESİ SESSİZCE KIRPILMASIN.  Satır bütçesi 2'ye sabitti;
+    #  124 karakterlik normal bir adreste "İstanbul Türkiye 34758" bölümü
+    #  çıktıdan düşüyor, kullanıcıya hiçbir şey söylenmiyordu.  Bütçe artık
+    #  kutunun gerçek yüksekliğinden türetiliyor;  yine sığmazsa kırpma
+    #  ÇIKTIDA görünür ( … ).
+    def _kapak_metni(_adres):
+        _b = KPK.pdf_bytes({"project_title": "D", "owner": "X",
+                            "company_name": "ABC", "company_address": _adres})
+        return _metin(_b) if pdfium else ""
+    if pdfium:
+        for _ad, _adres in (
+                ("90 karakter", "Atatürk Mahallesi Cumhuriyet Caddesi No 145 "
+                                "Kat 7 Daire 21 Ataşehir İstanbul Türkiye 34758"),
+                ("124 karakter", "Barbaros Hayrettin Paşa Mahallesi 1993. Sokak "
+                                 "Nuvo Dragos Sitesi A Blok No 12 Kat 9 Daire 41 "
+                                 "Ataşehir İstanbul Türkiye 34758")):
+            _t = _kapak_metni(_adres)
+            _eksik = [p for p in _adres.split() if p not in _t]
+            r.kontrol(f"kapak adresi tam basılıyor ( {_ad} )", not _eksik,
+                      f"→ düşen: {' '.join(_eksik)[:60]}")
+        #  Kutuya hiç sığmayan bir adreste kırpma GÖRÜNÜR olmalı
+        _cok = " ".join(["Mahalle Sokak Bina Kat Daire"] * 12)
+        r.kontrol("sığmayan adreste kırpma işareti basılıyor",
+                  "…" in _kapak_metni(_cok))
+
+    #  v2.9 — ÇÖKEN TEST ÇIKIŞ KODUNU BOZMALIDIR.  Bir test modülü istisna
+    #  atınca ( kaldi = 0 ) sayaç artmıyor, özet "0 başarısız" diyor ve çıkış
+    #  kodu 0 oluyordu:  sürekli tümleştirme yeşil görünürken test hiç
+    #  koşmamış oluyordu.
+    import subprocess as _sp, tempfile as _tf, textwrap as _tw
+    _gecici = _tf.mkdtemp(prefix="avan_kosucu_")
+    with open(os.path.join(_gecici, "coken.py"), "w", encoding="utf-8") as _f:
+        _f.write("def calistir():\n    raise RuntimeError('kasıtlı çökme')\n")
+    _kok = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _kod = _tw.dedent(f"""
+        import sys, os
+        sys.path.insert(0, {_kok!r})
+        sys.path.insert(0, {_gecici!r})
+        from testler import calistir as K
+        K.TESTLER = [("9", "Çöken", "coken", False)]
+        sys.exit(K.main(["9"]))
+    """)
+    _p = _sp.run([sys.executable, "-c", _kod], capture_output=True, text=True,
+                 env={**os.environ, "NO_COLOR": "1"})
+    r.esit("çöken test çıkış kodunu 1 yapıyor", _p.returncode, 1)
+    r.kontrol("çöken test özet satırında bildiriliyor",
+              "ÇALIŞTIRILAMAYAN" in _p.stdout, f"→ {_p.stdout[-160:]!r}")
+
+    #  v2.9 — EKRAN REDDEDİYORSA XLSX DE ÜRETİLMEZ.
+    #  PDF hatayı paftaya BASAR ( okunur belge çıkar ) ama Excel şablonu yalnız
+    #  girdi hücrelerini alır:  Python'a özgü denetimler ( "durak adedi N+1
+    #  olmalıdır" gibi ) şablonda yoktur, dolayısıyla ekranda reddedilen bir
+    #  hesap indirilen dosyada SORUNSUZ görünüyordu.
+    import json as _json
+    import main as _M
+    _hatali = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
+                            "yapi_yuksekligi": "43", "N": "11", "h": "3",
+                            "hizli1": "44", "hizli2": "3",
+                            "asansorler": [{"P": "10", "kapi_genisligi": "900",
+                                            "kapi_tipi": "Teleskopik Otomatik",
+                                            "durak": "2"}]}}
+    _y = _M.indir_trafik_xlsx(_hatali)
+    _g = _json.loads(bytes(_y.body).decode("utf-8")) if "json" in _y.media_type else {}
+    r.kontrol("hatalı hesapta trafik XLSX üretilmiyor",
+              "json" in _y.media_type and "HESAP HATASI" in str(_g.get("hata")),
+              f"→ {_y.media_type}")
+    r.kontrol("hatalı hesapta trafik PDF yine üretiliyor ( hata paftaya basılır )",
+              _M.indir_trafik_pdf(_hatali).media_type == "application/pdf")
+    _saglam = _json.loads(_json.dumps(_hatali))
+    _saglam["girdiler"]["asansorler"][0].pop("durak")
+    r.kontrol("sağlam hesapta trafik XLSX üretiliyor",
+              _M.indir_trafik_xlsx(_saglam).media_type == XLSX_TUR)
+
+    _av_hatali = {"girdiler": {"ortak": {"mk_yok": True},
+                               "asansorler": [{"aktif": True, "kapasite": "10",
+                                               "V": "1,6", "eta": "9",
+                                               "Hk": "32,85", "kuyu_genisligi": "1800",
+                                               "kabin_boyu": "1450",
+                                               "kabin_genisligi": "1300"}],
+                               "sabitler": {}}}
+    _ya = _M.indir_avan_xlsx(_av_hatali)
+    r.kontrol("hatalı hesapta avan XLSX üretilmiyor", "json" in _ya.media_type,
+              f"→ {_ya.media_type}")
 
     #  v2.8 — PDF GENİŞLİK ÇARPANI İSTEK BAŞINA AYRI OLMALIDIR.
     #  Modül globaliyken, trafik paftası küçültülürken ( çarpan 1/0,9 )
