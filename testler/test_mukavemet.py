@@ -156,20 +156,27 @@ def calistir():
         r.kontrol(f"bölüm {i + 1} adım üretti", len(bl.get("adimlar") or []) > 0)
         r.kontrol(f"bölüm {i + 1} sonucu var", bool(bl.get("sonuc")))
 
-    #  ÖRNEK PROJE ARTIK ASKI HALATINDAN KALIYOR.  TS EN 81-20 m.5.5.2.1
-    #  tahrik kasnağı / halat oranını EN AZ 40 ister;  Excel'in örneğinde
-    #  240 / 6,5 = 36,9.  Kaynak Excel bu kontrolü 30 ile yaptığı için
-    #  "uygun" görünüyordu.  Beklenen davranış budur — geri dönerse test bağırır.
+    #  ÖRNEK PROJE İKİ BÖLÜMDEN KALIYOR — ikisi de kaynak kitabın gizlediği
+    #  gerçek yetersizliklerdir:
+    #    · ASKI HALATLARI — TS EN 81-20 m.5.5.2.1 tahrik kasnağı / halat
+    #      oranını EN AZ 40 ister;  örnekte 240 / 6,5 = 36,9.  Kitap kontrolü
+    #      30 ile yaptığı için "uygun" görünüyordu  ( sapma ① ).
+    #    · MOTOR GÜCÜ — verim makine tipine bağlandı;  dişlisiz + 2:1 askıda
+    #      η′ = 0,75 ve gereken güç 5,90 kW.  Örnekte seçilen motor 4,9 kW.
+    #      Kitap sabit η = 0,92 ile 4,81 kW deyip "uygun" gösteriyordu
+    #      ( sapma ⑨ ).
+    #  Beklenen davranış budur — geri dönerse test bağırır.
     _kalan = [x["baslik"] for x in b if (x.get("sonuc") or {}).get("uygun") is False]
-    r.esit("örnek projede yalnız askı halatı kalıyor", len(_kalan), 1)
-    r.kontrol("kalan bölüm askı halatları", _kalan and "ASKI HALAT" in _kalan[0],
-              f"→ {_kalan}")
+    r.esit("örnek proje iki bölümden kalıyor", len(_kalan), 2)
+    r.kontrol("kalan bölümler motor gücü ve askı halatları",
+              sorted(x[:1] for x in _kalan) == ["1", "4"], f"→ {_kalan}")
     r.esit("Dt/dh eşiği standarda göre 40", MK.SABIT["Dt_dh_asgari"], 40)
     _oran = 240 / 6.5
     r.kontrol("örnek proje 40 eşiğini sağlamıyor", _oran < 40, f"→ {_oran}")
-    #  Kasnak büyütülünce geçmeli
-    _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280})
-    r.kontrol("kasnak 280 mm olunca bütün bölümler uygun",
+    #  İkisi de giderilince bütün bölümler uygun olmalı
+    _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280,
+                     "motor_gucu": 7.5})
+    r.kontrol("kasnak 280 mm ve motor 7,5 kW olunca bütün bölümler uygun",
               _d["aktif"] and _d["ozet"]["tumu_uygun"],
               "→ " + ", ".join(x["baslik"] for x in (_d.get("bolumler") or [])
                                if (x.get("sonuc") or {}).get("uygun") is False))
@@ -196,12 +203,16 @@ def calistir():
             r.kontrol(f"böl.{i + 1}  {hucre}  {ne}", bulundu,
                       f"→ Excel {bek!r} bölümün adımlarında yok")
 
-    #  Özet değerleri birebir
+    #  Özet değerleri birebir.  Bilerek ayrıldığımız hücreler ( ör. AQ23 —
+    #  motor gücü, verim makine tipine bağlandığı için ) burada da atlanır;
+    #  onları _sapmalar() ayrıca denetler.
     for anahtar, hucre in (("N_hesap", "AQ23"), ("kabin_alani", "X84"),
                            ("Sf", "T125"), ("S_gercek", "T126"),
                            ("Mg_kabin", "AH291"), ("Mg_agirlik", "AH554"),
                            ("Fk_kabin", "AU351"), ("FKR", "AX611"),
                            ("FAR", "AN616"), ("Fkt", "AF621"), ("Fat", "AI627")):
+        if hucre in AYRILAN:
+            continue
         r.kontrol(f"özet {anahtar} ≡ {hucre}",
                   _yakin(s["ozet"][anahtar], ws[hucre].value),
                   f"→ motor {s['ozet'][anahtar]!r}, Excel {ws[hucre].value!r}")
@@ -226,10 +237,14 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 7)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 8)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
-        r.kontrol(f"sapma '{ad[:34]}' standart maddesi yazılı",
-                  bool(madde) and ("81-20" in madde or "81-50" in madde),
+        #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
+        #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
+        #  verimi için sayı vermez, ofisin kendi avan tablosu verir ).
+        r.kontrol(f"sapma '{ad[:34]}' dayanağı yazılı",
+                  bool(madde) and ("81-20" in madde or "81-50" in madde
+                                   or "ofis standardı" in madde),
                   f"→ {madde!r}")
 
     #  ① Dt/dh eşiği
@@ -302,6 +317,44 @@ def _sapmalar(r):
               _yakin(s["_h"]["Z379"],
                      MK._flans(s["_h"]["AY321"],
                                MK._ray_ozellik("89 x 62 x 15,88"), 2 * 17)))
+
+    #  ⑨  motor verimi makine tipine bağlı  ( ofis standardı, TEK KAYNAK )
+    from engine.ortak import ofis as _OF
+    from engine.uygulama import mukavemet_girdi as _MG
+    import engine.avan.tablolar as _AT
+    r.kontrol("⑨ verim tablosu avan ile UYGULAMA'da tek kaynak",
+              _AT.MAKINE_TIPLERI is _OF.MAKINE_VERIMLERI,
+              "→ tablo ikiye ayrılmış;  yeniden ayrışabilir")
+    r.esit("⑨ ofis verim tablosu", dict(_OF.MAKINE_VERIMLERI),
+           {"Dişlisiz": 0.85, "Dişli": 0.50})
+    r.esit("⑨ palanga verim düşüşü  ( MMO/697 §2.4 )", _OF.PALANGA_VERIM_DUSUSU, 0.10)
+    r.kontrol("⑨ makine tipi artık girdi ve Excel'de B130'a bağlı",
+              ("makine_tipi", "B130") in [(a[0], a[1]) for a in _MG.ALANLAR],
+              f"→ {[a[:2] for a in _MG.ALANLAR if a[0] == 'makine_tipi']}")
+    _bek9 = {("Dişlisiz", 1): 0.85, ("Dişlisiz", 2): 0.75,
+             ("Dişli", 1): 0.50, ("Dişli", 2): 0.40}
+    for (_t, _r2), _e in sorted(_bek9.items()):
+        _v = MK.hesapla({"makine_tipi": _t, "aski_orani": _r2})["_h"]["AQ22"]
+        r.kontrol(f"⑨ η′  {_t} {_r2}:1  = {_e}", _yakin(_v, _e), f"→ {_v!r}")
+    _s9 = MK.hesapla({"makine_tipi": "Dişli", "aski_orani": 1})
+    _bekN = _s9["_h"]["AQ9"] * _s9["girdi"]["beyan_hizi"] / (0.50 * 102)
+    r.kontrol("⑨ N = Gmax·v/(η′·102)", _yakin(_s9["_h"]["AQ23"], _bekN),
+              f"→ {_s9['_h']['AQ23']!r} ≠ {_bekN!r}")
+    r.kontrol("⑨ dişli makine dişlisizden BÜYÜK güç istiyor",
+              MK.hesapla({"makine_tipi": "Dişli"})["_h"]["AQ23"]
+              > MK.hesapla({"makine_tipi": "Dişlisiz"})["_h"]["AQ23"])
+    r.kontrol("⑨ kitabın eski sabiti 0,92 hiçbir senaryoda kullanılmıyor",
+              all(not _yakin(MK.hesapla({"makine_tipi": _t, "aski_orani": _r2})["_h"]["AQ22"],
+                             0.92) for _t in ("Dişlisiz", "Dişli") for _r2 in (1, 2)))
+    from engine.uygulama import girdi as _UG
+    import engine.avan.hesap as _AVh
+    for _t in ("Dişlisiz", "Dişli"):
+        for _r2 in (1, 2):
+            _g9 = _UG.tamamla(dict(_UG.varsayilanlar(), makine_tipi=_t, aski_orani=_r2))
+            _oz9 = _AVh.hesapla(_UG.kopru(_g9))["asansorler"][0]["ozet"]
+            r.kontrol(f"⑨ köprü η′ aynı  ( {_t} {_r2}:1 )",
+                      _yakin(_oz9["eta_p"], _bek9[(_t, _r2)]),
+                      f"→ avan {_oz9['eta_p']!r}, beklenen {_bek9[(_t, _r2)]}")
 
     #  ⑧ sığınma açıklıklarının alt sınırları  ( EN 81-20 m.5.2.5.7 / 5.2.5.8 )
     _S = MK.SIGINMA

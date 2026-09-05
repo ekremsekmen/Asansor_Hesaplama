@@ -4,6 +4,7 @@ MMO/697 (2. Baskı, Ocak 2020), TS EN 81-20, ISO 8100-32:2020 ve IEC 60364-5-52
 kaynaklı tablolar.  Değerler ASANSOR_TRAFIK_HESABI_v2_1.xlsx ve
 ASANSOR AVAN HESAPLARI.xlsx dosyalarındaki tablolarla BİREBİR aynıdır.
 """
+from engine.ortak import ofis as _OFIS
 from engine.ortak.steps import excel_round, sayi_mi
 
 # ---------------------------------------------------------------- TABLO - 1
@@ -519,16 +520,16 @@ BODRUM_NOTU = (
 #  değerler daha yüksektir — uygulamada dişli sistemlerde ≈ 0,52 – 0,78,
 #  dişlisizlerde daha üstü.  Toplam verim girilecekse palanga cezası TEKRAR
 #  UYGULANMAMALIDIR (çift sayılır); program bunun için ayrı bir seçenek sunar.
-MAKINE_TIPLERI = {
-    "Dişlisiz": 0.85,     # ofis kabulü
-    "Dişli":    0.50,     # ofis kabulü
-}
+#  Makine verimi tablosu artık ORTAK ofis standardındadır:  uygulama projesi
+#  ( mukavemet ) de aynı sayıları okur.  Bir süre iki yerde ayrı durdu ve
+#  ayrıştı — bkz. engine/ortak/ofis.py.
+MAKINE_TIPLERI = _OFIS.MAKINE_VERIMLERI
 ASKI_ORANLARI = {"1:1": 1, "2:1": 2}
 
 
 def makine_verimi(makine_tipi):
     """Makine tipine göre η ( ofis kabulü ).  Tanınmayan tip için None."""
-    return MAKINE_TIPLERI.get(makine_tipi)
+    return _OFIS.makine_verimi(makine_tipi)
 
 
 def aski_orani_metni(i):

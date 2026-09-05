@@ -1085,10 +1085,16 @@ def calistir():
                  "KILAVUZ RAYLARININ", "SIĞINMA ALANLARI", "SONUÇ ÖZETİ",
                  "Hesabı yapan"):
         r.kontrol(f"mukavemet PDF: {_ara}", _ara in _mm)
-    #  Sayılar paftaya GERÇEKTEN basılıyor mu — boş şablon "geçti" sayılmasın
-    for _ara in ("4,81", "17,63", "21.326", "58.860"):
+    #  Sayılar paftaya GERÇEKTEN basılıyor mu — boş şablon "geçti" sayılmasın.
+    #  Motor gücü elle YAZILMAZ:  motordan okunur, yoksa hesap değiştiğinde
+    #  test sessizce eskir  ( verim makine tipine bağlanınca 4,81 → 5,90 oldu ).
+    _msn = _MK.hesapla()
+    _ngucu = f"{_msn['ozet']['N_hesap']:.2f}".replace(".", ",")
+    for _ara in (_ngucu, "17,63", "21.326", "58.860"):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
                   f"→ paftada yok")
+    r.kontrol("mukavemet PDF'inde makine tipi ve η′ görünüyor",
+              "Makine tipi" in _mm and "η′" in _mm, "→ verim satırları basılmamış")
 
     #  Hesap durduran girdide de GEÇERLİ belge çıkmalı, sebebi yazmalı
     _mbos = PE.mukavemet_pdf(_MK.hesapla({"kabin_agirligi": None}), PROJE)
@@ -1128,7 +1134,7 @@ def calistir():
                   "11-Muk. Hesapları" in _wb.sheetnames
                   and "Askı Tipleri" in _wb.sheetnames)
         #  TESLİM EDİLEN KİTAP PAFTAYLA ÇELİŞMEMELİ.
-        #  Program standart gereği kaynak kitabın yedi hesabından ayrılıyor;
+        #  Program kaynak kitabın sekiz hesabından ayrılıyor;
         #  kitap olduğu gibi verilseydi aynı projenin iki belgesi birbirini
         #  yalanlardı ( pafta "uygun değil" derken Excel "uygundur" ).
         #  Teslim kopyasında o FORMÜLLER düzeltilir — aşağıda gerçekten
@@ -1151,7 +1157,12 @@ def calistir():
                _duz["AD636"].value, "=P639*1000")
         r.esit("teslim kopyasında ray dibi açıklığı 100 mm",
                _duz["AD647"].value, 100)
+        r.kontrol("teslim kopyasında η makine tipine bağlı formül",
+                  "B130" in str(_duz["AQ22"].value)
+                  and "B100" in str(_duz["AQ22"].value),
+                  f"→ {_duz['AQ22'].value!r}")
         _sb = _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]
+        r.esit("kaynak kitapta η sabit 0,92 idi", _sb["AQ22"].value, 0.92)
         r.esit("kaynak kitapta bu sınırlar 1200 / 150 idi",
                [_sb["AD636"].value, _sb["AD647"].value], [1200, 150])
         r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",

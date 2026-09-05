@@ -28,11 +28,14 @@ Not:  ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β �
 zaten "Sabitler / Ofis Standardı" sekmesinden gelir;  o da ikinci kez
 sorulmaz.
 """
+from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import mukavemet_tablolari as MT
 
-MK_VERIM = MK.SABIT["motor_verimi"]
+#  Tanınmayan makine tipinde geri düşülecek verim.  Adı geriye dönük
+#  uyum içindir;  gerçek verim artık makine tipinden gelir ( OFIS ).
+MK_VERIM = OFIS.VARSAYILAN_VERIM
 
 #  ( anahtar , etiket , birim , tür , seçenekler , varsayılan )
 #  Mukavemette KARŞILIĞI OLMAYAN girdiler.  Hepsi elektrik hesaplarına girer.
@@ -126,10 +129,13 @@ def kopru(g):
         "Nsc": g.get("motor_gucu"),               # seçilen motor gücü  [kW]
         "i_palanga": g.get("aski_orani"),
         "gr": ray,                                # ray metre ağırlığı  [kg/m]
-        #  Motor verimi:  mukavemet motorunun kabulü kullanılır ( MMO 208/7
-        #  hesabındaki η ).  Avan tarafına da aynı değer gider ki iki hesap
-        #  aynı verimden konuşsun;  kullanıcıya ayrıca sorulmaz.
-        "eta": MK_VERIM,
+        #  Motor verimi:  MAKİNE TİPİNDEN gelir ( ofis standardı, tek kaynak
+        #  engine/ortak/ofis.py ).  Avan tarafına TABAN η geçilir — palanga
+        #  düşüşünü avan kendisi uygular, yoksa iki kez düşerdi.  Eskiden
+        #  buradan sabit 0,92 geçiyordu:  aynı asansör için avan paftası ile
+        #  uygulama paftası farklı motor gücü veriyordu.
+        "makine_tipi": g.get("makine_tipi"),
+        "eta": (OFIS.makine_verimi(g.get("makine_tipi")) or MK_VERIM),
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
         "S1": g.get("kolon_kesit"), "L1": g.get("kolon_uzunluk"),

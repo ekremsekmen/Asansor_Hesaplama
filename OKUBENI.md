@@ -415,21 +415,21 @@ kaldığınız yerden devam edersiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**24.658 kontrolün tamamı geçmiştir.**
+**24.536 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **757 / 757** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **368 / 368** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon, yerleşim taşması | **328 / 328** |
-| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.499 / 4.499** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **371 / 371** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon, yerleşim taşması | **329 / 329** |
+| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.507 / 4.507** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
-| **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.019 / 1.019** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **sekiz sapmanın uygulandığının kanıtı** + girdi reddi | **225 / 225** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan 30 hücre ayrı denetlenir | **10.794 / 10.794** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları | **91 / 91** |
+| **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.021 / 1.021** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **dokuz sapmanın uygulandığının kanıtı** + girdi reddi | **238 / 238** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan 30 hücre ayrı denetlenir | **10.641 / 10.641** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları | **95 / 95** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -476,7 +476,8 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki sekiz noktada kitap standarttan sapıyor — program
+noktasıdır. Aşağıdaki dokuz noktada kitap standarttan ( ⑨'da ofisin kendi
+kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
 
@@ -489,6 +490,7 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | ⑤ | ω burkulma katsayısı | **EN 81-50 m.5.10.3** — ω, λ **ve Rm**'e bağlıdır | Tek tablo kullanır; o tablo yalnız **Rm = 370** eğrisidir ve ray çeliğinden bağımsız uygulanır | Rm 370 ve 520 eğrileri, arada doğrusal ara değer |
 | ⑥ | Acil frenlemede μ | **EN 81-50 m.5.11.2.3.2** — μ = 0,1/(1+v/10), v **halat** hızı | Bağıntıya **kabin** hızını koyar | v = kabin hızı × askı oranı |
 | ⑦ | Nps · Npr | **EN 81-50 m.5.12.2** — tesisin askı düzenine bağlı | Hesap sayfasına **sabit** 1 ve 0 yazar | Girdi; palangalı sistemde uyarı verilir |
+| ⑨ | Motor verimi η | **Ofisin kendi tablosu** ( avan ): dişlisiz 0,85 · dişli 0,50 · palangalı sistemde −0,10 ( MMO/697 §2.4 ) | Makine tipinden **bağımsız** sabit 0,92; `B130`'daki makine tipini hiç okumaz | η makine tipinden gelir, palanga düşüşü uygulanır |
 | ⑧ | İki sığınma açıklığı | **EN 81-20 m.5.2.5.7.3** ve **m.5.2.5.8.2 a) 2)** | Kabin üstü **1200 mm**, ray dibi **150 mm** — ikisi de standartta yok | Kabin üstü = sığınma hacminin yüksekliği ( **1000 mm** ), ray dibi = Şekil 7 ( **100 mm** ) |
 
 **①'in pratik sonucu:** kitabın kendi örneğinde tahrik kasnağı 240 mm, halat
@@ -538,9 +540,26 @@ olarak değil, doğrudan sığınma hacminden okur.
 Ayrıca kitap ölçüleri `>` ile karşılaştırıyordu; standart **"en az"** dediği
 için sınıra **eşit** ölçü de uygundur — program `≥` kullanır.
 
+**⑨'un etkisi.** Kitap η'yı makine tipinden bağımsız 0,92 alıyordu; ofisin
+**kendi avan tablosu** ise dişlisiz için 0,85, dişli için 0,50 diyor. Aynı
+asansör, aynı ofis, iki pafta:
+
+| | mukavemet ( eski ) | avan | mukavemet ( şimdi ) |
+|---|---|---|---|
+| Dişlisiz 2:1 | 4,81 kW | 5,23 kW | **5,90 kW** |
+| Dişli 2:1 | 4,81 kW | 9,80 kW | **11,07 kW** |
+
+Dişli makinede kitap gerekli gücün **yarısından azını** söylüyordu — emniyetsiz.
+Örnek projede seçilen motor 4,9 kW: kitap "uygun" diyordu, program artık
+**UYGUN DEĞİL** diyor. Mukavemetin avandan bir tık yüksek çıkması normaldir:
+mukavemet halat ağırlığını ( Gh ) da dengesiz yüke katar, avan katmaz.
+
+Tablo artık **iki projede tek kaynaktan** okunur ( `engine/ortak/ofis.py` ) —
+ayrışmanın sebebi iki yerde iki kopya olmasıydı.
+
 ② · ④ · ⑧'de kitap **emniyetli tarafta** ama yanlış — ⑧ standarda uygun bir
-projeyi haksız yere reddeder, kuyu boyunu gereksiz büyütür. **③ · ⑤ · ⑥ ·
-⑦'de emniyetsiz tarafta** — hesabı olduğundan iyi gösteriyor.
+projeyi haksız yere reddeder, kuyu boyunu gereksiz büyütür. **③ · ⑤ · ⑥ · ⑦ ·
+⑨'da emniyetsiz tarafta** — hesabı olduğundan iyi gösteriyor.
 
 ### Teslim edilen Excel de düzeltilir
 
@@ -560,7 +579,8 @@ Doğrulama paketi hem şablonun değişmediğini hem de teslim kopyasının paft
 > ( sütun 7 → 6 ) · `11!AK190` ( `C61` → `C61*B100` ) · `11!AH105/AH106`
 > ( sabit → girdi ) · `11!Q380·Q385·Q477·Q482·Q538·Q596` ( `1+2*` → `ℓ+2*` ) ·
 > `11!AD354` ve `AB39` ( ω tablosu → EN 81-50 formülü ) · `11!AD636`
-> ( 1200 → `=P639*1000` ) · `11!AD647` ( 150 → 100 ).
+> ( 1200 → `=P639*1000` ) · `11!AD647` ( 150 → 100 ) · `11!AQ22`
+> ( 0,92 → makine tipi ve askı oranına bağlı formül ).
 
 #### Kitapta ayrıca bulunanlar
 
@@ -597,6 +617,12 @@ hepsi **birebir tutuyor**:
 - Birleşik gerilmeler σm + (Fv+k3·Maux)/A ve σk + 0,9·σm
 - **Halat emniyet katsayısı** 12 ( ≥ 3 halat ) / 16 ( 2 halat ) — m.5.5.2.2
 - **Sehim** 0,7·F·L³/(48·E·I), Fy ↔ Ix eşleşmesi
+- **Motor gücü** N = Gmax·v/(η′·102);  102 = 1000/gn ( kgf·m/s → kW ),
+  Gmax = F1 − Ga cebirsel olarak **Q/2 + Gh** — güç askı oranından
+  bağımsızdır, askı yalnız halat boyu ve verim üzerinden girer
+- **Makine kaidesi** basit kiriş statiği:  FA = F1(L−X)/L · FB = F1·X/L ·
+  Mmax = F1·X(L−X)/L — ΣF ve ΣM dengede;  σe = M/Wx;  burkulmada
+  σb = FB·ω/A ( omega yöntemi ), λ = L1/imin yukarı yuvarlanır
 - **Sığınma hacimleri** Çizelge 3 / Çizelge 4 tip 2 ( çömelmiş )
   0,50 × 0,70 × 1,00 m · **açıklıklar** m.5.2.5.7.2 ( 0,50 m ) ·
   m.5.2.5.8.2 ( 0,50 · 0,10 · 0,30 m ) · Şekil 7 ( Xₕ ≤ 0,15 m → 0,10 m )
@@ -745,9 +771,27 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   **yatay Xₕ ≤ 0,15 m** uzaklıkta olduğu kabulüyle Şekil 7'den 0,10 m alınır;
   daha uzaktaki parçalar için sınır 0,30 m ( Xₕ = 0,30 ) ve 0,50 m
   ( Xₕ ≥ 0,50 ) olur.
-- **Motor verimi η = 0,92**, **sürtünme yükü Gs = 0**, **ST 37 emniyet gerilmesi
-  σem = 130 N/mm²**, **yan yatak mesnet payı 335 mm** de kitabın kabulleridir;
-  hepsi `SABIT` sözlüğünde, yanlarında Excel hücre adresiyle durur.
+- **Sürtünme yükü Gs = 0**, **ST 37 emniyet gerilmesi σem = 130 N/mm²**,
+  **yan yatak mesnet payı 335 mm** kitabın kabulleridir; hepsi `SABIT`
+  sözlüğünde, yanlarında Excel hücre adresiyle durur. ( **Motor verimi η**
+  artık sabit değildir — makine tipinden gelir, bkz. sapma ⑨. )
+- **Motor gücü N kararlı rejim gücüdür.** Beyan hızındaki dengesiz yükü
+  karşılar; **kalkış ( ivmelenme ) momenti** — kabin, karşı ağırlık, halat,
+  kasnak ve rotor ataletleri — hesaba girmez. Motor seçiminde üretici kalkış
+  verisi ayrıca kontrol edilmelidir.
+- **Karşı ağırlık denge oranı q = 0,50 sabittir** ( Ga = P + Q/2 ). Kaynak
+  kitabın tamamı bu kabul üzerine kuruludur — karşı ağırlık kütlesi tahrik,
+  ray ve tampon hesaplarına da aynı yerden girer.
+- **Makine kaidesinde ( bölüm 2 ) darbe katsayısı k1 ve σem ofis kabulüdür.**
+  TS EN 81-20 makine kaidesi için yük modeli **vermez** — Çizelge 14
+  ( k1·k2·k3 ) o standartta açıkça **kılavuz ray** hesabına aittir. Buradaki
+  kullanım ödünçtür ve **emniyetli** taraftadır: k1 makinenin kendi ağırlığına
+  da uygulanır ve σem = 130, aynı standardın ST 37 için verdiği
+  Rm/1,8 = 205,6 N/mm²'nin yaklaşık yarısıdır. Güvenlik tertibatı tipi bu
+  bölümü doğrudan büyütür ( k1 = 2 · 3 · 5 → kaide yükü 2,5 kata kadar ).
+- **Burkulma boyu Lk = L1 alınır** ( β = 1,0 — iki ucu mafsallı ). Kolon tek
+  ucundan ankastre, öbür ucu serbestse bu kabul narinliği **olduğundan küçük**
+  gösterir; öyle bir konstrüksiyonda λ elle iki katına çıkarılmalıdır.
 - **Acil frenleme yavaşlaması a**, TS EN 81-20 gereği **en çok 1 gn**'dir; program
   bunu denetler. Tam **a = 1 gn** sınırında kabin tarafındaki halat kuvveti
   sıfırlanır — program tahrik yeteneğini *UYGUN DEĞİL* sayar ( kaynak Excel bu

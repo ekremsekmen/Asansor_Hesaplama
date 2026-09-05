@@ -121,8 +121,18 @@ def calistir():
     r.esit("köprü · Nsç = motor gücü", a["Nsc"], g["motor_gucu"])
     r.esit("köprü · askı oranı", a["i_palanga"], g["aski_orani"])
     r.esit("köprü · ray metre ağırlığı ray profilinden", a["gr"], 12.38)
-    r.esit("köprü · motor verimi mukavemetle aynı", a["eta"],
-           MK.SABIT["motor_verimi"])
+    #  Verim artık sabit değil, MAKİNE TİPİNDEN gelir;  köprü avana TABAN η
+    #  geçirir ( palanga düşüşünü avan kendisi uygular, yoksa iki kez düşerdi ).
+    from engine.ortak import ofis as _OF
+    r.esit("köprü · makine tipi taşınıyor", a["makine_tipi"], g["makine_tipi"])
+    r.esit("köprü · η makine tipinden", a["eta"],
+           _OF.makine_verimi(g["makine_tipi"]))
+    r.kontrol("köprü · η artık kitabın sabiti 0,92 DEĞİL", a["eta"] != 0.92,
+              f"→ {a['eta']!r}")
+    for _t in _OF.MAKINE_VERIMLERI:
+        _g = UG.tamamla(dict(UG.varsayilanlar(), makine_tipi=_t))
+        r.esit(f"köprü · η ( {_t} )", UG.kopru(_g)["asansorler"][0]["eta"],
+               _OF.MAKINE_VERIMLERI[_t])
     r.kontrol("köprü ORTAK_KOPRU listesindeki her alanı taşıyor",
               all(x in g for _ad, x, _av in UG.ORTAK_KOPRU),
               f"→ {[x for _a, x, _b in UG.ORTAK_KOPRU if x not in g]}")

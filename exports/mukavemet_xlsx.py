@@ -21,6 +21,7 @@ import os
 
 import openpyxl
 
+from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import mukavemet_tablolari as MT
@@ -268,6 +269,21 @@ def _omega_formulu(lam_hucre, rm_hucre):
     return f"=({a})+(({b})-({a}))*{oran}"
 
 
+def _verim_formulu():
+    """η′  =  makine tipi tablosu  −  palangalı sistemde düşüş.
+
+    Tablo ve düşüş ortak ofis standardından okunur ( engine/ortak/ofis.py ),
+    böylece pafta ile teslim edilen kitap aynı sayıyı kullanır.
+    """
+    tip, askı = "'Veri Girişi'!B130", "'Veri Girişi'!B100"
+    #  Tablo iki satırlık olduğu için iç içe IF yeterli;  tanınmayan tipte
+    #  kitabın eski sabitine ( VARSAYILAN_VERIM ) düşülür.
+    ic = repr(float(OFIS.VARSAYILAN_VERIM))
+    for ad, deger in reversed(list(OFIS.MAKINE_VERIMLERI.items())):
+        ic = f'IF({tip}="{ad}",{float(deger)!r},{ic})'
+    return (f"=({ic})-IF({askı}>1,{float(OFIS.PALANGA_VERIM_DUSUSU)!r},0)")
+
+
 def _standarda_uydur(wb, g):
     """Kaynak kitabın standarttan sapan formüllerini teslim kopyasında düzeltir."""
     ws, vg = wb[HESAP], wb[GIRDI]
@@ -312,6 +328,12 @@ def _standarda_uydur(wb, g):
     #  yuvarlı olduğu için burada da standardın formülü yazılır — yoksa
     #  pafta ile kitap binde ikilik bir farkla ayrışırdı.
     ws["AB39"] = _omega_formulu("Z71", str(MT.OMEGA_RM_ALT))
+
+    #  ⑨  Motor verimi makine tipine bağlanır  —  ofis standardı
+    #  Kitap 11!AQ22'ye sabit 0,92 yazar ve 'Veri Girişi'!B130'daki makine
+    #  tipini hiç okumaz.  Teslim kopyasında AQ22 bir FORMÜL olur:  Excel'de
+    #  makine tipi ya da askı oranı değiştirilirse verim de takip eder.
+    ws["AQ22"] = _verim_formulu()
 
     #  ⑧  Sığınma açıklıklarının iki alt sınırı  —  EN 81-20 m.5.2.5.7.3 ve
     #  m.5.2.5.8.2 a) 2).  Kitap 1200 / 150 mm ister;  standartta bu sayılar

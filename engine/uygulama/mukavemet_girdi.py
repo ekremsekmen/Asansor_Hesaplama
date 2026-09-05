@@ -14,6 +14,7 @@ AVANDAN AYRIDIR.  Avan tarafındaki tablolar ( engine/tables.py ) MMO/697
 avan kitabından gelir; buradakiler bu Excel'in kendi tablolarıdır ve
 bilerek ayrı tutulmuştur ( bkz. engine/mukavemet_tablolari.py ).
 """
+from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet_tablolari as MT
 
 #  Kabin durak yüksekliklerinin Excel'deki yeri:  G12:G34  ( 20 durak +
@@ -121,6 +122,12 @@ ALANLAR = (
     ("agirlik_ray_sayisi", "B116", "Ağırlık rayı sayısı",              "adet", "sayi", None, 2),
     ("ray_celigi_rm",     "B131", "Ray çeliği Rm",                     "N/mm²", "secim",
      MT.RAY_CELIKLERI, 370),
+    #  Makine tipi kaynak kitapta B130'da DURUYOR ( açılır listesi bile var:
+    #  "Dişli,Dişlisiz" ) ama hiçbir hesaba girmiyordu — motor gücü sabit
+    #  η = 0,92 ile hesaplanıyordu.  Artık verim buradan belirlenir;  ofisin
+    #  kendi tablosu ( engine/ortak/ofis.py ) dişli makinede 0,50 der.
+    ("makine_tipi",       "B130", "Makine tipi",                       "—",    "secim",
+     tuple(OFIS.MAKINE_VERIMLERI), "Dişlisiz"),
     ("kabin_paten_arasi", "B127", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
     ("agirlik_paten_arasi", "B128", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
     ("guvenlik_tertibati", "G36", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
@@ -217,7 +224,7 @@ GRUPLAR = (
      ("motor_gucu", "makine_agirligi", "sap_kasnak_yuk", "makine_yatak_yuk",
       "tahrik_kasnak_capi", "saptirma_kasnak_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
-      "yan_yatak_boyu")),
+      "yan_yatak_boyu", "makine_tipi")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
       "halat_arasi_yan", "kasnak_tek_yon", "kasnak_ters_yon",

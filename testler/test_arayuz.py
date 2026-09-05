@@ -151,29 +151,47 @@ def calistir():
                       _o["yukseklik"] <= 42, f"→ {_o['yukseklik']} px yüksek")
         pg.set_viewport_size({"width": 1440, "height": 1000})
         pg.wait_for_timeout(400)
-        #  VARSAYILAN PROJE ASKI HALATINDAN KALIR:  TS EN 81-20 m.5.5.2.1
-        #  tahrik kasnağı / halat oranını en az 40 ister, kaynak Excel'in
-        #  örneğinde 240 / 6,5 = 36,9.  Beklenen davranış budur.
+        #  VARSAYILAN PROJE İKİ BÖLÜMDEN KALIR — ikisi de kaynak kitabın
+        #  gizlediği gerçek yetersizliklerdir:
+        #    · ASKI HALATLARI — TS EN 81-20 m.5.5.2.1 kasnak/halat oranını en
+        #      az 40 ister, örnekte 240 / 6,5 = 36,9  ( sapma ① ).
+        #    · MOTOR GÜCÜ — verim makine tipine bağlı;  dişlisiz + 2:1'de
+        #      η′ = 0,75 → 5,90 kW gerekir, seçilen motor 4,9 kW  ( sapma ⑨ ).
+        #  Beklenen davranış budur.
         r.kontrol("uygulama hesabı koştu", pg.evaluate("SON.m && SON.m.aktif"),
                   f"→ {pg.evaluate('SON.m && SON.m.hata')}")
         _kalan = pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
                              "b.sonuc.uygun===false).map(b=>b.baslik)")
-        r.esit("varsayılanda yalnız askı halatı kalıyor", len(_kalan), 1)
-        r.kontrol("kalan bölüm askı halatları", _kalan and "ASKI HALAT" in _kalan[0],
-                  f"→ {_kalan}")
-        #  Standarda uyan kasnakla hepsi geçmeli
+        r.esit("varsayılanda iki bölüm kalıyor", len(_kalan), 2)
+        r.kontrol("kalanlar motor gücü ve askı halatları",
+                  sorted(x[:1] for x in _kalan) == ["1", "4"], f"→ {_kalan}")
+        #  İkisi de giderilince hepsi geçmeli
         pg.fill("#m_tahrik_kasnak_capi", "280")
         pg.fill("#m_saptirma_kasnak_capi", "280")
+        pg.fill("#m_motor_gucu", "7.5")
         pg.wait_for_timeout(1500)
-        r.kontrol("kasnak 280 mm olunca bütün bölümler uygun",
+        r.kontrol("kasnak 280 mm ve motor 7,5 kW olunca bütün bölümler uygun",
                   pg.evaluate("SON.m.ozet.tumu_uygun === true"),
                   f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
         r.esit("on dört hesap bölümü çizildi",
                pg.eval_on_selector_all("#m_sonuc .serit", "e=>e.length") >= 14, True)
-        #  Ekranda gerçekten SAYI var mı — boş tablo "geçti" sayılmasın
-        r.kontrol("motor gücü ekrana yazıldı",
-                  "4,81" in pg.inner_text("#m_sonuc"),
+        #  Ekranda gerçekten SAYI var mı — boş tablo "geçti" sayılmasın.
+        #  Sayı ELLE yazılmaz:  hesap değişince test sessizce eskiyor.
+        _ng = pg.evaluate("SON.m.ozet.N_hesap").__format__(".2f").replace(".", ",")
+        r.kontrol(f"motor gücü ekrana yazıldı  ( {_ng} )",
+                  _ng in pg.inner_text("#m_sonuc"),
                   f"→ {pg.inner_text('#m_sonuc')[:120]!r}")
+        #  Makine tipi seçimi ekranda gerçekten hesabı değiştiriyor mu
+        pg.select_option("#m_makine_tipi", "Dişli")
+        pg.wait_for_timeout(1400)
+        _nd = pg.evaluate("SON.m.ozet.N_hesap")
+        pg.select_option("#m_makine_tipi", "Dişlisiz")
+        pg.wait_for_timeout(1400)
+        r.kontrol("makine tipi ekranda motor gücünü değiştiriyor",
+                  _nd > pg.evaluate("SON.m.ozet.N_hesap"),
+                  f"→ dişli {_nd}, dişlisiz {pg.evaluate('SON.m.ozet.N_hesap')}")
+        pg.fill("#m_motor_gucu", "7.5")
+        pg.wait_for_timeout(1200)
 
         #  Girdi değişince yeniden hesaplanmalı ve sonuç DÖNMELİ
         pg.select_option("#m_kabin_ray_profili", "50 x 50 x 5")
