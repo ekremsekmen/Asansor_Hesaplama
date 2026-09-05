@@ -143,6 +143,34 @@ EXCEL_FARKLARI = (
      #  AC82:  azami kabin alanı.  320 kg'da kitap 0,97 der, standardın ara
      #  değeri 0,953'tür — yalnız bu yükte ayrışır.
      ("AC82",)),
+    ("Sürtünme çarpanı f kanal şeklinden bağımsız",
+     "TS EN 81-50 m.5.11.2.3.1.1  /  m.5.11.2.3.1.2",
+     "Kanal şeklinden BAĞIMSIZ olarak hep V kanal bağıntısını kullanır;  "
+     "yarım daire kanal seçilebildiği hâlde onun maddesi hiç uygulanmaz.  "
+     "Alt kesilmesi olmayan kanallarda da β = 90° alır.",
+     "Standart iki ayrı madde verir:\n"
+     "            YARIM DAİRE  ( m.5.11.2.3.1.1 )\n"
+     "                f = μ·4( cos(γ/2) − sin(β/2) ) / "
+     "( π − β − γ − sin β + sin γ )\n"
+     "            V KANAL  ( m.5.11.2.3.1.2 )\n"
+     "                sertleştirilmemiş:  f = μ·4( 1 − sin(β/2) ) / "
+     "( π − β − sin β )\n"
+     "                sertleştirilmiş ve ağırlık bloke:  f = μ / sin(γ/2)\n"
+     "        Alt kesilmesi olmayan kanalda β = 0'dır.  Kitabın yaklaşımı "
+     "yarım daire kanalda f'yi %6 ( altı kesik ) ila %65 ( düz ) BÜYÜK "
+     "gösteriyordu — tahrik yeteneğini olduğundan iyi çıkarır, emniyetsiz "
+     "taraf.  V kanalda bir fark yoktur.",
+     #  f ve ona bağlı e^(f·α) sınırları
+     ("AU206", "AV211", "AE216", "O242", "O285")),
+    ("Acil frenleme yavaşlamasının alt sınırı",
+     "TS EN 81-50 m.5.11.2.2.2",
+     "Yalnız üst sınırı ( 1 gn ) denetler;  a = 0,05 m/s² gibi bir değer "
+     "sorunsuz kabul edilirdi.",
+     "Standart 'In no case shall the rate of retardation to consider be less "
+     "than … 0,5 m/s²' der.  Küçük bir a atalet kuvvetini küçültür, T1/T2 "
+     "oranını iyileştirir ve tahrik yeteneğini olduğundan İYİ gösterir — "
+     "emniyetsiz taraf.  Alt sınır artık reddediliyor.",
+     ()),
     ("Sığınma açıklıklarının iki alt sınırı",
      "TS EN 81-20 m.5.2.5.7.3  /  m.5.2.5.8.2 a) 2)",
      "Kabin üstü serbest yüksekliğini 1200 mm, ray dibi açıklığını 150 mm "
@@ -782,7 +810,7 @@ FR_ISARET = {
 
 
 def _tahrik(g, o):
-    S = SABIT
+    S, O = SABIT, o["ofis"]
     Ra = g["halat_arasi"]
     C, D = g["sap_kasnak_yuk"], g["makine_yatak_yuk"]
     R1 = g["tahrik_kasnak_capi"] / 2.0
@@ -804,17 +832,33 @@ def _tahrik(g, o):
     mu_yuk = S["mu_yukleme"]
     mu_fren = S["mu_yukleme"] / (1 + v_halat / 10.0)
     mu_bloke = S["mu_bloke"]
-    gama, beta = math.radians(S["kanal_acisi"]), math.radians(S["alt_kesilme"])
+    #  SÜRTÜNME ÇARPANI f  —  KANAL ŞEKLİNE GÖRE AYRI MADDE.
+    #  Kaynak kitap şekilden bağımsız olarak hep V kanal bağıntısını
+    #  kullanıyordu;  yarım daire kanal seçilebildiği hâlde onun maddesi
+    #  ( m.5.11.2.3.1.1 ) hiç uygulanmıyordu — f olduğundan BÜYÜK, yani
+    #  tahrik yeteneği olduğundan iyi çıkıyordu.  ( bkz. EXCEL_FARKLARI )
+    sekil = g["kanal_sekli"]
+    yarim_daire = MT.kanal_yarim_daire_mi(sekil)
+    #  Alt kesilme yoksa β = 0;  düz yarım daire kanalın alt kesilmesi yoktur.
+    beta = math.radians(O["kanal_beta"] if MT.kanal_alti_kesik_mi(sekil) else 0.0)
+    gama = math.radians(O["kanal_gama_yd"] if yarim_daire else O["kanal_gama_v"])
     sert = g["kanal_isleme"] == "Sertleştirilmiş"
-    if sert:
-        f_yuk = mu_yuk / math.sin(gama / 2.0)
-        f_fren = mu_fren / math.sin(gama / 2.0)
-    else:
-        pay = 4 * (1 - math.sin(beta / 2.0))
-        payda = math.pi - beta - math.sin(beta)
-        f_yuk = mu_yuk * pay / payda
-        f_fren = mu_fren * pay / payda
-    f_bloke = mu_bloke / math.sin(gama / 2.0)
+
+    def _f(mu):
+        """TS EN 81-50 m.5.11.2.3.1.1 ( yarım daire ) / m.5.11.2.3.1.2 ( V )."""
+        if yarim_daire:
+            pay = 4 * (math.cos(gama / 2.0) - math.sin(beta / 2.0))
+            payda = (math.pi - beta - gama - math.sin(beta) + math.sin(gama))
+            return mu * pay / payda
+        if sert:
+            return mu / math.sin(gama / 2.0)
+        return mu * 4 * (1 - math.sin(beta / 2.0)) / (math.pi - beta - math.sin(beta))
+
+    f_yuk, f_fren = _f(mu_yuk), _f(mu_fren)
+    #  Ağırlık bloke durumu:  V kanalda m.5.11.2.3.1.2 sertleştirilmiş olsun
+    #  olmasın μ/sin(γ/2) der;  yarım dairede ayrı bir kural yoktur, aynı
+    #  bağıntı μ = 0,2 ile kullanılır.
+    f_bloke = (_f(mu_bloke) if yarim_daire else mu_bloke / math.sin(gama / 2.0))
 
     _kay(o, U174=A_yatay, Z178=B_dusey, C184=math.degrees(theta),
          S184=alfa_derece, AA184=alfa, AS190=mu_fren, AE216=f_bloke)
@@ -824,6 +868,19 @@ def _tahrik(g, o):
 
     b = Bolum("6 -  TAHRİK YETENEĞİNİN HESAPLANMASI",
               "TS EN 81-50 m.5.11.2  /  m.5.11.3")
+    #  m.5.11.2.3.1.2:  "Where the groove has not been submitted to an
+    #  additional hardening process, in order to limit the deterioration of
+    #  traction due to wear, an undercut is necessary."  Yani sertleştirilmemiş
+    #  V kanalın ALT KESİLMESİ OLMALIDIR;  bu birleşim standardın dışındadır.
+    if (not yarim_daire) and (not sert) and not MT.kanal_alti_kesik_mi(sekil):
+        b["notlar"] = [
+            "STANDART DIŞI BİRLEŞİM:  TS EN 81-50 m.5.11.2.3.1.2, "
+            "sertleştirilmemiş kanalda aşınmadan doğan tahrik kaybını "
+            "sınırlamak için ALT KESİLMENİN GEREKLİ olduğunu söyler.  "
+            f"Seçilen '{sekil}' + '{g['kanal_isleme']}' birleşiminde alt "
+            "kesilme yoktur;  hesap β = 0 ile ( emniyetli tarafta ) "
+            "yapılmıştır ama kanal ya sertleştirilmeli ya da altı kesik "
+            "seçilmelidir."]
     b["adimlar"] = [
         veri("Ra", "Halat arası ( ray merkezleri arası mesafe )", Ra, "mm",
              "GİRİŞ  ( " + g["agirlik_yeri"] + " ağırlık )"),

@@ -237,7 +237,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 10)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 12)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -410,6 +410,62 @@ def _sapmalar(r):
     _Fv = _k1 * 9.81 * (_gc["kabin_agirligi"] + _gc["beyan_yuku"]) / _n + _hc["AH291"] * 9.81
     r.kontrol("EN 81-50 C.2.1.2  Fv = k1·gn·(P+Q)/n + Mg·gn",
               _yakin(_hc["AU351"], _Fv), f"→ motor {_hc['AU351']!r}, standart {_Fv!r}")
+
+    #  ⑪  acil frenleme yavaşlamasının ALT sınırı  ( m.5.11.2.2.2 )
+    from engine.uygulama import mukavemet_girdi as _MGa
+    r.esit("EN 81-50 m.5.11.2.2.2  asgari yavaşlama 0,5 m/s²",
+           _MGa.ACIL_FRENLEME_ASGARI, 0.5)
+    for _a, _bek in ((0.05, False), (0.2, False), (0.5, True), (0.8, True),
+                     (9.81, True), (10, False)):
+        _sa = MK.hesapla({"acil_frenleme_a": _a})
+        r.esit(f"a = {_a} m/s² {'kabul' if _bek else 'RED'}", _sa["aktif"], _bek)
+    r.kontrol("alt sınır hatası maddeyi yazıyor",
+              any("5.11.2.2.2" in x for x in
+                  (MK.hesapla({"acil_frenleme_a": 0.2}).get("hata") or [])))
+
+    #  ⑫  sürtünme çarpanı f  —  kanal şekline göre AYRI madde
+    import math as _mf
+    _O = MK.hesapla()["ozet"] and None
+    from engine.uygulama import sabitler as _USf
+    _Sf = _USf.sabitler()
+    r.esit("EN 81-50  V kanal γ ≥ 35°", _Sf["kanal_gama_v"] >= 35, True)
+    r.esit("EN 81-50  yarım daire γ ≥ 25°", _Sf["kanal_gama_yd"] >= 25, True)
+    r.esit("EN 81-50  β ≤ 105°", _Sf["kanal_beta"] <= 105, True)
+
+    def _f_std(sekil, isleme, mu):
+        """Standardın kendi bağıntısı — motorun koduna bakılmadan."""
+        yd = sekil in _MTx.KANAL_YARIM_DAIRE
+        b = _mf.radians(_Sf["kanal_beta"] if sekil in _MTx.KANAL_ALTI_KESIK else 0)
+        gm = _mf.radians(_Sf["kanal_gama_yd"] if yd else _Sf["kanal_gama_v"])
+        if yd:
+            return mu * 4 * (_mf.cos(gm/2) - _mf.sin(b/2)) / (
+                _mf.pi - b - gm - _mf.sin(b) + _mf.sin(gm))
+        if isleme == "Sertleştirilmiş":
+            return mu / _mf.sin(gm/2)
+        return mu * 4 * (1 - _mf.sin(b/2)) / (_mf.pi - b - _mf.sin(b))
+
+    for _sk in _MTx.KANAL_SEKILLERI:
+        for _is in ("Sertleştirilmemiş", "Sertleştirilmiş"):
+            _x = MK.hesapla({"kanal_sekli": _sk, "kanal_isleme": _is})
+            _h2 = _x["_h"]
+            _fm = _h2.get("AU206") if _h2.get("AU206") is not None else _h2.get("AJ198")
+            r.kontrol(f"f yükleme  {_sk[:26]} · {_is[:14]}",
+                      _yakin(_fm, _f_std(_sk, _is, 0.1)),
+                      f"→ motor {_fm!r}, standart {_f_std(_sk, _is, 0.1)!r}")
+    #  Kanal şekli f'yi GERÇEKTEN değiştirmeli  ( eskiden değiştirmiyordu )
+    _fset = set()
+    for _sk in _MTx.KANAL_SEKILLERI:
+        _h2 = MK.hesapla({"kanal_sekli": _sk})["_h"]
+        _fset.add(round(_h2.get("AU206") or _h2.get("AJ198"), 6))
+    r.kontrol("kanal şekli sürtünme çarpanını değiştiriyor", len(_fset) > 1,
+              f"→ {_fset}")
+    #  Sertleştirilmemiş + alt kesilmesiz V kanal:  standart dışı, uyarı çıkmalı
+    _b6 = [b for b in MK.hesapla({"kanal_sekli": "V Kanal",
+                                  "kanal_isleme": "Sertleştirilmemiş"})["bolumler"]
+           if b["baslik"].startswith("6")][0]
+    r.kontrol("alt kesilmesiz sertleştirilmemiş kanal UYARI veriyor",
+              any("STANDART DIŞI" in x for x in (_b6.get("notlar") or [])),
+              f"→ {_b6.get('notlar')}")
 
     #  ⑨  motor verimi makine tipine bağlı  ( ofis standardı, TEK KAYNAK )
     from engine.ortak import ofis as _OF

@@ -165,6 +165,9 @@ HESAPLANAN = tuple(a[0] for a in ALANLAR if a[4] == "hesap")
 #  BOŞ BIRAKILABİLEN alanlar.  Boşsa motor değeri kendisi türetir ve
 #  paftada kaynağını "türetilen" diye yazar;  zorunlu tutmak kullanıcıyı
 #  bilmediği bir sayıyı uydurmaya iter.
+#  TS EN 81-50 m.5.11.2.2.2 — hesaba girecek en küçük yavaşlama.
+ACIL_FRENLEME_ASGARI = 0.5
+
 OPSIYONEL_ALANLAR = ("paten_balata_boyu",)
 
 #  Hesapta BÖLEN olarak geçen alanlar — sıfır kabul edilmez.
@@ -369,11 +372,22 @@ def dogrula(g):
             hata.append(f"{ALAN[anahtar][2]}: seçilen '{d}' için tabloda "
                         f"{ne} eksik ( {', '.join(eksik)} ). Başka bir değer seçin.")
 
-    #  TS EN 81-20:  acil frenleme yavaşlaması en çok 1 gn
+    #  ACİL FRENLEME YAVAŞLAMASININ İKİ SINIRI DA VARDIR.
+    #  Üst sınır TS EN 81-20'den:  en çok 1 gn.
+    #  ALT sınır TS EN 81-50 m.5.11.2.2.2'den:  "In no case shall the rate of
+    #  retardation to consider be less than … 0,5 m/s²".  Bu sınır önce
+    #  denetlenmiyordu;  küçük bir a atalet kuvvetini küçültür, T1/T2 oranını
+    #  iyileştirir ve tahrik yeteneğini olduğundan İYİ gösterir — emniyetsiz.
     ivme = g.get("acil_frenleme_a")
     if _sayi(ivme) and ivme > 9.81:
         hata.append(f"Acil frenleme yavaşlaması ({ivme} m/s²) TS EN 81-20 gereği "
                     "1 gn = 9,81 m/s² değerini aşamaz.")
+    if _sayi(ivme) and ivme < ACIL_FRENLEME_ASGARI:
+        hata.append(f"Acil frenleme yavaşlaması ({ivme} m/s²) TS EN 81-50 "
+                    f"m.5.11.2.2.2 gereği {ACIL_FRENLEME_ASGARI} m/s²'nin "
+                    "altına inemez. ( Tampon kursu kısıtlıysa daha küçük bir "
+                    "değer ancak tamponun tasarım yavaşlamasıyla birlikte "
+                    "gerekçelendirilebilir. )")
     if g.get("agirlik_yeri") == "Arka":
         a, b, c = g.get("kuyu_derinligi"), g.get("ray_kapi_arasi"), g.get("agirlik_ray_duvar")
         if _sayi(a) and _sayi(b) and _sayi(c) and a - b - c <= 0:

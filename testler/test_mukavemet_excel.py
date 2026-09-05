@@ -123,7 +123,9 @@ def senaryolar():
     #  Acil frenleme yavaşlaması  →  T1/T2
     #  a = gn ( 9,81 ) sınır hâlinde T1 sıfırlanır ve Excel #SAYI/0! üretir;
     #  o uç TEST 9'da motor tarafında denenir, burada karşılaştırılamaz.
-    for a in (0.3, 1.5, 5.0):
+    #  0,5 m/s²  TS EN 81-50 m.5.11.2.2.2'nin ALT SINIRIDIR;  altı artık
+    #  reddedilir ( bkz. EXCEL_FARKLARI ), o yüzden sınırın kendisinden başlanır.
+    for a in (0.5, 1.5, 5.0):
         E(f"a = {a} m/s²", acil_frenleme_a=a)
 
     #  Bükülgen kablo  →  MTrav

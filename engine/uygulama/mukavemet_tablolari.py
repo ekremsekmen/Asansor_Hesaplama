@@ -377,6 +377,39 @@ def kanal_acisi(sekil):
     return _ara(KANAL_SEKLI, sekil, 1)
 
 
+#  ---------------------------------------------------------------------
+#  KANAL ŞEKLİNİN SÜRTÜNME BAĞINTISI
+#  ---------------------------------------------------------------------
+#  TS EN 81-50 sürtünme çarpanı f için İKİ AYRI madde verir:
+#
+#    m.5.11.2.3.1.1  YARIM DAİRE ( ve altı kesik yarım daire ) kanal
+#        f = μ · 4( cos(γ/2) − sin(β/2) ) / ( π − β − γ − sin β + sin γ )
+#        γ imalatçıdan gelir, hiçbir durumda 25°'den küçük olamaz.
+#
+#    m.5.11.2.3.1.2  V KANAL
+#        sertleştirilmemiş, yükleme / acil frenleme :
+#            f = μ · 4( 1 − sin(β/2) ) / ( π − β − sin β )        ( γ girmez )
+#        sertleştirilmiş                            :  f = μ / sin(γ/2)
+#        ağırlık bloke ( ikisinde de )              :  f = μ / sin(γ/2)
+#        γ asansörlerde 35°'den küçük olamaz.
+#
+#  Kaynak kitap kanal şeklinden BAĞIMSIZ olarak hep V kanal bağıntısını
+#  kullanıyordu;  yarım daire seçilebildiği hâlde onun maddesi hiç
+#  uygulanmıyordu ( bkz. EXCEL_FARKLARI ).
+KANAL_YARIM_DAIRE = ("Yarım Daire Kanal", "Altı Kesik Yarım Daire Kanal",
+                     "Yarım Daire Kanal (Çift Sarım)")
+#  Altı kesik olanlar:  β = alt kesilme açısı;  ötekilerde β = 0.
+KANAL_ALTI_KESIK = ("Altı Kesik V Kanal", "Altı Kesik Yarım Daire Kanal")
+
+
+def kanal_yarim_daire_mi(sekil):
+    return sekil in KANAL_YARIM_DAIRE
+
+
+def kanal_alti_kesik_mi(sekil):
+    return sekil in KANAL_ALTI_KESIK
+
+
 def kanal_nequiv_t(sekil):
     """Kasnakların eşdeğer sayısı Nequiv(t)  ( TS EN 81-50 )."""
     return _ara(KANAL_SEKLI, sekil, 2)

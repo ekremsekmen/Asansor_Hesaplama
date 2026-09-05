@@ -457,7 +457,7 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**24.775 kontrolün tamamı geçmiştir.**
+**24.491 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
@@ -469,8 +469,8 @@ Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.507 / 4.507** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **935 / 935** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **on sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + girdi reddi | **353 / 353** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **10.737 / 10.737** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **on iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + girdi reddi | **374 / 374** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **10.430 / 10.430** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları** | **138 / 138** |
 
 ### Test 1 neden güçlü bir kanıt?
@@ -518,7 +518,7 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **on** noktada kitap standarttan ( yalnız verim
+noktasıdır. Aşağıdaki **on iki** noktada kitap standarttan ( yalnız verim
 maddesinde ofisin kendi kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
@@ -532,6 +532,8 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | ⑤ | ω burkulma katsayısı | **EN 81-50 m.5.10.3** — ω, λ **ve Rm**'e bağlıdır | Tek tablo kullanır; o tablo yalnız **Rm = 370** eğrisidir ve ray çeliğinden bağımsız uygulanır | Rm 370 ve 520 eğrileri, arada doğrusal ara değer |
 | ⑥ | Acil frenlemede μ | **EN 81-50 m.5.11.2.3.2** — μ = 0,1/(1+v/10), v **halat** hızı | Bağıntıya **kabin** hızını koyar | v = kabin hızı × askı oranı |
 | ⑦ | Nps · Npr | **EN 81-50 m.5.12.2** — tesisin askı düzenine bağlı | Hesap sayfasına **sabit** 1 ve 0 yazar | Girdi; palangalı sistemde uyarı verilir |
+| ⑫ | **Sürtünme çarpanı f** | **EN 81-50 m.5.11.2.3.1.1** ( yarım daire ) ve **m.5.11.2.3.1.2** ( V ) — **iki ayrı bağıntı** | Kanal şeklinden **bağımsız** olarak hep V kanal bağıntısı;  alt kesilmesi olmayan kanalda da β = 90° | Şekle göre doğru madde;  alt kesilme yoksa β = 0 |
+| ⑪ | Acil frenleme yavaşlamasının **alt** sınırı | **EN 81-50 m.5.11.2.2.2** — *"in no case … less than 0,5 m/s²"* | Yalnız üst sınırı ( 1 gn ) denetler | 0,5 m/s² altı **reddedilir** |
 | ⑩ | **Kabin alanı tablosu** | **EN 81-20 Çizelge 6** — 28 beyan yükü | 7'si tabloda ve açılır listede **yok** ( 100 · 1050 · **1250** · 1350 · 1425 · **1500** · 2500 kg );  320 kg için 0,97 m² | Tablo Çizelge 6'ya tamamlandı;  320 kg standardın ara değeriyle **0,953** |
 | ⑨ | Motor verimi η | **Ofisin kendi tablosu** ( avan ): dişlisiz 0,85 · dişli 0,50 · palangalı sistemde −0,10 ( MMO/697 §2.4 ) | Makine tipinden **bağımsız** sabit 0,92; `B130`'daki makine tipini hiç okumaz | η makine tipinden gelir, palanga düşüşü uygulanır |
 | ⑧ | İki sığınma açıklığı | **EN 81-20 m.5.2.5.7.3** ve **m.5.2.5.8.2 a) 2)** | Kabin üstü **1200 mm**, ray dibi **150 mm** — ikisi de standartta yok | Kabin üstü = sığınma hacminin yüksekliği ( **1000 mm** ), ray dibi = Şekil 7 ( **100 mm** ) |
@@ -569,6 +571,28 @@ seçildiğinde kitap σk'yı **%19-33 düşük** gösterir.
 hızı ve 2:1 askı için standart μ = 0,083 verir — bu ancak v = 2 m/s ( halat
 hızı ) ile çıkar. Kabin hızı kullanmak μ'yü, dolayısıyla e^(f·α) sınırını
 büyütür ve tahrik yeteneğini olduğundan iyi gösterir.
+
+**⑫'nin etkisi.** Kanal şekli açılır listede **seçilebiliyor** ama `f`'yi hiç
+değiştirmiyordu — beş şekil de aynı sürtünme çarpanını veriyordu. Standardın
+yarım daire kanallar için ayrı bir maddesi vardır:
+
+| Kanal | Doğrusu | Kitabın verdiği | |
+|---|---|---|---|
+| Altı kesik yarım daire ( β=90° · γ=25° ) | 0,1933 | 0,2053 | **+%6** |
+| Düz yarım daire ( β=0 · γ=25° ) | 0,1248 | 0,2053 | **+%65** |
+| V kanal | 0,2053 | 0,2053 | fark yok |
+
+İkisi de **emniyetsiz** taraftaydı — tahrik yeteneğini olduğundan iyi
+gösteriyordu. Kanal açıları ( V için γ ≥ 35° · yarım daire için γ ≥ 25° ·
+β ≤ 105° ) proje bazında bilinemediği için **ofis standardına** konmuştur.
+
+Ayrıca m.5.11.2.3.1.2, sertleştirilmemiş kanalda **alt kesilmenin gerekli**
+olduğunu söyler; alt kesilmesiz + sertleştirilmemiş birleşimi seçilirse pafta
+uyarı basar.
+
+**⑪'in etkisi.** `a = 0,05 m/s²` girip tahrik hesabını "UYGUN" almak
+mümkündü. Küçük bir yavaşlama atalet kuvvetini küçültür, T1/T2 oranını
+iyileştirir — emniyetsiz taraf.
 
 **⑩'un etkisi.** Liste **kapalıdır** — içinde olmayan bir yük seçilemez. Yani
 1250 ve 1500 kg gibi yaygın asansörlerde program hiç hesap yapamıyordu;

@@ -33,6 +33,15 @@ VARSAYILAN = {
     "q_denge":          0.50,   # Karşı ağırlık denge oranı  ( 11!AA627 )
     "halat_pay_m":      5,      # Halat boyu payı, m         ( 11!AQ19 )
 
+    #  ── TAHRİK KANALI GEOMETRİSİ ─────────────────────────────────────
+    #  Kasnak kanalının açıları imalatçıdan gelir;  proje bazında
+    #  bilinemedikleri için ofis kabulü olarak burada dururlar.
+    #  TS EN 81-50 sınırları:  β ≤ 105°  ·  V kanalda γ ≥ 35°  ·  yarım
+    #  daire kanalda γ ≥ 25°.
+    "kanal_gama_v":    38,      # V kanal açısı γ            [°]
+    "kanal_gama_yd":   25,      # Yarım daire kanal açısı γ  [°]
+    "kanal_beta":      90,      # Alt kesilme açısı β        [°]
+
     # ── ② MUKAVEMET KABULLERİ ────────────────────────────────────────
     #  σem ve k1 STANDARDIN sayıları DEĞİLDİR.  TS EN 81-20 makine kaidesi
     #  için yük modeli vermez;  Çizelge 14 ( k1 ) o standartta açıkça
@@ -95,6 +104,7 @@ ARALIK = {
     "verim_dislisiz": (0.1, 1), "verim_disli": (0.1, 1),
     "palanga_verim_dususu": (0, 0.5), "Gs": (0, 5000), "q_denge": (0.2, 0.8),
     "halat_pay_m": (0, 100),
+    "kanal_gama_v": (35, 90), "kanal_gama_yd": (25, 90), "kanal_beta": (0, 105),
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
     "k1_ani": (1, 10), "yan_yatak_L_X": (0, 5000),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
@@ -118,7 +128,8 @@ GRUPLAR = (
     ("① MAKİNE VE MOTOR",
      "TS EN 81-50 · MMO 208/7 — motor gücü ve verim",
      ("verim_dislisiz", "verim_disli", "palanga_verim_dususu",
-      "Gs", "q_denge", "halat_pay_m")),
+      "Gs", "q_denge", "halat_pay_m",
+      "kanal_gama_v", "kanal_gama_yd", "kanal_beta")),
     ("② MUKAVEMET KABULLERİ",
      "makine kaidesi ve ray hesabı — TS EN 81-20 bu yük modelini VERMEZ, "
      "aşağıdakiler ofis kabulüdür",
@@ -149,6 +160,11 @@ ETIKET = {
     "Gs": ("Sürtünme yükü Gs (kg)", "Gmax = F1 + Gs − Ga"),
     "q_denge": ("Denge faktörü q", "karşı ağırlık = P + q·Q;  kitabın tamamı q = 0,50 üzerine kuruludur"),
     "halat_pay_m": ("Halat boyu payı (m)", "kuyu boyuna eklenen pay"),
+    "kanal_gama_v": ("V kanal açısı γ (°)",
+                     "TS EN 81-50 m.5.11.2.3.1.2 — asansörlerde 35°'den küçük olamaz"),
+    "kanal_gama_yd": ("Yarım daire kanal açısı γ (°)",
+                      "TS EN 81-50 m.5.11.2.3.1.1 — hiçbir durumda 25°'den küçük olamaz"),
+    "kanal_beta": ("Alt kesilme açısı β (°)", "TS EN 81-50 — 105°'yi aşamaz"),
     "sigma_em": ("ST 37 emniyet gerilmesi σem (N/mm²)",
                  "makine kaidesi;  TS EN 81-20'nin ST 37 için verdiği Rm/1,8 = 205,6 N/mm²'den katıdır"),
     "k1_kaymali": ("k1 — kaymalı güvenlik tertibatı", "makine kaidesi darbe katsayısı"),
