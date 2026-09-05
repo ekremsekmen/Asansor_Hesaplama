@@ -173,7 +173,7 @@ yazıp programın başka bir sayı kullandığını fark etmeden kalamaz.
 | **Manuel k ve manuel V ana akıştan kalktı** | Çoklu asansör gövdesinde ortada duruyorlardı; artık katlanır **"Manuel değerler"** bölümünde. Elle bir değer girilirse başlıkta **"n elle"** rozeti çıkar — gizlenen bir ezme sessiz kalmaz. Tek asansör gövdesinde zaten "İleri seçenekler" altındaydılar, oraya da rozet eklendi. |
 | **Çokluda manuel k sessizce yok sayılıyordu** | Tablo-9'da değeri olan bir bina tipinde çoklu hesap, girilen manuel k'yı **görmezden geliyor ve hiçbir şey söylemiyordu**. Artık tek asansör hesabındaki gibi açıkça reddediliyor. Kamu binası ve Tablo-9'da olmayan bina tipleri ( karma, poliklinik, katlı otopark ) için manuel k yine geçerli. |
 | **Şablon denetimi** | Yanlış ya da eski bir Excel `templates/` klasörüne konursa program yine dosya üretiyordu — hesap doğru olduğu için ekranda belirti çıkmıyor, hata yalnız teslim edilen paftada görünüyordu. Artık üç katmanlı denetim var ( sayfalar · girdi hücreleri · şablonun içindeki tablo değerleri ) ve **denetimden geçmeyen şablonla XLSX ÜRETİLMEZ**. Sabitler sekmesinde **Şablon durumu** kartı, komut satırında `python3 araclar/sablon_denetle.py`. |
-| **XLSX kendi başına doğru** | Boş bırakılan ofis alanları ve otomatik seçilen Nsç / L1, indirilen dosyanın **GİRİŞ hücrelerine açıkça yazılır**. Excel'i tek başına açsanız da ekrandakiyle aynı sonucu verir. Şablonda hiçbir değişiklik yapılmadı. |
+| **XLSX kendi başına doğru** | İndirilen dosyanın **GİRİŞ hücrelerine, motorun gerçekten kullandığı değer yazılır** — boş bırakılan ofis alanları, otomatik seçilen Nsç / L1 ve aralık dışı olduğu için reddedilenler dâhil. Excel'i tek başına açsanız da ekrandakiyle aynı sonucu verir. Şablonda hiçbir değişiklik yapılmadı. |
 
 **Sürüm 1.5** — daha önce eklenenler:
 
@@ -380,6 +380,14 @@ girmezsiniz:
 
 Yeni indirdiğiniz dosya da aynı şekilde yüklenebilir — revizyon zinciri kapalıdır.
 
+> **Uygulama projesinin elektrik girdileri.** Kesitler, hat uzunlukları, temel
+> ölçüleri, makine dairesi ve paten balatası uzunluğu kaynak kitapta
+> **yoktur** — program bunları teslim kopyasında `Veri Girişi` sayfasının
+> sonuna, *"PROGRAMIN EKLEDİĞİ GİRDİLER"* başlığı altına yazar ve oradan geri
+> okur. **Elinizdeki özgün kitabı** yüklerseniz o satırlar bulunmadığı için bu
+> alanlar varsayılana döner; program hangilerinin döndüğünü **tek tek sayarak
+> söyler** — sessiz kalmaz.
+
 **Neden Excel, PDF değil?** Girdiler Excel'de *görünür hücrelerde* durur:
 gözle görürsünüz, gerekirse Excel'de elle düzeltirsiniz, program onu da okur.
 PDF'e gömülü gizli veri ise AutoCAD'e yerleştirme, yeniden yazdırma ya da bir
@@ -407,16 +415,16 @@ kaldığınız yerden devam edersiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**24.609 kontrolün tamamı geçmiştir.**
+**24.658 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
-| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **746 / 746** |
+| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **757 / 757** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
 | **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **368 / 368** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon, yerleşim taşması | **328 / 328** |
-| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.461 / 4.461** |
+| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.499 / 4.499** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.019 / 1.019** |
 | **9 · Mukavemet motoru** | 100 sonuç hücresi + **sekiz sapmanın uygulandığının kanıtı** + girdi reddi | **225 / 225** |
@@ -459,6 +467,8 @@ sistemler ve topraklama varyasyonları.
 | Açılır listede seçilebilen 1000 / 1200 / 700 mm kapı genişlikleri tabloda yoktu | seçilebilen bir değer **hesabı durduruyordu** |
 | Palanga ve denge faktörü proje geneli sabitti | dişlili + dişlisiz karışık projede **yanlış motor gücü ve karşı ağırlık** |
 | Bodrum durağı hiçbir yerde hesaba girmiyordu | Tablo-2 asgari hızı **düşük seçilebiliyordu** |
+| Uygulama projesinin **12 girdisi** ( kesitler · hat uzunlukları · temel ölçüleri · makine dairesi · paten balatası ) Excel'e hiç yazılmıyordu | revizyonda **sessizce kayboluyor**, kesitler varsayılana dönüyordu — ekran *"41 girdi geri yüklendi"* deyip eksiği söylemiyordu |
+| Aralık dışı Nsç / L1 motor tarafından reddedilip varsayılan kullanılırken, **XLSX'e reddedilen değer yazılıyordu** ( Nsç = 900 kW → ekran 7,5 kW, dosya 900 kW ) | indirilen kitap **paftadan farklı hesaplıyordu**;  yazıcı motorun kabul koşulunu kendi süzgeciyle ikinci kez uyguluyordu |
 
 Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 

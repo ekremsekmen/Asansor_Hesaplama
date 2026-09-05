@@ -1236,6 +1236,41 @@ def calistir():
                   bool(_ru.get("uyarilar")), f"→ {_ru.get('uyarilar')}")
     r.kontrol("avan: geçerli girdide gereksiz uyarı yok", not (_av().get("uyarilar") or []))
 
+    #  ---------------------------------------------------------------
+    #  REDDEDİLEN DEĞER TESLİM EDİLEN EXCEL'E SIZMAMALI
+    #  ---------------------------------------------------------------
+    #  Motor aralık dışı bir Nsç / L1'i reddedip varsayılanı kullanıyor, ama
+    #  XLSX yazıcısı kendi süzgecini ( "girilen > 0" ) uyguladığı için
+    #  dosyaya REDDEDİLEN değeri yazıyordu:  ekran 7,5 kW derken indirilen
+    #  kitap 900 kW ile hesaplıyordu.  Artık tek kaynak ozet[k]'dir.
+    import io as _io2, openpyxl as _op3
+    from exports import xlsx_export as _XE2
+
+    def _xlsx_girdi(ek):
+        _asa = {"aktif": True, "tanim": "T", "Q_elle": 800, "V": 1, "Hk": 30,
+                "eta": 0.7, "kuyu_genisligi": 1900, "kabin_boyu": 1300,
+                "kabin_genisligi": 1100}
+        _asa.update(ek)
+        _v = {"ortak": {}, "asansorler": [_asa], "sabitler": {}, "trafik": {}}
+        _oz = AV.hesapla(_v)["asansorler"][0]["ozet"]
+        _ws = _op3.load_workbook(_io2.BytesIO(_XE2.avan_xlsx(_v)))["GİRİŞ"]
+        return _oz, _ws
+
+    for _ad, _ek in (("boş bırakılmış", {}),
+                     ("geçerli girilmiş", {"Nsc": 11, "L1": 40}),
+                     ("aralık dışı ( red )", {"Nsc": 900, "L1": 600}),
+                     ("negatif", {"Nsc": -5, "L1": -2}),
+                     ("sınırda 500", {"Nsc": 500, "L1": 500})):
+        _oz, _ws = _xlsx_girdi(_ek)
+        r.esit(f"XLSX Nsç = motorun kullandığı  ( {_ad} )", _ws["C43"].value, _oz["Nsc"])
+        r.esit(f"XLSX L1 = motorun kullandığı  ( {_ad} )", _ws["C45"].value, _oz["L1"])
+    #  Reddedilen değerin kendisi dosyada HİÇBİR yerde kalmamalı
+    _oz9, _ws9 = _xlsx_girdi({"Nsc": 900, "L1": 600})
+    r.kontrol("reddedilen 900 / 600 GİRİŞ sayfasında hiç yok",
+              not any(_c.value in (900, 600) for _sat in _ws9.iter_rows()
+                      for _c in _sat),
+              "→ reddedilen değer dosyada kalmış")
+
     # ==================================================================
     #  v1.8 — ŞERİT BOYU ( L ) TEMEL ÖLÇÜLERİNDEN TÜRETİLİR
     #  Ofiste temel için yalnız UZUNLUK ve GENİŞLİK giriliyor; band boyu

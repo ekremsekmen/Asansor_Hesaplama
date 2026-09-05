@@ -1242,9 +1242,15 @@ def girdileri_coz(veriler: dict) -> dict:
         for k in OFIS_ASANSOR_ALANLARI:
             y[k] = _ofis_degeri(a, S, k)[0]
         oz = (hesaplanan.get(i) or {}).get("ozet") or {}
+        #  MOTORUN GERÇEKTEN KULLANDIĞI DEĞER YAZILIR — girdinin kabul edilip
+        #  edilmediğine BURADA yeniden karar verilmez.  Eskiden koşul
+        #  "girilen > 0" idi;  aralık dışı bir değer ( L1 = 600 m, Nsç =
+        #  900 kW ) bu süzgeci geçtiği için motor onu REDDEDİP varsayılanı
+        #  kullanırken dosyaya yine 600 / 900 yazılıyordu:  ekran ve teslim
+        #  edilen Excel ayrışıyordu.  ozet[k] zaten kullanılan değerdir
+        #  ( girdi geçerliyse girdinin kendisi ), tek kaynak odur.
         for k in ("L1", "Nsc"):
-            girilen = y.get(k)
-            if not (sayi_mi(girilen) and girilen > 0) and sayi_mi(oz.get(k)):
+            if sayi_mi(oz.get(k)):
                 y[k] = oz[k]
         cozulmus.append(y)
 

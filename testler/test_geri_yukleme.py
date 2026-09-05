@@ -354,6 +354,77 @@ def calistir():
                       ("m_karsi_agirlik", "m_kuyu_boyu", "m_halat_arasi")),
               f"→ {[k for k in _d['alanlar'] if 'agirlik' in k]}")
 
+    #  ---------------------------------------------------------------
+    #  UYGULAMA PROJESİNİN EK GİRDİLERİ  ( elektrik · topraklama · balata )
+    #  ---------------------------------------------------------------
+    #  Bunların kaynak kitapta hücresi YOKTUR;  program teslim kopyasına
+    #  kendi açtığı satırlara yazar.  Yazılıp okunmazsa revizyonda SESSİZCE
+    #  kaybolur ve kesitler / temel ölçüleri varsayılana dönerdi.
+    from engine.uygulama import girdi as _UG
+    _ug = _UG.tamamla(_UG.varsayilanlar())
+    _EK = {"paten_balata_boyu": 66, "kuyu_genisligi": 1900, "kolon_kesit": 25,
+           "kolon_uzunluk": 33, "makine_kesit": 10, "makine_uzunluk": 44,
+           "temel_a": 12.5, "temel_b": 8.5, "serit_L": 40, "mk_yok": False,
+           "mk_uzunluk": 3.5, "mk_genislik": 2.5}
+    _ug.update(_EK)
+    r.esit("ek girdi haritası bütün alanları kapsıyor",
+           sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))
+    _ekxl = _MX.mukavemet_xlsx(_ug)
+    _geri = _MX.xlsx_oku(_ekxl)
+    for _a, _bek in sorted(_EK.items()):
+        r.esit(f"ek girdi geri geliyor: {_a}", _geri.get(_a), _bek)
+    r.kontrol("ek girdiler mukavemet alanlarını bozmadı",
+              _geri.get("beyan_yuku") == _ug["beyan_yuku"]
+              and _geri.get("beyan_hizi") == _ug["beyan_hizi"],
+              f"→ {_geri.get('beyan_yuku')!r} / {_geri.get('beyan_hizi')!r}")
+    #  Onay kutusu iki yönde de doğru çözülmeli
+    r.esit("mk_yok = True geri geliyor",
+           _MX.xlsx_oku(_MX.mukavemet_xlsx(dict(_ug, mk_yok=True))).get("mk_yok"), True)
+
+    #  Forma da ulaşmalı  —  api katmanı bu alanları m_ önekiyle taşır
+    _ekd = _js.loads(_MM.api_xlsx_yukle(
+        {"icerik": base64.b64encode(_ekxl).decode()}).body)
+    for _a, _bek in sorted(_EK.items()):
+        r.esit(f"forma taşınıyor: m_{_a}", _ekd["alanlar"].get(f"m_{_a}"), _bek)
+    r.kontrol("program kopyasında gereksiz kayıp uyarısı ÇIKMIYOR",
+              "VARSAYILANA" not in (_ekd.get("ozet") or ""), f"→ {_ekd.get('ozet')}")
+    #  BOŞ bırakılmış alan KAYIP DEĞİLDİR — blok varsa uyarı çıkmamalı
+    _bos = _MX.mukavemet_xlsx(dict(_ug, temel_a=None, serit_L=None,
+                                   kolon_uzunluk=None))
+    _bosd = _js.loads(_MM.api_xlsx_yukle(
+        {"icerik": base64.b64encode(_bos).decode()}).body)
+    r.kontrol("boş bırakılan alan 'kayıp' sayılmıyor",
+              "VARSAYILANA" not in (_bosd.get("ozet") or ""), f"→ {_bosd.get('ozet')}")
+    _g2, _blok = _MX.xlsx_oku_ayrintili(_bos)
+    r.kontrol("program kopyasında ek girdi bloğu bulunuyor", _blok)
+    r.kontrol("boş bırakılan alan geri de gelmiyor",
+              not any(k in _g2 for k in ("temel_a", "serit_L", "kolon_uzunluk")),
+              f"→ {[k for k in ('temel_a','serit_L','kolon_uzunluk') if k in _g2]}")
+
+    #  ELDEN GELEN ÖZGÜN KİTAPTA bu satırlar yoktur:  program sessiz kalmamalı,
+    #  hangi alanların varsayılana döndüğünü SAYMALI.
+    _ozgun = _js.loads(_MM.api_xlsx_yukle(
+        {"icerik": base64.b64encode(open(_MX.SABLON, "rb").read()).decode()}).body)
+    r.kontrol("özgün kitap yine mukavemet olarak açılıyor",
+              _ozgun.get("tur") == "mukavemet", f"→ {_ozgun.get('tur')}")
+    r.kontrol("özgün kitapta taşınmayan alanlar AÇIKÇA bildiriliyor",
+              "VARSAYILANA" in (_ozgun.get("ozet") or ""), f"→ {_ozgun.get('ozet')}")
+    r.kontrol("özgün kitapta ek girdi bloğu YOK",
+              not _MX.xlsx_oku_ayrintili(open(_MX.SABLON, "rb").read())[1])
+    for _a, _et in (("kolon_kesit", "S1 — Kolon hattı kesiti"),
+                    ("paten_balata_boyu", "Paten balatası uzunluğu  ( ℓ )"),
+                    ("mk_genislik", "Makine dairesi genişliği")):
+        r.kontrol(f"kayıp listesi {_a} etiketini içeriyor",
+                  _et in (_ozgun.get("ozet") or ""), f"→ {_ozgun.get('ozet')}")
+
+    #  ŞABLONA DOKUNULMADI:  ek satırlar yalnız teslim kopyasında olmalı
+    import openpyxl as _op2
+    _sb = _op2.load_workbook(_MX.SABLON)[_MX.GIRDI_SAYFASI]
+    r.kontrol("şablonda ek girdi satırları YOK",
+              all(_sb[f"B{_s}"].value in (None, "")
+                  for _a, _s, _e2, _b2 in _MX.EK_GIRDI_HUCRELERI),
+              "→ şablon kirlenmiş")
+
     #  Avan / trafik dosyaları mukavemet sanılmamalı  ( ve tersi )
     r.kontrol("trafik dosyası mukavemet sanılmıyor",
               not _MX.mukavemet_dosyasi_mi(XE.trafik_xlsx("tek", _gt)))

@@ -103,7 +103,17 @@ def mukavemet_dosyasi_mi(icerik: bytes) -> bool:
 
 
 def xlsx_oku(icerik: bytes) -> dict:
-    """Mukavemet çalışma kitabından girdileri geri okur.
+    """Mukavemet çalışma kitabından girdileri geri okur."""
+    return xlsx_oku_ayrintili(icerik)[0]
+
+
+def xlsx_oku_ayrintili(icerik: bytes):
+    """( girdiler, ek_blok_var )  döndürür.
+
+    ``ek_blok_var``:  dosyada programın eklediği girdi bloğu var mı.  Yoksa
+    dosya ELDEN GELEN ÖZGÜN kitaptır ve o alanlar hiç taşınmamıştır — arayüz
+    bunu ayrıca söyler.  Blok VARSA boş hücre "girilmemiş" demektir;  kayıp
+    değildir ve uyarı üretmemelidir.
 
     Program kendi ürettiği dosyayı da, elden gelen özgün kitabı da okur:
     her ikisinde de girdiler aynı hücrelerdedir.  Formülle üretilen üç alan
@@ -135,7 +145,17 @@ def xlsx_oku(icerik: bytes) -> dict:
             deger = hs[hucre].value
             if deger not in (None, ""):
                 g[anahtar] = deger
-    return g
+    #  Programın eklediği girdiler.  Elden gelen özgün kitapta bu satırlar
+    #  YOKTUR;  o durumda hücreler boş okunur ve alan geri gelmez — davranış
+    #  eskisiyle aynı kalır, program kendi ürettiği dosyada ise tamamını
+    #  geri yükler.
+    ek_blok = (str(ws[f"A{EK_GIRDI_BASLIK}"].value or "").strip()
+               == EK_GIRDI_BASLIK_METNI)
+    for anahtar, satir, _et, _b in EK_GIRDI_HUCRELERI:
+        deger = _ek_deger_oku(anahtar, ws[f"B{satir}"].value)
+        if deger is not None:
+            g[anahtar] = deger
+    return g, ek_blok
 
 
 # =====================================================================
@@ -160,6 +180,67 @@ HESAP = "11-Muk. Hesapları"
 HESAP_SAYFASI_GIRDILERI = (("kasnak_tek_yon", "AH105"),
                            ("kasnak_ters_yon", "AH106"))
 GIRDI = GIRDI_SAYFASI
+
+#  ---------------------------------------------------------------------
+#  PROGRAMIN EKLEDİĞİ GİRDİ HÜCRELERİ
+#  ---------------------------------------------------------------------
+#  Kaynak kitapta karşılığı OLMAYAN girdiler:  paten balatası uzunluğu ve
+#  uygulama projesinin elektrik / topraklama alanları.  Bunlar yalnız
+#  programın belleğinde dursaydı revizyonda ( "Excel'den proje aç" ) SESSİZCE
+#  kaybolur, kesitler ve temel ölçüleri varsayılana dönerdi.  Bu yüzden
+#  teslim kopyasına, "Veri Girişi" sayfasının sonundaki boş alana açıkça
+#  yazılır ve oradan geri okunur.
+#
+#  ŞABLONA DOKUNULMAZ:  hücreler yalnız teslim edilen kopyaya yazılır,
+#  bu yüzden MG.ALANLAR'daki "hucre" alanı boş kalır — orası KAYNAK kitabın
+#  hücre haritasıdır ve doğrulama testlerinin dayanağıdır.
+EK_GIRDI_BASLIK = 226
+EK_GIRDI_BASLIK_METNI = ("PROGRAMIN EKLEDİĞİ GİRDİLER  "
+                        "( kaynak kitapta karşılığı yoktur )")
+EK_GIRDI_HUCRELERI = (
+    #  (anahtar,            satır, etiket,                          birim)
+    ("paten_balata_boyu",     228, "Paten balatası uzunluğu  ( ℓ )", "mm"),
+    ("kuyu_genisligi",        229, "Kuyu genişliği  ( KG )",         "mm"),
+    ("kolon_kesit",           230, "S1 — Kolon hattı kesiti",        "mm²"),
+    ("kolon_uzunluk",         231, "L1 — Kolon hattı uzunluğu",      "m"),
+    ("makine_kesit",          232, "S2 — Makine besleme kesiti",     "mm²"),
+    ("makine_uzunluk",        233, "L2 — Makine besleme uzunluğu",   "m"),
+    ("temel_a",               234, "Temel uzunluğu",                 "m"),
+    ("temel_b",               235, "Temel genişliği",                "m"),
+    ("serit_L",               236, "Topraklama şeridi boyu",         "m"),
+    ("mk_yok",                237, "Makine dairesiz  ( MRL )",       "EVET / HAYIR"),
+    ("mk_uzunluk",            238, "Makine dairesi uzunluğu",        "m"),
+    ("mk_genislik",           239, "Makine dairesi genişliği",       "m"),
+)
+EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
+#  Onay kutuları Excel'de metin olarak durur — projeci hücreyi elle de
+#  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
+EK_ONAY_ALANLARI = ("mk_yok",)
+_EVET = ("evet", "e", "var", "true", "1", "x", "✓")
+
+
+def _ek_deger_yaz(anahtar, deger):
+    if anahtar in EK_ONAY_ALANLARI:
+        return None if deger is None else ("EVET" if deger else "HAYIR")
+    return deger
+
+
+def _ek_deger_oku(anahtar, deger):
+    """Hücredeki ham değeri alan türüne çevirir;  okunamazsa None döner."""
+    if deger in (None, ""):
+        return None
+    if anahtar in EK_ONAY_ALANLARI:
+        if isinstance(deger, bool):
+            return deger
+        return str(deger).strip().lower() in _EVET
+    if isinstance(deger, bool):
+        return None
+    if isinstance(deger, (int, float)):
+        return deger
+    try:
+        return float(str(deger).strip().replace(",", "."))
+    except ValueError:
+        return None
 
 #  Flanş eğilmesi paydası:  ℓ + 2·( h1 − f )   [ EN 81-50 m.5.10.5 ]
 FLANS_HUCRELERI = (("Q380", "E73"), ("Q385", "E73"), ("Q477", "E73"),
@@ -239,8 +320,11 @@ def _standarda_uydur(wb, g):
     ws["AD636"] = "=P639*1000"
     ws["AD647"] = MK.SIGINMA["min_ray_alt"]
 
-    #  Paten balata boyunun kitapta hücresi yok — teslim kopyasına not düşülür
-    #  ki projeci hangi değerin kullanıldığını görsün.
-    if isinstance(l_girdi, (int, float)) and not isinstance(l_girdi, bool):
-        vg["A134"] = "Paten balatası uzunluğu ℓ ( mm )"
-        vg["B134"] = l_girdi
+    #  Kaynak kitapta karşılığı olmayan girdiler teslim kopyasına açıkça
+    #  yazılır  ( bkz. EK_GIRDI_HUCRELERI ):  projeci hangi değerin
+    #  kullanıldığını görür, revizyonda da dosyadan geri okunur.
+    vg[f"A{EK_GIRDI_BASLIK}"] = EK_GIRDI_BASLIK_METNI
+    for anahtar, satir, etiket, birim in EK_GIRDI_HUCRELERI:
+        vg[f"A{satir}"] = etiket
+        vg[f"B{satir}"] = _ek_deger_yaz(anahtar, g.get(anahtar))
+        vg[f"C{satir}"] = birim

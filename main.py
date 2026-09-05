@@ -100,7 +100,7 @@ def api_xlsx_yukle(veri: dict = Body(...)):
     #  işlevi ikisini de aynı yoldan işler.
     try:
         if X_MXLS.mukavemet_dosyasi_mi(icerik):
-            g = X_MXLS.xlsx_oku(icerik)
+            g, ek_blok = X_MXLS.xlsx_oku_ayrintili(icerik)
             alanlar, durak = {}, []
             for anahtar, _h, _e, _b, tur, _s2, _v in E_MGR.ALANLAR:
                 if anahtar not in g:
@@ -109,10 +109,28 @@ def api_xlsx_yukle(veri: dict = Body(...)):
                     durak = [str(x) for x in g[anahtar]]
                     continue
                 alanlar[f"m_{anahtar}"] = g[anahtar]
+            #  Uygulama projesinin elektrik / topraklama alanları.  Bunlar
+            #  kaynak kitapta yoktur;  program kendi ürettiği dosyaya yazar
+            #  ( X_MXLS.EK_GIRDI_HUCRELERI ).  Döngüye alınmazsa revizyonda
+            #  SESSİZCE kaybolur ve kesitler varsayılana dönerdi.
+            for anahtar in X_MXLS.EK_GIRDI_ANAHTARLARI:
+                if anahtar in g:
+                    alanlar[f"m_{anahtar}"] = g[anahtar]
+            #  Elden gelen ÖZGÜN kitapta bu blok hiç yoktur;  o zaman kayıp
+            #  alanlar tek tek sayılıp söylenir — sessiz kısmi geri yükleme
+            #  projeciyi yanıltır.  Blok VARSA boş hücre "girilmemiş" demektir,
+            #  kayıp değildir:  uyarı çıkmaz.
+            ozet = (f"Mukavemet hesabı — {len(durak)} durak, "
+                    f"{len(alanlar)} girdi geri yüklendi.")
+            if not ek_blok:
+                ozet += ("  Bu dosya programın ürettiği kopya değil:  "
+                         "elektrik ve topraklama alanları taşınmadı, "
+                         "VARSAYILANA döndüler — "
+                         + " · ".join(et for _a3, _s3, et, _b3
+                                      in X_MXLS.EK_GIRDI_HUCRELERI) + ".")
             return JSONResponse({
                 "tur": "mukavemet", "alanlar": alanlar, "muk_durak": durak,
-                "proje": {}, "ozet": f"Mukavemet hesabı — {len(durak)} durak, "
-                                     f"{len(alanlar)} girdi geri yüklendi."})
+                "proje": {}, "ozet": ozet})
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"hata": f"Mukavemet dosyası okunamadı: {e}"},
                             status_code=422)
