@@ -237,7 +237,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 8)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 10)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -317,6 +317,99 @@ def _sapmalar(r):
               _yakin(s["_h"]["Z379"],
                      MK._flans(s["_h"]["AY321"],
                                MK._ray_ozellik("89 x 62 x 15,88"), 2 * 17)))
+
+    #  ═══════════════════════════════════════════════════════════════
+    #  STANDARDIN METNİNE KARŞI BAĞIMSIZ DOĞRULAMA
+    #  ═══════════════════════════════════════════════════════════════
+    #  Aşağıdaki sayılar BS EN 81-20:2014 ve BS EN 81-50:2014'ün kendi
+    #  metninden alınmıştır — motorun koduna bakılmadan.  Kaynak Excel'e
+    #  karşı yapılan karşılaştırma "kitapla aynı mıyız" der;  bu blok
+    #  "standartla aynı mıyız" der.  İkisi ayrı sorulardır.
+    import math as _mt
+    from engine.uygulama import mukavemet_tablolari as _MTx
+
+    #  EN 81-20 Çizelge 14  —  darbe katsayıları
+    for _tip, _bek in (("Kaymalı", 2), ("Ani Frenlemeli Makaralı", 3),
+                       ("Ani Frenlemeli", 5)):
+        r.esit(f"EN 81-20 Çiz.14  k1 {_tip}", _MTx.darbe_k1(_tip), _bek)
+    r.esit("EN 81-20 Çiz.14  k2 = 1,2  ( hareket )", MK.SABIT["k3"], 1.2)
+
+    #  EN 81-20 Çizelge 15  —  σperm = Rm / St
+    for _rm, _nor, _guv in _MTx.RAY_CELIGI:
+        r.kontrol(f"EN 81-20 Çiz.15  Rm={_rm} normal ≈ Rm/2,25",
+                  abs(_nor - _rm / 2.25) <= 1.2, f"→ {_nor} · kesin {_rm/2.25:.2f}")
+        r.kontrol(f"EN 81-20 Çiz.15  Rm={_rm} güv.tert. ≈ Rm/1,8",
+                  abs(_guv - _rm / 1.8) <= 1.2, f"→ {_guv} · kesin {_rm/1.8:.2f}")
+
+    #  EN 81-20 m.5.5.2  ·  m.5.6.2.2.1  ·  m.5.7.4.6
+    r.esit("EN 81-20 m.5.5.2.1  Dt/dh ≥ 40", MK.SABIT["Dt_dh_asgari"], 40)
+    r.esit("EN 81-20 m.5.6.2.2.1.3 c)  Dreg/dreg ≥ 30", MK.SABIT["Dreg_dreg_asgari"], 30)
+    r.esit("EN 81-20 m.5.6.2.2.1.3 b)  emniyet katsayısı ≥ 8", MK.SABIT["reg_kat_asgari"], 8)
+    r.esit("EN 81-20 m.5.6.2.2.1.1 d)  çekme kuvveti ≥ 300 N", MK.SABIT["reg_kuvvet_asgari"], 300)
+    r.esit("EN 81-20 m.5.6.2.2.1.3 b)  μmax = 0,20", MK.SABIT["mu_bloke"], 0.2)
+    r.esit("EN 81-20 m.5.7.4.6 a)  δperm = 5 mm", MK.SABIT["dperm_kabin"], 5)
+    r.esit("EN 81-20 m.5.7.4.6 b)  δperm = 10 mm", MK.SABIT["dperm_agirlik"], 10)
+
+    #  EN 81-20 Çizelge 6 / 8 / m.5.4.2.3.1  —  kabin alanı
+    _CIZ6 = {100: 0.37, 180: 0.58, 225: 0.70, 300: 0.90, 375: 1.10, 400: 1.17,
+             450: 1.30, 525: 1.45, 600: 1.60, 630: 1.66, 675: 1.75, 750: 1.90,
+             800: 2.00, 825: 2.05, 900: 2.20, 975: 2.35, 1000: 2.40, 1050: 2.50,
+             1125: 2.65, 1200: 2.80, 1250: 2.90, 1275: 2.95, 1350: 3.10,
+             1425: 3.25, 1500: 3.40, 1600: 3.56, 2000: 4.20, 2500: 5.00}
+    _CIZ8 = {1: 0.28, 2: 0.49, 3: 0.60, 4: 0.79, 5: 0.98, 6: 1.17, 7: 1.31,
+             8: 1.45, 9: 1.59, 10: 1.73, 11: 1.87, 12: 2.01, 13: 2.15, 14: 2.29,
+             15: 2.43, 16: 2.57, 17: 2.71, 18: 2.85, 19: 2.99, 20: 3.13}
+    r.esit("EN 81-20 Çiz.6'nın hiçbir yükü eksik değil",
+           [q for q in sorted(_CIZ6) if _MTx.kabin_azami_alan(q) is None], [])
+    for _q, _a in sorted(_CIZ6.items()):
+        r.kontrol(f"EN 81-20 Çiz.6  Q={_q} → {_a} m²",
+                  _yakin(_MTx.kabin_azami_alan(_q), _a), f"→ {_MTx.kabin_azami_alan(_q)}")
+    for _q, _k, _az, _as in _MTx.KABIN_ALANI:
+        r.esit(f"EN 81-20 m.5.4.2.3.1  Q={_q} → kişi", _k, _q // 75)
+        _bek = _CIZ8.get(_k) if _k <= 20 else round(3.13 + 0.115 * (_k - 20), 4)
+        r.kontrol(f"EN 81-20 Çiz.8  {_k} kişi → {_bek} m²", _yakin(_as, _bek),
+                  f"→ {_as}")
+    #  320 kg Çizelge 6'da yoktur:  ara değer kuralı ( m.Çiz.6 dipnotu )
+    r.kontrol("EN 81-20 Çiz.6 dipnotu  320 kg ara değeri",
+              _yakin(_MTx.kabin_azami_alan(320), 0.90 + 0.20 * 20 / 75, 1e-3),
+              f"→ {_MTx.kabin_azami_alan(320)}")
+
+    #  EN 81-50 m.5.10.2 / 5.10.3 / 5.10.4 / 5.10.6  —  ray hesabı
+    r.esit("EN 81-50 m.5.10.2.1  Mm = 3·Fh·l/16",
+           (MK.SABIT["moment_pay"], MK.SABIT["moment_bolen"]), (3, 16))
+    r.esit("EN 81-50 m.5.10.4  σ = σk + 0,9·σm", MK.SABIT["birlesik_katsayi"], 0.9)
+    r.esit("EN 81-50 m.5.10.6  δ = 0,7·F·l³/(48·E·I)",
+           (MK.SABIT["sehim_katsayi"], MK.SABIT["sehim_bolen"]), (0.7, 48))
+    #  ω polinomları — standardın kendi katsayıları
+    r.esit("EN 81-50 m.5.10.3  Rm=370 eğrisi",
+           [(a, round(b, 8), c, d) for a, b, c, d in _MTx.OMEGA_370],
+           [(60, 0.0001292, 1.89, 1.0), (85, 0.00004627, 2.14, 1.0),
+            (115, 0.00001711, 2.35, 1.04), (250, 0.00016887, 2.0, 0.0)])
+    r.esit("EN 81-50 m.5.10.3  Rm=520 eğrisi",
+           [(a, round(b, 8), c, d) for a, b, c, d in _MTx.OMEGA_520],
+           [(50, 0.0000824, 2.06, 1.021), (70, 0.00001895, 2.41, 1.05),
+            (89, 0.00002447, 2.36, 1.03), (250, 0.0002533, 2.0, 0.0)])
+
+    #  EN 81-50 Ek C.2.1.1 — kuvvet · moment · gerilme zinciri
+    _sc = MK.hesapla()
+    _gc, _hc = _sc["girdi"], _sc["_h"]
+    _k1 = _MTx.darbe_k1(_gc["guvenlik_tertibati"])
+    _n, _hh = _gc["kabin_ray_sayisi"], _gc["kabin_paten_arasi"]
+    _l = _gc["kabin_konsol_arasi"]
+    _p = _MTx.RAY_PROFILI
+    _Wy = _MTx.ray(_gc["kabin_ray_profili"], "Wy")
+    _xc, _xp = _hc["AH293"], _hc["AH295"]
+    _xQ = _xc + _gc["kabin_derinligi"] / 8.0
+    _Fx = _k1 * 9.81 * (_gc["beyan_yuku"] * _xQ + _gc["kabin_agirligi"] * _xp) / (_n * _hh)
+    r.kontrol("EN 81-50 C.2.1.1 a)  Fx = k1·gn·(Q·xQ+P·xP)/(n·h)",
+              _yakin(_hc["AY321"], _Fx), f"→ motor {_hc['AY321']!r}, standart {_Fx!r}")
+    r.kontrol("EN 81-50 C.2.1.1 a)  σy = (3·Fx·l/16)/Wy",
+              _yakin(_hc["AU324"], 3 * _Fx * _l / 16 / _Wy),
+              f"→ motor {_hc['AU324']!r}")
+    #  C.2.1.2 burkulma
+    _Fv = _k1 * 9.81 * (_gc["kabin_agirligi"] + _gc["beyan_yuku"]) / _n + _hc["AH291"] * 9.81
+    r.kontrol("EN 81-50 C.2.1.2  Fv = k1·gn·(P+Q)/n + Mg·gn",
+              _yakin(_hc["AU351"], _Fv), f"→ motor {_hc['AU351']!r}, standart {_Fv!r}")
 
     #  ⑨  motor verimi makine tipine bağlı  ( ofis standardı, TEK KAYNAK )
     from engine.ortak import ofis as _OF

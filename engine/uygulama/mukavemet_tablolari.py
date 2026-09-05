@@ -265,11 +265,21 @@ def npu(olcu, ozellik):
 #  tek fark burada 320 kg satırının BULUNMASIDIR ( kitapta yok ).  İki tablo
 #  bilerek ayrı tutulur — biri kitabı, diğeri bu hesabın kaynağını uygular.
 # =====================================================================
+#  KAYNAK KİTABIN TABLOSU EKSİKTİ.  EN 81-20 Çizelge 6'nın 28 beyan yükünden
+#  7'si kitapta yoktu ( 100 · 1050 · 1250 · 1350 · 1425 · 1500 · 2500 kg ) ve
+#  açılır liste kapalı olduğu için o yüklerde HİÇ hesap yapılamıyordu — 1250
+#  ve 1500 kg yaygın asansörlerdir.  Tablo standarda tamamlandı;  eklenen
+#  satırlar aşağıda ★ ile işaretlidir.
+#
+#  Sütunlar:  beyan yükü · kişi · azami alan ( Çiz.6 ) · asgari alan ( Çiz.8 )
+#  Kişi sayısı m.5.4.2.3.1 a):  Q/75, aşağı yuvarlanır.
+#  Çizelge 8'de 20 kişiden sonrası:  3,13 + 0,115 × ( kişi − 20 ).
 KABIN_ALANI = (
+    (100, 1, 0.37, 0.28),          # ★ Çiz.6 — tek kişilik asansör asgarisi
     (180, 2, 0.58, 0.49),
     (225, 3, 0.7, 0.6),
     (300, 4, 0.9, 0.79),
-    (320, 4, 0.97, 0.79),
+    (320, 4, 0.953, 0.79),   # Çiz.6'da YOK — 300/375 arası doğrusal ara değer
     (375, 5, 1.1, 0.98),
     (400, 5, 1.17, 0.98),
     (450, 6, 1.3, 1.17),
@@ -283,13 +293,56 @@ KABIN_ALANI = (
     (900, 12, 2.2, 2.01),
     (975, 13, 2.35, 2.15),
     (1000, 13, 2.4, 2.15),
+    (1050, 14, 2.5, 2.29),      # ★
     (1125, 15, 2.65, 2.43),
     (1200, 16, 2.8, 2.57),
+    (1250, 16, 2.9, 2.57),      # ★
     (1275, 17, 2.95, 2.71),
+    (1350, 18, 3.1, 2.85),      # ★
+    (1425, 19, 3.25, 2.99),     # ★
+    (1500, 20, 3.4, 3.13),      # ★
     (1600, 21, 3.56, 3.245),
     (2000, 26, 4.2, 3.82),
+    (2500, 33, 5.0, 4.625),     # ★  Çiz.6'nın son satırı
 )
 
+
+
+#  ---------------------------------------------------------------------
+#  RAY TABLOSUNUN KENDİ TUTARLILIĞI
+#  ---------------------------------------------------------------------
+#  Atalet yarıçapı tanımı gereği  i = √( I / A )  olmalıdır.  Kaynak kitabın
+#  kendi 60. satırı bunu FORMÜLLE hesaplar ( =ROUND(SQRT(L60/K60),2) ), yani
+#  ofisin tanımı da budur;  ama iki satırda elle yazılmış değerler tutmuyor:
+#
+#      70 x 65 x 9      ix  20,90   √(Ix/A) = 20,84   %0,3
+#      125 x 82 x 16    iy  25,20   √(Iy/A) = 26,15   %3,6
+#
+#  125'lik satırda A, Ix ve ix birbiriyle tutarlıdır ( √(1511000/2290) =
+#  25,69 ≈ 25,7 );  tutmayan TEK sayı iy'dir.  Hangisinin doğru olduğu ISO
+#  7465'in kendi tablosundan teyit edilmelidir — elimizde o yok.
+#
+#  DEĞER DEĞİŞTİRİLMEDİ:  tabloda duran küçük iy, narinliği ( λ = l/i ) BÜYÜK
+#  gösterir, dolayısıyla ω ve burkulma gerilmesi de büyük çıkar — yani
+#  emniyetli taraftadır.  Doğrulanmamış bir sayıyı emniyetsiz yönde
+#  değiştirmek yerine tutarsızlık burada AÇIKÇA işaretlenir.
+#  %0,5 eşiğini AŞAN satır:  70'likteki %0,3 yuvarlama payı içindedir.
+RAY_TUTARSIZ = ("125 x 82 x 16",)
+
+
+def ray_tutarsizliklari(tolerans=0.005):
+    """i ≠ √(I/A) olan satırlar  →  [ ( profil, eksen, tablo, hesap ) ]."""
+    import math as _m
+    bulunan = []
+    for satir in RAY_PROFILI:
+        ad = satir[0]
+        A = ray(ad, "A")
+        for eksen, atalet in (("ix", "Ix"), ("iy", "Iy")):
+            tablo = ray(ad, eksen)
+            hesap = _m.sqrt(ray(ad, atalet) / A)
+            if abs(tablo - hesap) > tolerans * hesap:
+                bulunan.append((ad, eksen, tablo, round(hesap, 3)))
+    return bulunan
 
 
 def kabin_kisi(beyan_yuku):

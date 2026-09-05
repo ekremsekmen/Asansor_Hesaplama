@@ -391,6 +391,48 @@ def _omega_formulu(lam_hucre, rm_hucre):
     return f"=({a})+(({b})-({a}))*{oran}"
 
 
+#  Beyan yükü açılır listesinin kitaptaki kaynağı ve ilk boş satırı.
+BEYAN_LISTE_SUTUN = "S"
+BEYAN_LISTE_BAS = 2
+BEYAN_LISTE_HUCRE = "C59"
+
+
+def _liste_tamamla(wb):
+    """Beyan yükü açılır listesini EN 81-20 Çizelge 6'ya tamamlar.
+
+    Kitaptaki liste KAPALIDIR:  içinde olmayan bir yük Excel'de seçilemez.
+    Standardın 28 yükünden 7'si listede yoktu ( 100 · 1050 · 1250 · 1350 ·
+    1425 · 1500 · 2500 kg ) — 1250 ve 1500 yaygın asansörlerdir.
+
+    Listenin ilk 17 satırı TEKNİK sayfasına BAĞLIDIR ( "=TEKNİK!A2" … );
+    okunabilmesi için o başvurular çözülür.  Blok ilk boş satırda biter —
+    aşağıda S42/S43'te BAŞKA bir liste vardır, ona dokunulmamalıdır.
+    """
+    vg = wb[GIRDI]
+    var, satir = set(), BEYAN_LISTE_BAS
+    while True:
+        d = vg[f"{BEYAN_LISTE_SUTUN}{satir}"].value
+        if d in (None, ""):
+            break
+        if isinstance(d, str) and d.startswith("="):
+            sayfa, _, hucre = d[1:].partition("!")
+            if sayfa in wb.sheetnames:
+                d = wb[sayfa][hucre].value
+        if isinstance(d, (int, float)) and not isinstance(d, bool):
+            var.add(float(d))
+        satir += 1
+    eksik = [q for q in (k[0] for k in MT.KABIN_ALANI) if float(q) not in var]
+    if not eksik:
+        return
+    for i, q in enumerate(eksik):
+        vg[f"{BEYAN_LISTE_SUTUN}{satir + i}"] = q
+    aralik = (f"${BEYAN_LISTE_SUTUN}${BEYAN_LISTE_BAS}:"
+              f"${BEYAN_LISTE_SUTUN}${satir + len(eksik) - 1}")
+    for dv in list(vg.data_validations.dataValidation):
+        if BEYAN_LISTE_HUCRE in str(dv.sqref):
+            dv.formula1 = aralik
+
+
 def _verim_formulu(O):
     """η′  =  makine tipi tablosu  −  palangalı sistemde düşüş.
 
@@ -454,6 +496,12 @@ def _standarda_uydur(wb, g):
     #  yuvarlı olduğu için burada da standardın formülü yazılır — yoksa
     #  pafta ile kitap binde ikilik bir farkla ayrışırdı.
     ws["AB39"] = _omega_formulu("Z71", str(MT.OMEGA_RM_ALT))
+
+    #  ⑩  Beyan yükü listesi EN 81-20 Çizelge 6'ya tamamlanır
+    #  Kitabın açılır listesi ( 'Veri Girişi'!$S$2:$S$23 ) standardın 28
+    #  yükünden 7'sini içermiyordu;  o yüklerde kitapla hesap yapılamıyordu.
+    #  Eksik yükler listenin sonuna yazılır ve doğrulama aralığı genişletilir.
+    _liste_tamamla(wb)
 
     #  ⑨  Motor verimi makine tipine bağlanır  —  ofis standardı
     #  Kitap 11!AQ22'ye sabit 0,92 yazar ve 'Veri Girişi'!B130'daki makine

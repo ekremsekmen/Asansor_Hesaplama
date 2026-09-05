@@ -32,9 +32,12 @@ def _s(*d):
 #    "hesap" alanları kullanıcıdan alınmaz — tamamla() üretir.
 ALANLAR = (
     # ── ASANSÖR TEKNİK BİLGİLERİ ──────────────────────────────────────
+    #  SEÇENEKLER TABLODAN TÜRETİLİR.  Elle yazılan ikinci bir liste, kabin
+    #  alanı tablosuyla ayrışabilir — nitekim kaynak kitapta ayrışmıştı:
+    #  EN 81-20 Çizelge 6'nın 7 beyan yükü listede yoktu ve o yüklerde hiç
+    #  hesap yapılamıyordu.  Artık tek kaynak KABIN_ALANI'dır.
     ("beyan_yuku",        "C59",  "Beyan yükü",                        "kg",   "secim",
-     _s(180, 225, 300, 320, 375, 400, 450, 525, 600, 630, 675, 750, 800,
-        825, 900, 975, 1000, 1125, 1200, 1275, 1600, 2000), 800),
+     tuple(k[0] for k in MT.KABIN_ALANI), 800),
     ("beyan_hizi",        "C61",  "Beyan hızı",                        "m/s",  "secim",
      _s(0.63, 0.8, 1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6), 1),
     ("seyir_mesafesi",    "C63",  "Seyir mesafesi",                    "m",    "sayi", None, 21),

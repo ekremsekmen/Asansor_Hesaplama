@@ -42,6 +42,36 @@ ESLESME = (
 )
 
 
+#  KAYNAK KİTAPTAN GENİŞLETİLEN TABLOLAR.  Kitabın satırlarına dokunulmaz;
+#  yalnız standardın gerektirdiği satırlar EKLENİR.  Burada hem "kitabın
+#  hiçbir satırı değişmedi" hem de "eklenenler beklenenlerdir" denetlenir —
+#  yoksa genişletme, sessizce kaynak veriyi değiştirmenin kapısı olurdu.
+GENISLETILEN = {
+    #  EN 81-20 Çizelge 6'da olup kitapta olmayan beyan yükleri.
+    "KABIN_ALANI": {
+        "eklenen": (100, 1050, 1250, 1350, 1425, 1500, 2500),
+        #  320 kg Çizelge 6'da YOKTUR;  standardın ara değer notu 300/375
+        #  arası 0,953 m² verir, kitap 0,97 yazar ( emniyetsiz taraf ).
+        "degisen": {320: (4, 0.953, 0.79)},
+    },
+}
+
+
+def _genisletilen_tablo(r, ad, tablo, excel):
+    ex = {satir[0]: tuple(satir[1:]) for satir in excel}
+    mo = {satir[0]: tuple(satir[1:]) for satir in tablo}
+    kural = GENISLETILEN[ad]
+    r.esit(f"{ad}: kitabın satırlarının hepsi duruyor",
+           sorted(set(ex) - set(mo)), [])
+    r.esit(f"{ad}: eklenenler beklenenlerle aynı",
+           sorted(set(mo) - set(ex)), sorted(kural["eklenen"]))
+    for anahtar, deger in sorted(ex.items()):
+        beklenen = kural["degisen"].get(anahtar, deger)
+        r.kontrol(f"{ad}[{anahtar}]",
+                  all(_esit(a, b) for a, b in zip(mo[anahtar], beklenen)),
+                  f"→ modül {mo[anahtar]!r}, beklenen {beklenen!r}")
+
+
 def _esit(a, b):
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return abs(float(a) - float(b)) < 1e-9
@@ -70,6 +100,9 @@ def calistir():
     for ad, sayfa, aralik, sutunlar in ESLESME:
         tablo = getattr(MT, ad)
         excel = oku(sayfa, aralik, sutunlar)
+        if ad in GENISLETILEN:
+            _genisletilen_tablo(r, ad, tablo, excel)
+            continue
         if not r.esit(f"{ad}: satır sayısı", len(tablo), len(excel)):
             continue
         for i, (m, e) in enumerate(zip(tablo, excel)):
@@ -127,6 +160,16 @@ BILINEN_FARK = {
     #  Hız listesinin sonunda 5 adet dolgu 0 var; hız 0 anlamsız.
     "beyan_hizi": ([0.63, 0.8, 1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6, 0, 0, 0, 0, 0],
                    [0.63, 0.8, 1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6]),
+    #  KİTABIN LİSTESİ EKSİKTİ:  EN 81-20 Çizelge 6'nın 28 yükünden 7'si
+    #  yoktu ( 100 · 1050 · 1250 · 1350 · 1425 · 1500 · 2500 kg ) ve liste
+    #  kapalı olduğu için o yüklerde hiç hesap yapılamıyordu.  Modül tabloyu
+    #  standarda tamamladı;  teslim edilen kitabın listesi de genişletilir
+    #  ( bkz. exports/mukavemet_xlsx._liste_tamamla ).
+    "beyan_yuku": ([180, 225, 300, 320, 375, 400, 450, 525, 600, 630, 675,
+                    750, 800, 825, 900, 975, 1000, 1125, 1200, 1275, 1600, 2000],
+                   [100, 180, 225, 300, 320, 375, 400, 450, 525, 600, 630, 675,
+                    750, 800, 825, 900, 975, 1000, 1050, 1125, 1200, 1250, 1275,
+                    1350, 1425, 1500, 1600, 2000, 2500]),
 }
 
 

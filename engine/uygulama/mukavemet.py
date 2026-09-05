@@ -50,12 +50,25 @@ EXCEL_FARKLARI = (
      "m.5.5.6.2 c) dengeleme gergi kasnağı ve m.5.6.2.2.1.3 regülatör eşiğidir.",
      "Standardın istediği 40 uygulanır.",
      ()),
-    ("Karşı ağırlık rayı σ(My) böleni",
-     "TS EN 81-50 Ek C.2.1.1",
-     "σ(My) için Wy'ye böler.",
-     "Fy → Mx → Wx.  Standart açıkça 'Fy kuvveti Mx hesabında kullanılır' der; "
-     "Excel'in kabin raylarında da, sehim satırlarında da doğrusu yapılmıştır.",
+    ("Karşı ağırlık rayında Fy'nin mukavemet momenti",
+     "TS EN 81-50 Ek C.2.2.1",
+     "Fy'den gelen gerilme için Wy'ye böler.",
+     "Ek C.2.1.1 / C.2.2.1 açıkça şöyle yazar:\n"
+     "            Fx → My = 3·Fx·l/16 → σy = My/Wy\n"
+     "            Fy → Mx = 3·Fy·l/16 → σx = Mx/Wx\n"
+     "        Yani y yönündeki kuvvet rayı X EKSENİ etrafında eğer ve Wx'e "
+     "bölünür.  Excel'in kabin raylarında ve bütün sehim satırlarında doğrusu "
+     "zaten yapılmıştır;  yalnız karşı ağırlık rayında Wy kalmış.",
      ("AU575", "Z588", "AF590")),
+    ("Moment ve gerilmelerin eksen adları",
+     "TS EN 81-50 Ek C.2.1.1",
+     "Fx'ten gelen momente 'Mx', Fy'den gelene 'My' der ( doğru mukavemet "
+     "momentine bölse de ).",
+     "Standart bunun TERSİNİ yazar:  Fx → My, Fy → Mx.  Sayılar değişmez, "
+     "ama paftayı Ek C ile karşılaştıran bir denetçi olmayan bir hata "
+     "görüyordu — üstelik pafta kendi içinde de çelişiyordu:  sehim "
+     "satırları ( δx ↔ Fx ↔ Iy ) standardın adlandırmasını kullanıyordu.",
+     ()),
     ("Durum 2'de xQ",
      "TS EN 81-50 Ek C.2.1.1",
      "Sabit 0 yazar ( satır başlığı 'xQ = xc' dese de ).",
@@ -112,6 +125,24 @@ EXCEL_FARKLARI = (
      #  Q25 kitapta "=AQ23" aynasıdır ve motorda karşılığı yoktur;  listeye
      #  alınırsa "hiçbir senaryoda ayrışmadı" der.  AQ23 zaten denetleniyor.
      ("AQ22", "AQ23", "X25")),
+    ("Kabin alanı tablosu eksik",
+     "TS EN 81-20 Çizelge 6  /  Çizelge 8",
+     "Çizelge 6'nın 28 beyan yükünden 7'si tabloda ve açılır listede yoktu "
+     "( 100 · 1050 · 1250 · 1350 · 1425 · 1500 · 2500 kg );  liste kapalı "
+     "olduğu için o yüklerde HİÇ hesap yapılamıyordu.  Ayrıca 320 kg için "
+     "0,97 m² yazar.",
+     "Tablo Çizelge 6'ya tamamlandı;  asgari alanlar Çizelge 8'den, kişi "
+     "sayısı m.5.4.2.3.1 a)'dan ( Q/75 ) türetildi.  1250 ve 1500 kg yaygın "
+     "asansörlerdir.\n"
+     "        320 kg Çizelge 6'da YOKTUR;  standardın kendi notu ara yükler "
+     "için doğrusal ara değer ister ve 300/375 arası 0,953 m² verir.  0,97 "
+     "EMNİYETSİZ taraftadır — o yük için standardın izin verdiğinden büyük "
+     "kabine izin verir.\n"
+     "        Teslim edilen kitabın açılır listesi de genişletilir ( 'Veri "
+     "Girişi'!S sütunu ), yoksa kitap yeni yükleri reddederdi.",
+     #  AC82:  azami kabin alanı.  320 kg'da kitap 0,97 der, standardın ara
+     #  değeri 0,953'tür — yalnız bu yükte ayrışır.
+     ("AC82",)),
     ("Sığınma açıklıklarının iki alt sınırı",
      "TS EN 81-20 m.5.2.5.7.3  /  m.5.2.5.8.2 a) 2)",
      "Kabin üstü serbest yüksekliğini 1200 mm, ray dibi açıklığını 150 mm "
@@ -876,6 +907,27 @@ def _tahrik(g, o):
 # =====================================================================
 #  RAY HESABI ORTAK YARDIMCILARI
 # =====================================================================
+def _ray_tutarsizlik_notu(profil):
+    """Seçilen ray profilinin tablo değerleri kendi içinde tutarlı mı.
+
+    i = √(I/A) tanım gereğidir;  kaynak kitabın kendi 60. satırı da bunu
+    formülle hesaplar.  Tutmayan bir satır seçildiğinde projeci bunu
+    BİLMELİDİR — sayı emniyetli tarafta olsa bile.
+    """
+    if profil not in MT.RAY_TUTARSIZ:
+        return None
+    for ad, eksen, tablo, hesap in MT.ray_tutarsizliklari():
+        if ad == profil:
+            return (f"RAY TABLOSU TUTARSIZ:  {profil} profilinde {eksen} = "
+                    f"{tr(tablo)} yazılı, ama aynı satırdaki I ve A "
+                    f"{eksen} = {tr(hesap)} veriyor ( √(I/A) ).  Tablodaki "
+                    "küçük değer narinliği büyük gösterir, yani burkulma "
+                    "EMNİYETLİ tarafta hesaplanır;  yine de doğrusu ISO 7465 "
+                    "ya da ray imalatçısının veri sayfasından teyit "
+                    "edilmelidir.")
+    return None
+
+
 def _ray_ozellik(profil):
     """Bir ray profilinin hesaba giren bütün kesit değerleri."""
     d = {k: MT.ray(profil, k) for k in ("A", "Ix", "Iy", "Wx", "Wy", "ix", "c")}
@@ -931,15 +983,27 @@ def _burkulma_omega(l, ix, rm):
     return lam, MT.omega_en8150(lam, rm)
 
 
-def _ray_satirlari(ad, F, l, W, I, adimlar):
-    """Bir kuvvet için moment · gerilme satırlarını yazar, ( σ , δ ) döndürür."""
+def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar):
+    """Bir kuvvet için moment · gerilme satırlarını yazar, ( σ , δ ) döndürür.
+
+    ADLANDIRMA TS EN 81-50 Ek C.2.1.1'İN KENDİSİDİR:
+
+        Fx  →  My = 3·Fx·l/16  →  σy = My/Wy
+        Fy  →  Mx = 3·Fy·l/16  →  σx = Mx/Wx
+
+    Yani x yönündeki kuvvet rayı Y EKSENİ etrafında eğer.  Kaynak kitap bu
+    ikisini ters adlandırıyordu ( Fx'ten gelen momente "Mx" diyordu ) — sayı
+    doğruydu, ad yanlıştı.  Paftayı standartla karşılaştıran bir denetçi için
+    bu, olmayan bir hata gibi görünüyordu.
+    """
     M = _moment(F, l)
     sigma = M / W
     d = _sehim(F, l, I)
     adimlar.extend([
-        hesap(f"{ad} = 3 × F × l / 16", f"3 × {tr(F)} × {trn(l, 0)} / 16",
-              M, "N·mm", ondalik=0),
-        hesap(f"σ({ad}) = M / W", f"{trn(M, 0)} / {trn(W, 0)}", sigma, "N/mm²"),
+        hesap(f"M{eksen} = 3 × F{kuvvet} × l / 16",
+              f"3 × {tr(F)} × {trn(l, 0)} / 16", M, "N·mm", ondalik=0),
+        hesap(f"σ{eksen} = M{eksen} / W{eksen}",
+              f"{trn(M, 0)} / {trn(W, 0)}", sigma, "N/mm²"),
     ])
     return sigma, d
 
@@ -1020,8 +1084,14 @@ def _kabin_raylari(g, o):
                hucre=()):
         """Bir yükleme durumu için gerilme · burkulma · flanş · sehim satırları.
 
-        hucre  her durum için  ( Fx, σx, Fy, σy, σm, σc, σ, σF, δx, δy )
+        hucre  her durum için  ( Fx, σy, Fy, σx, σm, σc, σ, σF, δx, δy )
                Excel adresleri;  boş dize atlanır.
+
+        SIRA DİKKAT:  Excel'in hücreleri "Fx'ten gelen gerilme" ve "Fy'den
+        gelen gerilme" diye dizilidir.  TS EN 81-50'de Fx'ten gelen gerilme
+        σy'dir ( Fx → My → Wy ), Fy'den gelen ise σx.  Bu yüzden demet
+        σy · σx sırasındadır — Excel adresleri değişmez, yalnız adlar
+        standardın adlandırmasına oturmuştur.
         """
         ad.append(metin(baslik, vurgu=True))
         sonuc = []
@@ -1031,11 +1101,12 @@ def _kabin_raylari(g, o):
             ad.append(metin(etiket + " :"))
             ad.append(hesap("Fx", kaynak, Fx, "N"))
             ad.append(hesap("Fy", kaynak, Fy, "N"))
-            sx, dx = _ray_satirlari("Mx", Fx, l, p["Wy"], p["Iy"], ad)
-            sy, dy = _ray_satirlari("My", Fy, l, p["Wx"], p["Ix"], ad)
+            #  m.C.2.1.1:  Fx → My → Wy   ·   Fy → Mx → Wx
+            sy, dx = _ray_satirlari("y", "x", Fx, l, p["Wy"], p["Iy"], ad)
+            sx, dy = _ray_satirlari("x", "y", Fy, l, p["Wx"], p["Ix"], ad)
             sm = sx + sy
             sc = (kk["Fv"] + kk["k"] * MY) / p["A"] + sm
-            ad.append(hesap("σm = σ(My) + σ(Mx)", f"{tr(sy)} + {tr(sx)}", sm, "N/mm²"))
+            ad.append(hesap("σm = σx + σy", f"{tr(sx)} + {tr(sy)}", sm, "N/mm²"))
             ad.append(kontrol(f"σm = {tr(sm)}  ≤  σperm = {trn(sperm, 0)} N/mm²",
                               sm <= sperm))
             ad.append(hesap("σc = ( Fv + k × MY ) / A + σm",
@@ -1071,7 +1142,7 @@ def _kabin_raylari(g, o):
             sonuc += [sf <= sperm, dx <= dperm, dy <= dperm]
             if h:
                 st_v = kk["sigma_k"] + S["birlesik_katsayi"] * sm if omega else None
-                for adres, deger in zip(h, (Fx, sx, Fy, sy, sm, sc, st_v,
+                for adres, deger in zip(h, (Fx, sy, Fy, sx, sm, sc, st_v,
                                             sf, dx, dy)):
                     if adres:
                         _kay(o, **{adres: deger})
@@ -1145,13 +1216,14 @@ def _kabin_raylari(g, o):
     ad.append(hesap("Fy = ( gn × P × (yp−ys) + Fs × (yi−ys) ) / ( n × h )",
                     f"( {tr(gn)} × {trn(P, 0)} × {tr(yp - ys)} + {tr(Fs)} × "
                     f"{tr(yi - ys)} ) / ( {trn(n, 0)} × {trn(h, 0)} )", Fy3, "N"))
-    sx3, dx3 = _ray_satirlari("Mx", Fx3, l, p["Wy"], p["Iy"], ad)
-    sy3, dy3 = _ray_satirlari("My", Fy3, l, p["Wx"], p["Ix"], ad)
+    #  m.C.2.3:  Fx → My → Wy   ·   Fy → Mx → Wx
+    sy3, dx3 = _ray_satirlari("y", "x", Fx3, l, p["Wy"], p["Iy"], ad)
+    sx3, dy3 = _ray_satirlari("x", "y", Fy3, l, p["Wx"], p["Ix"], ad)
     sm3 = sx3 + sy3
     sc3 = (Fv + k3 * MY) / p["A"] + sm3
     sf3 = _flans(Fx3, p, balata)
     ad += [
-        hesap("σm = σ(My) + σ(Mx)", f"{tr(sy3)} + {tr(sx3)}", sm3, "N/mm²"),
+        hesap("σm = σx + σy", f"{tr(sx3)} + {tr(sy3)}", sm3, "N/mm²"),
         kontrol(f"σm = {tr(sm3)}  ≤  σperm = {trn(sperm_n, 0)} N/mm²", sm3 <= sperm_n),
         hesap("σc = ( Fv + k3 × MY ) / A + σm", f"σv + σm", sc3, "N/mm²"),
         kontrol(f"σc = {tr(sc3)}  ≤  σperm = {trn(sperm_n, 0)} N/mm²", sc3 <= sperm_n),
@@ -1169,7 +1241,9 @@ def _kabin_raylari(g, o):
          AH304=sperm_g, AH305=sperm_n, Z309=xQ1, Z312=yQ2,
          AU351=Fk, AV354=l / p["ix"], AV355=lam, AD354=omega, AL354=sigma_k,
          AE452=Fv, AL455=sigma_v,
-         L508=Fx3, AU511=sx3, L516=Fy3, AU519=sy3, Z530=sm3, AF532=sc3,
+         #  AU511 Fx3'ten, AU519 Fy3'ten gelen gerilmedir;  standardın
+         #  adlandırmasında bunlar sırasıyla σy ve σx'tir.
+         L508=Fx3, AU511=sy3, L516=Fy3, AU519=sx3, Z530=sm3, AF532=sc3,
          Z537=sf3, AH542=dx3, AH545=dy3)
     o.update(Fk_kabin=Fk, Mg_kabin=Mg, ray_boyu=ray_boyu)
     b["adimlar"] = ad
@@ -1179,7 +1253,14 @@ def _kabin_raylari(g, o):
                            else "UYGUN DEĞİLDİR — ray profilini büyütün ya da "
                                 "konsol aralığını küçültün",
                   "uygun": bool(hepsi)}
+    _not = _ray_tutarsizlik_notu(prof)
+    if _not:
+        b["notlar"] = [_not]
     b["aciklamalar"] = [
+        "Adlandırma TS EN 81-50 Ek C.2.1.1'in kendisidir:  Fx → My → Wy ve "
+        "Fy → Mx → Wx.  Yani x yönündeki kuvvet rayı Y ekseni etrafında eğer. "
+        "Kaynak kitap bu ikisini ters adlandırıyordu ( sayı doğru, ad "
+        "yanlıştı ) ve kendi sehim satırlarıyla çelişiyordu.",
         "Durum 1 yükü x ekseninde Dx/8, Durum 2 y ekseninde Dy/8 kadar "
         "kaydırır ( TS EN 81-50 Ek C.2.1.1 ); öteki eksendeki moment kolu her "
         "iki durumda da kabin merkezidir. Kaynak Excel Durum 2'de xQ'yu sabit "
@@ -1256,23 +1337,24 @@ def _agirlik_raylari(g, o):
         hesap("Fy = k3 × gn × Mcwt × ( Dya − ysa ) / ( n × h )",
               f"{tr(k3)} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dya)} / "
               f"( {trn(n, 0)} × {trn(h, 0)} )", Fy, "N"),
-        hesap("Mx = 3 × Fx × l / 16", f"3 × {tr(Fx)} × {trn(l, 0)} / 16", Mx,
+        #  m.C.2.2.1:  Fx → My → Wy   ·   Fy → Mx → Wx
+        hesap("My = 3 × Fx × l / 16", f"3 × {tr(Fx)} × {trn(l, 0)} / 16", Mx,
               "N·mm", ondalik=0),
-        hesap("σ(Mx) = Mx / Wy", f"{trn(Mx, 0)} / {trn(p['Wy'], 0)}", sx, "N/mm²"),
-        hesap("My = 3 × Fy × l / 16", f"3 × {tr(Fy)} × {trn(l, 0)} / 16", My,
+        hesap("σy = My / Wy", f"{trn(Mx, 0)} / {trn(p['Wy'], 0)}", sx, "N/mm²"),
+        hesap("Mx = 3 × Fy × l / 16", f"3 × {tr(Fy)} × {trn(l, 0)} / 16", My,
               "N·mm", ondalik=0),
-        hesap("σ(My) = My / Wx", f"{trn(My, 0)} / {trn(p['Wx'], 0)}", sy, "N/mm²"),
+        hesap("σx = Mx / Wx", f"{trn(My, 0)} / {trn(p['Wx'], 0)}", sy, "N/mm²"),
         metin("Burkulma :"),
         hesap("Fv = Mg × gn", f"{tr(Mg)} × {tr(gn)}", Fv, "N"),
         hesap("σv = ( Fv + k3 × MY ) / A",
               f"( {tr(Fv)} + {tr(k3)} × {trn(MY, 0)} ) / {trn(p['A'], 0)}", sv, "N/mm²"),
         metin("Birleşik gerilme :"),
-        hesap("σm = σ(Mx) + σ(My)", f"{tr(sx)} + {tr(sy)}", sm, "N/mm²"),
+        hesap("σm = σx + σy", f"{tr(sy)} + {tr(sx)}", sm, "N/mm²"),
         kontrol(f"σm = {tr(sm)}  ≤  σperm = {trn(sperm, 0)} N/mm²", sm <= sperm),
         hesap("σc = σv + σm", f"{tr(sv)} + {tr(sm)}", sc, "N/mm²"),
         kontrol(f"σc = {tr(sc)}  ≤  σperm = {trn(sperm, 0)} N/mm²", sc <= sperm),
         metin("Flanş eğilmesi :"),
-        hesap("σF = Fx × ( h1−b−f ) × 6 / ( c² × ( 1 + 2 × h1−f ) )",
+        hesap("σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
               f"Fx = {tr(Fx)} N", sf, "N/mm²"),
         kontrol(f"σF = {tr(sf)}  ≤  σperm = {trn(sperm, 0)} N/mm²", sf <= sperm),
         metin("Sehim miktarları :"),
@@ -1287,12 +1369,16 @@ def _agirlik_raylari(g, o):
                   "metin": "UYGUNDUR." if all(kontroller)
                            else "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün",
                   "uygun": bool(all(kontroller))}
+    _not8 = _ray_tutarsizlik_notu(prof)
+    if _not8:
+        b["notlar"] = [_not8]
     b["aciklamalar"] = [
-        "KAYNAK EXCEL'DEN AYRILAN NOKTA:  Excel σ(My) için de Wy'yi kullanır "
-        "( 11!AU575 ). y yönündeki kuvvet rayı x ekseni etrafında eğer, bu "
-        "yüzden Wx doğrudur — Excel'in sehim satırı da zaten Ix kullanır. "
-        "Burada Wx alındı; Excel'in değeri daha büyük ( emniyetli ama yanlış ) "
-        "çıkar."]
+        "KAYNAK EXCEL'DEN AYRILAN NOKTA:  Excel, Fy'den gelen gerilme için de "
+        "Wy'yi kullanır ( 11!AU575 ).  TS EN 81-50 Ek C.2.2.1 açıkça "
+        "Fy → Mx → Wx der;  y yönündeki kuvvet rayı X ekseni etrafında eğer. "
+        "Excel'in sehim satırı da zaten Ix kullanır — yani kitap kendi içinde "
+        "de çelişiyordu.  Burada Wx alındı;  Excel'in değeri daha büyük "
+        "( emniyetli ama yanlış ) çıkar."]
     _kay(o, AH550=derinlik, AH551=genislik, N562=Dxa, AL562=Dya, AH554=Mg,
          AP566=Fx, AU569=sx, AP572=Fy, AU575=sy, AE580=Fv, AL583=sv,
          Z588=sm, AF590=sc, Z595=sf, AH600=dx, AH603=dy)
