@@ -1370,18 +1370,33 @@ def calistir():
     r.esit("geçersiz katsayı varsayılana döner",
            T.sigorta_sec(18.58, 0), T.sigorta_sec(18.58, 1.25))
 
+    #  ŞEBEKEDEN ÇEKİLEN AKIM motorun ELEKTRİK verimine de bölünür:
+    #  Pşeb = P2 / ηm.  Program bir süre ηm'yi atlıyordu ve akımı %18 DÜŞÜK
+    #  gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.  Kaynak
+    #  kitabın elektrik sayfası ( 12-Elk.Hesapları!W35 ) ηm = 0,85 ile
+    #  bölerek doğrusunu yapıyor;  avan paftasındaki "4 x 25" ise ηm'siz
+    #  hesaplanmış eski değerdir ( bkz. EXCEL_FARKLARI ).
+    _S0 = AV.sabitler({})
     _s = _av()["asansorler"][0]["ozet"]
-    r.esit("ofis örneğinde sigorta Excel'deki gibi 4 x 25", _s["motor_sigorta"], "4 x 25")
-    r.esit("motor akımı özette", round(_s["I_motor"], 1),
-           round(_s["Nsc"] * 1000 / (_m.sqrt(3) * 380 * 0.90), 1))
+    r.esit("motor akımı ηm'ye de bölünüyor", round(_s["I_motor"], 1),
+           round(_s["Nsc"] * 1000 / (_m.sqrt(3) * 380 * 0.90
+                                     * _S0["motor_elektrik_verimi"]), 1))
+    r.kontrol("ηm atlanmış eski akımdan BÜYÜK",
+              _s["I_motor"] > _s["Nsc"] * 1000 / (_m.sqrt(3) * 380 * 0.90),
+              f"→ {_s['I_motor']}")
+    r.esit("ofis örneğinde sigorta", _s["motor_sigorta"], "4 x 32")
     _cet = [b for b in _av()["asansorler"][0]["bolumler"] if b.get("cetvel")][0]["cetvel"]
-    r.esit("cetveldeki sigorta hesaplanan değer", _cet[0]["sigorta"], "4 x 25")
+    r.esit("cetveldeki sigorta hesaplanan değer", _cet[0]["sigorta"], "4 x 32")
     r.kontrol("sigorta artık sabit değil — güç büyüyünce değişiyor",
-              _av({"Nsc": 110})["asansorler"][0]["ozet"]["motor_sigorta"] == "4 x 250")
+              _av({"Nsc": 110})["asansorler"][0]["ozet"]["motor_sigorta"] == "4 x 315")
     #  Katsayı ofis standardındadır
     r.esit("katsayı büyüyünce sigorta da büyüyor",
            _av(sab={"sigorta_katsayisi": 2.5})["asansorler"][0]["ozet"]["motor_sigorta"],
-           "4 x 50")
+           "4 x 63")
+    #  ηm ofis sabitidir — değiştirilince akım da değişir
+    r.kontrol("ηm ofis sabitinden geliyor",
+              _av(sab={"motor_elektrik_verimi": 1.0})["asansorler"][0]["ozet"]["I_motor"]
+              < _s["I_motor"])
     r.kontrol("geçersiz katsayı reddediliyor",
               any("sigorta_katsayisi" in x
                   for x in AV.sabitler({"sigorta_katsayisi": 0})["_reddedilen"]))
@@ -1401,10 +1416,20 @@ def calistir():
               not any("MAKİNE BESLEME" in x
                       for x in (_av({"kapasite": 25, "V": 2.5, "S2": 25,
                                      "S1": 50}).get("uyarilar") or [])))
-    r.kontrol("S2 kontrolü pafta SONUCUNU değiştirmiyor ( XLSX ile ayrışmasın )",
-              [b for b in _ince["asansorler"][0]["bolumler"]
-               if (b.get("sonuc") or {}).get("baslik", "").startswith("KONTROL      ε")
-               ][0]["sonuc"]["uygun"] is True)
+    #  S2 YETERSİZSE BÖLÜM DE UYGUN DEĞİLDİR.
+    #  Bir süre yalnız ⚠ uyarı veriliyordu ( "XLSX ile ayrışmasın" diye );
+    #  yanlış bir kitaba sadakat uğruna hatalı bir sonuç bırakılamaz.  Teslim
+    #  edilen kitabın elektrik sayfası da artık aynı kontrolü yapıyor
+    #  ( bkz. exports/mukavemet_xlsx._elektrik_sayfasi ).
+    _b6i = [b for b in _ince["asansorler"][0]["bolumler"]
+            if (b.get("sonuc") or {}).get("baslik", "").startswith("KONTROL      ε")][0]
+    r.kontrol("S2 yetersizken pafta BÖLÜMÜ de uygun değil",
+              _b6i["sonuc"]["uygun"] is False, f"→ {_b6i['sonuc']}")
+    r.kontrol("bölümün alt satırında I2 ≤ Iz2 var",
+              any("I2" in x for x in _b6i["sonuc"]["alt"]), f"→ {_b6i['sonuc']['alt']}")
+    r.kontrol("S2 yetersizliği ENGELLEYİCİ listede",
+              any("MAKİNE BESLEME" in x for x in (_ince.get("engelleyici") or [])),
+              f"→ {_ince.get('engelleyici')}")
 
     #  --- Kabin kuyuya sığmalı
     _sig = _av({"kuyu_genisligi": 1500, "kabin_genisligi": 2100})

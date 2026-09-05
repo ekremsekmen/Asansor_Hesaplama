@@ -23,6 +23,7 @@ try:
     from exports import dxf_export as _DXF          # noqa: E402
 except Exception:                                   # noqa: BLE001
     _DXF = None            # CAD kitaplıkları yoksa paket testi atlanır
+from engine.uygulama import sabitler as _US2
 from exports import kapak_export as KPK
 from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
 from api.avan import XLSX_TUR                           # noqa: E402
@@ -1095,7 +1096,10 @@ def calistir():
     #  test sessizce eskir  ( verim makine tipine bağlanınca 4,81 → 5,90 oldu ).
     _msn = _MK.hesapla()
     _ngucu = f"{_msn['ozet']['N_hesap']:.2f}".replace(".", ",")
-    for _ara in (_ngucu, "17,63", "21.326", "58.860"):
+    #  FKR de motordan okunur:  ray ağırlığı iki kez sayılmayı bırakınca
+    #  21.326 → 18.096 oldu ( bkz. EXCEL_FARKLARI ).
+    _fkr = f"{_msn['ozet']['FKR']:,.0f}".replace(",", ".")
+    for _ara in (_ngucu, "17,63", _fkr, "58.860"):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
                   f"→ paftada yok")
     r.kontrol("mukavemet PDF'inde makine tipi ve η′ görünüyor",
@@ -1168,6 +1172,25 @@ def calistir():
                   f"→ {_duz['AQ22'].value!r}")
         _sb = _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]
         r.esit("kaynak kitapta η sabit 0,92 idi", _sb["AQ22"].value, 0.92)
+        #  Elektrik sayfası programın girdilerini kullanıyor mu
+        _delk = _op.load_workbook(io.BytesIO(
+            _MX.mukavemet_xlsx(_MK.hesapla()["girdi"])))["12-Elk.Hesapları"]
+        _S0 = _US2.sabitler({})
+        r.esit("teslim kopyasında U programın değeri", _delk["W28"].value, _S0["U"])
+        r.esit("teslim kopyasında cosφ programın değeri", _delk["X58"].value, _S0["cosfi"])
+        #  Kesit değişince kapasite de değişmeli  ( kitapta 34 SABİTTİ )
+        _delk2 = _op.load_workbook(io.BytesIO(_MX.mukavemet_xlsx(
+            _MK.hesapla({"makine_kesit": 1.5})["girdi"])))["12-Elk.Hesapları"]
+        r.kontrol("teslim kopyasında kablo kapasitesi KESİTTEN geliyor",
+                  _delk2["Y65"].value != _delk["Y65"].value,
+                  f"→ 6 mm² {_delk['Y65'].value!r} · 1,5 mm² {_delk2['Y65'].value!r}")
+        r.esit("1,5 mm² kablonun kapasitesi", _delk2["Y65"].value, 17.5)
+        _sbe = _op.load_workbook(_MX.SABLON)["12-Elk.Hesapları"]
+        r.esit("kaynak kitapta kapasiteler ve gerilim SABİTTİ",
+               [str(_sbe["S60"].value), str(_sbe["Y65"].value), str(_sbe["W28"].value)],
+               ["43", "34", "400"])
+        r.esit("teslim kopyasında ray ağırlığı bir kez sayılıyor",
+               _duz["AO611"].value, "=AU351-AK351*AM351")
         r.esit("kaynak kitapta bu sınırlar 1200 / 150 idi",
                [_sb["AD636"].value, _sb["AD647"].value], [1200, 150])
         #  ---------------------------------------------------------------

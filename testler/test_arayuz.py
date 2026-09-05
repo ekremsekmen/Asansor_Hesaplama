@@ -873,7 +873,8 @@ def calistir():
         r.kontrol("gruba yazılmamış sabit kalmadı",
                   "DİĞER" not in pg.inner_text("#sabit_b_form"))
         for _k in ("q_denge", "n_ray", "gf", "Fmt", "kabin_armatur_W", "kuyu_armatur_W",
-                   "priz_adedi", "cosfi", "UL", "IDn", "lc", "ayd_sutun"):
+                   "priz_adedi", "cosfi", "motor_elektrik_verimi",
+                   "UL", "IDn", "lc", "ayd_sutun"):
             r.kontrol(f"SABİTLER alanı yerinde: {_k}",
                       pg.query_selector("#sb_" + _k) is not None)
         for _k in ("U", "kappa", "eps_max", "gr", "Fmk", "Fsh", "S1", "S2",

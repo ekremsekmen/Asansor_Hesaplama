@@ -172,7 +172,13 @@ def avan_xlsx(veriler: dict, proje: dict = None) -> bytes:
             _yaz(ws, f"{c}{r}", a.get(anahtar))
 
     # 3) SABİTLER sayfası — B bölümü (ofis standardı)
-    sb = veriler.get("sabitler") or {}
+    #    MOTORUN GERÇEKTEN KULLANDIĞI DEĞER YAZILIR, kullanıcının girdiği ham
+    #    değer değil.  Aralık dışı bir ofis sabiti ( cosφ = 2, q = 5, n_ray = 0 )
+    #    motor tarafından REDDEDİLİP varsayılana dönülüyor, ama dosyaya yine
+    #    ham hâli yazılıyordu:  ekran 0,90 ile hesaplarken indirilen kitap 2 ile
+    #    hesaplıyordu.  sabitler() çözülmüş değerleri verir.
+    sb_ham = veriler.get("sabitler") or {}
+    sb = E_AVAN.sabitler(sb_ham)
     wsS = wb[H.AVAN_SABIT_SAYFA]
     for anahtar, adres in H.AVAN_SABIT.items():
         if sb.get(anahtar) is not None:

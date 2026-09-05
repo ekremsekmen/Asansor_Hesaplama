@@ -65,6 +65,7 @@ def _notlari_uyarla(b):
 
 def hesapla(veriler=None):
     """Uygulama projesinin tamamı  —  mukavemet + elektrik + topraklama."""
+    eksik = []          # yapılamayan ZORUNLU hesaplar
     g = UG.varsayilanlar()
     g.update(veriler or {})
     g = UG.tamamla(g)
@@ -109,7 +110,10 @@ def hesapla(veriler=None):
         b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
         bolumler.append(b)
     elif mk.get("mk_yok") is False:
-        uyarilar.append("⚠ " + str(mk.get("uyari") or ""))
+        #  Makine dairesi VAR denmiş ama aydınlatması hesaplanamamış:  zorunlu
+        #  bir hesap eksiktir, proje "uygun" sayılamaz.
+        eksik.append("MAKİNE DAİRESİ AYDINLATMA HESABI YAPILAMADI: "
+                     + str(mk.get("uyari") or ""))
 
     tp = av.get("topraklama") or {}
     if tp.get("aktif"):
@@ -119,11 +123,21 @@ def hesapla(veriler=None):
             b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
             bolumler.append(b)
     elif g.get("temel_a") or g.get("temel_b"):
-        uyarilar.append("⚠ TOPRAKLAMA HESABI YAPILAMADI: "
-                        + str(tp.get("uyari") or ""))
+        #  Temel ölçüsü girilmiş ama topraklama hesaplanamamış — eksik hesap.
+        eksik.append("TOPRAKLAMA HESABI YAPILAMADI: "
+                     + str(tp.get("uyari") or ""))
 
+    #  GENEL SONUÇ:  bölüm sonuçları + ENGELLEYİCİ uyarılar + EKSİK hesaplar.
+    #  Bilgilendirici uyarılar ( reddedilen ofis girdisi, kabin alanı uyarısı … )
+    #  uygunluğu engellemez;  engelleyici olanlar ve yapılamayan zorunlu
+    #  hesaplar engeller.  Yoksa "bütün bölümler uygun" diye bir proje, içinde
+    #  yapılamamış bir hesapla ya da kurulamaz bir geometriyle teslim edilirdi.
+    engelleyici = list(av.get("engelleyici") or [])
+    uyarilar += [x for x in engelleyici if x not in uyarilar]
+    uyarilar += [f"⚠ {x}" for x in eksik]
     uygunlar = [b["sonuc"]["uygun"] for b in bolumler
                 if b.get("sonuc") and b["sonuc"].get("uygun") is not None]
+    uygunlar += [False] * (len(engelleyici) + len(eksik))
     ozet = dict(muk.get("ozet") or {})
     ao = asansor.get("ozet") or {}
     ozet.update({
@@ -139,6 +153,7 @@ def hesapla(veriler=None):
         "topraklama_uygun": (av.get("ozet") or {}).get("topraklama_uygun"),
         "elektrik_var": bool(elektrik),
         "tumu_uygun": all(uygunlar),
+        "engelleyici": engelleyici, "eksik_hesap": eksik,
     })
     return {
         "aktif": True,

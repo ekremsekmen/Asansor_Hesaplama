@@ -168,6 +168,25 @@ HESAPLANAN = tuple(a[0] for a in ALANLAR if a[4] == "hesap")
 #  TS EN 81-50 m.5.11.2.2.2 — hesaba girecek en küçük yavaşlama.
 ACIL_FRENLEME_ASGARI = 0.5
 
+#  ---------------------------------------------------------------------
+#  FİZİKSEL GİRDİ SINIRLARI
+#  ---------------------------------------------------------------------
+#  ADET alanları TAM SAYI olmalıdır:  6,5 halat ya da 2,5 ray diye bir şey
+#  yoktur, ama hesap böyle bir girdiyle sorunsuz koşup "UYGUN" veriyordu.
+TAM_SAYI_ALANLARI = ("halat_adedi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
+                     "kasnak_tek_yon", "kasnak_ters_yon", "durak_sayisi")
+#  SIFIR OLAMAYAN alanlar:  bölen ya da uzunluk oldukları için 0 girildiğinde
+#  hesap teknik bir hatayla ( TypeError · ZeroDivisionError ) çöküyordu;
+#  kullanıcı hangi alanın sorunlu olduğunu göremiyordu.
+POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
+                   "kabin_paten_arasi", "agirlik_paten_arasi",
+                   "yan_yatak_boyu", "sase_yuksekligi", "tahrik_kasnak_capi",
+                   "halat_capi", "reg_kasnak_capi", "reg_halat_capi",
+                   "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi")
+#  AÇI alanları:  0 < açı < 180.  360° girildiğinde sin(180°) = 0 çıkıyor ve
+#  hesap OverflowError ile çöküyordu.
+ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
+
 OPSIYONEL_ALANLAR = ("paten_balata_boyu",)
 
 #  Hesapta BÖLEN olarak geçen alanlar — sıfır kabul edilmez.
@@ -388,6 +407,40 @@ def dogrula(g):
                     "altına inemez. ( Tampon kursu kısıtlıysa daha küçük bir "
                     "değer ancak tamponun tasarım yavaşlamasıyla birlikte "
                     "gerekçelendirilebilir. )")
+    #  ADET · POZİTİFLİK · AÇI  —  fiziksel sınırlar
+    for anahtar in TAM_SAYI_ALANLARI:
+        d = g.get(anahtar)
+        if _sayi(d) and float(d) != int(d):
+            hata.append(f"{ALAN[anahtar][2]}: adet tam sayı olmalıdır "
+                        f"( {d} girildi ).")
+    for anahtar in POZITIF_ALANLAR:
+        d = g.get(anahtar)
+        if anahtar in ALAN and d is not None and (not _sayi(d) or d <= 0):
+            hata.append(f"{ALAN[anahtar][2]}: sıfırdan büyük olmalıdır "
+                        f"( {d} girildi ).")
+    for anahtar, (alt, ust) in ACI_ALANLARI.items():
+        d = g.get(anahtar)
+        if d is not None and (not _sayi(d) or not (alt <= d <= ust)):
+            hata.append(f"{ALAN[anahtar][2]}: {alt}° ile {ust}° arasında "
+                        f"olmalıdır ( {d} girildi ).")
+
+    #  MAKİNE KAİDESİ GEOMETRİSİ.  Bölüm 2 basit kiriş modelidir:  açıklığı L
+    #  olan kirişte tekil yük, A mesnedinden X = L − mesnet payı uzaklıktadır.
+    #  Model 0 < X < L gerektirir.  L mesnet payından küçükse X NEGATİF çıkar;
+    #  o zaman moment ve gerilme de negatif olur ve "σe ≤ σem" karşılaştırması
+    #  bunu SESSİZCE "uygun" sayar ( −5.350 N/mm² ≤ 130 doğrudur ).  Sayı
+    #  fiziksel değildir;  geometri baştan reddedilmelidir.
+    L = g.get("yan_yatak_boyu")
+    pay = (g.get("_ofis") or {}).get("yan_yatak_L_X")
+    if not _sayi(pay):
+        from engine.uygulama import sabitler as _US
+        pay = _US.VARSAYILAN["yan_yatak_L_X"]
+    if _sayi(L) and _sayi(pay) and L - pay <= 0:
+        hata.append(f"Yan yatak boyu ({L} mm) mesnet payından ({pay} mm) büyük "
+                    "olmalıdır. Makine kaidesi hesabı, açıklığı L olan basit "
+                    f"kirişte yükün mesnetten X = L − {pay} uzaklıkta olduğunu "
+                    "kabul eder; X ≤ 0 fiziksel değildir.")
+
     if g.get("agirlik_yeri") == "Arka":
         a, b, c = g.get("kuyu_derinligi"), g.get("ray_kapi_arasi"), g.get("agirlik_ray_duvar")
         if _sayi(a) and _sayi(b) and _sayi(c) and a - b - c <= 0:

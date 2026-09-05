@@ -147,9 +147,18 @@ def api_xlsx_yukle(veri: dict = Body(...)):
                          "VARSAYILANA döndüler — "
                          + " · ".join(et for _a3, _s3, et, _b3
                                       in X_MXLS.EK_GIRDI_HUCRELERI) + ".")
+            #  PROJE KİMLİĞİ de geri gelir:  dosyanın özelliklerinde yazılıdır.
+            #  Okunmazsa ekranda ÖNCEKİ projenin adı kalıyor ve bir sonraki
+            #  çıktı onun adıyla iniyordu.
+            kimlik = X_MXLS.proje_kimligi_oku(icerik)
+            proje = {f"mk_{k}": v for k, v in (
+                ("proje_adi", kimlik.get("proje_adi")),
+                ("isveren", kimlik.get("isveren")),
+                ("pafta_no", kimlik.get("pafta_no"))) if v}
+            alanlar.update(proje)
             return JSONResponse({
                 "tur": "mukavemet", "alanlar": alanlar, "muk_durak": durak,
-                "proje": {}, "ozet": ozet})
+                "proje": kimlik, "ozet": ozet})
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"hata": f"Mukavemet dosyası okunamadı: {e}"},
                             status_code=422)

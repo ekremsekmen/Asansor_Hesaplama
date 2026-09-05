@@ -23,9 +23,10 @@ from datetime import date
 import openpyxl
 
 from engine.ortak import ofis as OFIS
-from exports.hucre_haritasi import IMZA
+from exports.hucre_haritasi import IMZA, IMZALAR
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import mukavemet_girdi as MG
+from engine.avan import tablolar as AV_TAB
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
 
@@ -68,13 +69,15 @@ def mukavemet_xlsx(girdi: dict, proje: dict = None) -> bytes:
             continue
         ws[hucre] = g.get(anahtar)
     p = proje or {}
+    #  PROJE KİMLİĞİ dosya ÖZELLİKLERİNE yazılır ( şablonda hücresi yok ).
+    #  YAZAN ALANI HER ZAMAN DAMGALANIR:  şablonun özgün yazarı ( başka bir
+    #  kişi ) dosyada kalırsa, geri okurken onu "mühendis" sanıyorduk.
+    oz = wb.properties
     if any(p.get(k) for k in ("proje_adi", "isveren", "pafta_no", "muhendis")):
-        oz = wb.properties
         oz.title = p.get("proje_adi") or None
         oz.subject = p.get("isveren") or None
         oz.category = p.get("pafta_no") or None
-        if p.get("muhendis"):
-            oz.creator = oz.lastModifiedBy = p["muhendis"]
+    oz.creator = oz.lastModifiedBy = p.get("muhendis") or IMZA
     _standarda_uydur(wb, g)
     #  Dosya açılır açılmaz bütün formüller yeniden hesaplansın —  openpyxl
     #  önbelleğe alınmış değerleri düşürür, bayrak olmazsa Excel eski
@@ -109,6 +112,29 @@ def mukavemet_dosyasi_mi(icerik: bytes) -> bool:
 def xlsx_oku(icerik: bytes) -> dict:
     """Mukavemet çalışma kitabından girdileri geri okur."""
     return xlsx_oku_ayrintili(icerik)[0]
+
+
+def proje_kimligi_oku(icerik: bytes) -> dict:
+    """Dosya ÖZELLİKLERİNDEN proje adı · işveren · pafta no · mühendis.
+
+    Program bu üçünü yazarken kullanıyor ( mukavemet_xlsx ) ama geri
+    okumuyordu:  revizyonda ekranda ÖNCEKİ projenin kimliği kalıyor ve
+    bir sonraki çıktı yanlış adla iniyordu.
+    """
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(icerik), read_only=True)
+        try:
+            oz = wb.properties
+        finally:
+            wb.close()
+    except Exception:                                         # noqa: BLE001
+        return {}
+    yazan = str(oz.creator or "").strip()
+    return {"proje_adi": str(oz.title or "").strip(),
+            "isveren": str(oz.subject or "").strip(),
+            "pafta_no": str(oz.category or "").strip(),
+            #  Programın kendi imzası mühendis adı DEĞİLDİR.
+            "muhendis": "" if yazan in IMZALAR else yazan}
 
 
 def xlsx_oku_ayrintili(icerik: bytes):
@@ -155,6 +181,9 @@ def xlsx_oku_ayrintili(icerik: bytes):
     #  geri yükler.
     ek_blok = (str(ws[f"A{EK_GIRDI_BASLIK}"].value or "").strip()
                == EK_GIRDI_BASLIK_METNI)
+    ofis = _ofis_oku(ws)
+    if ofis:
+        g["_ofis"] = ofis
     for anahtar, satir, _et, _b in EK_GIRDI_HUCRELERI:
         deger = _ek_deger_oku(anahtar, ws[f"B{satir}"].value)
         if deger is not None:
@@ -336,10 +365,56 @@ EK_GIRDI_HUCRELERI = (
     ("mk_genislik",           239, "Makine dairesi genişliği",       "m"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
+
+#  PROJENİN OFİS SABİTLERİ.  Bunlar da kaynak kitapta yoktur ve proje
+#  dosyasının bir parçasıdır:  σem = 100 ile "UYGUN DEĞİL" çıkan bir proje,
+#  Excel'e aktarılıp geri okunduğunda varsayılan 130'a dönüyor ve "UYGUN"
+#  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
+OFIS_BASLIK = 242
+OFIS_BAS = 244
 #  Onay kutuları Excel'de metin olarak durur — projeci hücreyi elle de
 #  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
 EK_ONAY_ALANLARI = ("mk_yok",)
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
+
+
+def _ofis_yaz(vg, g):
+    """Projenin ofis sabitlerini teslim kopyasına yazar.
+
+    YALNIZ VARSAYILANDAN FARKLI OLANLAR yazılır:  dosya kalabalıklaşmasın ve
+    ofis varsayılanını değiştirdiğinde eski projeler yeni varsayılanı değil,
+    KENDİ değerlerini kullanmaya devam etsin — ama dokunulmamış alanlar
+    ofisin güncel kabulünü izlesin.
+    """
+    ofis = g.get("_ofis") if isinstance(g.get("_ofis"), dict) else {}
+    ozel = {k: v for k, v in ofis.items()
+            if k in US.VARSAYILAN and v is not None and v != US.VARSAYILAN[k]}
+    vg[f"A{OFIS_BASLIK}"] = ("PROJENİN OFİS SABİTLERİ  ( yalnız varsayılandan "
+                             "FARKLI olanlar yazılır )")
+    for i, (anahtar, deger) in enumerate(sorted(ozel.items())):
+        satir = OFIS_BAS + i
+        vg[f"A{satir}"] = US.ETIKET.get(anahtar, (anahtar,))[0]
+        vg[f"B{satir}"] = deger
+        vg[f"C{satir}"] = anahtar
+
+
+def _ofis_oku(vg):
+    """Teslim kopyasındaki proje sabitlerini geri okur."""
+    if str(vg[f"A{OFIS_BASLIK}"].value or "").strip()[:22] != "PROJENİN OFİS SABİTLER":
+        return {}
+    d = {}
+    for r in range(OFIS_BAS, OFIS_BAS + len(US.VARSAYILAN) + 2):
+        anahtar = vg[f"C{r}"].value
+        if anahtar in (None, ""):
+            continue
+        anahtar = str(anahtar).strip()
+        if anahtar not in US.VARSAYILAN:
+            continue
+        deger = vg[f"B{r}"].value
+        if deger in (None, ""):
+            continue
+        d[anahtar] = deger if anahtar in US.METIN else _ek_deger_oku(anahtar, deger)
+    return {k: v for k, v in d.items() if v is not None}
 
 
 def _ek_deger_yaz(anahtar, deger):
@@ -395,6 +470,47 @@ def _omega_formulu(lam_hucre, rm_hucre):
 BEYAN_LISTE_SUTUN = "S"
 BEYAN_LISTE_BAS = 2
 BEYAN_LISTE_HUCRE = "C59"
+
+
+ELEKTRIK = "12-Elk.Hesapları"
+
+
+def _elektrik_sayfasi(wb, g):
+    """Kitabın elektrik sayfasını programın girdileriyle doldurur.
+
+    Kitap bu sayfayı kendi sabitleriyle hesaplıyordu;  programın ekrandaki
+    sonucuyla ilgisi yoktu.  Hangi hücrenin ne olduğu W26…W35 blokunda
+    yazılıdır ( "L1 · L2 · U · e · Pm · PTAS · K · S1 · S2 · ηm" ).
+    """
+    if ELEKTRIK not in wb.sheetnames:
+        return
+    ws = wb[ELEKTRIK]
+    O = US.sabitler(g.get("_ofis"))
+    S1, S2 = g.get("kolon_kesit"), g.get("makine_kesit")
+    L1, L2 = g.get("kolon_uzunluk"), g.get("makine_uzunluk")
+    for hucre, deger in (("W27", L2), ("W28", O["U"]), ("W29", O["eps_max"]),
+                         ("W32", O["kappa"]), ("W33", S1), ("W34", S2),
+                         ("X58", O["cosfi"]), ("X63", O["cosfi"])):
+        if deger is not None:
+            ws[hucre] = deger
+    #  L1 boş bırakılmışsa kitabın kendi formülü kalsın:  o da kuyu boyundan
+    #  türetir.  Girilmişse programın kullandığı değer yazılır.
+    if L1 is not None:
+        ws["W26"] = L1
+    #  KABLO TAŞIMA KAPASİTELERİ hücreye sabit yazılıydı ( 43 / 34 A ) ve
+    #  seçilen kesitle ilgisi yoktu;  AB60 ve AH65'teki UYGUN / UYGUN DEĞİL
+    #  kararları bu sabitlerden çıkıyordu.
+    tip = O.get("kablo_tipi") or ""
+    for hucre, ad_hucre, kesit, etiket in (
+            ("S60", "A60", S1, "AT-TAS arası"),
+            ("Y65", "A65", S2, "TAS - Asansör motoru arası")):
+        if kesit is None:
+            continue
+        iz, kesin = AV_TAB.kablo_iz_sinir(kesit)
+        if iz is not None:
+            ws[hucre] = iz
+            ws[ad_hucre] = (f"{etiket} seçilen {kesit} mm² {tip} kablo"
+                            + ("" if kesin else "  ( kesit tablo dışı — alt sınır )"))
 
 
 def _liste_tamamla(wb):
@@ -497,6 +613,21 @@ def _standarda_uydur(wb, g):
     #  pafta ile kitap binde ikilik bir farkla ayrışırdı.
     ws["AB39"] = _omega_formulu("Z71", str(MT.OMEGA_RM_ALT))
 
+    #  ⑭  Kuyu tabanı yükünde ray ağırlığı bir kez sayılır
+    #  Kitap  AX611 = gn·Gr·LR/1000 + MY + AU351  yazar;  AU351 ( bölüm 7'nin
+    #  Fv'si ) zaten  AK351·AM351 = Mg·gn  içerir, yani ray hattının ağırlığı
+    #  aynı toplamda İKİ KEZ sayılır.  TS EN 81-20 m.5.2.1.8.4 kalemleri tek
+    #  tek sayar:  ray kütlesi ayrı, güvenlik tertibatı tepkisi ayrıdır.
+    ws["AO611"] = "=AU351-AK351*AM351"
+
+    #  ⑬  ELEKTRİK SAYFASI PROGRAMIN GİRDİLERİNİ KULLANIR
+    #  Kitabın '12-Elk.Hesapları' sayfası kendi sabitleriyle çalışıyordu:
+    #  L2 = 5 m · U = 400 V · S1 = 6 · S2 = 4 mm² · cosφ = 0,8 ve kablo
+    #  taşıma kapasiteleri 43 / 34 A olarak HÜCREYE YAZILIYDI.  Programın
+    #  girdileriyle hiçbiri aynı değildi;  ekran ile teslim edilen kitap
+    #  farklı hesap yapıyordu.  Artık aynı sayıları kullanırlar.
+    _elektrik_sayfasi(wb, g)
+
     #  ⑩  Beyan yükü listesi EN 81-20 Çizelge 6'ya tamamlanır
     #  Kitabın açılır listesi ( 'Veri Girişi'!$S$2:$S$23 ) standardın 28
     #  yükünden 7'sini içermiyordu;  o yüklerde kitapla hesap yapılamıyordu.
@@ -524,3 +655,4 @@ def _standarda_uydur(wb, g):
         vg[f"A{satir}"] = etiket
         vg[f"B{satir}"] = _ek_deger_yaz(anahtar, g.get(anahtar))
         vg[f"C{satir}"] = birim
+    _ofis_yaz(vg, g)

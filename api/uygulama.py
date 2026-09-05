@@ -118,8 +118,25 @@ def _mukavemet_girdi(veri: dict):
             ham if str(ham).strip() != "" else None)
     #  Ofis standardı ( Sabitler sekmesi ) — elektrik ve topraklama hesapları
     #  buradan besleniyor;  avan tarafındaki ile aynı biçimde alınır.
+    #  METİN ALANLARI SAYIYA ÇEVRİLMEZ.  Hepsine _sayi() uygulanıyordu;
+    #  kablo tipine "NYY" yazınca None'a düşüyor ve sessizce varsayılan
+    #  ( NHXMH FE180 ) kullanılıyordu.  Belirsiz yazımlar ( "1.200" ) da
+    #  uyarısız varsayılana düşüyordu — artık bildiriliyor.
     sb = (veri or {}).get("sabitler")
-    g["_ofis"] = {k: _sayi(x) for k, x in sb.items()} if isinstance(sb, dict) else {}
+    ofis = {}
+    if isinstance(sb, dict):
+        for k, ham in sb.items():
+            if k in E_US.METIN:
+                metin = str(ham).strip()
+                if metin:
+                    ofis[k] = metin
+                continue
+            if belirsiz_sayi_mi(ham):
+                _BELIRSIZ.append(f"{E_US.ETIKET.get(k, (k,))[0]} = {str(ham).strip()}")
+            d = _sayi(ham)
+            if d is not None:
+                ofis[k] = d
+    g["_ofis"] = ofis
     return g
 
 

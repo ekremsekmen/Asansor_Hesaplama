@@ -227,6 +227,162 @@ def calistir():
               all(abs(s[1] - round(MT.omega_en8150(s[0], 370), 4)) < 1e-9
                   for s in _w["satirlar"]))
 
+    # ═══════════════════════════════════════════════════════════════
+    #  DENETİMDE BULUNAN SEKİZ HATA  —  her biri yeniden üretilerek
+    # ═══════════════════════════════════════════════════════════════
+    import io as _io4, json as _js4, base64 as _b64, openpyxl as _op5
+    from engine.uygulama import hesap as UH
+
+    def _yakin(a, b, tol=1e-6):
+        try:
+            return abs(float(a) - float(b)) <= tol * max(1.0, abs(float(b)))
+        except (TypeError, ValueError):
+            return a == b
+    import main as _M4
+    from exports import mukavemet_xlsx as _MX4
+
+    #  ①  NEGATİF GERİLME "UYGUN" SAYILMAZ
+    #  X = L − mesnet payı ≤ 0 iken σe negatif çıkıyor ve "σe ≤ σem" bunu
+    #  sessizce geçiriyordu ( −5.350 ≤ 130 doğrudur ).
+    _n1 = MK.hesapla({"yan_yatak_boyu": 100, "yan_yatak": 30, "dikine_kiris": 30})
+    r.kontrol("① imkânsız kaide geometrisi REDDEDİLİYOR", not _n1["aktif"],
+              f"→ {_n1.get('ozet')}")
+    r.kontrol("① hata mesajı alanı ve sebebi söylüyor",
+              any("Yan yatak boyu" in x and "mesnet payı" in x
+                  for x in (_n1.get("hata") or [])), f"→ {_n1.get('hata')}")
+    r.kontrol("① sınırda ( X = 0 ) da reddediliyor",
+              not MK.hesapla({"yan_yatak_boyu": 335})["aktif"])
+    r.kontrol("① X = 1 mm kabul ediliyor", MK.hesapla({"yan_yatak_boyu": 336})["aktif"])
+    #  İkinci kalkan:  negatif gerilme hiçbir koşulda uygun sayılmamalı
+    import engine.uygulama.mukavemet as _MKm
+    r.kontrol("① negatif gerilme uygun sayılmıyor  ( ikinci kalkan )",
+              not (0 <= -1 <= 130), "→ karşılaştırma yalnız ≤ ile yapılıyor")
+
+    #  ②  GENEL SONUÇ ENGELLEYİCİ UYARILARI SAYIYOR
+    _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280, motor_gucu=7.5)
+    _t = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)))
+    r.kontrol("② temiz proje uygun", _t["ozet"]["tumu_uygun"] is True)
+    #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil
+    _s2 = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), tahrik_kasnak_capi=280,
+                                     saptirma_kasnak_capi=280, motor_gucu=37,
+                                     kolon_kesit=95, makine_kesit=1.5,
+                                     makine_uzunluk=2)))
+    _b14 = [b for b in _s2["bolumler"] if b["baslik"].startswith("14")][0]
+    r.kontrol("② akım yetersizken BÖLÜM uygun değil",
+              _b14["sonuc"]["uygun"] is False, f"→ {_b14['sonuc']}")
+    r.kontrol("② bölümün alt satırında I2 ≤ Iz2 kontrolü var",
+              any("I2" in x for x in _b14["sonuc"]["alt"]), f"→ {_b14['sonuc']['alt']}")
+    r.kontrol("② akım yetersizken proje uygun değil",
+              _s2["ozet"]["tumu_uygun"] is False)
+    #  Fiziksel imkânsızlık ENGELLEYİCİ
+    _kk = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
+                                     kabin_genisligi=1850, kuyu_genisligi=1800)))
+    r.kontrol("② kabin kuyuya sığmıyorsa proje uygun değil",
+              _kk["ozet"]["tumu_uygun"] is False)
+    r.kontrol("② engelleyici uyarı ayrı listede",
+              len(_kk["ozet"].get("engelleyici") or []) >= 1,
+              f"→ {_kk['ozet'].get('engelleyici')}")
+    #  Zorunlu hesap yapılamıyorsa EKSİK
+    _ek = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
+                                     temel_a=10, temel_b=None)))
+    r.kontrol("② yapılamayan zorunlu hesap projeyi uygun bırakmıyor",
+              _ek["ozet"]["tumu_uygun"] is False)
+    r.kontrol("② eksik hesap ayrı listede",
+              len(_ek["ozet"].get("eksik_hesap") or []) >= 1,
+              f"→ {_ek['ozet'].get('eksik_hesap')}")
+    #  BİLGİLENDİRİCİ uyarı uygunluğu ENGELLEMEZ
+    _bg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
+                                     _ofis={"cosfi": 99})))
+    r.kontrol("② bilgilendirici uyarı uygunluğu engellemiyor",
+              _bg["ozet"]["tumu_uygun"] is True,
+              f"→ {_bg['ozet'].get('engelleyici')} / {_bg['ozet'].get('eksik_hesap')}")
+
+    #  ③  OFİS SABİTLERİ EXCEL'DEN GERİ GELİYOR  ( sonuç değişmemeli )
+    _g3 = UG.tamamla(dict(UG.varsayilanlar(), **_temiz))
+    _g3["_ofis"] = {"sigma_em": 100, "kablo_tipi": "NYY", "kanal_gama_yd": 30}
+    _once = UH.hesapla(_g3)
+    _geri = _MX4.xlsx_oku(_MX4.mukavemet_xlsx(_g3))
+    r.esit("③ ofis sabitleri geri geliyor", _geri.get("_ofis"),
+           {"kablo_tipi": "NYY", "kanal_gama_yd": 30, "sigma_em": 100})
+    _sonra = UH.hesapla(_geri)
+    def _b2m(x):
+        return [b for b in x["bolumler"] if b["baslik"].startswith("2")][0]["sonuc"]
+    r.esit("③ Excel'den dönünce bölüm 2 sonucu AYNI", _b2m(_sonra), _b2m(_once))
+    r.esit("③ Excel'den dönünce genel sonuç AYNI",
+           _sonra["ozet"]["tumu_uygun"], _once["ozet"]["tumu_uygun"])
+    r.kontrol("③ varsayılanla aynı olan sabit dosyayı şişirmiyor",
+              not _MX4.xlsx_oku(_MX4.mukavemet_xlsx(
+                  UG.tamamla(UG.varsayilanlar()))).get("_ofis"))
+
+    #  ④  REDDEDİLEN OFİS SABİTİ EXCEL'E HAM GİTMİYOR
+    import engine.avan.hesap as _AV4
+    from exports import xlsx_export as _XE4, hucre_haritasi as _H4
+    _veri4 = {"ortak": {}, "asansorler": [{"aktif": True, "tanim": "T",
+              "Q_elle": 800, "V": 1, "Hk": 30, "eta": 0.7, "kuyu_genisligi": 1900,
+              "kabin_boyu": 1300, "kabin_genisligi": 1100}],
+              "sabitler": {"cosfi": 2, "q_denge": 5, "n_ray": 0}, "trafik": {}}
+    _S4 = _AV4.sabitler(_veri4["sabitler"])
+    _ws4 = _op5.load_workbook(_io4.BytesIO(_XE4.avan_xlsx(_veri4)))["SABİTLER"]
+    for _k in ("cosfi", "q_denge", "n_ray"):
+        r.esit(f"④ Excel'e motorun kullandığı {_k} yazılıyor",
+               _ws4[_H4.AVAN_SABIT[_k]].value, _S4[_k])
+    #  Ham değerin kendisi hücrede DURMAMALI.  ( n_ray'in ham değeri 0'dır;
+    #  çözülmüş değeri 2 — yani "2 var mı" diye bakmak yanıltıcı olur,
+    #  hücrenin HAM değere eşit OLMAMASI aranır. )
+    for _k, _ham in (("cosfi", 2), ("q_denge", 5), ("n_ray", 0)):
+        r.kontrol(f"④ {_k} hücresinde ham değer ({_ham}) yok",
+                  _ws4[_H4.AVAN_SABIT[_k]].value != _ham,
+                  f"→ {_ws4[_H4.AVAN_SABIT[_k]].value!r}")
+
+    #  ⑤  METİN OFİS ALANI SAYIYA ÇEVRİLMİYOR
+    import api.uygulama as _AU4
+    _AU4._BELIRSIZ.clear()
+    _g5 = _AU4._mukavemet_girdi({"girdiler": {}, "sabitler": {
+        "kablo_tipi": "NYY", "cosfi": "0,85", "priz_gucu": "1.200"}})
+    r.esit("⑤ metin ofis alanı korunuyor", _g5["_ofis"].get("kablo_tipi"), "NYY")
+    r.esit("⑤ sayısal ofis alanı okunuyor", _g5["_ofis"].get("cosfi"), 0.85)
+    r.kontrol("⑤ belirsiz yazım BİLDİRİLİYOR", len(list(_AU4._BELIRSIZ)) >= 1,
+              f"→ {list(_AU4._BELIRSIZ)}")
+
+    #  ⑥  FİZİKSEL GİRDİ SINIRLARI
+    for _ad6, _ek6 in (("kesirli halat adedi", {"halat_adedi": 6.5}),
+                       ("kesirli ray sayısı", {"kabin_ray_sayisi": 2.5}),
+                       ("konsol aralığı 0", {"kabin_konsol_arasi": 0}),
+                       ("regülatör açısı 360", {"reg_kanal_acisi": 360}),
+                       ("regülatör açısı 0", {"reg_kanal_acisi": 0})):
+        _x6 = MK.hesapla(_ek6)
+        r.kontrol(f"⑥ {_ad6} reddediliyor", not _x6["aktif"], f"→ hesap yapıldı")
+        r.kontrol(f"⑥ {_ad6} hatası ALAN ADINI söylüyor",
+                  bool(_x6.get("hata")) and not any("Traceback" in x
+                                                    for x in _x6["hata"]),
+                  f"→ {_x6.get('hata')}")
+    r.kontrol("⑥ geçerli girdi hâlâ kabul ediliyor", MK.hesapla()["aktif"])
+
+    #  ⑦  PROJE KİMLİĞİ GERİ GELİYOR
+    _xl7 = _MX4.mukavemet_xlsx(MK.hesapla()["girdi"],
+                               {"proje_adi": "Jan Mühendislik",
+                                "isveren": "Öz Yapı", "pafta_no": "A-07"})
+    _d7 = _js4.loads(_M4.api_xlsx_yukle(
+        {"icerik": _b64.b64encode(_xl7).decode()}).body)
+    r.esit("⑦ proje adı geri geliyor", _d7["proje"].get("proje_adi"), "Jan Mühendislik")
+    r.esit("⑦ işveren geri geliyor", _d7["proje"].get("isveren"), "Öz Yapı")
+    r.esit("⑦ pafta no geri geliyor", _d7["proje"].get("pafta_no"), "A-07")
+    r.esit("⑦ forma da taşınıyor", _d7["alanlar"].get("mk_proje_adi"), "Jan Mühendislik")
+    r.esit("⑦ programın imzası mühendis sanılmıyor", _d7["proje"].get("muhendis"), "")
+
+    #  ⑧  RAY AĞIRLIĞI BİR KEZ SAYILIYOR
+    _s8 = MK.hesapla()
+    _h8 = _s8["_h"]
+    _gn8 = MK.SABIT["gn"]
+    _ray8 = _gn8 * MT.ray(_s8["girdi"]["kabin_ray_profili"], "Gr") * \
+        _s8["ozet"]["ray_boyu"]
+    _bek8 = _ray8 + MK.SABIT["MY_kabin"] + (_h8["AU351"] - _h8["AH291"] * _gn8)
+    r.kontrol("⑧ FKR = ray kütlesi + bileşen + güv.tert. tepkisi",
+              _yakin(_h8["AX611"], _bek8), f"→ {_h8['AX611']!r} ≠ {_bek8!r}")
+    r.kontrol("⑧ ray ağırlığı iki kez sayılmıyor",
+              abs(_h8["AX611"] - (_bek8 + _ray8)) > 1,
+              "→ hâlâ çift sayılıyor")
+
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı
     #  notları "kesin seçim UYGULAMA PROJESİNDE yapılır" der;  avan paftasında

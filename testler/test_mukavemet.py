@@ -237,7 +237,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 12)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 13)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine

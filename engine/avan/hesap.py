@@ -65,6 +65,11 @@ SABIT_B_VARSAYILAN = {
     "priz_adedi": 3,
     "priz_gucu": 300,        # W
     "cosfi": 0.90,
+    #  Motorun ELEKTRİK verimi — şebekeden çekilen güç = mil gücü / ηm.
+    #  Mekanik sistem verimi η ( makine tipine bağlı, 0,85 / 0,50 ) ile
+    #  KARIŞTIRILMAMALIDIR:  o motor GÜCÜNÜ belirler, bu ise o gücü çekmek
+    #  için şebekeden akan AKIMI.  Kablo ve sigorta bu akıma göre seçilir.
+    "motor_elektrik_verimi": 0.85,
     "UL": 50,                # İzin verilen temas gerilimi, V (TT sistem)
     "IDn": 0.30,             # Kaçak akım rölesi anma akımı, A
     "lc": 1.5,               # Çubuk topraklayıcı boyu, m
@@ -757,8 +762,15 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  duruyordu; her güçte aynı yazıyordu.  Motor anma akımından seçiliyor:
     #  In = P2 / ( √3 · U · cosφ ),  kademe = katsayı · In üstündeki ilk
     #  standart değer.  Ofisin 11 kW örneğinde sonuç yine "4 x 25" çıkar.
-    I_motor = (g_motor / (math.sqrt(3) * U_sebeke * S["cosfi"])
-               if all(sayi_mi(x) and x > 0 for x in (U_sebeke, S["cosfi"])) else None)
+    #  ŞEBEKEDEN ÇEKİLEN AKIM.  Motorun MİL gücü değil, şebekeden çektiği
+    #  güç akar:  Pşeb = P2 / ηm.  Program bir süre ηm'yi atlıyordu ve akımı
+    #  %18 DÜŞÜK gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.
+    #  Kaynak kitabın elektrik sayfası ( 12-Elk.Hesapları!W35 ) ηm = 0,85 ile
+    #  bölerek doğrusunu yapıyordu;  ekran ile kitap bu yüzden ayrışıyordu.
+    _eta_m = S["motor_elektrik_verimi"]
+    I_motor = (g_motor / (math.sqrt(3) * U_sebeke * S["cosfi"] * _eta_m)
+               if all(sayi_mi(x) and x > 0
+                      for x in (U_sebeke, S["cosfi"], _eta_m)) else None)
     sigorta_A = T.sigorta_sec(I_motor, S["sigorta_katsayisi"])
     motor_sigorta = f"4 x {trn(sigorta_A, 0)}" if sigorta_A else "uygulama projesinde"
 
@@ -844,28 +856,48 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("I   =   P1   /   ( √3 · U · cosφ )",
               f"=   {trn(P_kurulu,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · {tr(cosfi)} )",
               I_hat, "A", "hat akımı"),
+        hesap("I2  =   P2   /   ( √3 · U · cosφ · ηm )",
+              f"=   {trn(P_motor_W,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · "
+              f"{tr(cosfi)} · {tr(_eta_m)} )",
+              I2, "A", "makine besleme akımı  —  şebekeden çekilen"),
+        veri("Iz2", "Makine besleme kablosunun taşıma kapasitesi",
+             (trn(Iz2, 1) if Iz2_kesin else f"≥ {trn(Iz2, 1)}") if sayi_mi(Iz2)
+             else "tablo dışı — kontrol edilemedi", "A",
+             "TABLOLAR / IEC 60364-5-52" if Iz2_kesin
+             else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
         veri("Iz", "Kablonun akım taşıma kapasitesi",
              (trn(Iz, 1) if Iz_kesin else f"≥ {trn(Iz, 1)}") if sayi_mi(Iz)
              else "tablo dışı — kontrol edilemedi", "A",
              "TABLOLAR / IEC 60364-5-52" if Iz_kesin
              else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
     ]
+    #  MAKİNE BESLEME HATTI ( S2 ) DA SONUCA GİRER.
+    #  Kaynak Excel bu kontrolü hiç yapmaz ve program bir süre yalnız ⚠ uyarı
+    #  veriyordu:  37 kW motora 1,5 mm² kabloyla bölüm "uygundur" diyordu.
+    #  Yanlış bir kitaba sadakat uğruna hatalı bir sonuç bırakılamaz — teslim
+    #  edilen Excel de aynı kontrolü yapacak biçimde düzeltilir.
+    s2_kontrol = sayi_mi(I2)
+    tumu = eps_uygun and akim_uygun and (akim2_uygun or not s2_kontrol)
     b6["sonuc"] = {
-        "baslik": "KONTROL      ε ≤ εmax    ve    I ≤ Iz",
+        "baslik": "KONTROL      ε ≤ εmax    ·    I ≤ Iz    ·    I2 ≤ Iz2",
         "metin": (f"Seçilen kablo :   {tr(S1)} mm²  {kablo_tipi}   —   "
-                  + ("uygundur." if (eps_uygun and akim_uygun) else "UYGUN DEĞİLDİR.")),
-        "uygun": bool(eps_uygun and akim_uygun),
+                  + ("uygundur." if tumu else "UYGUN DEĞİLDİR.")),
+        "uygun": bool(tumu),
         "alt": [f"ε  ≤  εmax  :  " + ("UYGUN" if eps_uygun else "UYGUN DEĞİL — kesiti büyütün"),
                 f"I  ≤  Iz    :  " + ("UYGUN" if akim_uygun else
                                       ("UYGUN DEĞİL — kesiti büyütün" if sayi_mi(Iz) else
-                                       "KONTROL EDİLEMEDİ — kesit akım tablosunun dışında"))],
+                                       "KONTROL EDİLEMEDİ — kesit akım tablosunun dışında")),
+                f"I2 ≤  Iz2   :  " + ("UYGUN" if akim2_uygun else
+                                      ("UYGUN DEĞİL — makine besleme kesitini büyütün"
+                                       if s2_kontrol else "KONTROL EDİLEMEDİ"))],
     }
     bolumler.append(b6)
 
     # =========================================================
     #  PAFTAYA GİRMEYEN EK DENETİMLER  —  ⚠ uyarı olarak bildirilir
     # =========================================================
-    ikaz = []
+    ikaz = []            # bilgilendirici — uygunluğu ENGELLEMEZ
+    engelleyici = []     # projeyi durduran — genel sonuca girer
     for _ad, _kesit, _iz, _kesin in (("S1 — kolon hattı", S1, Iz, Iz_kesin),
                                      ("S2 — makine besleme", S2, Iz2, Iz2_kesin)):
         if _kesin:
@@ -881,11 +913,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                 f"{_ad} kesiti {tr(_kesit)} mm² akım tablosunun EN KÜÇÜK kesitinin altında : "
                 "akım taşıma kontrolü yapılamadı.")
     if sayi_mi(I2) and not akim2_uygun:
-        ikaz.append(
+        engelleyici.append(
             f"MAKİNE BESLEME KESİTİ AKIM BAKIMINDAN YETERSİZ : S2 = {tr(S2)} mm² "
             f"kablo {(tr(Iz2) + ' A') if sayi_mi(Iz2) else 'tablo dışı'} taşır, "
-            f"motor akımı I2 = {tr(I2)} A. Paftadaki 'I ≤ Iz' kontrolü yalnız "
-            "KOLON HATTINI ( S1 ) denetler; S2'yi büyütün.")
+            f"motor akımı I2 = {tr(I2)} A. Kesiti büyütün.")
     #  Kabin kuyunun içine girer — genişlik karşılaştırması fizikseldir.
     #  Aradaki boşluk kapı tipine, karşı ağırlık ve ray konumuna göre değişir,
     #  bu yüzden asgari boşluk dayatılmaz; yalnız "kabin ≥ kuyu" reddedilir.
@@ -904,8 +935,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                 "Beyan yükünü büyütün ya da kabini küçültün — aksi hâlde kabin, "
                 "beyan yükünün üstünde yüklenebilir.")
 
+    #  Kabin kuyuya sığmıyorsa proje FİZİKSEL olarak kurulamaz — bilgilendirici
+    #  değil, engelleyicidir.
     if all(sayi_mi(x) and x > 0 for x in (kuyu_b, kabin_b)) and kabin_b >= kuyu_b:
-        ikaz.append(
+        engelleyici.append(
             f"KABİN KUYUYA SIĞMIYOR : kabin genişliği {trn(kabin_b,0)} mm, kuyu "
             f"genişliği {trn(kuyu_b,0)} mm. Kabin genişliği kuyudan KÜÇÜK olmalıdır "
             "( aradaki boşluk kapı tipine, ray ve karşı ağırlık konumuna göre belirlenir ).")
@@ -914,7 +947,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         "no": no, "aktif": True, "tanim": tanim, "baslik": f"{no} NOLU ASANSÖR",
         #  Girilip de kullanılamayan değerler ve fiziksel tutarsızlıklar —
         #  sessiz kalmamalı
-        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in (red + ikaz)],
+        #  UYARILAR İKİYE AYRILIR:
+        #    ikaz        bilgilendirici — uygunluğu engellemez
+        #    engelleyici projeyi durdurur — genel sonuca ( tumu_uygun ) girer
+        #  Reddedilen girdiler ( red ) bilgilendiricidir:  motor zaten
+        #  varsayılana dönüp hesabı yapmıştır.
+        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in (red + ikaz + engelleyici)],
+        "engelleyici": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in engelleyici],
         "bolumler": bolumler,
         "ozet": {
             "tanim": tanim, "kapasite": P_kap, "Q": Q, "Q0": Q0, "V": V, "eta": eta,
@@ -1290,6 +1329,7 @@ def hesapla(veriler: dict) -> dict:
         "eps_max": ortak.get("eps_max"),
     }
     uyarilar = []
+    engelleyiciler = []
     if S.get("_reddedilen"):
         uyarilar.append(
             "⚠ Ofis standardında geçersiz değer yok sayıldı, varsayılan kullanıldı : "
@@ -1300,6 +1340,8 @@ def hesapla(veriler: dict) -> dict:
         if not a.get("aktif") and a.get("uyari"):
             uyarilar.append(a["uyari"])
         uyarilar += a.get("uyarilar") or []
+        engelleyiciler += a.get("engelleyici") or []
     uyarilar += _trafik_tutarlilik(veriler.get("trafik"), veriler.get("asansorler"))
     return {"asansorler": asansorler, "makine_dairesi": mk, "topraklama": tp,
-            "ozet": ozet, "sabitler": S, "ortak": ortak, "uyarilar": uyarilar}
+            "ozet": ozet, "sabitler": S, "ortak": ortak, "uyarilar": uyarilar,
+            "engelleyici": engelleyiciler}

@@ -316,6 +316,7 @@ const SABIT_ETIKET = {
   cubuk_sayisi:['Is — Çubuk topraklayıcı adedi','paralel bağlı çubuk sayısı'],
   goz_araligi:['Karelaj gözü (m)','şerit boyu temel ölçülerinden türetilirken kullanılır'],
   sigorta_katsayisi:['Motor sigortası kalkış katsayısı','sigorta = bu katsayı × motor akımı, standart kademeye yuvarlanır'],
+  motor_elektrik_verimi:['Motorun elektrik verimi ηm','şebekeden çekilen güç = mil gücü / ηm;  kablo ve sigorta bu akıma göre seçilir'],
 };
 
 /*  Her sabitin HANGİ HESABA girdiği.  [ başlık, açıklama, alanlar ]
@@ -329,7 +330,8 @@ const SABIT_GRUP = [
    ['sb:kabin_armatur_W', 'sb:kabin_armatur_lm', 'sb:kabin_ustu_armatur',
     'sb:kuyu_armatur_W', 'sb:kuyu_armatur_lm', 'sb:kuyu_Dmax', 'sb:ayd_sutun']],
   ['③ KURULU GÜÇ VE GERİLİM DÜŞÜMÜ', 'IEC 60364-5-52 — kurulu güç, hat akımı, kablo ve gerilim düşümü',
-   ['of:U', 'of:kappa', 'of:eps_max', 'sb:cosfi', 'sb:priz_adedi', 'sb:priz_gucu',
+   ['of:U', 'of:kappa', 'of:eps_max', 'sb:cosfi', 'sb:motor_elektrik_verimi',
+    'sb:priz_adedi', 'sb:priz_gucu',
     'of:S1', 'of:S2', 'of:L2', 'of:L1_pay', 'of:kablo_tipi', 'of:sigorta_katsayisi']],
   ['④ TEMEL TOPRAKLAMA', 'IEEE Std 80 · BYKHY — temel ve çubuk topraklayıcı',
    ['of:beta', 'of:cubuk_sayisi', 'of:goz_araligi', 'sb:lc', 'sb:UL', 'sb:IDn']],

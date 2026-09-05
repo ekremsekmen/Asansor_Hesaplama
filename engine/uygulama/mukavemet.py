@@ -162,6 +162,20 @@ EXCEL_FARKLARI = (
      "taraf.  V kanalda bir fark yoktur.",
      #  f ve ona bağlı e^(f·α) sınırları
      ("AU206", "AV211", "AE216", "O242", "O285")),
+    ("Kuyu tabanı yükünde ray ağırlığı iki kez",
+     "TS EN 81-20 m.5.2.1.8.4",
+     "FKR = gn·Gr·LR + MY + Fk yazar.  Fk ( bölüm 7'nin Fv'si ) ZATEN Mg·gn "
+     "içerir;  ray hattının ağırlığı aynı toplamda iki kez sayılır.",
+     "Standart kalemleri tek tek sayar:  'the force due to the MASS OF THE "
+     "GUIDE RAILS plus any load due to components fixed or linked to the "
+     "guide(s) … plus the REACTION at the moment of operation of the safety "
+     "gear'.  Ray kütlesi ayrı bir kalem, güvenlik tertibatı tepkisi ayrı bir "
+     "kalemdir;  tepki k1·gn·(P+Q)/n'dir ve Mg·gn ona dahil değildir.\n"
+     "        Örnek projede kitap 21.326 N der, doğrusu 18.096 N — ray başına "
+     "3,23 kN ( %18 ) FAZLA.  Bu kalem fazla hesaplanıyor;  hatanın yönü "
+     "emniyetli olsa da, listede bulunması gereken başka yüklerin ( ör. klips "
+     "itme kuvveti Fp ) eksikliğini telafi etmez.",
+     ("AX611",)),
     ("Acil frenleme yavaşlamasının alt sınırı",
      "TS EN 81-50 m.5.11.2.2.2",
      "Yalnız üst sınırı ( 1 gn ) denetler;  a = 0,05 m/s² gibi bir değer "
@@ -440,8 +454,12 @@ def _makine(g, o):
     omega = MT.omega_en8150(lam, MT.OMEGA_RM_ALT)
     sigma_b = FB * omega / A if omega else None
     #  σem "en çok" değeridir:  sınıra eşit gerilme de uygundur.
-    egilme_uygun = sigma_e <= O["sigma_em"]
-    burkulma_uygun = sigma_b is not None and sigma_b <= O["sigma_em"]
+    #  NEGATİF GERİLME "UYGUN" SAYILMAZ:  gerilme büyüklüktür, işareti
+    #  geometrinin ters dönmesinden gelir ( X < 0 ).  Yalnız "≤ σem" bakmak,
+    #  −5.350 N/mm² gibi anlamsız bir değeri sessizce geçirirdi.  Girdi
+    #  doğrulaması bu geometriyi zaten reddediyor;  bu ikinci kalkandır.
+    egilme_uygun = 0 <= sigma_e <= O["sigma_em"]
+    burkulma_uygun = (sigma_b is not None and 0 <= sigma_b <= O["sigma_em"])
 
     o.update(k1=k1, F_kaide=F, FA=FA, FB=FB)
     _kay(o, AB31=k1, AB37=A, AB38=imin, AB41=Wx, AB39=omega, C47=F, I51=F1,
@@ -1452,7 +1470,20 @@ def _kuyu_tabani(g, o):
     LR = o["ray_boyu"] * 1000.0                      # mm
     Gr_k = MT.ray(g["kabin_ray_profili"], "Gr")
     Gr_a = MT.ray(g["agirlik_ray_profili"], "Gr")
-    FKR = (gn * Gr_k * LR / 1000.0) + S["MY_kabin"] + o["Fk_kabin"]
+    #  RAY AĞIRLIĞI BİR KEZ SAYILIR.  TS EN 81-20 m.5.2.1.8.4 kalemleri tek
+    #  tek sayar:  "the force due to the MASS OF THE GUIDE RAILS plus any load
+    #  due to components fixed or linked to the guide(s) … plus the REACTION
+    #  at the moment of operation of the safety gear".  Yani ray kütlesi ayrı
+    #  bir kalem, güvenlik tertibatı tepkisi ayrı bir kalemdir.
+    #
+    #  Kaynak kitap ikisini üst üste ekliyordu:  Fk ( bölüm 7'nin Fv'si,
+    #  EN 81-50 Ek C.2.1.2 ) zaten Mg·gn içerir, üstüne bir de gn·Gr·LR
+    #  ekleniyordu.  Aynı sayı iki kez sayılıyordu.
+    ray_agirlik = gn * Gr_k * LR / 1000.0
+    #  Fk'den ray kütlesinin payı düşülür;  geriye güvenlik tertibatı
+    #  tepkisi ( k1·gn·(P+Q)/n ) ve varsa klips itme kuvveti kalır.
+    guvenlik_tepkisi = o["Fk_kabin"] - o["Mg_kabin"] * gn
+    FKR = ray_agirlik + S["MY_kabin"] + guvenlik_tepkisi
     FAR = (gn * Gr_a * LR / 1000.0) + S["MY_agirlik"]
     Fkt = S["tampon_katsayi"] * gn * (P + Q)
     Fat = S["tampon_katsayi"] * gn * (P + o["ofis"]["q_denge"] * Q)
@@ -1462,9 +1493,13 @@ def _kuyu_tabani(g, o):
     b["adimlar"] = [
         veri("LR", "Kılavuz ray boyu", LR, "mm", "Σ durak + kaide − 200 + kuyu dibi − 300", 0),
         metin("Kabin raylarına gelen kuvvetler :"),
-        hesap("FKR = gn × Gr × LR / 1000 + MY + Fk",
+        hesap("FKR = gn × Gr × LR / 1000 + MY + Fgt",
               f"{tr(gn)} × {tr(Gr_k)} × {trn(LR, 0)} / 1000 + "
-              f"{trn(S['MY_kabin'], 0)} + {tr(o['Fk_kabin'])}", FKR, "N"),
+              f"{trn(S['MY_kabin'], 0)} + {tr(guvenlik_tepkisi)}", FKR, "N",
+              "EN 81-20 m.5.2.1.8.4"),
+        veri("Fgt", "Güvenlik tertibatı çalışma tepkisi  ( Fk − Mg·gn )",
+             guvenlik_tepkisi, "N",
+             "ray kütlesi ayrı kalemdir, iki kez sayılmaz"),
         metin("Ağırlık raylarına gelen kuvvetler :"),
         hesap("FAR = gn × Gar × Lar / 1000 + Ma",
               f"{tr(gn)} × {tr(Gr_a)} × {trn(LR, 0)} / 1000 + "

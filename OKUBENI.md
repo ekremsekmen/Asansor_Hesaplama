@@ -457,21 +457,21 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**24.491 kontrolün tamamı geçmiştir.**
+**24.470 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
-| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **757 / 757** |
+| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **761 / 761** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **406 / 406** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması | **363 / 363** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **417 / 417** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması | **364 / 364** |
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.507 / 4.507** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **935 / 935** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **on iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + girdi reddi | **374 / 374** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **10.430 / 10.430** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları** | **138 / 138** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **on üç sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + girdi reddi | **373 / 373** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **10.353 / 10.353** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **denetimde bulunan sekiz hatanın her biri** | **183 / 183** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -486,6 +486,24 @@ elle süre ve adet girişleri, 1–4 asansörlü gruplar, farklı duraklı asans
 **asansör bazında bodrum ve imalatçı süreleri**, **asansör bazında askı ve
 denge faktörü (dişlili + dişlisiz karışık proje)**, makine daireli/MRL
 sistemler ve topraklama varyasyonları.
+
+### Bağımsız denetimde bulunan ve düzeltilen hatalar
+
+Testlerin geçmesi hataları dışlamaz. Aşağıdakiler **testlerin yakalamadığı**,
+ayrı bir denetimde bulunup yeniden üretilen hatalardır; her biri artık kendi
+regresyon kontrolüyle korunuyor.
+
+| Bulgu | Etkisi |
+|---|---|
+| **Negatif gerilme "uygun" sayılıyordu.** Yan yatak boyu mesnet payından küçükse `X ≤ 0` çıkıyor, σe = −5.350 N/mm² oluyor ve `σe ≤ σem` bunu sessizce geçiriyordu | fiziksel olmayan bir kaide **"UYGUNDUR"** raporlanabiliyordu — artık geometri baştan reddediliyor, ayrıca negatif gerilme hiçbir koşulda uygun sayılmıyor |
+| **Genel sonuç engelleyici uyarıları saymıyordu.** 37 kW motora 1,5 mm² kablo ( 62,5 A / 17,5 A ) yalnız ⚠ uyarı üretiyor, bölüm ve proje "uygundur" diyordu | akım kontrolü artık **bölüm sonucuna** girer;  uyarılar **engelleyici / bilgilendirici** diye ayrıldı;  yapılamayan zorunlu hesap ( topraklama · makine dairesi ) projeyi uygun bırakmıyor |
+| **Excel'den dönünce sonuç değişiyordu.** Ofis sabitleri dosyaya yazılmıyordu: σem = 100 ile "UYGUN DEĞİL" olan proje, aktarılıp geri okununca varsayılan 130'a dönüp "UYGUN" oluyordu | proje sabitleri artık dosyada saklanıp geri okunuyor — **aynı projenin sonucu dosyadan geçince değişmiyor** |
+| **Reddedilen ofis sabiti Excel'e ham gidiyordu.** `cosφ = 2` motor tarafından reddedilip 0,9 kullanılırken dosyaya 2 yazılıyordu | ekran ve indirilen kitap **farklı hesap yapıyordu**;  artık motorun kullandığı değer yazılıyor |
+| **Metin ofis alanı sayıya çevriliyordu.** Kablo tipine "NYY" yazınca `None`'a düşüp sessizce varsayılan kullanılıyordu | metin alanları korunuyor;  belirsiz sayı yazımı ( `1.200` ) artık **bildiriliyor** |
+| **Fiziksel girdi doğrulaması eksikti.** 6,5 halat ile hesap yapılıp "UYGUN" veriliyor;  konsol aralığı 0 `TypeError`, regülatör açısı 360° `OverflowError` ile çöküyordu | adet alanları tam sayı, uzunluklar pozitif, açılar aralıkta olmalı — hepsi **alan adıyla** reddediliyor |
+| **Proje kimliği geri gelmiyordu.** Dosya özelliklerinde yazılı olan proje adı · işveren · pafta no yükleme yanıtına alınmıyordu | önceki projenin kimliği ekranda kalıp sonraki çıktı yanlış adla iniyordu;  artık geri okunuyor ( programın kendi imzası **mühendis sanılmıyor** ) |
+| **Motor akımı %18 düşüktü.** Şebekeden çekilen akım `P2/(√3·U·cosφ·ηm)`'dir;  program `ηm`'ye bölmüyordu | **kablo ve sigorta olduğundan küçük seçiliyordu.** Kitabın kendi elektrik sayfası ( `12-Elk.Hesapları!W35` ) 0,85 ile bölerek doğrusunu yapıyordu — kaynak **kendi içinde tutarsızdı**. `motor_elektrik_verimi` ofis sabiti eklendi;  **sigorta kademeleri değişti** ( 11 kW'ta 4 x 25 → 4 x 32 ) |
+| **Excel'in elektrik sayfası girdilerden kopuktu.** `12-Elk.Hesapları` kendi sabitleriyle çalışıyordu:  L2 = 5 m · U = 400 V · S1 = 6 · S2 = 4 mm² · cosφ = 0,8 ve kablo kapasiteleri 43 / 34 A hücreye yazılı | teslim edilen kitap ekrandan **başka** hesap yapıyordu;  artık programın girdileri yazılıyor ve kapasiteler kesitten geliyor |
 
 ### Test yazılırken bulunan ve düzeltilen hatalar
 
@@ -518,7 +536,7 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **on iki** noktada kitap standarttan ( yalnız verim
+noktasıdır. Aşağıdaki **on üç** noktada kitap standarttan ( yalnız verim
 maddesinde ofisin kendi kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
@@ -532,6 +550,7 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | ⑤ | ω burkulma katsayısı | **EN 81-50 m.5.10.3** — ω, λ **ve Rm**'e bağlıdır | Tek tablo kullanır; o tablo yalnız **Rm = 370** eğrisidir ve ray çeliğinden bağımsız uygulanır | Rm 370 ve 520 eğrileri, arada doğrusal ara değer |
 | ⑥ | Acil frenlemede μ | **EN 81-50 m.5.11.2.3.2** — μ = 0,1/(1+v/10), v **halat** hızı | Bağıntıya **kabin** hızını koyar | v = kabin hızı × askı oranı |
 | ⑦ | Nps · Npr | **EN 81-50 m.5.12.2** — tesisin askı düzenine bağlı | Hesap sayfasına **sabit** 1 ve 0 yazar | Girdi; palangalı sistemde uyarı verilir |
+| ⑬ | **Kuyu tabanı yükünde ray ağırlığı** | **EN 81-20 m.5.2.1.8.4** — ray kütlesi ve güvenlik tertibatı tepkisi **ayrı kalemler** | `FKR = gn·Gr·LR + MY + Fk`;  `Fk` zaten `Mg·gn` içerir → ray ağırlığı **iki kez** | Ray kütlesi bir kez;  tepki `Fk − Mg·gn` |
 | ⑫ | **Sürtünme çarpanı f** | **EN 81-50 m.5.11.2.3.1.1** ( yarım daire ) ve **m.5.11.2.3.1.2** ( V ) — **iki ayrı bağıntı** | Kanal şeklinden **bağımsız** olarak hep V kanal bağıntısı;  alt kesilmesi olmayan kanalda da β = 90° | Şekle göre doğru madde;  alt kesilme yoksa β = 0 |
 | ⑪ | Acil frenleme yavaşlamasının **alt** sınırı | **EN 81-50 m.5.11.2.2.2** — *"in no case … less than 0,5 m/s²"* | Yalnız üst sınırı ( 1 gn ) denetler | 0,5 m/s² altı **reddedilir** |
 | ⑩ | **Kabin alanı tablosu** | **EN 81-20 Çizelge 6** — 28 beyan yükü | 7'si tabloda ve açılır listede **yok** ( 100 · 1050 · **1250** · 1350 · 1425 · **1500** · 2500 kg );  320 kg için 0,97 m² | Tablo Çizelge 6'ya tamamlandı;  320 kg standardın ara değeriyle **0,953** |
@@ -571,6 +590,11 @@ seçildiğinde kitap σk'yı **%19-33 düşük** gösterir.
 hızı ve 2:1 askı için standart μ = 0,083 verir — bu ancak v = 2 m/s ( halat
 hızı ) ile çıkar. Kabin hızı kullanmak μ'yü, dolayısıyla e^(f·α) sınırını
 büyütür ve tahrik yeteneğini olduğundan iyi gösterir.
+
+**⑬'ün etkisi.** Örnek projede kitap 21.326 N der, doğrusu 18.096 N — ray
+başına **3,23 kN ( %18 )**. Bu kalem **fazla hesaplanıyor**. Hatanın yönü
+emniyetli olsa da, listede bulunması gereken başka yüklerin ( ör. klips itme
+kuvveti Fp ) eksikliğini telafi etmez.
 
 **⑫'nin etkisi.** Kanal şekli açılır listede **seçilebiliyor** ama `f`'yi hiç
 değiştirmiyordu — beş şekil de aynı sürtünme çarpanını veriyordu. Standardın
