@@ -630,6 +630,36 @@ hepsi **birebir tutuyor**:
   tanımındadır ( Çizelge 2 ). Program kuyu ölçülerini anma konumundan aldığı
   için terimi sınıra ekler; eşitsizlik cebirsel olarak aynıdır.
 
+#### Hangi baskıya karşı doğrulandı
+
+Hesaplar **EN 81-20:2020 / EN 81-50:2020**'ye uygundur. Doğrulama metin
+olarak **2014** baskısından okundu; bu bir eksiklik değildir, çünkü 2020
+baskısının **kendi Avrupa önsözü** şunu yazar:
+
+> *"This document supersedes EN 81-20:2014. This document is a revision of
+> EN 81-20:2014. Significant changes made are as follows: — All externally
+> referenced standards have now been dated. — A new Annex ZA has been
+> developed … **No technical changes have been made during this revision.**"*
+
+Aynı cümle EN 81-50:2020'nin önsözünde de vardır. İki ayrı ulusal
+uyarlamadan ( İrlanda **I.S. EN 81-20:2020** · Slovenya **SIST EN 81-50:2020**
+ve **SIST EN 81-20:2020** ) birebir aynı metinle teyit edildi. Madde
+numaraları da değişmemiştir — programın kullandıklarının hepsi iki baskıda
+aynı yerdedir:
+
+| Program | 2014 | 2020 |
+|---|---|---|
+| Kasnak / halat oranı | 5.5.2 | 5.5.2 ✔ |
+| Emniyet gerilmeleri · darbe katsayıları | 5.7.2 · 5.7.4 | 5.7.2 · 5.7.4 ✔ |
+| Ray hesabı · burkulma · flanş | 5.10 · 5.10.3 · 5.10.5 | aynı ✔ |
+| Tahrik · Nequiv · Sf | 5.11.2 · 5.12.2 · 5.12.3 | aynı ✔ |
+| Ray / tahrik / Nequiv örnekleri | Ek C · D · E | aynı ✔ |
+
+**Geçerlilik takvimi:** EN 81-20/50:2020 Şubat 2020'de yayımlandı, Temmuz
+2021'de AB Resmî Gazetesi'ne girdi; **2014 baskısı 27 Temmuz 2022'de** uygunluk
+varsayımını yitirdi. Bugün geçerli olan 2020 baskısıdır — teknik içeriği 2014
+ile aynı olduğu için programda değişiklik gerekmedi.
+
 #### ISO 8100 ve 2026 revizyonu
 
 Hesaplar **TS EN 81-20 / EN 81-50**'ye göre yapılır. Aynı kurallar
@@ -639,7 +669,7 @@ oradan bakmak aynı sayıları verir. ISO 8100-**32** ise trafik planlamasıdır
 mukavemetle ilgisi yoktur.
 
 **EN ISO 8100-1/-2:2026** yayımlandı; **36 aylık** geçiş süresi işliyor, yani
-TS EN 81-20/50 bugün hâlâ geçerli. Avrupa Asansör Birliği'nin ( ELA ) 144
+TS EN 81-20/50:2020 bugün hâlâ geçerli. Avrupa Asansör Birliği'nin ( ELA ) 144
 sayfalık karşılaştırma belgesine göre programın yaptığı hesaplarda değişen:
 
 | Konu | 2026 revizyonunda |
