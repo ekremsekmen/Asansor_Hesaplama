@@ -13,8 +13,8 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from api.ortak import (KOK, _BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi,
-                       _indir, _proje_kimligi, _sayi, _sozluk_listesi,
-                       _temiz, _uretilemedi, belirsiz_sayi_mi)
+                       _indir, _paket_ekleri, _proje_kimligi, _sayi,
+                       _sozluk_listesi, _temiz, _uretilemedi, belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
@@ -362,7 +362,26 @@ def indir_proje_dwg(veri: dict = Body(...)):
                          "ya da trafik / avan hesabını yapın."}, status_code=200)
 
         ad = _dosya_adi(_proje_kimligi(veri), "Avan Projesi", "zip")
-        paket, sebep, tasti = X_DXF.proje_paketi(paftalar, os.path.splitext(ad)[0])
+        #  Pakete ÇALIŞMA KİTAPLARI ve PROJE DOSYASI da girer:  teslim paketi
+        #  ile geri dönüş noktası aynı arşivde dursun.
+        kok = os.path.splitext(ad)[0]
+        ekler = list(_paket_ekleri(veri, "avan"))
+        if isinstance(trafik_ham, dict):
+            try:
+                _t = E_TRF.hesapla(g)
+                if not _t.get("hata"):
+                    ekler.append((f"{kok} - Trafik.xlsx",
+                                  X_XLS.trafik_xlsx(_t.get("yol", "tek"), g,
+                                                    _proje_kimligi(veri))))
+            except Exception:                                 # noqa: BLE001
+                pass          # şablon yoksa paket yine çıkar, kitap olmaz
+        if isinstance(avan_ham, dict):
+            try:
+                ekler.append((f"{kok} - Avan.xlsx",
+                              X_XLS.avan_xlsx(a, _proje_kimligi(veri))))
+            except Exception:                                 # noqa: BLE001
+                pass
+        paket, sebep, tasti = X_DXF.proje_paketi(paftalar, kok, ekler)
         yanit = _indir(paket, ad, "application/zip")
         #  Kullanıcının BİLMESİ GEREKENLER başlıkta taşınır:
         #    DXF   → DWG üretilemedi, pakette yalnız DXF var ( sebebi OKUBENI'de )

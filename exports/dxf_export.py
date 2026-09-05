@@ -602,7 +602,7 @@ def dwg_uret(dxf_baytlari, surum="ACAD2018"):
     return None, "DWG dönüştürücü dosya üretemedi — DXF verildi."
 
 
-def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False):
+def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False, ekler=()):
     satir = [f"{dosya_adi}   —   Asansör Proje Programı", "",
              "PAKETİN İÇİNDEKİLER", ""]
     if dwg_var:
@@ -610,6 +610,9 @@ def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False):
     satir += [
         f"  {dosya_adi}.dxf    Aynı çizimin DXF'i — AutoCAD birebir açar",
         "  pafta pdf/         Çizime dönüştürülen kaynak paftalar",
+    ]
+    satir += [f"  {a}" for a in ekler]
+    satir += [
         "",
         "ÇİZİM NASIL KURULDU",
         "  Paftaların vektör geometrisi okunup CAD varlığına çevrildi:  çizgiler",
@@ -630,12 +633,29 @@ def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False):
         satir += ["", "DİKKAT",
                   "  Pafta sayısı formatın çerçevesine sığmadı; alta taşan",
                   "  sayfalar var.  Çerçeveyi büyütün ya da paftaları azaltın."]
+    if any(a.endswith((".avan", ".uygulama")) for a in ekler):
+        satir += ["", "PROJE DOSYASI",
+                  "  Paketteki .avan / .uygulama dosyası projenin BÜTÜN",
+                  "  girdilerini taşır.  Aylar sonra revizyon gerektiğinde onu",
+                  "  programa yükleyin:  her şey yerine oturur, değişeni",
+                  "  düzeltip çıktıları yeniden alırsınız.  Hiçbir girdiyi",
+                  "  baştan girmeniz gerekmez."]
     if not dwg_var:
         satir += ["", "DWG İSTERSENİZ", "  " + (sebep or "")]
     return "\n".join(satir) + "\n"
 
 
-def proje_paketi(paftalar, dosya_adi="Avan Projesi"):
+def proje_paketi(paftalar, dosya_adi="Avan Projesi", ekler=None):
+    """`ekler`:  pakete konacak ek dosyalar  —  [ ( ad, bayt ) ].
+
+    "Projeyi paketle" düğmesi buradan geçer:  paftaların yanına çalışma
+    kitabı ve PROJE DOSYASI da girer, böylece teslim paketi ile geri dönüş
+    noktası aynı arşivde durur.
+    """
+    return _proje_paketi(paftalar, dosya_adi, ekler)
+
+
+def _proje_paketi(paftalar, dosya_adi="Avan Projesi", ekler=None):
     """
     Butonun indirdiği ZIP:  içinde DXF ( her zaman ) ve DWG ( üretilebildiyse ).
     Dönen: ( zip_baytlari, dwg_yoksa_sebebi, paftalar_tasti_mi )
@@ -657,7 +677,11 @@ def proje_paketi(paftalar, dosya_adi="Avan Projesi"):
         for _sira, (_ad, _ham) in enumerate(paftalar, 1):
             if _ham:
                 z.writestr(f"pafta pdf/{_sira} - {_ad}.pdf", _ham)
+        for _ad, _ham in (ekler or ()):
+            if _ham:
+                z.writestr(_ad, _ham)
         z.writestr("OKUBENI.txt",
-                   _okubeni(dosya_adi, bool(dwg), sebep, sablonlu, tasti))
+                   _okubeni(dosya_adi, bool(dwg), sebep, sablonlu, tasti,
+                            [a for a, h in (ekler or ()) if h]))
     tampon.seek(0)
     return tampon.read(), sebep, tasti

@@ -241,12 +241,13 @@ def calistir():
         #  Çıktı düğmeleri:  varlıkları YETMEZ, gerçekten dosya dönmeli
         #  Girdi formundaki durak düğmeleri de ".dugmeler .dg" — çıktı
         #  düğmeleri form DIŞINDA olanlardır.
-        r.esit("uygulama çıktı düğmeleri",
+        r.esit("uygulama çıktı ve proje dosyası düğmeleri",
                pg.eval_on_selector_all(
                    "#s-mukavemet .dugmeler .dg",
                    "e=>e.filter(x=>!x.closest('#m_form')).map(x=>x.textContent.trim())"),
-               ["Uygulama Projesi PDF", "Uygulama Projesi Excel",
-                "Uygulama CAD (DWG/DXF)"])
+               ["Projeyi kaydet", "Proje aç (.uygulama)", "Tümünü temizle",
+                "Uygulama Projesi PDF", "Uygulama Projesi Excel",
+                "Projeyi paketle (ZIP)"])
         _ind = pg.evaluate("""async () => {
             const dene = async uc => {
               const r = await fetch('/api/indir/'+uc, {method:'POST',
@@ -335,12 +336,120 @@ def calistir():
                pg.evaluate("MUK_DURAK.length"), _once["durak"])
         r.esit("yenilemeden sonra proje adı duruyor",
                pg.input_value("#mk_proje_adi"), "Güneş Apartmanı")
+        #  ─────────── AVAN VE UYGULAMA AYRI KOVALARDA ───────────
+        #  Tek kova varken iki proje yan yana yaşıyordu:  avan üzerinde
+        #  çalışıp uygulamaya geçince avan verisi orada duruyordu ve
+        #  "Tümünü temizle" ikisini birden siliyordu.
+        _kovalar = pg.evaluate(
+            "Object.keys(localStorage).filter(k=>/program_v1/.test(k)).sort()")
+        r.kontrol("uygulama kendi kovasına yazıyor",
+                  "uygulama_program_v1" in _kovalar, f"→ {_kovalar}")
+        _uk = pg.evaluate(
+            "JSON.parse(localStorage.getItem('uygulama_program_v1')||'{}')")
+        r.esit("uygulama kovası kendi modunu yazıyor", _uk.get("__mod"), "uygulama")
+        r.esit("uygulama kovasında AVAN alanı yok",
+               [k for k in _uk if k[:2] in ("c_", "a_", "k_") or k[:3] in ("of_", "sb_")], [])
+        r.kontrol("uygulama kovasında mukavemet alanları var",
+                  any(k.startswith("m_") for k in _uk), f"→ {sorted(_uk)[:6]}")
+        r.kontrol("uygulamanın kendi ofis sabitleri de kovada",
+                  any(k.startswith("uof_") for k in _uk), f"→ {sorted(_uk)[:6]}")
+
         #  Testin geri kalanı temiz girdiyle koşsun
-        pg.evaluate("localStorage.removeItem(ANAHTAR)")
+        pg.evaluate("localStorage.removeItem(KOVA[MOD])")
         pg.reload(wait_until="networkidle")
         pg.wait_for_timeout(600)
         pg.click("#gk_uygulama")
         pg.wait_for_timeout(2200)
+
+        #  ─────────── UYGULAMANIN KENDİ OFİS SABİTLERİ ───────────
+        #  Avanınkinden AYRI:  avan ön tasarımdır, uygulama kesin tasarım.
+        #  σem ve k1 bugüne kadar KODDA GÖMÜLÜYDÜ, ekrana çıkarıldı.
+        pg.click(".sekme[data-sekme='sabitler']")
+        pg.wait_for_timeout(500)
+        r.kontrol("uygulamada KENDİ sabitler gövdesi görünüyor",
+                  pg.is_visible("#sabitler_uygulama"))
+        r.kontrol("uygulamada AVAN sabitleri görünmüyor",
+                  not pg.is_visible("#sabitler_avan"))
+        _uof = pg.eval_on_selector_all("[id^='uof_']", "e=>e.length")
+        r.kontrol("uygulama ofis sabitleri çizildi", _uof >= 40, f"→ {_uof} alan")
+        for _a in ("uof_sigma_em", "uof_k1_kaymali", "uof_verim_dislisiz",
+                   "uof_palanga_verim_dususu", "uof_tavan_payi"):
+            r.kontrol(f"ofis sabiti ekranda: {_a}", pg.is_visible(f"#{_a}"))
+
+        #  Ekrandan değiştirilen sabit HESABI değiştirmeli
+        pg.click(".sekme[data-sekme='mukavemet']")
+        pg.wait_for_timeout(400)
+        _n0 = pg.evaluate("SON.m.ozet.N_hesap")
+        pg.click(".sekme[data-sekme='sabitler']")
+        pg.wait_for_timeout(300)
+        pg.fill("#uof_verim_dislisiz", "0,95")
+        pg.wait_for_timeout(2200)
+        _n1 = pg.evaluate("SON.m.ozet.N_hesap")
+        r.kontrol("ofis verimi motor gücünü değiştiriyor", _n1 < _n0,
+                  f"→ önce {_n0}, sonra {_n1}")
+        pg.fill("#uof_sigma_em", "100")
+        pg.wait_for_timeout(2200)
+        _b2 = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
+        r.kontrol("σem düşürülünce makine kaidesi kalıyor",
+                  _b2.get("uygun") is False, f"→ {_b2}")
+        r.kontrol("σem satırı kaynağını OFİS STANDARDI diye yazıyor",
+                  "OFİS STANDARDI" in pg.evaluate(
+                      "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
+                      ".adimlar.find(a=>a.sembol==='σem').kaynak"))
+        pg.click("button:has-text('Tümünü varsayılana döndür')")
+        pg.wait_for_timeout(2200)
+        r.kontrol("sabitler varsayılana dönüyor",
+                  abs(pg.evaluate("SON.m.ozet.N_hesap") - _n0) < 1e-9,
+                  f"→ {pg.evaluate('SON.m.ozet.N_hesap')} ≠ {_n0}")
+
+        #  ─────────── UYGULAMANIN KENDİ TABLOLARI ───────────
+        #  Bugüne kadar YOKTU:  Tablolar sekmesi yalnız avan modundaydı,
+        #  uygulama yapan mühendis kullandığı ray tablosuna bakamıyordu.
+        pg.click(".sekme[data-sekme='tablolar']")
+        pg.wait_for_timeout(600)
+        r.kontrol("uygulamada KENDİ tablolar gövdesi görünüyor",
+                  pg.is_visible("#tablolar_uygulama"))
+        r.kontrol("uygulamada AVAN tabloları görünmüyor",
+                  not pg.is_visible("#tablolar_avan"))
+        _tb = pg.eval_on_selector_all("#utablolar_ic table", "e=>e.length")
+        r.kontrol("uygulama tabloları çizildi", _tb >= 12, f"→ {_tb} tablo")
+        #  BAŞLIKLAR CSS İLE BÜYÜK HARFE ÇEVRİLİYOR ve Türkçede bu dönüşüm
+        #  geri alınamaz ( KILAVUZ → kilavuz, PROFİLLERİ → profi̇lleri̇ ).
+        #  Bu yüzden görüntülenen metin değil, DOM'daki textContent okunur —
+        #  text-transform onu değiştirmez.
+        _tm = pg.eval_on_selector("#utablolar_ic", "e=>e.textContent")
+        for _ara in ("Kılavuz ray profilleri", "NPU profilleri", "Askı halatları",
+                     "burkulma", "Kabin alanı"):
+            r.kontrol(f"uygulama tablosu: {_ara}", _ara in _tm,
+                      f"→ {_tm[:130]!r}")
+        #  Tablo İÇERİĞİ de basılmalı — boş başlık listesi "geçti" sayılmasın
+        r.kontrol("ray tablosunda gerçek profil var", "50 x 50 x 5" in _tm)
+        r.kontrol("halat tablosunda TS 12385-5 yazılı", "12385" in _tm)
+
+        #  ─────────── PROJE DOSYASI  (.uygulama) ───────────
+        pg.click(".sekme[data-sekme='mukavemet']")
+        pg.wait_for_timeout(400)
+        _pd = pg.evaluate("projeGovdesi('uygulama')")
+        r.esit("proje dosyası modunu yazıyor", _pd.get("__mod"), "uygulama")
+        r.kontrol("proje dosyası SÜRÜM taşıyor", bool(_pd.get("__surum")),
+                  f"→ {_pd.get('__surum')}")
+        r.esit("proje dosyasında AVAN alanı yok",
+               [k for k in _pd["alanlar"]
+                if k[:2] in ("c_", "a_", "k_") or k[:3] in ("of_", "sb_")], [])
+        r.kontrol("proje dosyası ofis sabitlerini de taşıyor",
+                  any(k.startswith("uof_") for k in _pd["alanlar"]))
+        pg.fill("#mk_proje_adi", "Jan Mühendislik")
+        pg.wait_for_timeout(300)
+        r.esit("dosya adı proje adından üretiliyor",
+               pg.evaluate("projeDosyaAdi('uygulama')"), "Jan Mühendislik.uygulama")
+        #  YANLIŞ MODA yükleme reddedilmeli
+        pg.evaluate("projeUygula({__mod:'avan',__surum:1,alanlar:{c_N:'11'}}, 'x.avan')")
+        pg.wait_for_timeout(400)
+        r.kontrol("avan dosyası uygulamaya yüklenmiyor",
+                  "AVAN projesine ait" in pg.inner_text("#durum"),
+                  f"→ {pg.inner_text('#durum')[:80]}")
+        r.esit("reddedilen dosya girdiyi bozmadı",
+               pg.input_value("#mk_proje_adi"), "Jan Mühendislik")
 
         pg.click("#dg_ana_ekran")
         pg.wait_for_timeout(300)

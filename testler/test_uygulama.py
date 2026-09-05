@@ -137,6 +137,96 @@ def calistir():
               all(x in g for _ad, x, _av in UG.ORTAK_KOPRU),
               f"→ {[x for _a, x, _b in UG.ORTAK_KOPRU if x not in g]}")
 
+    # -------------------------------------------------------------
+    #  UYGULAMANIN KENDİ OFİS STANDARDI  ( avandan AYRI )
+    # -------------------------------------------------------------
+    from engine.uygulama import sabitler as _US
+    from engine.uygulama import tablolar_gorunum as _UTG
+    from engine.uygulama import mukavemet_tablolari as MT
+    _S = _US.sabitler()
+    r.kontrol("ofis sabitleri eksiksiz tanımlı",
+              not [k for k in _US.VARSAYILAN if k not in _US.ETIKET],
+              f"→ etiketi olmayan: {[k for k in _US.VARSAYILAN if k not in _US.ETIKET]}")
+    r.kontrol("her sabit bir gruba ait",
+              not [k for k in _US.VARSAYILAN
+                   if not any(k in g[2] for g in _US.GRUPLAR)])
+    r.kontrol("sayısal her sabitin aralığı var",
+              not [k for k in _US.VARSAYILAN
+                   if k not in _US.ARALIK and k not in _US.METIN])
+    r.kontrol("aralık dışı değer REDDEDİLİYOR",
+              _US.sabitler({"sigma_em": 9999})["_reddedilen"] == ["sigma_em"])
+    r.esit("geçerli değer kabul ediliyor", _US.sabitler({"cosfi": 0.85})["cosfi"], 0.85)
+    r.esit("reddedilen değer varsayılana dönüyor",
+           _US.sabitler({"sigma_em": 9999})["sigma_em"], _US.VARSAYILAN["sigma_em"])
+
+    #  σem ve k1 KODDA GÖMÜLÜ DEĞİL — ofis bunları gözden geçirebilmeli
+    for _k in ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani",
+               "q_denge", "verim_dislisiz", "verim_disli", "tavan_payi"):
+        r.kontrol(f"ofis sabiti ekrana çıkıyor: {_k}", _k in _US.VARSAYILAN)
+
+    #  AVANIN kuvvet sabitleri uygulamada YOK — ayrı projeler
+    import engine.avan.hesap as _AVh
+    _avan_ozel = ("gf", "Fmt", "n_ray", "gr", "Fmk", "Fsh", "i_palanga")
+    r.esit("avanın MMO/697 kuvvet sabitleri uygulamada yok",
+           [k for k in _avan_ozel if k in _US.VARSAYILAN], [])
+
+    #  Ofis sabiti hesabı GERÇEKTEN değiştiriyor mu
+    _t = MK.hesapla()
+    for _ez, _hucre in (({"verim_dislisiz": 0.88}, "AQ23"),
+                        ({"sigma_em": 100}, "J65"),
+                        ({"k1_kaymali": 3}, "C47"),
+                        ({"q_denge": 0.45}, "AQ13"),
+                        ({"tavan_payi": 200}, "AI636"),
+                        ({"Gs": 50}, "AQ9"),
+                        ({"halat_pay_m": 8}, "AQ19"),
+                        ({"yan_yatak_L_X": 400}, "K58")):
+        _y = MK.hesapla({"_ofis": _ez})
+        _ad = list(_ez)[0]
+        if _ad == "sigma_em":
+            #  σem gerilmeyi DEĞİL, sınırı değiştirir:  etkisi bölüm 2'nin
+            #  KARARINDA görünür.  Örnek projede başka bölümler zaten
+            #  kaldığı için "tumu_uygun" ile bakmak yanıltıcı olurdu.
+            def _b2(x):
+                return [b for b in x["bolumler"]
+                        if b["baslik"].startswith("2")][0]["sonuc"]["uygun"]
+            r.kontrol(f"ofis sabiti '{_ad}' makine kaidesinin kararını çeviriyor",
+                      _b2(_t) is True and _b2(_y) is False,
+                      f"→ önce {_b2(_t)}, sonra {_b2(_y)}")
+        else:
+            r.kontrol(f"ofis sabiti '{_ad}' hesabı değiştiriyor",
+                      _y["_h"][_hucre] != _t["_h"][_hucre],
+                      f"→ {_hucre}: {_t['_h'][_hucre]} → {_y['_h'][_hucre]}")
+
+    #  Ofis sabitleri TESLİM EDİLEN EXCEL'e de yansımalı
+    import io as _io3, openpyxl as _op4
+    from exports import mukavemet_xlsx as _MX3
+    _wsx = _op4.load_workbook(_io3.BytesIO(_MX3.mukavemet_xlsx(
+        MK.hesapla({"_ofis": {"verim_dislisiz": 0.88}})["girdi"])))["11-Muk. Hesapları"]
+    r.kontrol("ofis verimi teslim edilen kitaba da giriyor",
+              "0.88" in str(_wsx["AQ22"].value), f"→ {str(_wsx['AQ22'].value)[:80]}")
+
+    # -------------------------------------------------------------
+    #  UYGULAMANIN KENDİ TABLOLARI  ( ekranda bugüne kadar YOKTU )
+    # -------------------------------------------------------------
+    _tb = _UTG.arayuz_tablolari()
+    r.kontrol("tablo görünümü dolu", len(_tb) >= 12, f"→ {len(_tb)} tablo")
+    for _x in _tb:
+        r.kontrol(f"tablo '{_x['ad'][:28]}' eksiksiz",
+                  bool(_x["ad"]) and bool(_x["basliklar"]) and bool(_x["satirlar"])
+                  and all(len(s) == len(_x["basliklar"]) for s in _x["satirlar"]),
+                  f"→ {len(_x['basliklar'])} sütun, {len(_x['satirlar'])} satır")
+    #  TABLOLAR KOPYALANMAZ — motorun kendi sözlüğünden okunmalı
+    _ray = [x for x in _tb if "Kılavuz ray" in x["ad"]][0]
+    r.esit("ray tablosu motorun tablosuyla aynı satır sayısında",
+           len(_ray["satirlar"]), len(MT.RAY_PROFILI))
+    r.kontrol("ray tablosu gerçek profil taşıyor",
+              any("50 x 50 x 5" in str(s[0]) for s in _ray["satirlar"]))
+    _w = [x for x in _tb if x["ad"].startswith("ω")][0]
+    r.kontrol("ω tablosu üç Rm sütunu veriyor", len(_w["basliklar"]) == 4)
+    r.kontrol("ω tablosu motorun formülüyle aynı",
+              all(abs(s[1] - round(MT.omega_en8150(s[0], 370), 4)) < 1e-9
+                  for s in _w["satirlar"]))
+
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı
     #  notları "kesin seçim UYGULAMA PROJESİNDE yapılır" der;  avan paftasında

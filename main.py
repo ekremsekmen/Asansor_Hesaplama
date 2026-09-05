@@ -11,6 +11,7 @@ Program tümüyle bilgisayarınızda çalışır, internet gerektirmez.
 """
 import json
 import math
+import hashlib
 import os
 import re
 import sys
@@ -68,7 +69,25 @@ app.include_router(UC_UYGULAMA.router)
 @app.get("/", response_class=HTMLResponse)
 def anasayfa():
     with open(os.path.join(KOK, "static", "index.html"), encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        return HTMLResponse(f.read().replace("?v=SURUM", "?v=" + _statik_damga()))
+
+
+def _statik_damga():
+    """Betik ve biçem dosyalarının içeriğinden türetilen önbellek damgası.
+
+    Elle yazılan bir sürüm etiketi ( "?v=3.0" ) unutulabiliyordu:  JS
+    değiştiğinde etiket aynı kaldığı için tarayıcı ESKİ betiği önbellekten
+    çalıştırıyor, YENİ index.html ile birleşince ekran sessizce bozuluyordu.
+    İçerikten türetilen damga unutulamaz — dosya değişince damga da değişir.
+    """
+    h = hashlib.sha1()
+    for ad in ("ortak.js", "avan.js", "uygulama.js", "style.css"):
+        try:
+            with open(os.path.join(KOK, "static", ad), "rb") as f:
+                h.update(f.read())
+        except OSError:
+            h.update(ad.encode())
+    return h.hexdigest()[:12]
 
 
 @app.post("/api/xlsx-yukle")

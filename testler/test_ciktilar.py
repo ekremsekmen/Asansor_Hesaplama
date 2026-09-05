@@ -6,6 +6,7 @@ TEST 4  —  ÇIKTI BÜTÜNLÜĞÜ  (XLSX ve PDF)
 doğru sayfaları taşıyor mu, PDF geçerli ve Türkçe karakterler yerinde mi?
 """
 import io
+import json as _js
 import os
 import re
 import shutil
@@ -18,6 +19,10 @@ import openpyxl                                            # noqa: E402
 from engine.avan import hesap as AV
 from engine.avan import trafik as TR               # noqa: E402
 from exports import hucre_haritasi as H                    # noqa: E402
+try:
+    from exports import dxf_export as _DXF          # noqa: E402
+except Exception:                                   # noqa: BLE001
+    _DXF = None            # CAD kitaplıkları yoksa paket testi atlanır
 from exports import kapak_export as KPK
 from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
 from api.avan import XLSX_TUR                           # noqa: E402
@@ -1165,6 +1170,82 @@ def calistir():
         r.esit("kaynak kitapta η sabit 0,92 idi", _sb["AQ22"].value, 0.92)
         r.esit("kaynak kitapta bu sınırlar 1200 / 150 idi",
                [_sb["AD636"].value, _sb["AD647"].value], [1200, 150])
+        #  ---------------------------------------------------------------
+        #  OFİSİN ANA KİTABININ DÜZELTİLMİŞ KOPYASI
+        #  ---------------------------------------------------------------
+        #  Teslim edilen dosya düzeltiliyordu ama ofisin masasındaki ANA kitap
+        #  düzelmiyordu:  onu açıp elle hesap yapan eski, bazıları emniyetsiz
+        #  sonuçları alıyordu.  araclar/kaynak_excel_duzelt.py o boşluğu
+        #  kapatır;  burada gerçekten düzeltilmiş VE doğru hesaplıyor mu diye
+        #  bakılır.
+        _usta = _MX.duzeltilmis_kaynak()
+        _uwb = _op.load_workbook(io.BytesIO(_usta))
+        _uws = _uwb["11-Muk. Hesapları"]
+        r.kontrol("düzeltilmiş kitap üretildi", len(_usta) > 200_000,
+                  f"→ {len(_usta)} bayt")
+        for _h, _bek in (("Q97", 40), ("AO312", "=AH293"),
+                         ("AD636", "=P639*1000"), ("AD647", 100)):
+            r.esit(f"düzeltilmiş kitap {_h}", _uws[_h].value, _bek)
+        for _h, _ara in (("AQ22", "B130"), ("AK190", "B100"),
+                         ("AD354", "B131"), ("AU575", ",6,0)")):
+            r.kontrol(f"düzeltilmiş kitap {_h} düzeltilmiş",
+                      _ara in str(_uws[_h].value), f"→ {str(_uws[_h].value)[:70]}")
+        r.kontrol("düzeltilmiş kitapta flanş paydasında ℓ var",
+                  "(1+2*" not in str(_uws["Q380"].value).replace(" ", ""))
+        #  HİÇBİR PROJENİN GİRDİSİ SIZMAMALI — bu boş bir usta kopyadır
+        _uvg = _uwb[_MX.GIRDI_SAYFASI]
+        r.kontrol("usta kopyada ek girdi satırları BOŞ",
+                  all(_uvg[f"B{_st}"].value in (None, "")
+                      for _a, _st, _e, _b in _MX.EK_GIRDI_HUCRELERI),
+                  "→ bir projenin girdisi sızmış")
+        #  Neyin niçin değiştiği kitabın İÇİNDE yazılı olmalı
+        r.kontrol("DÜZELTMELER sayfası var", _MX.DUZELTME_SAYFASI in _uwb.sheetnames,
+                  f"→ {_uwb.sheetnames}")
+        _dz = "\n".join(str(c.value) for _sat in _uwb[_MX.DUZELTME_SAYFASI].iter_rows()
+                         for c in _sat if c.value is not None)
+        for _ad, _md, _e2, _y2, _hc in _MK.EXCEL_FARKLARI:
+            r.kontrol(f"kayıtta '{_ad[:30]}' var", _ad in _dz)
+        for _h in ("Q97", "AQ22", "AD647", "AD636", "AO312"):
+            r.kontrol(f"kayıt düzenlenen {_h} hücresini sayıyor", _h in _dz)
+
+        #  ---------------------------------------------------------------
+        #  "PROJEYİ PAKETLE"  —  teslim paketi + geri dönüş noktası
+        #  ---------------------------------------------------------------
+        #  Çıktılar projeyi ANLATIR, proje dosyası onu GERİ GETİRİR.  İkisi
+        #  ayrı yerlerde durursa arşivden dönmek imkânsızlaşır;  bu yüzden
+        #  aynı ZIP'te olmaları denetlenir.
+        import zipfile as _zf
+        from api.ortak import _paket_ekleri as _PE
+        _pd = {"__mod": "uygulama", "__surum": 1,
+               "alanlar": {"m_beyan_yuku": "800", "uof_sigma_em": "150"}}
+        #  Kapak alanı sunucuda "project_title" adıyla gelir.
+        _ek = _PE({"kapak": {"project_title": "Jan Mühendislik"},
+                   "proje_dosyasi": _pd}, "uygulama")
+        r.esit("paket eki bir dosya üretiyor", len(_ek), 1)
+        r.kontrol("proje dosyasının uzantısı moda göre",
+                  _ek[0][0].endswith(".uygulama"), f"→ {_ek[0][0]}")
+        r.kontrol("proje dosyası adı proje adından",
+                  "Jan Mühendislik" in _ek[0][0], f"→ {_ek[0][0]}")
+        _geri = _js.loads(_ek[0][1].decode("utf-8"))
+        r.esit("paketteki proje dosyası gövdeyi birebir taşıyor", _geri, _pd)
+        r.esit("avan modunda uzantı .avan",
+               _PE({"proje_dosyasi": _pd}, "avan")[0][0].endswith(".avan"), True)
+        r.esit("proje dosyası yoksa ek de yok", _PE({}, "avan"), [])
+
+        #  ZIP gerçekten hepsini taşıyor mu
+        if _DXF is not None:
+            _zip, _sebep, _tasti = _DXF.proje_paketi(
+                [("Kapak", None), ("Hesap", PE.mukavemet_pdf(_MK.hesapla(), PROJE))],
+                "Jan Mühendislik - Uygulama Projesi", _ek)
+            _z = _zf.ZipFile(io.BytesIO(_zip))
+            _adlar = _z.namelist()
+            r.kontrol("pakette DXF var", any(a.endswith(".dxf") for a in _adlar), f"→ {_adlar}")
+            r.kontrol("pakette pafta PDF'i var", any(a.endswith(".pdf") for a in _adlar))
+            r.kontrol("pakette PROJE DOSYASI var",
+                      any(a.endswith(".uygulama") for a in _adlar), f"→ {_adlar}")
+            r.kontrol("paket OKUBENİ proje dosyasını anlatıyor",
+                      "PROJE DOSYASI" in _z.read("OKUBENI.txt").decode("utf-8"))
+
         r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",
                   _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]["Q97"].value == 30,
                   "→ şablon değişmiş;  doğrulama testleri dayanağını kaybeder")

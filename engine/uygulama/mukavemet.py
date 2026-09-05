@@ -26,8 +26,8 @@ kontrol ), böylece ekran, PDF ve XLSX katmanları ortak kalır.
 """
 import math
 
-from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet_girdi as MG
+from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
 from engine.ortak.steps import Bolum, hesap, kontrol, veri
 from engine.ortak.steps import metin, tr, trn
@@ -142,17 +142,8 @@ FARKLI_HUCRELER = tuple(sorted({h for *_x, hucreler in EXCEL_FARKLARI
 #  Kaynakları yanlarında; değiştirmek gerekirse tek yer burasıdır.
 SABIT = {
     "gn":              9.81,      # yerçekimi ivmesi              [m/s²]
-    "Gs":              0,         # sürtünme yükü                 [kg]   (11!AQ8)
-    #  η ARTIK BURADAN OKUNMUYOR.  Kaynak kitabın 11!AQ22'sindeki bu sabit,
-    #  makine tipinden bağımsızdı;  verim artık makine tipine bağlıdır
-    #  ( engine/ortak/ofis.py ).  Sayı yalnız tanınmayan tipte geri düşülecek
-    #  değer olarak ORADA durur — bkz. OFIS.VARSAYILAN_VERIM.
-    "motor_verimi":    OFIS.VARSAYILAN_VERIM,   # yalnız geriye dönük uyum
     "motor_sabiti":    102,       # kW ↔ kg·m/s dönüşümü                 (11!AQ23)
     "hp_carpani":      1.34,      # kW → HP                              (11!X25)
-    "halat_pay_m":     5,         # halat boyu payı               [m]    (11!AQ19)
-    "sigma_em":        130,       # ST 37 emniyet gerilmesi     [N/mm²]  (11!AB40)
-    "yan_yatak_L_X":   335,       # L − X  ( kaide kiriş mesnedi ) [mm]  (11!S58)
     "Dt_dh_asgari":    40,        # tahrik kasnağı / halat oranı   EN 81-20 m.5.5.2.1
     "Dreg_dreg_asgari": 30,       # regülatör kasnağı / halat oranı      (11!N142)
     "reg_kat_asgari":  8,         # regülatör halatı emniyet katsayısı   (11!K161)
@@ -184,7 +175,6 @@ SABIT = {
     "Fs_ust":          0.6,       # eşik kuvveti  Q ≥ 2500 kg
     "Fs_sinir":        2500,      # [kg]
     "tampon_katsayi":  4,         # F = 4·gn·(P+Q)                       (11!R621)
-    "q_denge":         0.5,       # karşı ağırlık denge oranı            (11!AA627)
     "FRcar_katsayi":   0.02,      # kabin sürtünme direnci        (Askı Tipleri!P128)
     "FRcwt_katsayi":   0.015,     # ağırlık sürtünme direnci      (Askı Tipleri!P129)
     "ray_kaide_payi":  200,       # ray boyu:  kaide yüksekliği − 200 mm (11!AH291)
@@ -194,6 +184,12 @@ SABIT = {
 #  Sığınma alanı hesaplarındaki kabin/kuyu geometrisi payları.  Excel'de
 #  doğrudan formüle gömülüdür ( 11!AI635…AI648 ); ofis kabulüdür, MMO ya da
 #  EN 81-20 sayısı DEĞİLDİR.
+#  Kabin / kuyu geometrisi payları OFİS STANDARDINDADIR ( ekrandan
+#  değiştirilir );  aşağıdaki değerler yalnız motor tek başına çağrıldığında
+#  geçerli olan fabrika ayarıdır.
+SIGINMA_PAYLARI = ("kabin_yuksekligi", "kabin_ust_donanim", "paten_payi",
+                   "tavan_payi", "revizyon_payi", "etek_payi", "etek_kotu",
+                   "ray_alt_payi", "regulator_payi")
 SIGINMA = {
     "kabin_yuksekligi":     2400,   # üst paten - ray üst ucu payı      [mm]
     "kabin_ust_donanim":    2100,   # kabin üstü kotu                   [mm]
@@ -228,21 +224,6 @@ SIGINMA = {
 }
 
 
-def _ofis_sabiti(g, anahtar, varsayilan):
-    """Sabitler sekmesinden gelen ofis değeri  ( yoksa / bozuksa varsayılan ).
-
-    Uygulama projesinde ofis sabitleri girdinin ``_ofis`` anahtarıyla taşınır
-    ( bkz. api/uygulama.py ).  Motor doğrudan çağrıldığında sözlük yoktur;
-    o zaman ortak ofis standardı geçerlidir.
-    """
-    ofis = g.get("_ofis")
-    if isinstance(ofis, dict):
-        d = ofis.get(anahtar)
-        if isinstance(d, (int, float)) and not isinstance(d, bool) and 0 <= d < 1:
-            return d
-    return varsayilan
-
-
 def _bosluk(v):
     """0,10 m ilave kılavuzlu yol + 0,035·v² sıçrama payı  →  mm.
 
@@ -272,7 +253,7 @@ def _kay(o, **hucreler):
 #  1 -  ASANSÖR MOTOR GÜCÜ                        ( MMO 208/7 - 2.4 )
 # =====================================================================
 def _motor(g, o):
-    S = SABIT
+    S, O = SABIT, o["ofis"]
     Q, P, v = g["beyan_yuku"], g["kabin_agirligi"], g["beyan_hizi"]
     Dt, dh, nh, r = (g["tahrik_kasnak_capi"], g["halat_capi"],
                      g["halat_adedi"], g["aski_orani"])
@@ -283,22 +264,22 @@ def _motor(g, o):
     yigin = (g["agirlik_tampon_baba"] + g["agirlik_carpma_arasi"]
              - g["agirlik_tampon_ezilme"] + g["agirlik_paten_arasi"]
              + g["kabin_paten_arasi"])
-    lh = (g["kuyu_boyu"] - yigin) / 1000.0 + S["halat_pay_m"]
+    lh = (g["kuyu_boyu"] - yigin) / 1000.0 + O["halat_pay_m"]
     if r != 1:
         lh *= 2
     Gh = gh * lh * nh
     F1 = Q + P + Gh                       # kabin ve aksesuarlarının yükü
-    Ga = P + S["q_denge"] * Q             # karşı ağırlık yükü
-    Gmax = F1 + S["Gs"] - Ga              # maksimum artan yük
+    Ga = P + O["q_denge"] * Q             # karşı ağırlık yükü
+    Gmax = F1 + O["Gs"] - Ga              # maksimum artan yük
     Pm = F1 - Ga                          # makine miline gelen döndürme kuvveti
     M = Gmax * (Dt / 2000.0)              # moment
     #  VERİM — makine tipine ve askı oranına bağlıdır  ( ofis standardı ).
     #  Kaynak kitap burada makine tipinden bağımsız sabit 0,92 kullanıyordu;
     #  ofisin kendi avan tablosu ise dişli makinede 0,50 der.  Dişli makinede
     #  0,92 gerekli gücü YARIYA yakın gösteriyordu — emniyetsiz taraf.
-    dusus = _ofis_sabiti(g, "palanga_verim_dususu", OFIS.PALANGA_VERIM_DUSUSU)
-    eta_taban = OFIS.makine_verimi(g.get("makine_tipi"))
-    eta = OFIS.sistem_verimi(g.get("makine_tipi"), r, dusus)
+    dusus = O["palanga_verim_dususu"]
+    eta_taban = US.verim(O, g.get("makine_tipi"), 1)
+    eta = US.verim(O, g.get("makine_tipi"), r)
     N = Gmax * v / (eta * S["motor_sabiti"])
     HP = N * S["hp_carpani"]
     uygun = g["motor_gucu"] >= N
@@ -321,21 +302,22 @@ def _motor(g, o):
         hesap("lh = ( Kuyu boyu − tampon/paten yığını ) / 1000 + 5"
               + ("  ( × 2 :  2:1 askı )" if r != 1 else ""),
               f"( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
-              f"{S['halat_pay_m']}" + ("  × 2" if r != 1 else ""),
+              f"{O['halat_pay_m']}" + ("  × 2" if r != 1 else ""),
               lh, "m", "11!AQ19"),
         hesap("Gh = gh × lh × nh", f"{tr(gh)} × {tr(lh)} × {trn(nh, 0)}",
               Gh, "kg"),
         hesap("F1 = P + Q + Gh", f"{trn(P, 0)} + {trn(Q, 0)} + {tr(Gh)}", F1, "kg"),
-        hesap("Ga = P + Q / 2", f"{trn(P, 0)} + {trn(Q, 0)} / 2", Ga, "kg"),
-        veri("Gs", "Sürtünme yükü", S["Gs"], "kg", "Ofis kabulü"),
-        hesap("Gmax = F1 + Gs − Ga", f"{tr(F1)} + {tr(S['Gs'])} − {tr(Ga)}",
+        hesap(f"Ga = P + {tr(O['q_denge'])} × Q",
+              f"{trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)}", Ga, "kg"),
+        veri("Gs", "Sürtünme yükü", O["Gs"], "kg", "OFİS STANDARDI"),
+        hesap("Gmax = F1 + Gs − Ga", f"{tr(F1)} + {tr(O['Gs'])} − {tr(Ga)}",
               Gmax, "kg"),
         hesap("Pm = F1 − Ga", f"{tr(F1)} − {tr(Ga)}", Pm, "kg"),
         veri("Dt", "Tahrik kasnağı çapı", Dt, "mm", "GİRİŞ"),
         hesap("M = Gmax × ( Dt / 2 )", f"{tr(Gmax)} × {tr(Dt / 2000.0)}", M, "kg·m"),
         veri("", "Makine tipi", g.get("makine_tipi") or "—", "", "GİRİŞ"),
         veri("η", "Makine verimi", eta_taban if eta_taban is not None else eta,
-             "", f"Ofis kabulü  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
+             "", f"OFİS STANDARDI  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
         veri("η′", ("Palangalı sistemde verim  ( i > 1 ise η − "
                     + tr(dusus) + " )") if r != 1 else
                    "Sistem verimi  ( 1:1 askıda η′ = η )", eta, "",
@@ -376,8 +358,8 @@ def _motor(g, o):
 #  2 -  MAKİNE KONSTRÜKSİYONU                   ( MMO 208/4 - m.3.4.6 )
 # =====================================================================
 def _makine(g, o):
-    S, gn = SABIT, SABIT["gn"]
-    k1 = MT.darbe_k1(g["guvenlik_tertibati"])
+    S, gn, O = SABIT, SABIT["gn"], o["ofis"]
+    k1 = US.darbe_k1(O, g["guvenlik_tertibati"])
     Gm, L, L1 = g["makine_agirligi"], g["yan_yatak_boyu"], g["sase_yuksekligi"]
     A = MT.npu(g["dikine_kiris"], "A") * 100            # cm² → mm²
     #  NPU tablosunun 14. sütunu:  atalet YARIÇAPI ix ( cm ).  Excel bu satırı
@@ -388,7 +370,7 @@ def _makine(g, o):
 
     F = k1 * gn * (o["Q"] + o["P"] + o["Gh"] + o["Ga"] + Gm)
     F1 = F / 2.0                                        # yan yatak putreli
-    X = L - S["yan_yatak_L_X"]
+    X = L - O["yan_yatak_L_X"]
     FB = F1 * X / L
     FA = F1 - FB
     Mmax = FA * X
@@ -399,8 +381,8 @@ def _makine(g, o):
     omega = MT.omega_en8150(lam, MT.OMEGA_RM_ALT)
     sigma_b = FB * omega / A if omega else None
     #  σem "en çok" değeridir:  sınıra eşit gerilme de uygundur.
-    egilme_uygun = sigma_e <= S["sigma_em"]
-    burkulma_uygun = sigma_b is not None and sigma_b <= S["sigma_em"]
+    egilme_uygun = sigma_e <= O["sigma_em"]
+    burkulma_uygun = sigma_b is not None and sigma_b <= O["sigma_em"]
 
     o.update(k1=k1, F_kaide=F, FA=FA, FB=FB)
     _kay(o, AB31=k1, AB37=A, AB38=imin, AB41=Wx, AB39=omega, C47=F, I51=F1,
@@ -410,7 +392,7 @@ def _makine(g, o):
     b = Bolum("2 -  MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", "MMO 208/4 - m.3.4.6")
     b["adimlar"] = [
         veri("k1", "Darbe katsayısı", k1, "",
-             f"Ofis kabulü  ·  {g['guvenlik_tertibati']}"),
+             f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
         veri("Gm", "Makine motor ağırlığı", Gm, "kg", "GİRİŞ ( üretici kataloğu )"),
         veri("L", "Yan yatak boyu", L, "mm", "GİRİŞ"),
         veri("L1", "Dikine kirişin boyu", L1, "mm", "GİRİŞ"),
@@ -420,20 +402,20 @@ def _makine(g, o):
              f"NPU {g['dikine_kiris']}"),
         veri("Wx", "Yan yatağın mukavemet momenti", Wx, "mm³",
              f"NPU {g['yan_yatak']}", 0),
-        veri("σem", "Emniyet gerilmesi ( ST 37 )", S["sigma_em"], "N/mm²", "Ofis kabulü"),
+        veri("σem", "Emniyet gerilmesi ( ST 37 )", O["sigma_em"], "N/mm²", "OFİS STANDARDI"),
         metin("Kaide üzerindeki en büyük kuvvet :"),
         hesap("F = k1 × gn × ( Q + P + Gh + Ga + Gm )",
               f"{tr(k1)} × {tr(gn)} × ( {trn(o['Q'], 0)} + {trn(o['P'], 0)} + "
               f"{tr(o['Gh'])} + {tr(o['Ga'])} + {trn(Gm, 0)} )", F, "N"),
         metin("Yan yatak putreline gelen kuvvet :"),
         hesap("F1 = F / 2", f"{tr(F)} / 2", F1, "N"),
-        hesap("X = L − 335", f"{trn(L, 0)} − {S['yan_yatak_L_X']}", X, "mm"),
+        hesap("X = L − 335", f"{trn(L, 0)} − {O['yan_yatak_L_X']}", X, "mm"),
         hesap("FB = F1 × X / L", f"{tr(F1)} × {trn(X, 0)} / {trn(L, 0)}", FB, "N"),
         hesap("FA = F1 − FB", f"{tr(F1)} − {tr(FB)}", FA, "N"),
         metin("Kaide yatay kirişlerinde eğilme momenti ve gerilmesi :"),
         hesap("Mmax = FA × X", f"{tr(FA)} × {trn(X, 0)}", Mmax, "N·mm", ondalik=0),
         hesap("σe = Mmax / Wx", f"{trn(Mmax, 0)} / {trn(Wx, 0)}", sigma_e, "N/mm²"),
-        kontrol(f"σe = {tr(sigma_e)}  ≤  σem = {tr(S['sigma_em'])} N/mm²  →  "
+        kontrol(f"σe = {tr(sigma_e)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['yan_yatak']}", egilme_uygun),
         metin("Dikine kirişlerin bükülme kontrolü :"),
         hesap("λ = L1 / imin", f"{trn(L1, 0)} / {tr(imin)}", lam_ham, ""),
@@ -441,7 +423,7 @@ def _makine(g, o):
         veri("ω", "Omega değeri", omega, "", f"Burkulma tablosu  λ = {lam}", 4),
         hesap("σb = FB × ω / A",
               f"{tr(FB)} × {tr(omega)} / {trn(A, 0)}", sigma_b, "N/mm²"),
-        kontrol(f"σb = {tr(sigma_b)}  ≤  σem = {tr(S['sigma_em'])} N/mm²  →  "
+        kontrol(f"σb = {tr(sigma_b)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['dikine_kiris']}", burkulma_uygun),
     ]
     b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
@@ -456,8 +438,8 @@ def _makine(g, o):
         "kabulüdür ( β = 1,0 ).  Kolon tek ucundan ankastre, öbür ucu "
         "serbestse bu kabul narinliği OLDUĞUNDAN KÜÇÜK gösterir."]
     b["notlar"] = [
-        "Darbe katsayısı k1 ve emniyet gerilmesi σem = 130 N/mm² kaynak "
-        "kitabın OFİS KABULLERİDİR. TS EN 81-20 makine kaidesi için yük "
+        "Darbe katsayısı k1 ve emniyet gerilmesi σem OFİS KABULLERİDİR "
+        "( Sabitler sekmesinden değiştirilir ). TS EN 81-20 makine kaidesi için yük "
         "modeli vermez — Çizelge 14 (k1·k2·k3) o standartta açıkça KILAVUZ "
         "RAY hesabına aittir. Buradaki kullanım ödünçtür ve emniyetli "
         "taraftadır:  k1 makinenin kendi ağırlığına da uygulanır ve σem, "
@@ -1322,7 +1304,7 @@ def _agirlik_raylari(g, o):
 #  9 -  KUYU TABANINA GELEN YÜKLER            ( TS EN 81-20 m.5.2.1.8 )
 # =====================================================================
 def _kuyu_tabani(g, o):
-    S, gn = SABIT, SABIT["gn"]
+    S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Q, P = o["Q"], o["P"]
     LR = o["ray_boyu"] * 1000.0                      # mm
     Gr_k = MT.ray(g["kabin_ray_profili"], "Gr")
@@ -1330,7 +1312,7 @@ def _kuyu_tabani(g, o):
     FKR = (gn * Gr_k * LR / 1000.0) + S["MY_kabin"] + o["Fk_kabin"]
     FAR = (gn * Gr_a * LR / 1000.0) + S["MY_agirlik"]
     Fkt = S["tampon_katsayi"] * gn * (P + Q)
-    Fat = S["tampon_katsayi"] * gn * (P + S["q_denge"] * Q)
+    Fat = S["tampon_katsayi"] * gn * (P + o["ofis"]["q_denge"] * Q)
 
     b = Bolum("9 -  KUYU TABANINA GELEN YÜKLERİN HESAPLANMASI",
               "TS EN 81-20 m.5.2.1.8")
@@ -1349,7 +1331,7 @@ def _kuyu_tabani(g, o):
               f"4 × {tr(gn)} × ( {trn(P, 0)} + {trn(Q, 0)} )", Fkt, "N"),
         metin("Ağırlık tamponlarına gelen kuvvetler :"),
         hesap("Fat = 4 × gn × ( P + q × Q )",
-              f"4 × {tr(gn)} × ( {trn(P, 0)} + {tr(S['q_denge'])} × {trn(Q, 0)} )",
+              f"4 × {tr(gn)} × ( {trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)} )",
               Fat, "N"),
     ]
     b["notlar"] = [
@@ -1368,7 +1350,10 @@ def _kuyu_tabani(g, o):
 # 10 -  SIĞINMA ALANLARI VE AÇIKLIKLAR  ( EN 81-20 m.5.2.5.7 / 5.2.5.8 )
 # =====================================================================
 def _siginma(g, o):
-    K, v = SIGINMA, o["v"]
+    #  Paylar OFİS STANDARDINDAN, asgari açıklıklar SIGINMA'dan:  birincisi
+    #  kabin imalatına bağlı bir kabuldür ve ekrandan değiştirilir, ikincisi
+    #  TS EN 81-20'nin sayısıdır ve değiştirilemez.
+    K, v = dict(SIGINMA, **{k: o["ofis"][k] for k in SIGINMA_PAYLARI}), o["v"]
     SK = g["son_kat_yuksekligi"]
     W, D = g["kabin_genisligi"], g["kabin_derinligi"]
     bosluk = _bosluk(v)
@@ -1489,7 +1474,10 @@ def hesapla(veriler=None):
     if hata:
         return {"aktif": False, "hata": hata, "girdi": g}
 
-    o = {}
+    #  OFİS STANDARDI — uygulama projesinin KENDİ sabitleri ( avandan ayrı,
+    #  bkz. engine/uygulama/sabitler.py ).  Bölümler bunu o["ofis"]'ten okur;
+    #  ekrandaki Sabitler sekmesinde değiştirilen her değer buradan geçer.
+    o = {"ofis": US.sabitler(g.get("_ofis"))}
     bolumler = [uret(g, o) for uret in BOLUM_URETICILERI]
     uygunlar = [b["sonuc"]["uygun"] for b in bolumler
                 if b.get("sonuc") and b["sonuc"].get("uygun") is not None]

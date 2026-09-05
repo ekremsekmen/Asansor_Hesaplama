@@ -187,6 +187,27 @@ def _indir(icerik: bytes, ad: str, tur: str):
 
 XLSX_TUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+#  "Projeyi paketle":  teslim paketi ile GERİ DÖNÜŞ NOKTASI aynı arşivde.
+#  Çıktılar ( PDF · XLSX · DXF/DWG ) projeyi anlatır, proje dosyası ise onu
+#  geri getirir.  İkisi ayrı yerlerde durursa arşivden dönmek imkânsızlaşır.
+PROJE_UZANTI = {"avan": ".avan", "uygulama": ".uygulama"}
+
+
+def _paket_ekleri(veri, mod):
+    """ZIP'e konacak ek dosyalar — [ ( ad, bayt ) ].
+
+    Arayüz proje dosyasının gövdesini ``proje_dosyasi`` alanında yollar;
+    sunucu onu OLDUĞU GİBİ pakete koyar.  Biçimi arayüz belirler ( tek
+    kaynak orasıdır ), sunucu yalnız taşır.
+    """
+    ekler = []
+    govde = (veri or {}).get("proje_dosyasi")
+    if isinstance(govde, dict) and govde:
+        ad = _dosya_adi(_proje_kimligi(veri), "", "").rstrip(" -.") or "Asansor"
+        ekler.append((ad + PROJE_UZANTI.get(mod, ".avan"),
+                      json.dumps(govde, ensure_ascii=False, indent=1).encode("utf-8")))
+    return ekler
+
 
 def _uretilemedi(e: Exception):
     """

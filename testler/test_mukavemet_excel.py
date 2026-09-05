@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import openpyxl                                          # noqa: E402
 
 from engine.uygulama import mukavemet as MK                       # noqa: E402
+from exports import mukavemet_xlsx as MX                          # noqa: E402
 from engine.uygulama import mukavemet_girdi as MG                 # noqa: E402
 from engine.uygulama import mukavemet_tablolari as MT             # noqa: E402
 from testler.ortak import (Rapor, hata_hucresi_ara,      # noqa: E402
@@ -230,6 +231,47 @@ def calistir():
                   hucre in ayrisan,
                   "→ hiçbir senaryoda ayrışmadı; motor Excel'e dönmüş olabilir "
                   "ya da EXCEL_FARKLARI bayatlamış")
+    #  ---------------------------------------------------------------
+    #  OFİSİN DÜZELTİLMİŞ ANA KİTABI KENDİ BAŞINA DOĞRU HESAPLIYOR MU
+    #  ---------------------------------------------------------------
+    #  Yukarıdaki senaryolar ÖZGÜN kitabı denetler ( sapmalarımızın dayanağı
+    #  odur ).  Burada ise araclar/kaynak_excel_duzelt.py'nin ürettiği kitap
+    #  LibreOffice'e yeniden hesaplatılır:  ofis onu tek başına açıp
+    #  kullandığında pafta ile aynı sonucu vermelidir.
+    _uk = os.path.join(GECICI, "usta")
+    _ug = os.path.join(_uk, "in")
+    os.makedirs(_ug, exist_ok=True)
+    with open(os.path.join(_ug, "usta.xlsx"), "wb") as _f:
+        _f.write(MX.duzeltilmis_kaynak())
+    yeniden_hesapla([os.path.join(_ug, "usta.xlsx")], os.path.join(_uk, "out"))
+    _uyol = os.path.join(_uk, "out", "usta.xlsx")
+    if not os.path.isfile(_uyol):
+        r.kontrol("düzeltilmiş kitap LibreOffice ile açıldı", False,
+                  "→ dönüştürme başarısız")
+    else:
+        _uws = openpyxl.load_workbook(_uyol, data_only=True)[SAYFA]
+        _s = MK.hesapla()
+        _tut = 0
+        for _h, _m in sorted(_s["_h"].items()):
+            _v = _uws[_h].value
+            if not isinstance(_v, (int, float)) or not isinstance(_m, (int, float)):
+                continue
+            if isinstance(_v, bool) or isinstance(_m, bool):
+                continue
+            _tut += 1
+            r.kontrol(f"[düzeltilmiş kitap] {SAYFA}!{_h}", _esit(_m, _v),
+                      f"→ motor {_m!r}, kitap {_v!r}")
+        r.kontrol("düzeltilmiş kitapta karşılaştırılan hücre var", _tut > 100,
+                  f"→ yalnız {_tut} hücre")
+        #  Kitabın kendi hesabı, düzeltilmiş eşikleri de göstermeli
+        for _h, _bek in (("Q97", 40), ("AD636", 1000), ("AD647", 100),
+                         ("AQ22", 0.75)):
+            r.kontrol(f"[düzeltilmiş kitap] {_h} = {_bek}",
+                      _esit(_uws[_h].value, _bek), f"→ {_uws[_h].value!r}")
+        for _e in hata_hucresi_ara(_uyol):
+            if _e.startswith(SAYFA) or _e.startswith("Askı Tipleri"):
+                r.kontrol("[düzeltilmiş kitap] Excel hata hücresi", False, _e)
+
     shutil.rmtree(GECICI, ignore_errors=True)
     return r
 

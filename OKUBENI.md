@@ -401,12 +401,54 @@ yükleme noktası olması, iki belirsiz noktadan iyidir.
 
 ---
 
-## 5. Proje dosyası
+## 5. Proje dosyası ve paketleme
 
-**Proje Bilgileri → Projeyi kaydet** tüm girdileri `.avan` dosyasına yazar.
-Bu dosya başka bilgisayarda **Proje aç** ile açılabilir; arşive konabilir.
-Girdiler ayrıca tarayıcıda kendiliğinden saklanır — programı kapatıp açtığınızda
-kaldığınız yerden devam edersiniz.
+### Proje dosyası — girdilerin geri dönüş noktası
+
+**Projeyi kaydet** tüm girdileri tek dosyaya yazar. Ne PDF ne Excel ne CAD —
+yalnız programın okuyup yazdığı veri. Aylar sonra revizyon gerektiğinde dosyayı
+yükler, değişeni düzeltir, çıktıları yeniden alırsınız.
+
+**İki ayrı uzantı**, çünkü avan ve uygulama ayrı projelerdir:
+
+| Proje | Uzantı | Nerede |
+|---|---|---|
+| Avan | **`.avan`** | Proje Kapağı → Proje araçları |
+| Uygulama | **`.uygulama`** | Uygulama Hesapları → Proje dosyası |
+
+Dosya adı **proje adından** üretilir (`Jan Mühendislik.uygulama`). Her dosya
+**yalnız kendi projesinin** alanlarını taşır; avan dosyasını uygulamaya
+yüklemeye çalışırsanız program *"Bu dosya AVAN projesine ait"* deyip reddeder.
+
+Dosyanın içinde ayrıca **`surum`** alanı vardır. Girdi sözleşmesi zamanla
+değişir; sürüm yazılı olmasaydı eski bir dosyadaki eksik alan **sessizce**
+varsayılana düşerdi. Yazılı olduğu için program kaç alanın döndüğünü sayıp
+söyler. **Ofis sabitleri de dosyaya girer** — proje o günkü kabullerle
+hesaplandı, üç yıl sonra açıldığında aynı sonucu vermelidir.
+
+### Projeyi paketle — tek ZIP
+
+**Projeyi paketle (ZIP)** düğmesi teslim edilecek her şeyi ve geri dönüş
+noktasını **aynı arşive** koyar:
+
+```
+Jan Mühendislik - Uygulama Projesi.dxf     ← CAD çizimi ( + DWG üretilebildiyse )
+pafta pdf/1 - Kapak.pdf
+pafta pdf/2 - Uygulama Projesi.pdf
+Jan Mühendislik - Uygulama Projesi.xlsx    ← çalışma kitabı
+Jan Mühendislik.uygulama                   ← GERİ DÖNÜŞ NOKTASI
+OKUBENI.txt
+```
+
+Çıktılar projeyi **anlatır**, proje dosyası onu **geri getirir**. İkisi ayrı
+yerlerde durursa arşivden dönmek imkânsızlaşır — bu yüzden birlikte inerler.
+
+### Kalıcılık
+
+Girdiler tarayıcıda da kendiliğinden saklanır; programı kapatıp açtığınızda
+kaldığınız yerden devam edersiniz. **Avan ve uygulama ayrı kovalarda durur**:
+biri diğerini görmez, **"Tümünü temizle" yalnız içinde bulunduğunuz projeyi
+siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 
 **Örnek proje yükle** düğmesi, Excel dosyalarınızdaki örnek değerleri yükler.
 
@@ -415,21 +457,21 @@ kaldığınız yerden devam edersiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**24.536 kontrolün tamamı geçmiştir.**
+**24.821 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları** | **757 / 757** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **371 / 371** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, kalıcılık, revizyon, yerleşim taşması | **329 / 329** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **406 / 406** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması | **363 / 363** |
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.507 / 4.507** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 65 girdi alanı, kaynak Excel'e karşı hücre hücre | **1.021 / 1.021** |
 | **9 · Mukavemet motoru** | 100 sonuç hücresi + **dokuz sapmanın uygulandığının kanıtı** + girdi reddi | **238 / 238** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan 30 hücre ayrı denetlenir | **10.641 / 10.641** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları | **95 / 95** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 167 hücre** — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **10.814 / 10.814** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları** | **138 / 138** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -574,13 +616,39 @@ hâlinde kalır; doğrulama testleri programı ona karşı denetlemeye devam ede
 Doğrulama paketi hem şablonun değişmediğini hem de teslim kopyasının paftayla
 **hücre hücre birebir aynı** olduğunu denetler.
 
-> Ofisin ana Excel dosyasını da güncellemek isterseniz düzeltilecek hücreler
-> şunlardır: `11!Q97` ( 30 → 40 ) · `11!AO312` ( 0 → `=AH293` ) · `11!AU575`
-> ( sütun 7 → 6 ) · `11!AK190` ( `C61` → `C61*B100` ) · `11!AH105/AH106`
-> ( sabit → girdi ) · `11!Q380·Q385·Q477·Q482·Q538·Q596` ( `1+2*` → `ℓ+2*` ) ·
-> `11!AD354` ve `AB39` ( ω tablosu → EN 81-50 formülü ) · `11!AD636`
-> ( 1200 → `=P639*1000` ) · `11!AD647` ( 150 → 100 ) · `11!AQ22`
-> ( 0,92 → makine tipi ve askı oranına bağlı formül ).
+#### Ofisin ana kitabını düzeltmek
+
+Teslim edilen dosya düzeltiliyor, ama **ofisin masasındaki ana kitap**
+düzelmiyordu: onu açıp elle hesap yapan eski — bazıları emniyetsiz —
+sonuçları alıyordu. Düzeltilmiş bir kopya üretmek için:
+
+```bash
+python3 araclar/kaynak_excel_duzelt.py
+```
+
+`MUKAVEMET_HESABI_DUZELTILMIS.xlsx` çıkar. Ofis bunu yeni ana dosya olarak
+kullanabilir: içine **hiçbir projenin girdisi yazılmaz**, yalnız formüller
+düzeltilir, kitap kendi kendini hesaplamaya devam eder. İçinde bir
+**`DÜZELTMELER`** sayfası vardır — her sapmanın gerekçesi ve standart
+maddesi, artı **düzenlenen 40 hücrenin** tek tek "kitapta ne yazıyordu /
+şimdi ne yazıyor" dökümü. Dosya elden ele dolaşacağı için kayıt dosyanın
+İÇİNDE durur.
+
+Doğrulama paketi bu kitabı da denetler: LibreOffice ile yeniden hesaplatılır
+ve **motorun ürettiği 168 değerin tamamıyla** karşılaştırılır ( TEST 10 ).
+
+> **Şablon dosyasına dokunulmaz.** `templates/MUKAVEMET_HESABI.xlsx` özgün
+> hâlinde kalır — doğrulama paketinin tamamı motoru **ona** karşı denetler ve
+> sapmalarımızın gerekçesi kitabın o hücrelerde ne yaptığıdır. Düzeltilmiş
+> kitap **ayrı** bir dosyadır.
+
+Elle düzeltmek isterseniz hücreler şunlardır: `11!Q97` ( 30 → 40 ) ·
+`11!AO312` ( 0 → `=AH293` ) · `11!AU575` ( sütun 7 → 6 ) · `11!AK190`
+( `C61` → `C61*B100` ) · `11!AH105/AH106` ( sabit → girdi ) ·
+`11!Q380·Q385·Q477·Q482·Q538·Q596` ( `1+2*` → `ℓ+2*` ) · `11!AD354` ve
+`AB39` ( ω tablosu → EN 81-50 formülü ) · `11!AD636` ( 1200 → `=P639*1000` ) ·
+`11!AD647` ( 150 → 100 ) · `11!AQ22` ( 0,92 → makine tipi ve askı oranına
+bağlı formül ).
 
 #### Kitapta ayrıca bulunanlar
 
@@ -845,6 +913,50 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ## 8. Ofis standardını değiştirmek
 
+> **İKİ PROJENİN OFİS STANDARDI AYRIDIR.** Sabitler sekmesi her iki projede de
+> vardır ama **içerikleri farklıdır** — avan yaparken uygulamanın kabullerini,
+> uygulama yaparken avanınkini görmezsiniz.
+>
+> Avan **ön tasarımdır**: genel, emniyetli kabullerle çalışır. Uygulama **kesin
+> tasarımdır**: elinizde imalatçı verisi vardır. Dişlisiz makine için avanda
+> 0,85 kabulü yeterliyken uygulamada makinenin kataloğundaki değer kullanılabilir.
+> **İkisinin aynı sayıyı tutma zorunluluğu yoktur.**
+>
+> Fabrika ayarı ortaktır (`engine/ortak/ofis.py`): ikisi de oradan başlar,
+> sonrası her projenin kendi kararıdır. Her değer paftaya **kaynağıyla**
+> basıldığı için ayrışırlarsa bilerek ayrışırlar.
+
+### Uygulama projesinin ofis standardı
+
+**41 alan, 6 grup** — `engine/uygulama/sabitler.py`:
+
+| Grup | İçindekiler |
+|---|---|
+| ① Makine ve motor | dişlisiz / dişli verimi, palanga düşüşü, Gs, q, halat payı |
+| ② **Mukavemet kabulleri** | **σem**, **k1** (kaymalı · makaralı · ani), yan yatak mesnet payı |
+| ③ Sığınma payları | kabin gövde yüksekliği, kabin üstü kotu, tavan / etek / ray altı payları |
+| ④ Aydınlatma | kabin · kuyu armatürleri, azami aralık, tablo sütunu |
+| ⑤ Kurulu güç ve gerilim düşümü | U · κ · εmax · cosφ · priz · kablo tipi · sigorta katsayısı |
+| ⑥ Temel topraklama | β · çubuk adedi · karelaj gözü · çubuk boyu · UL · IΔn |
+
+**② özellikle gözden geçirilmelidir.** σem = 130 ve k1 = 2/3/5 bugüne kadar
+**kodda gömülüydü**, artık ekranda. TS EN 81-20 makine kaidesi için yük modeli
+**vermez** ve Çizelge 14 (k1) o standartta açıkça **kılavuz ray** hesabına
+aittir — buradaki kullanım ödünçtür ve emniyetli taraftadır (σem = 130,
+standardın ST 37 için verdiği Rm/1,8 = 205,6 N/mm²'nin yaklaşık yarısı).
+Kiriş gereğinden kalın çıkıyorsa bakılacak yer burasıdır.
+
+Buradan değiştirdiğinizde **ekrandaki hesap, PDF paftası ve indirilen Excel
+birlikte** değişir — teslim edilen kitaptaki formüller de bu değerleri kullanır.
+
+**Tablolar sekmesi de ayrıdır.** Uygulamanın 14 tablosu (ray profilleri, NPU
+kesitleri, halat ağırlıkları, ω burkulma, kabin alanları, kanal katsayıları …)
+bugüne kadar **yalnız motorun içindeydi** — hesaba giriyorlardı ama ekranda
+görünmüyorlardı. Tablolar kopyalanmaz; motorun kendi sözlüklerinden okunur, o
+yüzden ekrandaki tablo ile hesaba giren tablo ayrışamaz.
+
+### Avan projesinin ofis standardı
+
 **Sabitler / Ofis Standardı** sekmesindeki değerler proje geneli için ortaktır
 (palanga, denge faktörü, ray sayısı, flexbil, montör, armatürler, priz, cosφ,
 UL, IΔn, çubuk boyu, aydınlatma verimi sütunu). Buradan değiştirdiğinizde hem
@@ -902,7 +1014,9 @@ AVAN HESAPLAMA PROGRAMI/
 │
 ├── engine/                 ← HESAP MOTORLARI  ( arayüzden ve sunucudan bağımsız )
 │   ├── ortak/
-│   │   └── steps.py        ← işlem adımı yapısı, Türkçe sayı biçimi
+│   │   ├── steps.py        ← işlem adımı yapısı, Türkçe sayı biçimi
+│   │   └── ofis.py         ← FABRİKA AYARI:  iki projenin ofis standardı da
+│   │                          buradan başlar ( makine verimleri, palanga düşüşü )
 │   ├── avan/               ─────────────────────────────── AVAN PROJESİ
 │   │   ├── tablolar.py     ← MMO/697 + ISO + IEC tabloları
 │   │   ├── trafik.py       ← trafik hesabı ( tek + çoklu )
@@ -911,6 +1025,10 @@ AVAN HESAPLAMA PROGRAMI/
 │       ├── mukavemet_tablolari.py ← ISO 7465 · TS 12385-5 · EN 81-50
 │       ├── mukavemet_girdi.py     ← 65 girdinin sözleşmesi ( TEK KAYNAK )
 │       ├── mukavemet.py           ← 10 bölümlük mukavemet hesabı
+│       ├── sabitler.py            ← UYGULAMANIN KENDİ OFİS STANDARDI
+│       │                             ( 41 alan · avanınkinden ayrı )
+│       ├── tablolar_gorunum.py    ← 14 tablonun EKRAN GÖRÜNÜMÜ
+│       │                             ( kopya değil — motorun sözlüğünden okur )
 │       ├── girdi.py               ← ek girdiler + ORTAK GİRDİ KÖPRÜSÜ
 │       └── hesap.py               ← mukavemet + elektrik orkestratörü
 │
@@ -966,12 +1084,16 @@ AVAN HESAPLAMA PROGRAMI/
 | `dxf_export.py` | CAD yerleşimi hesaptan bağımsız |
 | **Avanın elektrik motoru** | Uygulama projesindeki aydınlatma · kurulu güç · gerilim düşümü · topraklama, avanın `engine/avan/hesap.py`'sini **çağırır**. Kopyalanmaz — iki kopya zamanla ayrışır |
 
+| `engine/ortak/ofis.py` | **Fabrika ayarı** — iki projenin ofis standardı da buradan başlar. Ayrı ayrı değiştirilebilirler, ama sıfır noktaları ortaktır |
+
 | Paylaşılmayan | Niçin |
 |---|---|
-| Hesap tabloları | Mukavemet kendi kaynağından gelir; kabin alanı tablosu bile bilerek ayrıdır |
+| **Ofis standardı** | Avan ön tasarım, uygulama kesin tasarım — kabulleri aynı olmak zorunda değil. Her projenin kendi Sabitler ekranı var |
+| **Tablolar** | Mukavemet kendi kaynağından gelir; kabin alanı tablosu bile bilerek ayrıdır. Her projenin kendi Tablolar sekmesi var |
+| **Veri kovası** | `avan_program_v1` · `uygulama_program_v1` — biri diğerini görmez, "Tümünü temizle" yalnız kendi projesini siler |
+| **Proje dosyası** | `.avan` · `.uygulama` — her biri yalnız kendi alanlarını taşır, yanlış moda yüklenmez |
 | Çalışma kitapları | Her proje kendi Excel'iyle teslim edilir |
-| Proje kapağı | Uygulama projesi kapağı MMO'nun ayrı kitabına aittir |
-| Sekme şeridi ve girdi formları | Moda göre ayrılır; yalnız Sabitler / Ofis Standardı ikisinde de durur |
+| Sekme şeridi ve girdi formları | Moda göre ayrılır. Sabitler ve Tablolar sekmeleri ikisinde de vardır ama **içerikleri ayrıdır** |
 
 ### Şablonu güncellemek
 Excel dosyalarınızda **biçim, açıklama veya sayfa düzeni** değişirse

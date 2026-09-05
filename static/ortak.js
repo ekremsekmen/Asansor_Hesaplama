@@ -79,10 +79,17 @@ function sekmeGoster(ad){
 function modAyarla(m){
   MOD = (m === 'uygulama') ? 'uygulama' : 'avan';
   document.body.dataset.mod = MOD;
-  //  Bir sekme birden çok moda ait olabilir ( "avan uygulama" ) — ofis
-  //  standardı iki hesapta da kullanılır, moda göre saklanmaz.
+  //  Bir sekme birden çok moda ait olabilir ( "avan uygulama" ) — Sabitler
+  //  ve Tablolar iki projede de vardır, ama İÇERİKLERİ ayrıdır.
   document.querySelectorAll('.sekme[data-mod]').forEach(b=>{
     b.hidden = !b.dataset.mod.split(/\s+/).includes(MOD);
+  });
+  //  AYNI SEKME, AYRI GÖVDE:  uygulamanın kendi ofis sabitleri ve kendi
+  //  tabloları vardır;  kimse öbürünün ayarını ya da tablosunu görmez.
+  const uyg = MOD === 'uygulama';
+  [['sabitler_uygulama', uyg], ['sabitler_avan', !uyg],
+   ['tablolar_uygulama', uyg], ['tablolar_avan', !uyg]].forEach(([id, gorunsun])=>{
+    const e = $(id); if(e) e.hidden = !gorunsun;
   });
   //  Başlık ve kaynak şeridi de moda uyar — hangi projede olduğu üst
   //  şeritten okunabilmeli, ekran görüntüsü alındığında da belli olsun.
@@ -328,54 +335,6 @@ const SABIT_GRUP = [
    ['of:beta', 'of:cubuk_sayisi', 'of:goz_araligi', 'sb:lc', 'sb:UL', 'sb:IDn']],
 ];
 
-function sabitFormuKur(){
-  const yedek = new Set(SEC.sabit_b_yedek || []);
-  const B = SEC.sabit_b || {}, C = SEC.ofis_varsayilan || {};
-  const deger = (kaynak, k) => (kaynak === 'sb' ? B[k] : C[k]);
-  let h = '', basilan = new Set();
-
-  SABIT_GRUP.forEach(([baslik, aciklama, alanlar]) => {
-    const gecerli = alanlar.filter(x => {
-      const [kaynak, k] = x.split(':');
-      return !yedek.has(k) && deger(kaynak, k) !== undefined;
-    });
-    if(!gecerli.length) return;
-    h += `<div class="bolum-bas">${baslik}${aciklama ? ` <span class="ipucu">— ${aciklama}</span>` : ''}</div>`;
-    gecerli.forEach(x => {
-      const [kaynak, k] = x.split(':');
-      basilan.add(k);
-      const [et, ip] = SABIT_ETIKET[k] || [k, ''];
-      const d = String(deger(kaynak, k)).replace('.', ',');
-      const girdi = (k === 'kapi_tipi')
-        ? `<select id="of_${k}" class="girdi">${(SEC.kapi_tipleri||[])
-             .map(v=>`<option value="${v}"${v===C[k]?' selected':''}>${v}</option>`).join('')}</select>`
-        : `<input id="${kaynak}_${k}" class="girdi" value="${d}">`;
-      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>${girdi}</div>`;
-    });
-  });
-
-  /*  Gruplara yazılmamış bir sabit kalırsa SESSİZCE kaybolmasın — yeni bir
-      sabit eklenip SABIT_GRUP güncellenmezse burada görünür. */
-  const artan = [];
-  Object.keys(B).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['sb',k]); });
-  Object.keys(C).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['of',k]); });
-  if(artan.length){
-    h += `<div class="bolum-bas">DİĞER <span class="ipucu">— henüz bir hesap grubuna yazılmadı</span></div>`;
-    artan.forEach(([kaynak,k])=>{
-      const [et,ip] = SABIT_ETIKET[k] || [k,''];
-      const d = String(deger(kaynak,k)).replace('.',',');
-      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>
-            <input id="${kaynak}_${k}" class="girdi" value="${d}"></div>`;
-    });
-  }
-
-  //  Panelde görünmeyen alanlar ( SABIT_B_YEDEK — askı oranı ) kart
-  //  başlığındaki ( ! ) balonunda anlatılır; ekranı kalabalıklaştıran
-  //  bilgi bandına gerek yok.
-  $('sabit_b_form').innerHTML = h;
-}
-
-function ofisSifirla(){ sabitleriSifirla(); }
 
 /* Şablon durumu — yanlış / eski Excel konmuşsa kullanıcı XLSX indirmeyi
    denemeden önce görsün.  Hesap ve PDF bundan etkilenmez. */
@@ -428,17 +387,6 @@ async function sablonDurumu(){
     Alan boş bırakılırsa türetilen değer kullanılır; topraklama planı
     çizildiğinde plandaki gerçek boy yazılır ve o değer türetileni ezer. */
 
-/* Temel çevresi — L ( şerit boyu ) için KARŞILAŞTIRMA bilgisi.
-   Kural değildir: şeridin temelde nasıl dolaştığı projeye göre değişir,
-   bazen çevreden kısa ( yalnız bir bölüm ), bazen enine bağlarla uzun olur.
-   Yalnız "yazdığım sayı mantıklı mı" diye bakabilmek için gösterilir. */
-function temelCevresi(){
-  const e=$('a_temel_cevre'); if(!e) return;
-  const a=sayiOku(v('a_temel_a')), b=sayiOku(v('a_temel_b'));
-  e.textContent = (a>0 && b>0)
-    ? `Karşılaştırma için: bu temelin çevresi 2·( ${tr(a)} + ${tr(b)} ) = ${tr(2*(a+b))} m.`
-    : '';
-}
 
 /* Şerit boyu yer tutucusu — motorun türettiği değeri ve açılımını gösterir.
    Böylece "boş bıraktım, ne kullanıldı" sorusu ekrandan cevaplanır. */
@@ -477,143 +425,10 @@ function sayiOku(x){
   return isFinite(f) ? f : NaN;
 }
 
-/* Q ve Gk artık GİRDİ değil, TÜRETİLEN değerdir:
-     Q  = kapasiteden ( Tablo-7 ),  Gk = anma yükünden ( Tablo-11 ).
-   Ana kartta salt okunur gösterilir; tablo dışına çıkmak gerekirse
-   katlanır bölümdeki "Q elle" / "Gk elle" alanları kullanılır ve bu
-   satırlar o zaman GİRİLEN değeri gösterir — yani her zaman hesapta
-   kullanılan değer görünür. */
-function turetilenGoster(r){
-  const liste = (r && r.asansorler) || [];
-  for(let i=1;i<=4;i++){
-    const oz = (liste[i-1] || {}).ozet || null;
-    const q = $('a_Q_goster'+i), g = $('a_Gk_goster'+i);
-    if(q){
-      q.value = (oz && oz.Q!=null) ? trn(oz.Q,0)
-              : (v('a_Q_elle'+i) || (SEC.tablo_7||{})[v('a_kapasite'+i)] || '');
-    }
-    if(g){
-      g.value = (oz && oz.Gk!=null) ? trn(oz.Gk,0) : (v('a_Gk_elle'+i) || '');
-    }
-    //  L1 yer tutucusu HESAPLANAN değeri gösterir: "42,00  ( Hk + 3,50 )".
-    //  Böylece "kuyu yüksekliğinden mi geliyor" sorusu ekrandan cevaplanır.
-    const l1 = $('a_L1'+i);
-    if(l1){
-      const pay = sayiOku((($('of_L1_pay')||{}).value) || (SEC.ofis_varsayilan||{}).L1_pay);
-      const hk  = sayiOku(v('a_Hk'+i));
-      const hes = (oz && oz.L1!=null) ? oz.L1 : ((hk>0 && pay>=0) ? hk+pay : NaN);
-      l1.placeholder = isFinite(hes)
-        ? `${tr(hes)}   ( Hk + ${tr(pay)} )` : 'Hk + ofis payı';
-    }
-  }
-}
 
-/* Katlanır "manuel değerler" bölümü kapalıyken de elle girilmiş bir değer
-   olduğu görünsün — gizlenen bir ezme sessiz kalmamalı. */
-function manuelRozet(){
-  [['c_manuel_rozet', ['c_manuel_V','c_manuel_k']]].forEach(([rozet, alanlar])=>{
-    const r=$(rozet); if(!r) return;
-    const n = alanlar.filter(id=>v(id)!=='').length;
-    r.textContent = n ? `${n} elle` : '';
-    r.className = 'ozel-rozet' + (n ? ' dolu' : '');
-  });
-}
-
-/* Asansör kartında ofis standardından SAPAN alan sayısı — katlanır bölüm
-   kapalıyken de görünsün diye başlıkta rozet olarak yazılır. */
-function ozelRozet(i){
-  const r = $('a_ozel_rozet'+i); if(!r) return;
-  const alanlar = ['Q_elle','Gk_elle','gr','Fmk','Fsh','S1','S2','L2',
-                   'kablo_tipi','L1','q_denge'];
-  const n = alanlar.filter(k=>v('a_'+k+i)!=='').length;
-  r.textContent = n ? `${n} özel` : '';
-  r.className = 'ozel-rozet' + (n ? ' dolu' : '');
-}
-
-/* Ofis varsayılanı olan alanların YER TUTUCUSU her zaman güncel değeri
-   gösterir: kullanıcı panelde ray kütlesini değiştirdiğinde asansör
-   kartındaki boş alan da yeni değeri "hayalet" olarak gösterir. */
-function ofisTazele(){
-  document.querySelectorAll('.ofis-alan').forEach(e=>{
-    const k = e.dataset.ofis; if(!k) return;
-    const kaynak = $('of_'+k);
-    const deger = kaynak ? kaynak.value.trim() : '';
-    if(e.tagName==='SELECT'){
-      const ilk = e.options[0];
-      if(ilk && ilk.value==='') ilk.textContent = deger ? `ofis standardı ( ${deger} )` : 'ofis standardı';
-    }else{
-      e.placeholder = deger || 'ofis standardı';
-    }
-  });
-  for(let i=1;i<=4;i++) ozelRozet(i);
-  manuelRozet();
-}
-
-function sabitleriSifirla(){
-  //  İki kaynak da sıfırlanır: sb_* ( SABİTLER sayfası ) + of_* ( GİRİŞ hücreleri )
-  Object.entries(SEC.sabit_b||{}).forEach(([k,val])=>{
-    const e=$('sb_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
-  });
-  Object.entries(SEC.ofis_varsayilan||{}).forEach(([k,val])=>{
-    const e=$('of_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
-  });
-  ofisTazele(); planla(); durum('Ofis standardının tamamı varsayılana döndürüldü');
-}
-function sabitATablosu(){
-  const ET={gn:['gn','Yerçekimi ivmesi','m/s²','MMO/697 s.18 — TS EN 81-20'],
-    tampon_katsayi:['—','Tampon altı zemin kuvvet katsayısı','—','MMO/697 §2.3.3.1-2  F = 4·gn·(P+Q)'],
-    k1_hizli:['k1','Darbe faktörü — V > 1,00 m/s','—','MMO/697 Çizelge-1'],
-    k1_orta:['k1','Darbe faktörü — 0,63 < V ≤ 1,00 m/s','—','MMO/697 Çizelge-1'],
-    k1_yavas:['k1','Darbe faktörü — 0,15 < V ≤ 0,63 m/s','—','MMO/697 Çizelge-1'],
-    motor_sabiti:['—','Motor gücü denklem sabiti','kg·m/s','MMO/697 §2.4'],
-    palanga_verim_dususu:['Δη','Palangalı sistemde verim düşüşü','—','MMO/697 §2.4'],
-    kirlenme_faktoru:['d','Aydınlatmada kirlenme (bakım) faktörü','—','Aydınlatma tekniği teamülü'],
-    E_makine_dairesi:['E','Aydınlatma şiddeti — makine dairesi','lüx','TS EN 81-20'],
-    E_kabin:['E','Aydınlatma şiddeti — kabin','lüx','TS EN 81-20'],
-    E_kuyu:['E','Aydınlatma şiddeti — kuyu','lüx','TS EN 81-20'],
-    kuyu_ek_armatur:['—','Kuyu aydınlatmasına eklenen armatür','adet','Kuyu dibi + kuyu üstü'],
-    h_armatur:['h','Armatür ile çalışma düzlemi arası yükseklik','m','Bölge indeksi k hesabında'],
-    ray_dusumu:['—','Ray uzunluğu düşümü','m','I = Hk − 0,20'],
-    flexbil_sabiti:['—','Flexbil uzunluğu sabiti','m','Flexbil boyu = Hk / 2 + 3']};
-  let h='<tr><th>Sembol</th><th>Büyüklük</th><th style="text-align:right">Değer</th><th>Birim</th><th>Kaynak</th></tr>';
-  Object.entries(SEC.sabit_a).forEach(([k,val])=>{
-    const [s,b,bi,kay]=ET[k]||[k,k,'',''];
-    h+=`<tr><td><b>${s}</b></td><td>${b}</td><td class="sag">${trn(val,3)}</td><td>${bi}</td><td style="font-size:11px;color:#98A2AE">${kay}</td></tr>`;
-  });
-  $('sabit_a_tablo').innerHTML=h;
-}
-
-/* ek nüfus satırları */
-function ekNufusEkle(p, veri){
-  const liste=$(p+'_eknufus_liste');
-  const d=el('div','satir i3'); d.style.marginBottom='8px';
-  d.innerHTML=`<div class="alan" style="margin:0"><input class="girdi en-ac" placeholder="Açıklama" value="${kacis(veri?.aciklama||'')}"></div>
-    <div class="alan" style="margin:0"><input class="girdi en-mi" placeholder="Miktar" value="${kacis(veri?.miktar??'')}"></div>
-    <div class="alan" style="margin:0;display:flex;gap:6px"><select class="girdi en-ka" style="flex:1">
-      ${SEC.nufus_kalemleri.map(k=>`<option value="${k}"${veri?.kalem===k?' selected':''}>${k}</option>`).join('')}</select>
-      <button class="dg kucuk" onclick="this.closest('.satir').remove();planla()">×</button></div>`;
-  liste.appendChild(d);
-  if(!veri) planla();
-}
-function ekNufusTopla(p){
-  const kok = $(p+'_eknufus_liste');
-  if(!kok) return [];                      //  tek gövde kalktı: 't' listesi yok
-  return [...kok.querySelectorAll('.satir')].map(r=>({
-    aciklama:r.querySelector('.en-ac').value, miktar:r.querySelector('.en-mi').value,
-    kalem:r.querySelector('.en-ka').value })).filter(x=>x.miktar!=='');
-}
 /* Adet değişince ek nüfus kalemleri de taşınır — karma yapıda bunlar
    nüfusun tamamını belirlediği için kaybolmaları hesabı bozardı. */
 
-/* Avan sekmesi trafik sonucuyla karşılaştırılır: kapasite / hız / kuyu
-   yüksekliği tutarsızlığı uyarı olarak görünür.  Çoklu hesap varsa o,
-   yoksa tek hesap esas alınır — aktarım düğmesiyle aynı öncelik. */
-function trafikKoprusu(){
-  const al = x => (x && !x.hata && x.avan_koprusu
-                   && (x.avan_koprusu.asansorler||[]).length) ? x.avan_koprusu : null;
-  /*  Tek hesap yolu kaldı — hangi yöntemin kullanıldığı sonucun içindedir. */
-  return al(SON.c);
-}
 
 /* ---------------------------------------------------------- indir */
 async function indir(uc){
@@ -627,6 +442,13 @@ async function indir(uc){
     : uc.startsWith('uygulama')
     ? {kapak:mukavemetKimlik(), girdiler:mukavemetGirdi(), sabitler:ofisSabitleri()}
     : {kapak:kapakGirdi(), girdiler:avanGirdi()};
+  //  PAKETLEME ( ZIP ):  teslim edilecek çıktıların yanına PROJE DOSYASI da
+  //  konur — arşivden dönebilmek için tek gereken odur.  Uygulama paketine
+  //  ayrıca kapak sayfası girer ( avanınki zaten "kapak" alanından gider ).
+  if(uc.endsWith('-dwg')){
+    govde.proje_dosyasi = projeGovdesi(MOD);
+    if(uc.startsWith('uygulama')) govde.kapak_sayfasi = kapakGirdi();
+  }
   try{
     const r = await fetch('/api/indir/'+uc, {method:'POST',
       headers:{'Content-Type':'application/json'}, body:JSON.stringify(govde)});
@@ -650,26 +472,50 @@ async function indir(uc){
 }
 
 /* ---------------------------------------------------------- kalıcılık */
-const ANAHTAR='avan_program_v1';
-function tumGirdiler(){
-  const o={};
+/*  AVAN VE UYGULAMA AYRI KOVALARDA DURUR.
+    Tek kova varken iki proje yan yana yaşıyordu:  avan üzerinde çalışıp
+    uygulamaya geçince avan verisi orada duruyor, "Tümünü temizle" ikisini
+    birden siliyor, aynı anda bir avan ve bir uygulama projesi tutulamıyordu.
+    Ayrı kova, ayrı ön ek:  hiçbiri diğerini görmez.                        */
+const KOVA = { avan:'avan_program_v1', uygulama:'uygulama_program_v1' };
+//  UYARI:  ön ekler ÇAKIŞMAMALI.  'mk_' ( uygulamanın proje kimliği ) ile
+//  'm_' ( mukavemet alanları ) ayrı ayrı yazılır;  'k_' ( avan kapağı ) ise
+//  'mk_' ile karışmasın diye uygulama listesi ÖNCE denenir ( bkz. alanModu ).
+const ONEK = { avan:['c_','a_','k_','of_','sb_'], uygulama:['m_','mk_','uof_'] };
+
+/*  Bir alan hangi projeye ait?  Kimlik ön ekinden bilinir;  ortak olan
+    ( Sabitler sekmesindeki eski of_/sb_ ) avana aittir, uygulamanın kendi
+    sabitleri uof_ ön ekiyle durur.                                        */
+function alanModu(id){
+  for(const m of ['uygulama','avan'])
+    if(ONEK[m].some(p => id.startsWith(p))) return m;
+  return null;
+}
+function tumGirdiler(mod){
+  const m = mod || MOD, o = { __mod:m, __surum:PROJE_SURUM };
   document.querySelectorAll('input,select').forEach(e=>{
     //  "_goster" alanları TÜRETİLMİŞTİR ( Q, Gk ) — girdi değildir, kaydedilmez;
     //  her hesapta yeniden doldurulurlar.
     if(!e.id || e.id.indexOf('_goster') >= 0) return;
+    if(alanModu(e.id) !== m) return;
     o[e.id] = e.type==='checkbox' ? e.checked : e.value;
   });
-  o.__eknufus_c = ekNufusTopla('c');
-  o.__muk_durak = MUK_DURAK.slice();
-  o.__trafik_adet = TRAFIK_ADET;
-  o.__avan_ek = AVAN_EK;
-  o.__avan_oto = AVAN_OTO;
-  o.__avan_trf = AVAN_TRF;
+  if(m === 'uygulama'){
+    o.__muk_durak = MUK_DURAK.slice();
+  }else{
+    o.__eknufus_c = ekNufusTopla('c');
+    o.__trafik_adet = TRAFIK_ADET;
+    o.__avan_ek = AVAN_EK;
+    o.__avan_oto = AVAN_OTO;
+    o.__avan_trf = AVAN_TRF;
+  }
   return o;
 }
-function yaz(){ try{ localStorage.setItem(ANAHTAR, JSON.stringify(tumGirdiler())); }catch(e){} }
+function yaz(){
+  try{ localStorage.setItem(KOVA[MOD], JSON.stringify(tumGirdiler(MOD))); }catch(e){}
+}
 function oku(){
-  let o; try{ o=JSON.parse(localStorage.getItem(ANAHTAR)||'null'); }catch(e){ o=null; }
+  let o; try{ o=JSON.parse(localStorage.getItem(KOVA[MOD])||'null'); }catch(e){ o=null; }
   if(o) uygula(o);
 }
 /* Bir alana değer yazar.
@@ -714,6 +560,8 @@ function bolumuTemizle(tur){
       if(e.type === 'checkbox') e.checked = !!f.varsayilan;
       else alanaYaz(e, f.varsayilan===null||f.varsayilan===undefined ? '' : mSayi(f.varsayilan));
     }
+    //  Uygulamanın ofis sabitleri de:  boş = varsayılan.
+    Object.keys(((MUK.sabitler||{}).varsayilan)||{}).forEach(k=>bosalt('uof_'+k));
   }
   if(tur==='avan'){
     for(let i=1;i<=4;i++){
@@ -851,23 +699,97 @@ function _birakma(alanId, secId){
   ['dragover','drop'].forEach(o=>window.addEventListener(o,e=>{
     if(!a.contains(e.target)) e.preventDefault(); }));
 }
+/* ═══════════════════════════ PROJE DOSYASI ═══════════════════════════
+   Projenin bütün girdilerinin GERİ DÖNÜŞ NOKTASI.  Ne PDF ne Excel ne DXF —
+   yalnız programın okuyup yazdığı veri.  Aylar sonra revizyon gerektiğinde
+   dosya yüklenir, değişen düzeltilir, çıktılar yeniden alınır.
+
+   İKİ AYRI UZANTI:  avan ve uygulama ayrı projelerdir, dosyaları da ayrıdır.
+   Her dosya YALNIZ kendi projesinin alanlarını taşır;  yanlış dosyayı yanlış
+   moda yüklemek de böyle engellenir.
+
+   SÜRÜM ALANI:  girdi sözleşmesi zamanla değişir ( bugün makine tipi eklendi ).
+   Sürüm yazılı olmasaydı eski bir dosyadaki eksik alan SESSİZCE varsayılana
+   düşerdi.  Yazılı olduğu için program eksiği sayıp söyleyebiliyor.        */
+const PROJE_SURUM = 1;
+const PROJE_UZANTI = { avan:'.avan', uygulama:'.uygulama' };
+
+function projeDosyaAdi(mod){
+  //  Proje adı her modun KENDİ kimlik alanından okunur:  uygulamanınki
+  //  mk_proje_adi, avanınki kapak formundadır.  Karıştırılırsa dosya adı
+  //  hep "Asansor" çıkar.
+  //  kapakGirdi() alanı "project_title" adıyla döndürür;  "proje_adi"
+  //  aranırsa hep boş çıkar ve dosya adı her projede "Asansor" olurdu.
+  const p = (mod === 'uygulama')
+    ? (($('mk_proje_adi') || {}).value || '')
+    : ((kapakGirdi() || {}).project_title || '');
+  const ad = String(p).replace(/[^\p{L}\p{N} \-_]/gu,'').trim().slice(0,48) || 'Asansor';
+  return ad + PROJE_UZANTI[mod];
+}
+/*  Ofis sabitleri de dosyaya girer:  proje o günkü kabullerle hesaplandı,
+    üç yıl sonra açıldığında AYNI sonucu vermelidir.  Ama karşı bilgisayarın
+    ofis standardını sessizce ezmemeli — yüklerken sorulur.                */
+function projeGovdesi(mod){
+  const m = mod || MOD;
+  return { __mod:m, __surum:PROJE_SURUM, __program:'Asansör Proje Programı',
+           __tarih:new Date().toISOString().slice(0,10),
+           alanlar: tumGirdiler(m) };
+}
 function projeKaydet(){
-  const ad='Asansor - avan projesi.avan';
-  const b=new Blob([JSON.stringify(tumGirdiler(),null,1)],{type:'application/json'});
-  const u=URL.createObjectURL(b), a=document.createElement('a');
+  const ad = projeDosyaAdi(MOD);
+  const b = new Blob([JSON.stringify(projeGovdesi(MOD),null,1)],{type:'application/json'});
+  const u = URL.createObjectURL(b), a = document.createElement('a');
   a.href=u; a.download=ad; a.click(); setTimeout(()=>URL.revokeObjectURL(u),3000);
   durum('Proje kaydedildi: '+ad);
 }
 function projeAc(ev){
   const f=ev.target.files[0]; if(!f) return;
   const fr=new FileReader();
-  fr.onload=()=>{ try{ uygula(JSON.parse(fr.result)); yaz(); hesaplaHepsi(); durum('Proje açıldı: '+f.name); }
-    catch(e){ durum('Dosya okunamadı', true); } };
+  fr.onload=()=>{
+    let d; try{ d=JSON.parse(fr.result); }catch(e){ durum('Dosya okunamadı — geçerli bir proje dosyası değil', true); return; }
+    projeUygula(d, f.name);
+  };
   fr.readAsText(f); ev.target.value='';
 }
+function projeUygula(d, dosyaAdi){
+  //  Eski biçim ( başlıksız düz girdi sözlüğü ) da okunur.
+  const govde = (d && d.alanlar) ? d.alanlar : d;
+  const mod = (d && d.__mod) || (govde && govde.__mod) || null;
+  if(mod && mod !== MOD){
+    const ad = mod === 'uygulama' ? 'UYGULAMA' : 'AVAN';
+    durum(`Bu dosya ${ad} projesine ait — o bölümü açıp yeniden deneyin.`, true);
+    return;
+  }
+  //  SÜRÜM:  dosyada olmayan alanlar varsayılana döner;  sessiz kalmamalı.
+  const surum = (d && d.__surum) || 0;
+  const eksik = eksikAlanlar(govde, MOD);
+  bolumuTemizle(MOD === 'uygulama' ? 'mukavemet' : 'avan');
+  if(MOD !== 'uygulama'){ bolumuTemizle('tek'); bolumuTemizle('coklu'); }
+  uygula(govde);
+  yaz();
+  if(MOD === 'uygulama') hesapMukavemet(); else hesaplaHepsi();
+  let m = 'Proje açıldı: ' + dosyaAdi;
+  if(surum && surum !== PROJE_SURUM) m += `  ( dosya sürüm ${surum}, program sürüm ${PROJE_SURUM} )`;
+  if(eksik.length) m += `  ·  dosyada bulunmayan ${eksik.length} alan VARSAYILANA döndü`;
+  durum(m, eksik.length > 0);
+  if(eksik.length) console.warn('Varsayılana dönen alanlar:', eksik);
+}
+/*  Dosyada olmayan ama formda bulunan alanlar.  Sürüm farkının somut
+    karşılığı budur — kaç alan sessizce varsayılana döndü.                 */
+function eksikAlanlar(govde, mod){
+  const eksik = [];
+  document.querySelectorAll('input,select').forEach(e=>{
+    if(!e.id || e.id.indexOf('_goster') >= 0) return;
+    if(alanModu(e.id) !== mod) return;
+    if(govde[e.id] === undefined) eksik.push(e.id);
+  });
+  return eksik;
+}
 function hepsiniTemizle(){
-  if(!confirm('Tüm girdiler silinecek. Emin misiniz?')) return;
-  localStorage.removeItem(ANAHTAR); location.reload();
+  const ad = MOD === 'uygulama' ? 'uygulama projesinin' : 'avan projesinin';
+  //  YALNIZ İÇİNDE BULUNULAN PROJE silinir — öbürü ayrı kovadadır.
+  if(!confirm(`Bu ${ad} tüm girdileri silinecek. Emin misiniz?\n\n( Öbür proje etkilenmez. )`)) return;
+  localStorage.removeItem(KOVA[MOD]); location.reload();
 }
 function ornekYukle(){
   const O={c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43', c_N:'11', c_h:'3',

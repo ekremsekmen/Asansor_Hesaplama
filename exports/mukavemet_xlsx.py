@@ -18,12 +18,15 @@ NİÇİN:
 """
 import io
 import os
+from datetime import date
 
 import openpyxl
 
 from engine.ortak import ofis as OFIS
+from exports.hucre_haritasi import IMZA
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import mukavemet_girdi as MG
+from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -160,6 +163,125 @@ def xlsx_oku_ayrintili(icerik: bytes):
 
 
 # =====================================================================
+#  OFİSİN ANA KİTABININ DÜZELTİLMİŞ KOPYASI
+# =====================================================================
+DUZELTME_SAYFASI = "DÜZELTMELER"
+
+
+def duzeltilmis_kaynak() -> bytes:
+    """Ofisin ana çalışma kitabının DÜZELTİLMİŞ kopyasını üretir.
+
+    Program teslim ettiği her dosyayı zaten düzeltir ( _standarda_uydur ), ama
+    ofisin masasındaki ana kitap düzelmiyordu:  onu açıp elle hesap yapan
+    eski sonuçları alıyordu.  Bu işlev o boşluğu kapatır.
+
+    ŞABLON DOSYASINA DOKUNULMAZ.  templates/MUKAVEMET_HESABI.xlsx özgün
+    hâlinde kalmalıdır — doğrulama paketinin tamamı ( TEST 9 · TEST 10 )
+    motoru ONA karşı denetler ve sapmalarımızın gerekçesi kitabın o
+    hücrelerde ne yaptığıdır.  Düzeltilmiş kitap AYRI bir dosyadır.
+
+    Teslim kopyasından farkı:  buraya HİÇBİR projenin girdisi yazılmaz.
+    Yalnız FORMÜLLER düzeltilir;  kitap kendi örnek girdileriyle kendi
+    kendini hesaplamaya devam eder ve ofis onu boş bir usta kopya olarak
+    kullanabilir.
+    """
+    if not sablon_var():
+        raise FileNotFoundError(
+            f"Mukavemet şablonu bulunamadı: templates/{os.path.basename(SABLON)}")
+    wb = openpyxl.load_workbook(SABLON)
+    #  g = {} :  ⑦'nin girdi yazması ve ek girdi bloğunun dolması engellenir;
+    #  ④'te ℓ, sayı yerine ray tablosunu okuyan VLOOKUP olur.
+    _standarda_uydur(wb, {})
+    #  KAYIT, ÖZGÜNLE FARK ALINARAK ÜRETİLİR.  Elle tutulan bir liste zamanla
+    #  koddan ayrışır;  fark almak neyin gerçekten değiştiğini gösterir.
+    _duzeltme_kaydi(wb, _fark(openpyxl.load_workbook(SABLON), wb))
+    wb.calculation.fullCalcOnLoad = True
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
+def _fark(ozgun, yeni):
+    """İki kitabı hücre hücre karşılaştırır  →  [ (sayfa, hücre, eski, yeni) ]."""
+    degisen = []
+    for sayfa in yeni.sheetnames:
+        if sayfa == DUZELTME_SAYFASI or sayfa not in ozgun.sheetnames:
+            continue
+        a, b = ozgun[sayfa], yeni[sayfa]
+        satir = max(a.max_row, b.max_row)
+        sutun = max(a.max_column, b.max_column)
+        for r in range(1, satir + 1):
+            for c in range(1, sutun + 1):
+                x, y = a.cell(row=r, column=c), b.cell(row=r, column=c)
+                if x.value != y.value:
+                    degisen.append((sayfa, y.coordinate, x.value, y.value))
+    return degisen
+
+
+def _duzeltme_kaydi(wb, degisen):
+    """Kitabın içine, NEYİN NİÇİN değiştiğini anlatan bir sayfa ekler.
+
+    Dosya elden ele dolaşacağı için kaydın dosyanın DIŞINDA durması yetmez;
+    açan herkes hangi hücrenin niçin değiştiğini görebilmelidir.
+    """
+    if DUZELTME_SAYFASI in wb.sheetnames:
+        del wb[DUZELTME_SAYFASI]
+    ws = wb.create_sheet(DUZELTME_SAYFASI)
+    ws.column_dimensions["A"].width = 4
+    ws.column_dimensions["B"].width = 38
+    ws.column_dimensions["C"].width = 34
+    ws.column_dimensions["D"].width = 30
+    ws.column_dimensions["E"].width = 76
+    ws.column_dimensions["F"].width = 76
+    ws["A1"] = "BU KİTAP DÜZELTİLMİŞTİR"
+    ws["A2"] = (f"Üreten: {IMZA}   ·   Tarih: {date.today():%d.%m.%Y}   ·   "
+                "Kaynak: templates/MUKAVEMET_HESABI.xlsx ( özgün hâli korunur )")
+    ws["A3"] = ("Aşağıdaki hücrelerin FORMÜLLERİ değiştirilmiştir;  değerleri "
+                "değil.  Kitap kendi kendini hesaplamaya devam eder.")
+    #  1)  NİÇİN  —  sapmaların gerekçesi
+    ws["A5"] = "NİÇİN DEĞİŞTİ"
+    basliklar = ("#", "Konu", "Dayanak", "Sonucu değişen hücreler",
+                 "Kitabın yaptığı", "Düzeltilmiş hâli")
+    for j, b in enumerate(basliklar, start=1):
+        ws.cell(row=6, column=j, value=b)
+    satir = 7
+    for i, (ad, madde, eski, yeni, hucreler) in enumerate(MK.EXCEL_FARKLARI, 1):
+        ws.cell(row=satir, column=1, value=i)
+        ws.cell(row=satir, column=2, value=ad)
+        ws.cell(row=satir, column=3, value=madde)
+        ws.cell(row=satir, column=4,
+                value=", ".join(hucreler) if hucreler else "—")
+        ws.cell(row=satir, column=5, value=eski.replace("\n", " "))
+        ws.cell(row=satir, column=6, value=yeni.replace("\n", " "))
+        satir += 1
+
+    #  2)  NE  —  gerçekten düzenlenen hücreler  ( özgünle fark alınarak )
+    satir += 2
+    ws.cell(row=satir, column=1,
+            value=f"DÜZENLENEN HÜCRELER  ( {len(degisen)} adet )")
+    satir += 1
+    for j, b in enumerate(("Sayfa", "Hücre", "Kitapta", "Şimdi"), start=1):
+        ws.cell(row=satir, column=j, value=b)
+    satir += 1
+    for sayfa, hucre, eski, yeni in degisen:
+        ws.cell(row=satir, column=1, value=sayfa)
+        ws.cell(row=satir, column=2, value=hucre)
+        ws.cell(row=satir, column=3, value=_kisalt(eski))
+        ws.cell(row=satir, column=4, value=_kisalt(yeni))
+        satir += 1
+    return ws
+
+
+def _kisalt(v, n=900):
+    """Hücreye yazılabilir hâle getirir  ( ω formülleri çok uzundur )."""
+    if v is None:
+        return "( boş )"
+    m = str(v)
+    return m if len(m) <= n else m[:n] + " …"
+
+
+# =====================================================================
 #  TESLİM EDİLEN KİTABI STANDARDA UYDURMA
 # =====================================================================
 #  NİÇİN GEREKLİ:  program TS EN 81-20 / TS EN 81-50 gereği kaynak kitabın
@@ -269,24 +391,28 @@ def _omega_formulu(lam_hucre, rm_hucre):
     return f"=({a})+(({b})-({a}))*{oran}"
 
 
-def _verim_formulu():
+def _verim_formulu(O):
     """η′  =  makine tipi tablosu  −  palangalı sistemde düşüş.
 
-    Tablo ve düşüş ortak ofis standardından okunur ( engine/ortak/ofis.py ),
-    böylece pafta ile teslim edilen kitap aynı sayıyı kullanır.
+    Tablo ve düşüş PROJENİN ofis sabitlerinden okunur ( uygulama projesinin
+    kendi Sabitler sekmesi ) — böylece ekranda değiştirilen verim teslim
+    edilen kitapta da geçerli olur, pafta ile kitap ayrışmaz.
     """
     tip, askı = "'Veri Girişi'!B130", "'Veri Girişi'!B100"
     #  Tablo iki satırlık olduğu için iç içe IF yeterli;  tanınmayan tipte
-    #  kitabın eski sabitine ( VARSAYILAN_VERIM ) düşülür.
+    #  ortak fabrika ayarına düşülür.
     ic = repr(float(OFIS.VARSAYILAN_VERIM))
-    for ad, deger in reversed(list(OFIS.MAKINE_VERIMLERI.items())):
-        ic = f'IF({tip}="{ad}",{float(deger)!r},{ic})'
-    return (f"=({ic})-IF({askı}>1,{float(OFIS.PALANGA_VERIM_DUSUSU)!r},0)")
+    for ad, anahtar in (("Dişli", "verim_disli"), ("Dişlisiz", "verim_dislisiz")):
+        ic = f'IF({tip}="{ad}",{float(O[anahtar])!r},{ic})'
+    return f"=({ic})-IF({askı}>1,{float(O['palanga_verim_dususu'])!r},0)"
 
 
 def _standarda_uydur(wb, g):
     """Kaynak kitabın standarttan sapan formüllerini teslim kopyasında düzeltir."""
     ws, vg = wb[HESAP], wb[GIRDI]
+    #  Projenin KENDİ ofis sabitleri:  ekranda değiştirilen verim, σem ve
+    #  paylar teslim edilen kitaba da yansımalı.
+    O = US.sabitler(g.get("_ofis"))
 
     #  ①  Tahrik kasnağı / halat oranı eşiği  —  EN 81-20 m.5.5.2.1
     ws["Q97"] = MK.SABIT["Dt_dh_asgari"]
@@ -333,7 +459,7 @@ def _standarda_uydur(wb, g):
     #  Kitap 11!AQ22'ye sabit 0,92 yazar ve 'Veri Girişi'!B130'daki makine
     #  tipini hiç okumaz.  Teslim kopyasında AQ22 bir FORMÜL olur:  Excel'de
     #  makine tipi ya da askı oranı değiştirilirse verim de takip eder.
-    ws["AQ22"] = _verim_formulu()
+    ws["AQ22"] = _verim_formulu(O)
 
     #  ⑧  Sığınma açıklıklarının iki alt sınırı  —  EN 81-20 m.5.2.5.7.3 ve
     #  m.5.2.5.8.2 a) 2).  Kitap 1200 / 150 mm ister;  standartta bu sayılar

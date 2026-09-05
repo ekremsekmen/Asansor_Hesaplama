@@ -13,11 +13,15 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
-                       _proje_kimligi, _sayi, _uretilemedi, belirsiz_sayi_mi)
+                       _paket_ekleri, _proje_kimligi, _sayi, _uretilemedi,
+                       belirsiz_sayi_mi)
 from engine.uygulama import girdi as E_UGR
+from engine.uygulama import sabitler as E_US
+from engine.uygulama import tablolar_gorunum as E_UTB
 from engine.uygulama import hesap as E_UYG
 from engine.uygulama import mukavemet_girdi as E_MGR
 from exports import mukavemet_xlsx as X_MXLS
+from exports import kapak_export as X_KAPAK
 from exports import pdf_export as X_PDF
 
 try:
@@ -39,6 +43,22 @@ def uygulama_alanlari():
     veri = E_UGR.arayuz_alanlari()
     veri["ortak_kopru"] = [{"mukavemet": ad, "anahtar": a, "avan": av}
                            for ad, a, av in E_UGR.ORTAK_KOPRU]
+    #  UYGULAMANIN KENDİ OFİS STANDARDI  —  avanınkinden ayrıdır.
+    #  Ekran bu listeden kurulur;  avanın MMO/697 kuvvet sabitleri burada
+    #  YOKTUR, uygulamanın mukavemet kabulleri ( σem · k1 · paylar ) ise
+    #  yalnız burada vardır.
+    veri["sabitler"] = {
+        "varsayilan": E_US.VARSAYILAN,
+        "metin": list(E_US.METIN),
+        "gruplar": [{"baslik": b, "aciklama": a, "alanlar": list(al)}
+                    for b, a, al in E_US.GRUPLAR],
+        "etiket": {k: list(v) for k, v in E_US.ETIKET.items()},
+    }
+    #  Tablolar sekmesi:  uygulamanın kendi tabloları  ( ray · NPU · halat ·
+    #  ω · kabin alanı … ).  Bunlar bugüne kadar yalnız motorun içindeydi,
+    #  ekranda görünmüyordu — uygulama yapan mühendis kullandığı ray
+    #  tablosuna bakamıyordu.
+    veri["tablolar"] = E_UTB.arayuz_tablolari()
     return veri
 
 
@@ -181,11 +201,25 @@ def indir_uygulama_dwg(veri: dict = Body(...)):
         s, yanit = _uygulama_sonucu(veri)
         if yanit is not None:
             return yanit
-        #  Uygulama projesinin kapağı MMO'nun AYRI kitabındadır — avan kapağı
-        #  buraya basılmaz;  pakette yalnız hesap paftası olur.
-        paftalar = [("Uygulama Projesi", X_PDF.uygulama_pdf(s))]
+        paftalar = []
+        #  KAPAK.  Uygulama projesinin kapağı MMO'nun ayrı kitabındadır;  ama
+        #  paket bir teslim dosyasıdır ve kapaksız gitmesi için sebep yok —
+        #  kapak alanları doldurulmuşsa pakete de girer.
+        kapak = veri.get("kapak_sayfasi")
+        if isinstance(kapak, dict) and any(str(x).strip() for x in kapak.values()):
+            paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak)))
+        paftalar.append(("Uygulama Projesi", X_PDF.uygulama_pdf(s)))
         ad = _dosya_adi(_proje_kimligi(veri), "Uygulama Projesi", "zip")
-        paket, sebep, tasti = X_DXF.proje_paketi(paftalar, os.path.splitext(ad)[0])
+        #  Pakete çalışma kitabı ve PROJE DOSYASI da girer:  teslim paketi ile
+        #  geri dönüş noktası aynı arşivde dursun.
+        ekler = list(_paket_ekleri(veri, "uygulama"))
+        try:
+            ekler.append((os.path.splitext(ad)[0] + ".xlsx",
+                          X_MXLS.mukavemet_xlsx(s["girdi"], _proje_kimligi(veri))))
+        except Exception:                                     # noqa: BLE001
+            pass          # şablon yoksa paket yine çıkar, yalnız kitap olmaz
+        paket, sebep, tasti = X_DXF.proje_paketi(
+            paftalar, os.path.splitext(ad)[0], ekler)
         yanit = _indir(paket, ad, "application/zip")
         notlar = (["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
         if notlar:

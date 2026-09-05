@@ -28,14 +28,14 @@ Not:  ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β �
 zaten "Sabitler / Ofis Standardı" sekmesinden gelir;  o da ikinci kez
 sorulmaz.
 """
-from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet as MK
+from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import mukavemet_tablolari as MT
 
-#  Tanınmayan makine tipinde geri düşülecek verim.  Adı geriye dönük
-#  uyum içindir;  gerçek verim artık makine tipinden gelir ( OFIS ).
-MK_VERIM = OFIS.VARSAYILAN_VERIM
+#  Tanınmayan makine tipinde geri düşülecek verim.  Gerçek verim makine
+#  tipinden ve projenin kendi ofis sabitlerinden gelir ( US.verim ).
+MK_VERIM = US.OFIS.VARSAYILAN_VERIM
 
 #  ( anahtar , etiket , birim , tür , seçenekler , varsayılan )
 #  Mukavemette KARŞILIĞI OLMAYAN girdiler.  Hepsi elektrik hesaplarına girer.
@@ -135,7 +135,7 @@ def kopru(g):
         #  buradan sabit 0,92 geçiyordu:  aynı asansör için avan paftası ile
         #  uygulama paftası farklı motor gücü veriyordu.
         "makine_tipi": g.get("makine_tipi"),
-        "eta": (OFIS.makine_verimi(g.get("makine_tipi")) or MK_VERIM),
+        "eta": US.verim(US.sabitler(g.get("_ofis")), g.get("makine_tipi"), 1),
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
         "S1": g.get("kolon_kesit"), "L1": g.get("kolon_uzunluk"),
@@ -151,10 +151,32 @@ def kopru(g):
     #  εmax, κ, U, β, çubuk sayısı …  Elektrik ve topraklama hesapları bunları
     #  kullanır;  köprüden geçmezse kullanıcının sekmedeki değişikliği hiçbir
     #  şeyi değiştirmezdi.
-    sabitler = g.get("_ofis")
     return {"ortak": ortak, "asansorler": [asansor],
-            "sabitler": sabitler if isinstance(sabitler, dict) else {},
-            "trafik": {}}
+            "sabitler": _avan_sabitleri(g.get("_ofis")), "trafik": {}}
+
+
+#  Uygulamanın ofis sabiti  →  avan motorunun beklediği anahtar.  Elektrik ve
+#  topraklama hesapları avan motorunda koştuğu için ( ELEKTRIK_BOLUMLERI )
+#  uygulamanın kendi setinden karşılığı olanlar oraya çevrilir.  Adı aynı
+#  olanlar zaten eşleşir;  liste yalnız ADI FARKLI olanlar içindir.
+AVAN_KARSILIGI = {}
+#  Avan motoruna GEÇMEYECEKLER:  yalnız mukavemeti ilgilendirirler ve avan
+#  tarafında aynı adla başka bir anlam taşıyabilirler.
+AVAN_DISI = ("q_denge", "sigma_em", "k1_kaymali", "k1_makarali", "k1_ani",
+             "yan_yatak_L_X", "halat_pay_m", "Gs", "verim_dislisiz",
+             "verim_disli") + MK.SIGINMA_PAYLARI
+
+
+def _avan_sabitleri(ofis):
+    """Uygulamanın ofis setinden, avan motorunun kullanabileceği alt küme."""
+    if not isinstance(ofis, dict):
+        return {}
+    d = {}
+    for k, v in ofis.items():
+        if k in AVAN_DISI:
+            continue
+        d[AVAN_KARSILIGI.get(k, k)] = v
+    return d
 
 
 #  ORTAK ALANLARIN LİSTESİ  —  arayüz bunu "bu değer mukavemetten geliyor"

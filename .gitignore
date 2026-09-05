@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .gecici_mukavemet/
+
+#  araclar/kaynak_excel_duzelt.py çıktısı — üretilen dosya, kaynak değil.
+#  Depoya konursa koddaki düzeltmelerden sessizce geri kalır.
+MUKAVEMET_HESABI_DUZELTILMIS.xlsx

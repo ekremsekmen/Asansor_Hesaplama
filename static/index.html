@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Asansör Proje Programı</title>
-<link rel="stylesheet" href="/static/style.css?v=2.7">
+<link rel="stylesheet" href="/static/style.css?v=SURUM">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23123E6B'/><path d='M9 7h14v18H9z' fill='none' stroke='%23fff' stroke-width='2'/><path d='M16 7v18M12 12l0 8M20 12l0 8' stroke='%23fff' stroke-width='1.6'/></svg>">
 </head>
 <body class="giriste">
@@ -86,7 +86,7 @@
           bu yüzden şeridin sağ ucuna itilir ( .sekme-ayrac ).            -->
     <span class="sekme-ayrac"></span>
     <button class="sekme yan ayrik" data-sekme="sabitler" data-mod="avan uygulama">Sabitler / Ofis Standardı</button>
-    <button class="sekme yan" data-sekme="tablolar" data-mod="avan">Tablolar</button>
+    <button class="sekme yan" data-sekme="tablolar" data-mod="avan uygulama">Tablolar</button>
   </div>
 </nav>
 
@@ -118,7 +118,8 @@
         <div class="kart-bas"><span>PROJE DOSYASI</span></div>
         <div class="kart-ic">
           <div class="yardim">Girdiler tarayıcıda kendiliğinden saklanır. Ayrıca tüm sekmeleri tek dosyada
-            arşivlemek için <b>proje dosyası</b> olarak kaydedebilirsiniz (.avan).</div>
+            arşivlemek için <b>proje dosyası</b> olarak kaydedebilirsiniz (.avan).
+            <b>Uygulama projesi dosyaları (.uygulama) buraya yüklenmez</b> — ayrı projelerdir.</div>
           <div class="dugmeler">
             <button class="dg ana" onclick="projeKaydet()">Projeyi kaydet</button>
             <button class="dg" onclick="document.getElementById('dosya_ac').click()">Proje aç (.avan)</button>
@@ -420,7 +421,7 @@
             gerçek metindir, çizgiler tek tek çizgidir; siyah-beyaz baskıya uygundur.</div>
           <div class="dugmeler">
             <button class="dg ana" id="dg_proje_dwg" onclick="indirProjeDwg()">
-              Avan Projesini DWG al</button>
+              Projeyi paketle (ZIP)</button>
           </div>
           <div class="ipucu" style="margin-top:6px">
             ZIP'in içinde <b>.dxf</b> çizim ( AutoCAD çift tıkla açar; DWG için
@@ -475,6 +476,27 @@
           <div id="m_yukleme_ozeti"></div>
         </div>
       </div>
+      <!--  UYGULAMA PROJESİNİN KENDİ PROJE DOSYASI.
+            Bugüne kadar YOKTU:  proje dosyası düğmeleri Proje Kapağı
+            sekmesindeydi, o sekme de yalnız avan modunda görünüyordu.
+            Uygulamada tek geri dönüş yolu Excel'di.                     -->
+      <div class="kart">
+        <div class="kart-bas"><span>PROJE DOSYASI</span>
+          <span class="kaynak">.uygulama — girdilerin geri dönüş noktası</span></div>
+        <div class="kart-ic">
+          <div class="yardim">Girdiler tarayıcıda kendiliğinden saklanır. Ayrıca projeyi
+            <b>tek dosyada</b> arşivleyebilirsiniz (<b>.uygulama</b>): ne PDF ne Excel ne
+            CAD — yalnız programın okuyup yazdığı veri. Aylar sonra dosyayı yükleyip
+            değişeni düzeltir, çıktıları yeniden alırsınız.
+            <b>Avan projesi dosyaları (.avan) buraya yüklenmez</b> — ayrı projelerdir.</div>
+          <div class="dugmeler">
+            <button class="dg ana" onclick="projeKaydet()">Projeyi kaydet</button>
+            <button class="dg" onclick="document.getElementById('m_dosya_ac').click()">Proje aç (.uygulama)</button>
+            <button class="dg" onclick="hepsiniTemizle()">Tümünü temizle</button>
+          </div>
+          <input type="file" id="m_dosya_ac" accept=".uygulama,.json" style="display:none" onchange="projeAc(event)">
+        </div>
+      </div>
       <div class="kart">
         <div class="kart-bas"><span>UYGULAMA PROJESİ GİRDİLERİ</span>
           <span class="kaynak">mukavemet · elektrik · topraklama</span></div>
@@ -496,12 +518,14 @@
             ( mukavemet + elektrik + topraklama ). <b>Excel</b> çıktısı uygulama
             projesinin kendi çalışma kitabıdır ( <b>MUKAVEMET_HESABI.xlsx</b> ) —
             girdileriniz "Veri Girişi" sayfasına yazılır, formüller yerinde kalır,
-            dosya açıldığında Excel kendi hesabını yapar. CAD çıktısı paftayı ofis
-            tip proje formatına yerleştirir.</div>
+            dosya açıldığında Excel kendi hesabını yapar.
+            <b>Projeyi paketle</b> hepsini tek ZIP'te verir: kapak + pafta PDF'i,
+            çalışma kitabı, DXF/DWG çizimi ve <b>.uygulama proje dosyası</b> —
+            yani teslim paketi ile geri dönüş noktası aynı arşivde.</div>
           <div class="dugmeler">
             <button class="dg ana" onclick="indir('uygulama-pdf')">Uygulama Projesi PDF</button>
             <button class="dg" onclick="indir('uygulama-xlsx')">Uygulama Projesi Excel</button>
-            <button class="dg" id="dg_uygulama_dwg" onclick="indir('uygulama-dwg')">Uygulama CAD (DWG/DXF)</button>
+            <button class="dg" id="dg_uygulama_dwg" onclick="indir('uygulama-dwg')">Projeyi paketle (ZIP)</button>
           </div>
         </div>
       </div>
@@ -512,7 +536,37 @@
 
 <!-- ═══════════════════════════════ SABİTLER ═══════════════════════════════ -->
 <section id="s-sabitler" class="sayfa" hidden>
-  <div class="ikili">
+
+  <!-- ─────────── UYGULAMA PROJESİNİN KENDİ OFİS STANDARDI ───────────
+       Avanınkinden AYRIDIR:  avan ön tasarımdır ve genel kabullerle
+       çalışır, uygulama kesin tasarımdır ve imalatçı verisi vardır.
+       İkisinin aynı sayıyı tutma zorunluluğu yoktur.                 -->
+  <div id="sabitler_uygulama" hidden>
+    <div class="kart">
+      <div class="kart-bas"><span>UYGULAMA PROJESİ — OFİS STANDARDI <span class="bilgi" tabindex="0" role="button"
+        aria-label="Açıklamayı göster" onclick="bilgiAc(this,event)"><span class="bilgi-im">!</span><span class="bilgi-balon">
+        <p>Bunlar <b>uygulama projesinin kendi</b> kabulleridir; avan projesininkinden
+          ayrıdır ve aynı olmak zorunda değildir. Avan ön tasarımdır, genel ve emniyetli
+          kabullerle çalışır; uygulama kesin tasarımdır ve elinizde imalatçı verisi vardır.</p>
+        <p>Buradan değiştirdiğinizde <b>ekrandaki hesap, PDF paftası ve indirilen Excel
+          birlikte</b> değişir — teslim edilen kitaptaki formüller de bu değerleri kullanır.</p>
+        <p><b>② Mukavemet kabulleri</b> özellikle gözden geçirilmelidir: TS EN 81-20 makine
+          kaidesi için yük modeli <b>vermez</b>, Çizelge 14 (k1) o standartta açıkça
+          <b>kılavuz ray</b> hesabına aittir. Buradaki kullanım ödünçtür ve emniyetli
+          taraftadır — σem = 130, standardın ST 37 için verdiği Rm/1,8 = 205,6 N/mm²'nin
+          yaklaşık yarısıdır.</p>
+        <p>Geçersiz bir değer girilirse yok sayılır, varsayılana dönülür ve hangi alanın
+          reddedildiği hesap sekmesinde bildirilir.</p></span></span></span><span class="kaynak">hesap bazında gruplu</span></div>
+      <div class="kart-ic">
+        <div id="usabit_form"></div>
+        <div class="dugmeler" style="margin-top:12px">
+          <button class="dg" onclick="uygulamaSabitleriSifirla()">Tümünü varsayılana döndür</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ikili" id="sabitler_avan">
     <div>
       <div class="kart">
         <div class="kart-bas"><span>B) OFİS STANDARDI <span class="bilgi" tabindex="0" role="button"
@@ -565,9 +619,18 @@
 
 <!-- ═══════════════════════════════ TABLOLAR ═══════════════════════════════ -->
 <section id="s-tablolar" class="sayfa" hidden>
-  <div class="kart"><div class="kart-bas"><span>HESAPLARDA KULLANILAN TABLOLAR</span>
-    <span class="kaynak">MMO/697 · ISO 8100-32:2020 · IEC 60364-5-52</span></div>
-    <div class="kart-ic" id="tablolar_ic"></div></div>
+  <div id="tablolar_avan">
+    <div class="kart"><div class="kart-bas"><span>HESAPLARDA KULLANILAN TABLOLAR</span>
+      <span class="kaynak">MMO/697 · ISO 8100-32:2020 · IEC 60364-5-52</span></div>
+      <div class="kart-ic" id="tablolar_ic"></div></div>
+  </div>
+  <!--  Uygulamanın tabloları bugüne kadar yalnız motorun içindeydi:  hesaba
+        giriyorlardı ama ekranda görünmüyorlardı.                          -->
+  <div id="tablolar_uygulama" hidden>
+    <div class="kart"><div class="kart-bas"><span>UYGULAMA PROJESİNDE KULLANILAN TABLOLAR</span>
+      <span class="kaynak">TS EN 81-20 · TS EN 81-50 · TS 12385-5 · ISO 7465</span></div>
+      <div class="kart-ic" id="utablolar_ic"></div></div>
+  </div>
 </section>
 
 </main>
@@ -575,8 +638,8 @@
 <div class="durum" id="durum"></div>
 <!--  Yükleme sırası önemli:  ortak → avan → uygulama.
       kur() en sonda, uygulama.js içinden çağrılır.            -->
-<script src="/static/ortak.js?v=3.0"></script>
-<script src="/static/avan.js?v=3.0"></script>
-<script src="/static/uygulama.js?v=3.0"></script>
+<script src="/static/ortak.js?v=SURUM"></script>
+<script src="/static/avan.js?v=SURUM"></script>
+<script src="/static/uygulama.js?v=SURUM"></script>
 </body>
 </html>

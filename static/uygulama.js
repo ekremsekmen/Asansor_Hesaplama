@@ -59,8 +59,15 @@ async function mukavemetKur(){
   //  Varsayılan durak listesi
   const d = MUK.gruplar.flatMap(g=>g.alanlar).find(f=>f.tur==='liste');
   MUK_DURAK = (d && d.varsayilan ? d.varsayilan : [3000]).map(mSayi);
+  //  Uygulamanın KENDİ ofis sabitleri ve KENDİ tabloları — avanınkinden ayrı.
+  uygulamaSabitFormuKur();
+  uygulamaTablolariKur();
   mukavemetGeriYukle();
   mDurakCiz();
+  //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
+  //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
+  //  sorun yok, orada form açılışta kuruluyor ).
+  yaz();
   hesapMukavemet();
 }
 
@@ -68,7 +75,8 @@ async function mukavemetKur(){
     saklanan değerler burada, form ayağa kalktıktan sonra yerine oturur.
     Yoksa uygulama projesi her açılışta varsayılanlara dönüyordu. */
 function mukavemetGeriYukle(){
-  let o; try{ o = JSON.parse(localStorage.getItem(ANAHTAR)||'null'); }catch(e){ o = null; }
+  //  Uygulamanın KENDİ kovası okunur — avanınki ayrı dosyadadır.
+  let o; try{ o = JSON.parse(localStorage.getItem(KOVA.uygulama)||'null'); }catch(e){ o = null; }
   if(!o) return;
   for(const gr of MUK.gruplar) for(const f of gr.alanlar){
     if(f.tur === 'liste') continue;
@@ -77,6 +85,16 @@ function mukavemetGeriYukle(){
     if(e.type === 'checkbox') e.checked = !!o[e.id];
     else if(o[e.id] !== '') alanaYaz(e, o[e.id]);
   }
+  //  UYGULAMAYA AİT HER ALAN geri yazılır — yalnız sözleşmedekiler değil.
+  //  Proje kimliği ( mk_… ) ve ofis sabitleri ( uof_… ) de buradadır;
+  //  yoksa sayfa yenilendiğinde proje adı ve ofis ayarları kayboluyordu.
+  document.querySelectorAll('input,select').forEach(e=>{
+    if(!e.id || e.id.indexOf('_goster') >= 0) return;
+    if(alanModu(e.id) !== 'uygulama') return;
+    if(o[e.id] === undefined) return;
+    if(e.type === 'checkbox') e.checked = !!o[e.id];
+    else alanaYaz(e, o[e.id]);
+  });
   if(Array.isArray(o.__muk_durak) && o.__muk_durak.length)
     MUK_DURAK = o.__muk_durak.slice(0, MUK.durak_azami).map(mSayi);
 }
@@ -89,13 +107,67 @@ const mSatir = alanlar => `<div class="satir i${alanlar.length}">${alanlar.join(
 /*  Sabitler / Ofis Standardı sekmesindeki değerler.  Avan tarafında
     avanGirdi() aynı işi yapar;  uygulama projesinin elektrik ve topraklama
     hesapları da bunları kullanır. */
+/* ═════════════ UYGULAMANIN KENDİ OFİS STANDARDI ═════════════
+   Avanınkinden AYRIDIR ( ön ek uof_ ).  Avan ön tasarımdır ve genel
+   kabullerle çalışır;  uygulama kesin tasarımdır ve imalatçı verisi vardır.
+   İkisinin aynı sayıyı tutma zorunluluğu yoktur — ama ikisi de ekranda
+   durur, paftaya kaynağıyla basılır ve bilerek ayrışır.                  */
+const UOF = k => 'uof_' + k;
+
 function ofisSabitleri(){
-  const o = {};
-  Object.keys((SEC && SEC.sabit_b) || {}).forEach(k=>{
-    const x = v('sb_'+k); if(x!=='') o[k] = x; });
-  Object.keys((SEC && SEC.ofis_varsayilan) || {}).forEach(k=>{
-    const x = v('of_'+k); if(x!=='') o[k] = x; });
+  const o = {}, S = (MUK && MUK.sabitler) || {};
+  Object.keys(S.varsayilan || {}).forEach(k=>{
+    const x = v(UOF(k)); if(x !== '') o[k] = x; });
   return o;
+}
+
+function uygulamaSabitFormuKur(){
+  const S = (MUK && MUK.sabitler) || {}, kutu = $('usabit_form');
+  if(!kutu || !S.gruplar) return;
+  const metin = new Set(S.metin || []);
+  let h = '';
+  (S.gruplar || []).forEach(gr=>{
+    h += `<div class="bolum-bas">${kacis(gr.baslik)}`
+       + (gr.aciklama ? ` <span class="ipucu">— ${kacis(gr.aciklama)}</span>` : '')
+       + `</div>`;
+    const alanlar = gr.alanlar.map(k=>{
+      const [et, ip] = S.etiket[k] || [k, ''];
+      const d = String(S.varsayilan[k]).replace('.', ',');
+      //  Boş bırakılan alan varsayılanı kullanır;  yer tutucu o değeri gösterir.
+      const giris = `<input id="${UOF(k)}" class="girdi" placeholder="${kacis(d)}"${metin.has(k) ? '' : ' inputmode="decimal"'}>`;
+      return `<div class="alan"><label>${kacis(et)}`
+        + (ip ? ` <span class="ipucu">${kacis(ip)}</span>` : '')
+        + `</label>${giris}</div>`;
+    });
+    for(let i=0; i<alanlar.length; i+=3)
+      h += `<div class="satir i3">${alanlar.slice(i, i+3).join('')}</div>`;
+  });
+  kutu.innerHTML = h;
+}
+function uygulamaSabitleriSifirla(){
+  const S = (MUK && MUK.sabitler) || {};
+  Object.keys(S.varsayilan || {}).forEach(k=>{ const e=$(UOF(k)); if(e) e.value=''; });
+  yaz(); hesapMukavemet();
+  durum('Uygulama projesinin ofis sabitleri varsayılana döndürüldü.');
+}
+
+/* ═════════════ UYGULAMANIN TABLOLARI ═════════════
+   Bugüne kadar yalnız motorun içindeydiler:  hesaba giriyorlardı ama
+   ekranda görünmüyorlardı.  Tablolar KOPYALANMAZ — sunucu motorun kendi
+   sözlüklerinden üretir ( engine/uygulama/tablolar_gorunum.py ).       */
+function uygulamaTablolariKur(){
+  const kutu = $('utablolar_ic'); if(!kutu) return;
+  const t = (MUK && MUK.tablolar) || [];
+  kutu.innerHTML = t.map(x=>{
+    const bas = x.basliklar.map(b=>`<th>${kacis(b)}</th>`).join('');
+    const sat = x.satirlar.map(r=>
+      `<tr>${r.map(c=>`<td>${kacis(String(c))}</td>`).join('')}</tr>`).join('');
+    return `<div class="bolum-bas">${kacis(x.ad)}`
+      + (x.kaynak ? ` <span class="ipucu">— ${kacis(x.kaynak)}</span>` : '') + `</div>`
+      + (x.aciklama ? `<div class="yardim">${kacis(x.aciklama)}</div>` : '')
+      + `<div class="kaydir"><table class="veri"><thead><tr>${bas}</tr></thead>`
+      + `<tbody>${sat}</tbody></table></div>`;
+  }).join('');
 }
 
 function mukavemetKimlik(){

@@ -723,7 +723,10 @@ async function indirProjeDwg(){
   durum('Proje çizimi hazırlanıyor — bütün paftalar CAD varlığına çevriliyor…');
   try{
     const govde = {kapak: kapakGirdi(),
-                   girdiler: {trafik: trafikGirdi(), avan: avanGirdi()}};
+                   girdiler: {trafik: trafikGirdi(), avan: avanGirdi()},
+                   //  Paket teslim edilecek çıktıları TAŞIR;  proje dosyası
+                   //  onu geri getirir.  İkisi aynı arşivde durmalı.
+                   proje_dosyasi: projeGovdesi('avan')};
     const r = await fetch('/api/indir/proje-dwg', {method:'POST',
       headers:{'Content-Type':'application/json'}, body:JSON.stringify(govde)});
     const tur = r.headers.get('Content-Type')||'';
@@ -883,3 +886,211 @@ function tablolariKur(){
   $('tablolar_ic').innerHTML=h;
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ORTAK DOSYADAN TAŞINANLAR
+   Bunlar ortak.js'te duruyordu ama hiçbiri UYGULAMA projesini
+   ilgilendirmiyor:  ek nüfus, trafik köprüsü, avanın ofis standardı
+   formu, MMO/697 sabit tablosu, avan rozetleri, temel çevresi.
+   Ortak dosyada durmaları "ortak" olduklarını sanmaya yol açıyordu.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ek nüfus satırları */
+function ekNufusEkle(p, veri){
+  const liste=$(p+'_eknufus_liste');
+  const d=el('div','satir i3'); d.style.marginBottom='8px';
+  d.innerHTML=`<div class="alan" style="margin:0"><input class="girdi en-ac" placeholder="Açıklama" value="${kacis(veri?.aciklama||'')}"></div>
+    <div class="alan" style="margin:0"><input class="girdi en-mi" placeholder="Miktar" value="${kacis(veri?.miktar??'')}"></div>
+    <div class="alan" style="margin:0;display:flex;gap:6px"><select class="girdi en-ka" style="flex:1">
+      ${SEC.nufus_kalemleri.map(k=>`<option value="${k}"${veri?.kalem===k?' selected':''}>${k}</option>`).join('')}</select>
+      <button class="dg kucuk" onclick="this.closest('.satir').remove();planla()">×</button></div>`;
+  liste.appendChild(d);
+  if(!veri) planla();
+}
+
+function ekNufusTopla(p){
+  const kok = $(p+'_eknufus_liste');
+  if(!kok) return [];                      //  tek gövde kalktı: 't' listesi yok
+  return [...kok.querySelectorAll('.satir')].map(r=>({
+    aciklama:r.querySelector('.en-ac').value, miktar:r.querySelector('.en-mi').value,
+    kalem:r.querySelector('.en-ka').value })).filter(x=>x.miktar!=='');
+}
+
+/* Avan sekmesi trafik sonucuyla karşılaştırılır: kapasite / hız / kuyu
+   yüksekliği tutarsızlığı uyarı olarak görünür.  Çoklu hesap varsa o,
+   yoksa tek hesap esas alınır — aktarım düğmesiyle aynı öncelik. */
+function trafikKoprusu(){
+  const al = x => (x && !x.hata && x.avan_koprusu
+                   && (x.avan_koprusu.asansorler||[]).length) ? x.avan_koprusu : null;
+  /*  Tek hesap yolu kaldı — hangi yöntemin kullanıldığı sonucun içindedir. */
+  return al(SON.c);
+}
+
+function sabitATablosu(){
+  const ET={gn:['gn','Yerçekimi ivmesi','m/s²','MMO/697 s.18 — TS EN 81-20'],
+    tampon_katsayi:['—','Tampon altı zemin kuvvet katsayısı','—','MMO/697 §2.3.3.1-2  F = 4·gn·(P+Q)'],
+    k1_hizli:['k1','Darbe faktörü — V > 1,00 m/s','—','MMO/697 Çizelge-1'],
+    k1_orta:['k1','Darbe faktörü — 0,63 < V ≤ 1,00 m/s','—','MMO/697 Çizelge-1'],
+    k1_yavas:['k1','Darbe faktörü — 0,15 < V ≤ 0,63 m/s','—','MMO/697 Çizelge-1'],
+    motor_sabiti:['—','Motor gücü denklem sabiti','kg·m/s','MMO/697 §2.4'],
+    palanga_verim_dususu:['Δη','Palangalı sistemde verim düşüşü','—','MMO/697 §2.4'],
+    kirlenme_faktoru:['d','Aydınlatmada kirlenme (bakım) faktörü','—','Aydınlatma tekniği teamülü'],
+    E_makine_dairesi:['E','Aydınlatma şiddeti — makine dairesi','lüx','TS EN 81-20'],
+    E_kabin:['E','Aydınlatma şiddeti — kabin','lüx','TS EN 81-20'],
+    E_kuyu:['E','Aydınlatma şiddeti — kuyu','lüx','TS EN 81-20'],
+    kuyu_ek_armatur:['—','Kuyu aydınlatmasına eklenen armatür','adet','Kuyu dibi + kuyu üstü'],
+    h_armatur:['h','Armatür ile çalışma düzlemi arası yükseklik','m','Bölge indeksi k hesabında'],
+    ray_dusumu:['—','Ray uzunluğu düşümü','m','I = Hk − 0,20'],
+    flexbil_sabiti:['—','Flexbil uzunluğu sabiti','m','Flexbil boyu = Hk / 2 + 3']};
+  let h='<tr><th>Sembol</th><th>Büyüklük</th><th style="text-align:right">Değer</th><th>Birim</th><th>Kaynak</th></tr>';
+  Object.entries(SEC.sabit_a).forEach(([k,val])=>{
+    const [s,b,bi,kay]=ET[k]||[k,k,'',''];
+    h+=`<tr><td><b>${s}</b></td><td>${b}</td><td class="sag">${trn(val,3)}</td><td>${bi}</td><td style="font-size:11px;color:#98A2AE">${kay}</td></tr>`;
+  });
+  $('sabit_a_tablo').innerHTML=h;
+}
+
+/* Katlanır "manuel değerler" bölümü kapalıyken de elle girilmiş bir değer
+   olduğu görünsün — gizlenen bir ezme sessiz kalmamalı. */
+function manuelRozet(){
+  [['c_manuel_rozet', ['c_manuel_V','c_manuel_k']]].forEach(([rozet, alanlar])=>{
+    const r=$(rozet); if(!r) return;
+    const n = alanlar.filter(id=>v(id)!=='').length;
+    r.textContent = n ? `${n} elle` : '';
+    r.className = 'ozel-rozet' + (n ? ' dolu' : '');
+  });
+}
+
+/* Asansör kartında ofis standardından SAPAN alan sayısı — katlanır bölüm
+   kapalıyken de görünsün diye başlıkta rozet olarak yazılır. */
+function ozelRozet(i){
+  const r = $('a_ozel_rozet'+i); if(!r) return;
+  const alanlar = ['Q_elle','Gk_elle','gr','Fmk','Fsh','S1','S2','L2',
+                   'kablo_tipi','L1','q_denge'];
+  const n = alanlar.filter(k=>v('a_'+k+i)!=='').length;
+  r.textContent = n ? `${n} özel` : '';
+  r.className = 'ozel-rozet' + (n ? ' dolu' : '');
+}
+
+/* Temel çevresi — L ( şerit boyu ) için KARŞILAŞTIRMA bilgisi.
+   Kural değildir: şeridin temelde nasıl dolaştığı projeye göre değişir,
+   bazen çevreden kısa ( yalnız bir bölüm ), bazen enine bağlarla uzun olur.
+   Yalnız "yazdığım sayı mantıklı mı" diye bakabilmek için gösterilir. */
+function temelCevresi(){
+  const e=$('a_temel_cevre'); if(!e) return;
+  const a=sayiOku(v('a_temel_a')), b=sayiOku(v('a_temel_b'));
+  e.textContent = (a>0 && b>0)
+    ? `Karşılaştırma için: bu temelin çevresi 2·( ${tr(a)} + ${tr(b)} ) = ${tr(2*(a+b))} m.`
+    : '';
+}
+
+/* Q ve Gk artık GİRDİ değil, TÜRETİLEN değerdir:
+     Q  = kapasiteden ( Tablo-7 ),  Gk = anma yükünden ( Tablo-11 ).
+   Ana kartta salt okunur gösterilir; tablo dışına çıkmak gerekirse
+   katlanır bölümdeki "Q elle" / "Gk elle" alanları kullanılır ve bu
+   satırlar o zaman GİRİLEN değeri gösterir — yani her zaman hesapta
+   kullanılan değer görünür. */
+function turetilenGoster(r){
+  const liste = (r && r.asansorler) || [];
+  for(let i=1;i<=4;i++){
+    const oz = (liste[i-1] || {}).ozet || null;
+    const q = $('a_Q_goster'+i), g = $('a_Gk_goster'+i);
+    if(q){
+      q.value = (oz && oz.Q!=null) ? trn(oz.Q,0)
+              : (v('a_Q_elle'+i) || (SEC.tablo_7||{})[v('a_kapasite'+i)] || '');
+    }
+    if(g){
+      g.value = (oz && oz.Gk!=null) ? trn(oz.Gk,0) : (v('a_Gk_elle'+i) || '');
+    }
+    //  L1 yer tutucusu HESAPLANAN değeri gösterir: "42,00  ( Hk + 3,50 )".
+    //  Böylece "kuyu yüksekliğinden mi geliyor" sorusu ekrandan cevaplanır.
+    const l1 = $('a_L1'+i);
+    if(l1){
+      const pay = sayiOku((($('of_L1_pay')||{}).value) || (SEC.ofis_varsayilan||{}).L1_pay);
+      const hk  = sayiOku(v('a_Hk'+i));
+      const hes = (oz && oz.L1!=null) ? oz.L1 : ((hk>0 && pay>=0) ? hk+pay : NaN);
+      l1.placeholder = isFinite(hes)
+        ? `${tr(hes)}   ( Hk + ${tr(pay)} )` : 'Hk + ofis payı';
+    }
+  }
+}
+
+function sabitFormuKur(){
+  const yedek = new Set(SEC.sabit_b_yedek || []);
+  const B = SEC.sabit_b || {}, C = SEC.ofis_varsayilan || {};
+  const deger = (kaynak, k) => (kaynak === 'sb' ? B[k] : C[k]);
+  let h = '', basilan = new Set();
+
+  SABIT_GRUP.forEach(([baslik, aciklama, alanlar]) => {
+    const gecerli = alanlar.filter(x => {
+      const [kaynak, k] = x.split(':');
+      return !yedek.has(k) && deger(kaynak, k) !== undefined;
+    });
+    if(!gecerli.length) return;
+    h += `<div class="bolum-bas">${baslik}${aciklama ? ` <span class="ipucu">— ${aciklama}</span>` : ''}</div>`;
+    gecerli.forEach(x => {
+      const [kaynak, k] = x.split(':');
+      basilan.add(k);
+      const [et, ip] = SABIT_ETIKET[k] || [k, ''];
+      const d = String(deger(kaynak, k)).replace('.', ',');
+      const girdi = (k === 'kapi_tipi')
+        ? `<select id="of_${k}" class="girdi">${(SEC.kapi_tipleri||[])
+             .map(v=>`<option value="${v}"${v===C[k]?' selected':''}>${v}</option>`).join('')}</select>`
+        : `<input id="${kaynak}_${k}" class="girdi" value="${d}">`;
+      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>${girdi}</div>`;
+    });
+  });
+
+  /*  Gruplara yazılmamış bir sabit kalırsa SESSİZCE kaybolmasın — yeni bir
+      sabit eklenip SABIT_GRUP güncellenmezse burada görünür. */
+  const artan = [];
+  Object.keys(B).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['sb',k]); });
+  Object.keys(C).forEach(k=>{ if(!yedek.has(k) && !basilan.has(k)) artan.push(['of',k]); });
+  if(artan.length){
+    h += `<div class="bolum-bas">DİĞER <span class="ipucu">— henüz bir hesap grubuna yazılmadı</span></div>`;
+    artan.forEach(([kaynak,k])=>{
+      const [et,ip] = SABIT_ETIKET[k] || [k,''];
+      const d = String(deger(kaynak,k)).replace('.',',');
+      h += `<div class="alan"><label>${et} ${ip?`<span class="ipucu">— ${ip}</span>`:''}</label>
+            <input id="${kaynak}_${k}" class="girdi" value="${d}"></div>`;
+    });
+  }
+
+  //  Panelde görünmeyen alanlar ( SABIT_B_YEDEK — askı oranı ) kart
+  //  başlığındaki ( ! ) balonunda anlatılır; ekranı kalabalıklaştıran
+  //  bilgi bandına gerek yok.
+  $('sabit_b_form').innerHTML = h;
+}
+
+function sabitleriSifirla(){
+  //  İki kaynak da sıfırlanır: sb_* ( SABİTLER sayfası ) + of_* ( GİRİŞ hücreleri )
+  Object.entries(SEC.sabit_b||{}).forEach(([k,val])=>{
+    const e=$('sb_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
+  });
+  Object.entries(SEC.ofis_varsayilan||{}).forEach(([k,val])=>{
+    const e=$('of_'+k); if(e) alanaYaz(e, String(val).replace('.',','));
+  });
+  ofisTazele(); planla(); durum('Ofis standardının tamamı varsayılana döndürüldü');
+}
+
+function ofisSifirla(){ sabitleriSifirla(); }
+
+/* Ofis varsayılanı olan alanların YER TUTUCUSU her zaman güncel değeri
+   gösterir: kullanıcı panelde ray kütlesini değiştirdiğinde asansör
+   kartındaki boş alan da yeni değeri "hayalet" olarak gösterir. */
+function ofisTazele(){
+  document.querySelectorAll('.ofis-alan').forEach(e=>{
+    const k = e.dataset.ofis; if(!k) return;
+    const kaynak = $('of_'+k);
+    const deger = kaynak ? kaynak.value.trim() : '';
+    if(e.tagName==='SELECT'){
+      const ilk = e.options[0];
+      if(ilk && ilk.value==='') ilk.textContent = deger ? `ofis standardı ( ${deger} )` : 'ofis standardı';
+    }else{
+      e.placeholder = deger || 'ofis standardı';
+    }
+  });
+  for(let i=1;i<=4;i++) ozelRozet(i);
+  manuelRozet();
+}
