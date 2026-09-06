@@ -42,6 +42,7 @@ import tempfile
 import zipfile
 
 import ezdxf
+from ezdxf import zoom
 from reportlab.pdfbase import pdfmetrics
 
 from pdfminer.high_level import extract_pages
@@ -122,6 +123,20 @@ YAZI_BICIMI_K = "AVAN-KALIN"
 #  tipinde bulunmayan harf AutoCAD'de "?" olarak çıkar.  Bu üçü, aynı anlamı
 #  taşıyan ve her yazı tipinde bulunan karşılıklarına çevrilir.  Anlam kaybı
 #  yoktur: satırlar zaten "UYGUN / UYGUN DEĞİL", "sağlanıyor / aşılıyor" der.
+#
+#  ŞAPKA ( ^ )  —  AUTOCAD'İ ÇÖKERTİYOR, sadece çirkin görünmüyor.
+#  AutoCAD metinde "^" + karakteri DENETİM KARAKTERİ diye yorumlar ( ^8 → 0x18,
+#  ^( → 0x08 ).  Yazı tipinde o kodun glifi yoktur ve macOS'ta arama
+#  FontCacheOSX::getCharData içinde ÇÖKER:  AutoCAD 2027 "A software problem
+#  has caused application to close unexpectedly" verip kapanır, çizim hiç
+#  açılmaz.  AutoCAD 2027 for Mac'in kendi başsız motorunda ( AcCoreConsole )
+#  ölçüldü:  "^8" ve "e^(f·α)" çökertiyor, "^^8" · "%%948" · "**8" · "ˆ8"
+#  çökertmiyor.  Şapka paftada ÜS işareti olarak geçiyor  —  10^[…], e^(f·α),
+#  (Dt/dh)^8,567  —  yani kaçınılmaz.
+#  Yerine U+02C6 ( düzeltme imi ) konur:  görünüşü şapkanın aynısıdır, CP1252'de
+#  0x88'de durduğu için HER ANSI yazı tipinde bulunur ve hiçbir CAD onu denetim
+#  karakteri saymaz.  "**" ya da "%%94" de çökertmiyordu ama biri gösterimi
+#  bozar, öteki yalnız AutoCAD'in anladığı bir kaçıştır.
 CAD_SIMGE = {
     "✔": "√",     # ✔ → √   onay
     "✓": "√",     # ✓ → √
@@ -129,6 +144,7 @@ CAD_SIMGE = {
     "✕": "×",     # ✕ → ×
     "⚠": "!",          # ⚠ → !   uyarı
     "ℹ": "i",          # ℹ → i   bilgi
+    "^": "ˆ",     # ^ → ˆ   ÜS  ( denetim karakteri olarak yorumlanmasın )
 }
 
 #  Aynı satırda sayılan iki karakter arasındaki azami boşluk ( em oranı ).
@@ -458,6 +474,33 @@ def _yerlesim(adet):
     return yerler, (kullanilan_y > yuk + 0.5)
 
 
+def _gorunumu_ayarla(d, kutu):
+    """
+    Çizim AÇILDIĞINDA EKRANDA GÖRÜNSÜN diye sınırları ve kayıtlı görünümü kurar.
+
+    İKİ AYRI ŞEY DÜZELTİLİR:
+
+    ·  $EXTMIN / $EXTMAX  —  ezdxf bu başlıkları dosyayı YAZARKEN model
+       sekmesinin kendi değerlerinden YENİDEN ÜRETİR ( Drawing.update_extents ).
+       Başlığa doğrudan yazmak bu yüzden hiçbir işe yaramıyordu:  şablondan
+       gelen 1e+20 / -1e+20  —  "hiç hesaplanmadı" işareti  —  dosyaya olduğu
+       gibi geçiyor, ZOOM EXTENTS'in dayanağı kalmıyordu.  Değer artık
+       sekmenin üstüne yazılıyor; başlığı ezdxf oradan doldurur.
+
+    ·  KAYITLI GÖRÜNÜM ( *Active VPORT )  —  şablonda ORİJİNDE ve 1000 birim
+       yüksekliğinde duruyor;  oysa ofisin pafta formatı x ≈ -4000'de.  Dosya
+       bu yüzden AutoCAD'de BOMBOŞ bir ekranla açılıyordu:  çizim ekranın
+       kilometrelerce dışında kalıyor, kullanıcı "dosya açılmadı" sanıyordu.
+    """
+    x0, y0, x1, y1 = kutu
+    msp = d.modelspace()
+    msp.dxf.extmin = (x0, y0, 0)
+    msp.dxf.extmax = (x1, y1, 0)
+    msp.dxf.limmin = (x0, y0)
+    msp.dxf.limmax = (x1, y1)
+    zoom.window(msp, (x0, y0), (x1, y1))
+
+
 def _dxf_yaz(sayfalar, surum=None) -> bytes:
     """Şablonsuz yedek yol:  sayfaları yan yana bir şerit olarak yazar."""
     d = ezdxf.new(surum or DXF_SURUMU, setup=True)
@@ -472,8 +515,7 @@ def _dxf_yaz(sayfalar, surum=None) -> bytes:
         _a4_cercevesi(msp, ox, 0.0, g, y)
         _sayfayi_ciz(msp, sayfa, ox, 0.0)
         ox += g + ARA
-    d.header["$EXTMIN"] = (0, 0, 0)
-    d.header["$EXTMAX"] = (max(ox - ARA, A4_G), A4_Y, 0)
+    _gorunumu_ayarla(d, (0.0, 0.0, max(ox - ARA, A4_G), A4_Y))
     return _kaydet(d)
 
 
@@ -519,8 +561,9 @@ def _formata_yerlestir(sayfalar):
                       sayfa["yukseklik"] * PT_MM)
         _sayfayi_ciz(msp, sayfa, ox, oy)
 
-    d.header["$EXTMIN"] = (BANT[0] - 10, min([BANT[1]] + [y for _x, y in yerler]) - 10, 0)
-    d.header["$EXTMAX"] = (BANT[2] + 10, BANT[3] + 10, 0)
+    _gorunumu_ayarla(d, (BANT[0] - 10,
+                         min([BANT[1]] + [y for _x, y in yerler]) - 10,
+                         BANT[2] + 10, BANT[3] + 10))
     return _kaydet(d), tasti
 
 

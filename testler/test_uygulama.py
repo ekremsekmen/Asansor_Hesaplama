@@ -519,6 +519,66 @@ def calistir():
     av = AV.hesapla(UG.kopru(UG.tamamla(dict(UG.varsayilanlar(), **TAM))))
     r.esit("elektrik özeti avan motoruyla aynı",
            birlikte["ozet"]["P_kurulu"], av["asansorler"][0]["ozet"]["P_kurulu"])
+
+    # ==================================================================
+    #  CAD ÇIKTISI  —  UYGULAMA PAFTASI AUTOCAD'DE AÇILIYOR MU
+    #
+    #  Bu bölümün varlık sebebi teslim edilmiş bir projedir:  AutoCAD 2027
+    #  çizimi açarken ÇÖKÜYORDU ( "A software problem has caused application
+    #  to close unexpectedly" ).  Sebep, AutoCAD'in metinde "^" + karakteri
+    #  DENETİM KARAKTERİ diye yorumlaması;  yazı tipinde o kodun glifi yok ve
+    #  macOS'ta arama FontCacheOSX::getCharData içinde çöküyor.  Şapka YALNIZ
+    #  uygulama paftasında geçiyordu  —  halat emniyet katsayısı formülünde
+    #  ( 10^[…], (Dt/dh)^8,567 ) ve tahrik yeteneğinde ( e^(f·α) )  —  bu
+    #  yüzden avan paftalarını ölçen TEST 4 hatayı göremedi.  Uygulama
+    #  paftasının CAD çıktısı o günden beri BURADA ölçülüyor.
+    # ==================================================================
+    try:
+        import ezdxf                                          # noqa: F401
+        from exports import dxf_export as DXE                 # noqa: E402
+        from exports import pdf_export as PE                  # noqa: E402
+    except Exception as _cad_hata:                            # noqa: BLE001
+        r.atla(f"CAD çıktısı testi atlandı — ezdxf / pdfminer.six kurulu değil "
+               f"( {_cad_hata} )")
+    else:
+        #  `s` bu noktada bozuk girdilerle yeniden hesaplanmış durumda;
+        #  pafta TAM girdiden üretilmeli.
+        _pdf = PE.uygulama_pdf(birlikte)
+        _dxf = DXE.proje_dxf([("Uygulama Projesi", _pdf)])
+        import io as _io
+        _d = ezdxf.read(_io.StringIO(_dxf.decode("utf-8")))
+        _m = _d.modelspace()
+        _yazilar = [_e.dxf.text for _e in _m.query("TEXT")]
+        r.kontrol("CAD: uygulama paftası çizime döndü", len(_yazilar) > 100,
+                  f"→ {len(_yazilar)} yazı")
+
+        _sapkali = [t for t in _yazilar if "^" in t]
+        r.kontrol("CAD: hiçbir yazıda şapka ( ^ ) yok — AutoCAD'i çökertiyor",
+                  not _sapkali, f"→ {_sapkali[:3]}")
+        _yuzdeli = [t for t in _yazilar if "%%" in t]
+        r.kontrol("CAD: hiçbir yazıda AutoCAD kaçış dizisi ( %% ) yok",
+                  not _yuzdeli, f"→ {_yuzdeli[:3]}")
+        #  Üs işareti PAFTADA gerçekten var mı — yoksa yukarıdaki iki kontrol
+        #  hiçbir şey ölçmemiş olur.
+        _pdf_yazi = " ".join(t["metin"] for _s in DXE._sayfa_geometrisi(_pdf)
+                             for t in _s["metinler"])
+        r.kontrol("CAD: paftada üs işareti gerçekten geçiyor  ( ölçüt boş değil )",
+                  "^" in _pdf_yazi)
+        r.kontrol("CAD: üs işareti çizimde U+02C6 olarak duruyor",
+                  any("\u02c6" in t for t in _yazilar))
+
+        #  Açılış görünümü:  sınırlar hesaplanmış ve görünüm çizimin üstünde
+        _emin, _emax = _d.header["$EXTMIN"], _d.header["$EXTMAX"]
+        r.kontrol("CAD: $EXTMIN / $EXTMAX hesaplanmış ( 1e+20 değil )",
+                  all(abs(q) < 1e9 for q in list(_emin) + list(_emax)),
+                  f"→ {_emin} {_emax}")
+        from ezdxf.bbox import extents as _extents
+        _bb = _extents(_m)
+        _mrk = list(_d.viewports.get("*Active"))[0].dxf.center
+        r.kontrol("CAD: kayıtlı görünüm çizimin ÜSTÜNDE ( boş ekran açılmıyor )",
+                  _bb.extmin.x <= _mrk.x <= _bb.extmax.x
+                  and _bb.extmin.y <= _mrk.y <= _bb.extmax.y,
+                  f"→ görünüm {_mrk}, çizim {_bb.extmin}-{_bb.extmax}")
     return r
 
 

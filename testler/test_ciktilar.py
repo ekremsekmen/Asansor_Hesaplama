@@ -930,6 +930,62 @@ def calistir():
                   "UYGUN" in _cad_yazi and "ASANSÖR" in _cad_yazi)
 
         # ---------------------------------------------------------------
+        #  ŞAPKA  —  AUTOCAD'İ ÇÖKERTEN KARAKTER  ( v2.4'te bulunan hata )
+        #  AutoCAD metinde "^" + karakteri DENETİM KARAKTERİ diye yorumlar
+        #  ( ^8 → 0x18, ^( → 0x08 ).  Yazı tipinde o kodun glifi yoktur ve
+        #  macOS'ta arama FontCacheOSX::getCharData içinde ÇÖKER:  AutoCAD
+        #  2027 "A software problem has caused application to close
+        #  unexpectedly" verip kapanır, çizim HİÇ AÇILMAZ.  Teslim edilen bir
+        #  projede ölçüldü;  suçlu, halat emniyet katsayısı formülündeki
+        #  "(Dt/dh)^8,567" ile "e^(f·α)" idi.  Şapka paftada üs işareti olarak
+        #  geçtiği için kaçınılmazdır — çizimde U+02C6 ile yazılır.
+        #  "%%" de AutoCAD'in kendi kaçış dizisidir ( %%d %%c %%p %%nnn );
+        #  çizimde bulunursa yazının bir bölümü YUTULUR.
+        # ---------------------------------------------------------------
+        _sapkali = [_e.dxf.text for _e in _m.query("TEXT") if "^" in _e.dxf.text]
+        r.kontrol("CAD: hiçbir yazıda şapka ( ^ ) yok — AutoCAD'i çökertiyor",
+                  not _sapkali, f"→ {_sapkali[:3]}")
+        _yuzdeli = [_e.dxf.text for _e in _m.query("TEXT") if "%%" in _e.dxf.text]
+        r.kontrol("CAD: hiçbir yazıda AutoCAD kaçış dizisi ( %% ) yok",
+                  not _yuzdeli, f"→ {_yuzdeli[:3]}")
+        r.esit("CAD: şapkanın karşılığı U+02C6", DXE.CAD_SIMGE["^"], "\u02c6")
+        if "^" in _pdf_yazi:
+            r.kontrol("CAD: paftadaki üs işaretleri çizimde de duruyor",
+                      "\u02c6" in _cad_yazi)
+
+        # ---------------------------------------------------------------
+        #  AÇILIŞ GÖRÜNÜMÜ  ( v2.4'te bulunan hata )
+        #  $EXTMIN / $EXTMAX BAŞLIĞA yazılıyordu; oysa ezdxf bu başlıkları
+        #  dosyayı yazarken model sekmesinin kendi değerlerinden yeniden
+        #  üretir — atama dosyaya hiç geçmiyor, şablondan gelen 1e+20 /
+        #  -1e+20 ( "hiç hesaplanmadı" ) kalıyordu.  Üstelik kayıtlı görünüm
+        #  şablonda ORİJİNDE duruyor, oysa pafta formatı x ≈ -4000'de:  çizim
+        #  bomboş bir ekranla açılıyordu.
+        # ---------------------------------------------------------------
+        _emin, _emax = _d.header["$EXTMIN"], _d.header["$EXTMAX"]
+        r.kontrol("CAD: $EXTMIN hesaplanmış ( 1e+20 değil )",
+                  all(abs(_q) < 1e9 for _q in _emin), f"→ {_emin}")
+        r.kontrol("CAD: $EXTMAX hesaplanmış ( -1e+20 değil )",
+                  all(abs(_q) < 1e9 for _q in _emax), f"→ {_emax}")
+        r.kontrol("CAD: $EXTMIN < $EXTMAX", _emin[0] < _emax[0] and _emin[1] < _emax[1])
+        from ezdxf.bbox import extents as _extents
+        _bb = _extents(_m)
+        r.kontrol("CAD: sınırlar gerçek çizimi kapsıyor",
+                  _emin[0] <= _bb.extmin.x and _emin[1] <= _bb.extmin.y
+                  and _emax[0] >= _bb.extmax.x and _emax[1] >= _bb.extmax.y,
+                  f"→ sınır {_emin}-{_emax}, çizim {_bb.extmin}-{_bb.extmax}")
+        _vp = list(_d.viewports.get("*Active"))
+        r.kontrol("CAD: kayıtlı görünüm tanımlı", len(_vp) == 1)
+        _mrk = _vp[0].dxf.center
+        r.kontrol("CAD: kayıtlı görünüm çizimin ÜSTÜNDE ( boş ekran açılmıyor )",
+                  _bb.extmin.x <= _mrk.x <= _bb.extmax.x
+                  and _bb.extmin.y <= _mrk.y <= _bb.extmax.y,
+                  f"→ görünüm merkezi {_mrk}, çizim {_bb.extmin}-{_bb.extmax}")
+        r.kontrol("CAD: görünüm yüksekliği çizimi alıyor",
+                  _vp[0].dxf.height >= (_bb.extmax.y - _bb.extmin.y),
+                  f"→ {_vp[0].dxf.height:.1f} / {_bb.extmax.y - _bb.extmin.y:.1f}")
+
+        # ---------------------------------------------------------------
         #  BAĞIMSIZ VERİ SADAKATİ  ( denetim 2.5 )
         #  Yukarıdaki karşılaştırmalar dxf_export'un KENDİ okuyucusuyla
         #  yapılır — okuyucu yanılırsa test de onunla birlikte yanılır.

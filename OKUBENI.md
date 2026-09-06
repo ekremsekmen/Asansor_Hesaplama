@@ -468,21 +468,21 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**23.693 kontrolün tamamı geçmiştir.**
+**23.711 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **790 / 790** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **427 / 427** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **438 / 438** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **370 / 370** |
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.537 / 4.537** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ve varsayılan açılarda kitapla birebir tutar | **951 / 951** |
 | **9 · Mukavemet motoru** | 100 sonuç hücresi + **yirmi iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü denetimin her bulgusu yeniden üretilerek** + girdi reddi | **470 / 470** |
 | **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **9.354 / 9.354** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği** | **217 / 217** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **224 / 224** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -502,9 +502,11 @@ sistemler ve topraklama varyasyonları.
 
 Testlerin geçmesi hataları dışlamaz. Aşağıdakiler **testlerin yakalamadığı**,
 ayrı denetimlerde bulunup yeniden üretilen hatalardır; her biri artık kendi
-regresyon kontrolüyle korunuyor. İki tur yapıldı: birincisi programın
+regresyon kontrolüyle korunuyor. Beş tur yapıldı: birincisi programın
 **davranışını** ( girdi–çıktı, dosya akışı, uyarılar ), ikincisi doğrudan
-**hesap motorlarını** standardın metnine karşı denetledi.
+**hesap motorlarını** standardın metnine karşı, üçüncüsü **sayısal fiziği**,
+dördüncüsü **sınır durumlarını**, beşincisi de **teslim edilen çizimin
+AutoCAD'de açıldığını** denetledi.
 
 #### Birinci denetim — davranış ve dosya akışı
 
@@ -596,6 +598,39 @@ iki bulgu normal girdilerde hesabı etkilemez; kalkanların eksikliğidir.
 
 Her ikisinde de **ikinci kalkan** var: girdi doğrulaması atlansa bile motor
 çökmüyor, bölüm 1 *"HESAP YAPILAMADI"* diyor ve proje *uygundur* çıkmıyor.
+
+#### Beşinci denetim — teslim edilen çizim AutoCAD'de açılmıyordu
+
+Teslim edilmiş bir uygulama projesinin DXF'i **AutoCAD 2027 for Mac'te
+açılmıyor**, program *"A software problem has caused application to close
+unexpectedly"* verip kapanıyordu. Dosya bozuk değildi: yapısal denetimden
+sıfır hatayla geçiyor, etiket akışı kusursuz, sınıflar ve karolar eksiksiz.
+
+Sebep AutoCAD'in kendi başsız motoruyla ( `AcCoreConsole` ) yığın izi alınarak
+bulundu — çökme yeniden çizim sırasında, bir yazının TrueType genişliği
+ölçülürken:
+
+```
+regenall → fullregen → AcDbImpText::textDraw → TextEditor::get_extents
+  → AcGiContextImp::getTrueTypeTextExtents → WhipImp::GetTextExtents
+    → FontCacheHashImp::calTotalWidths → FontCacheOSX::getCharData   ← ÇÖKME
+```
+
+Suçlu, ikili aramayla 2 943 varlıktan tek bir yazıya, oradan **iki karaktere**
+indirildi. Her adım gerçek AutoCAD çekirdeğinde ölçüldü.
+
+| Bulgu | Etkisi ve düzeltme |
+|---|---|
+| **Şapka ( `^` ) AutoCAD'i çökertiyordu.** AutoCAD metinde `^` + karakteri **denetim karakteri** diye yorumlar ( `^8` → 0x18, `^(` → 0x08 ); yazı tipinde o kodun glifi yoktur ve macOS'ta arama çöker | En kısa çökerten parça **`^8`** ( `8` tek başına açılıyor ). İkinci suçlu `e^(f·α)`. Şapka paftada **üs işareti** olarak geçiyor — `10^[…]` · `(Dt/dh)^8,567` · `e^(f·α)` — yani kaçınılmaz. Çizimde artık **U+02C6** yazılır: görünüşü şapkanın aynısı, CP1252'de 0x88'de durduğu için her ANSI yazı tipinde var, hiçbir CAD onu denetim karakteri saymaz. `**` ve `%%94` de çökertmiyordu ama biri gösterimi bozar, öteki yalnız AutoCAD'in anladığı bir kaçıştır |
+| **`$EXTMIN` / `$EXTMAX` atamaları dosyaya hiç geçmiyordu** | ezdxf bu başlıkları dosyayı **yazarken** model sekmesinin kendi değerlerinden yeniden üretir ( `Drawing.update_extents` ); başlığa yazmak boşunaydı. Şablondan gelen `1e+20 / -1e+20` ( *"hiç hesaplanmadı"* ) dosyaya olduğu gibi geçiyor, ZOOM EXTENTS'in dayanağı kalmıyordu. Değer artık sekmenin üstüne yazılıyor |
+| **Kayıtlı görünüm orijinde duruyordu** | Şablonun `*Active` görünümü ( 0, 0 ), 1 000 birim yüksekliğinde; oysa ofisin pafta formatı **x ≈ −4 000**'de. Çökme olmasaydı bile çizim **bomboş ekranla** açılırdı. Görünüm artık çizimin üstüne oturtulur |
+
+Şapka **yalnız uygulama paftasında** geçiyordu; avan paftalarını ölçen TEST 4
+bu yüzden hatayı göremedi. Uygulama paftasının CAD çıktısı artık **TEST 11'de**
+ayrıca ölçülüyor: hiçbir yazıda `^` ya da `%%` kalmadığı, üs işaretinin
+paftada gerçekten geçtiği ( ölçüt boş kalmasın ), sınırların hesaplandığı ve
+görünümün çizimin üstünde olduğu. Düzeltilmiş çizim, aynı kaynak paftalardan
+yeniden üretilip **AutoCAD 2027'de açılarak** doğrulandı.
 
 ### Test yazılırken bulunan ve düzeltilen hatalar
 
@@ -814,10 +849,23 @@ Excel *"uygundur"* derdi. Bu yüzden **teslim edilen kopyada ilgili formüller
 düzeltilir** — değerler değil, **formüller**; kitap kendi kendini hesaplamaya
 devam eder ve Excel'de girdi değiştirildiğinde de doğru sonucu verir.
 
-**Şablon dosyasına dokunulmaz.** `templates/MUKAVEMET_HESABI.xlsx` özgün
-hâlinde kalır; doğrulama testleri programı ona karşı denetlemeye devam eder.
-Doğrulama paketi hem şablonun değişmediğini hem de teslim kopyasının paftayla
-**hücre hücre birebir aynı** olduğunu denetler.
+**Şablonun HESABINA dokunulmaz.** `templates/MUKAVEMET_HESABI.xlsx` içindeki
+formüller, değerler ve tablolar özgün hâlinde kalır; doğrulama testleri
+programı ona karşı denetlemeye devam eder. Doğrulama paketi hem şablonun
+hesabının değişmediğini hem de teslim kopyasının paftayla **hücre hücre
+birebir aynı** olduğunu denetler.
+
+Şablonda hesap dışı **tek** düzeltme yapılmıştır: *Veri Girişi* `B131`
+( **Ray Çeliği Rm** ) hücresinin 370 / 440 / 520 açılır listesi, Excel'in
+**uzantı biçiminde** ( `x14:dataValidation` ) yazılmıştı. openpyxl bu biçimi
+tanımıyor — okurken *"Data Validation extension is not supported and will be
+removed"* diye uyarıyor, kaydederken de **atıyordu**:  teslim edilen kitapta o
+tek açılır liste kayboluyor, kitabı elle açan biri Rm'ye listede olmayan bir
+sayı yazabiliyordu. Doğrulama artık kitabın **kendi düzenine uygun** normal
+biçimde duruyor ve sayfa-dışı listeyi `rayçeliğirm` adlandırılmış alanıyla
+gösteriyor — kitap `firmalistesi`, `tamponmarka` gibi dört listeyi zaten böyle
+kuruyor ve eski Excel sürümleri sayfa-dışı referansı ancak böyle kabul eder.
+Teslim edilen kopyada doğrulama sayısı **32 → 33** çıktı, uyarı da sustu.
 
 #### Ofisin ana kitabını düzeltmek
 
