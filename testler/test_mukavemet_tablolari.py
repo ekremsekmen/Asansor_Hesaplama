@@ -82,30 +82,46 @@ def _kanal_tablosu(r, ws):
         aci_x, neq_x = satir.get(ad, (None, None))
         #  Kitabın "açı" sütunu iki büyüklüğü karıştırır:  V kanalda γ,
         #  altı kesik kanalda β.  Karşılaştırma buna göre yapılır.
-        bizim_aci = (O["kanal_beta"] if MT.kanal_alti_kesik_mi(ad)
-                     else (None if MT.kanal_yarim_daire_mi(ad)
-                           else O["kanal_gama_v"]))
+        _tur = MT.kanal_turu(ad)
+        bizim_aci = (O["kanal_beta"] if _tur == "UK"
+                     else (None if _tur == "U" else O["kanal_gama_v"]))
+        bizim = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
+        if _tur == "VK":
+            #  ALTI KESİK V'DE BİLEREK AYRILIYORUZ:  kitap onu Çizelge 2'nin
+            #  β satırından okuyor ( 5,0 ), standart ise V satırındadır
+            #  ( γ = 38° → 12 ).  Bkz. EXCEL_FARKLARI ㉕.
+            r.esit(f"kanal '{ad}' kitapta β satırından okunuyor", neq_x, 5)
+            r.esit(f"kanal '{ad}' bizde V satırından  ( standart )", bizim, 12.0)
+            continue
         r.kontrol(f"kanal '{ad}' açısı kitapla aynı  ( varsayılan ofis )",
                   _esit(bizim_aci, aci_x), f"→ modül {bizim_aci!r}, Excel {aci_x!r}")
-        bizim = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
         r.kontrol(f"kanal '{ad}' Nequiv(t) kitapla aynı  ( varsayılan ofis )",
                   _esit(bizim, neq_x), f"→ modül {bizim!r}, Excel {neq_x!r}")
     #  ÇİZELGE 2'NİN KENDİSİ  —  TS EN 81-50 m.5.12.2.2
     for aci, bek in MT.NEQUIV_V:
         r.esit(f"Çizelge 2  V kanal γ = {aci}°",
                MT.kanal_nequiv_t("V Kanal", aci, 90), bek)
+    #  β SATIRI "U-Undercut grooves" SATIRIDIR:  altı kesik YARIM DAİRE.
+    #  Altı kesik V, Çizelge 2'nin V satırındadır ( bkz. EXCEL_FARKLARI ).
     for aci, bek in MT.NEQUIV_U_ALTI_KESIK:
-        r.esit(f"Çizelge 2  altı kesik β = {aci}°",
-               MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, aci), bek)
+        r.esit(f"Çizelge 2  altı kesik yarım daire β = {aci}°",
+               MT.kanal_nequiv_t("Altı Kesik Yarım Daire Kanal", 38, aci), bek)
+    for aci, bek in MT.NEQUIV_V:
+        r.esit(f"Çizelge 2  altı kesik V γ = {aci}°  ( V satırı )",
+               MT.kanal_nequiv_t("Altı Kesik V Kanal", aci, 90), bek)
+    r.esit("altı kesik V'de β Nequiv'i değiştirmez",
+           MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, 105), 12.0)
     r.esit("Çizelge 2  alt kesilmesiz yarım daire",
            MT.kanal_nequiv_t("Yarım Daire Kanal", 38, 90), 1.0)
     r.esit("çift sarımda iki geçiş",
            MT.kanal_nequiv_t("Yarım Daire Kanal (Çift Sarım)", 38, 90), 2.0)
     #  Ara değer:  çizelgenin kendi notu doğrusal ara değere izin verir
+    r.esit("Çizelge 2  ara değer β = 87,5°  ( altı kesik yarım daire )",
+           MT.kanal_nequiv_t("Altı Kesik Yarım Daire Kanal", 38, 87.5), 4.4)
     r.esit("Çizelge 2  ara değer γ = 39°",
            MT.kanal_nequiv_t("V Kanal", 39, 90), 11.0)
-    r.esit("Çizelge 2  ara değer β = 87,5°",
-           MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, 87.5), 4.4)
+    r.esit("Çizelge 2  ara değer γ = 43,5°  ( altı kesik V, V satırı )",
+           MT.kanal_nequiv_t("Altı Kesik V Kanal", 43.5, 90), 7.25)
 
 
 def _genisletilen_tablo(r, ad, tablo, excel):

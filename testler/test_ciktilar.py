@@ -1155,7 +1155,10 @@ def calistir():
     #  FKR de motordan okunur:  ray ağırlığı iki kez sayılmayı bırakınca
     #  21.326 → 18.096 oldu ( bkz. EXCEL_FARKLARI ).
     _fkr = f"{_msn['ozet']['FKR']:,.0f}".replace(",", ".")
-    for _ara in (_ngucu, "17,63", _fkr, "58.860"):
+    #  Sf de motordan okunur:  altı kesik V kanal Çizelge 2'nin V satırına
+    #  oturunca 17,63 → 23,61 oldu ( bkz. EXCEL_FARKLARI ).
+    _sf = f"{_msn['ozet']['Sf']:.2f}".replace(".", ",")
+    for _ara in (_ngucu, _sf, _fkr, "58.860"):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
                   f"→ paftada yok")
     r.kontrol("mukavemet PDF'inde makine tipi ve η′ görünüyor",

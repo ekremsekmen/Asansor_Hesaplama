@@ -162,6 +162,19 @@ ALANLAR = (
     #  YOKTUR ( oraya 1 yazılıdır ), bu yüzden hücre alanı boştur.  Boş
     #  bırakılırsa ray tablosundaki balata yarı genişliğinden türetilir.
     ("paten_balata_boyu", "", "Paten balatası uzunluğu  ( ℓ )",  "mm",   "sayi", None, None),
+    #  TS EN 81-50 m.5.10.5 / Ek C.2.1.4 flanş eğilmesi için İKİ formül verir:
+    #  makaralı patende 1,85·Fx/c² , kaymalı patende balata boyuna bağlı olan.
+    #  Kitap yalnız kaymalıyı tanıyordu.
+    ("paten_tipi",        "",     "Paten tipi",                        "—",    "secim",
+     _s("Kaymalı", "Makaralı"), "Kaymalı"),
+    #  Ek C.2.1.2 / C.2.2.2 / C.2.3.2:  Fv = … + Fp.  Fp, bir raydaki bütün
+    #  konsol klipslerinin itme kuvvetidir ( binanın oturması, betonun
+    #  büzülmesi ).  Kitapta hiç yoktu;  varsayılan 0, değeri tesise bağlıdır.
+    ("klips_itme_kuvveti", "",    "Fp ( konsol klipslerinin itme kuvveti )", "N", "sayi", None, 0),
+    #  Ek C.2.1.5 / C.2.2.5 / C.2.3.5:  δ = 0,7·F·l³/(48·E·I) + δstr.
+    #  δstr binanın kendi sehimidir;  kitapta hiç yoktu, varsayılan 0.
+    ("yapi_sehim_x",      "",     "δstr-x ( bina yapısının x sehimi )", "mm",   "sayi", None, 0),
+    ("yapi_sehim_y",      "",     "δstr-y ( bina yapısının y sehimi )", "mm",   "sayi", None, 0),
 
     # ── KARŞI AĞIRLIK ─────────────────────────────────────────────────
     ("agirlik_malzemesi", "B118", "Karşı ağırlık malzemesi",           "—",    "secim",
@@ -299,7 +312,8 @@ GRUPLAR = (
      ("kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
       "agirlik_konsol_arasi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
       "ray_celigi_rm", "kabin_paten_arasi", "agirlik_paten_arasi",
-      "guvenlik_tertibati", "paten_balata_boyu")),
+      "guvenlik_tertibati", "paten_balata_boyu", "paten_tipi",
+      "klips_itme_kuvveti", "yapi_sehim_x", "yapi_sehim_y")),
     ("Karşı ağırlık", ("agirlik_malzemesi", "agirlik_ray_arasi",
                        "agirlik_guvenlik_tertibati")),
     ("Tamponlar",

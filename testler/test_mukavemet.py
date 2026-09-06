@@ -236,16 +236,18 @@ def calistir():
                   f"→ Excel {ws[hucre].value!r}, beklenen {bek!r} — "
                   "kaynak dosya güncellendiyse sapma gerekçesi gözden geçirilmeli")
     p = MT.ray("50 x 50 x 5", "Wx")
+    #  Karşı ağırlık Fy:  k2 · gn · Mcwt · Dya / ( ( n / 2 ) · h )
+    #  ( Ek C.2.2.1 b) — payda n·h DEĞİL, (n/2)·h;  bkz. EXCEL_FARKLARI )
     r.kontrol("motor σ(My) için Wx kullanıyor",
               any(_yakin(a["deger"], MK._moment(
-                  1.2 * 9.81 * 1100 * 48 / (2 * 3400), 3000) / p)
+                  1.2 * 9.81 * 1100 * 48 / ((2 / 2) * 3400), 3000) / p)
                   for a in b[7]["adimlar"] if isinstance(a["deger"], (int, float))))
     return _girdi_yollari(_denetim_bulgulari(_sapmalar(r)))
 
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 23)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 31)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -268,7 +270,7 @@ def _sapmalar(r):
 
     #  ③ Durum 2'de xQ = xc
     _xc = s["_h"]["AH293"]
-    _bek = MK.SABIT["k3"] * 0 + 2 * 9.81 * (800 * _xc + 700 * s["_h"]["AH295"]) / (2 * 3400)
+    _bek = 2 * 9.81 * (800 * _xc + 700 * s["_h"]["AH295"]) / (2 * 3400)
     r.kontrol("③ Durum 2 Fx, xQ = xc ile hesaplanıyor",
               _yakin(s["_h"]["AY335"], _bek), f"→ {s['_h']['AY335']!r} ≠ {_bek!r}")
 
@@ -298,7 +300,8 @@ def _sapmalar(r):
 
     #  ⑦ Nps / Npr artık girdi  ( Excel sabit yazıyordu )
     _n = {x: MK.hesapla({"kasnak_tek_yon": x})["_h"]["V116"] for x in (1, 2, 3)}
-    r.esit("⑦ Nps Nequiv'i belirliyor", [_n[1], _n[2], _n[3]], [6.0, 7.0, 8.0])
+    #  Nequiv(t) = 12  ( altı kesik V, γ = 38°, Çizelge 2'nin V satırı ) + Nps
+    r.esit("⑦ Nps Nequiv'i belirliyor", [_n[1], _n[2], _n[3]], [13.0, 14.0, 15.0])
     _sf = MK.hesapla({"kasnak_tek_yon": 2})["_h"]["T125"]
     r.kontrol("⑦ Nps büyüyünce gereken Sf de büyüyor",
               _sf > MK.hesapla()["_h"]["T125"], f"→ {_sf!r}")
@@ -340,7 +343,7 @@ def _sapmalar(r):
     for _tip, _bek in (("Kaymalı", 2), ("Ani Frenlemeli Makaralı", 3),
                        ("Ani Frenlemeli", 5)):
         r.esit(f"EN 81-20 Çiz.14  k1 {_tip}", _MTx.darbe_k1(_tip), _bek)
-    r.esit("EN 81-20 Çiz.14  k2 = 1,2  ( hareket )", MK.SABIT["k3"], 1.2)
+    r.esit("EN 81-20 Çiz.14  k2 = 1,2  ( hareket )", MK.SABIT["k2"], 1.2)
 
     #  EN 81-20 Çizelge 15  —  σperm = Rm / St
     for _rm, _nor, _guv in _MTx.RAY_CELIGI:
@@ -670,14 +673,23 @@ def _denetim_bulgulari(r):
     #  ── B7  Nequiv(t) ve pafta γ'sı ofis sabitini izliyor
     _n38 = MK.hesapla()["_h"]["AH104"]
     _n45 = MK.hesapla({"_ofis": {"kanal_gama_v": 45}})["_h"]["AH104"]
-    r.esit("B7  γ = 38° → Nequiv(t) = 5  ( altı kesik, β = 90° )", _n38, 5.0)
+    #  ALTI KESİK V DE BİR V KANALDIR  ( Çizelge 2'nin V satırı, γ ile ).
+    #  Kitap onu β satırından okuyup 5,0 diyordu — bkz. EXCEL_FARKLARI.
+    r.esit("B7  altı kesik V, γ = 38° → Nequiv(t) = 12", _n38, 12.0)
+    r.esit("B7  altı kesik V γ = 45° → 6,5  ( V satırını izliyor )", _n45, 6.5)
+    r.esit("B7  altı kesik V'de β Nequiv'i DEĞİŞTİRMEZ",
+           MK.hesapla({"_ofis": {"kanal_beta": 100}})["_h"]["AH104"], 12.0)
     _sb = MK.hesapla({"kanal_sekli": "V Kanal"})["_h"]["AH104"]
     _sb45 = MK.hesapla({"kanal_sekli": "V Kanal",
                         "_ofis": {"kanal_gama_v": 45}})["_h"]["AH104"]
     r.esit("B7  V kanal γ = 38° → 12", _sb, 12.0)
     r.esit("B7  V kanal γ = 45° → 6,5  ( ofis sabiti izleniyor )", _sb45, 6.5)
-    _b45 = MK.hesapla({"_ofis": {"kanal_beta": 100}})["_h"]["AH104"]
-    r.esit("B7  altı kesik β = 100° → 10", _b45, 10.0)
+    #  β satırı ALTI KESİK YARIM DAİRE kanalda geçerlidir
+    _uk = {b: MK.hesapla({"kanal_sekli": "Altı Kesik Yarım Daire Kanal",
+                          "_ofis": {"kanal_beta": b}})["_h"]["AH104"]
+           for b in (90, 100)}
+    r.esit("B7  altı kesik yarım daire β = 90° → 5", _uk[90], 5.0)
+    r.esit("B7  altı kesik yarım daire β = 100° → 10", _uk[100], 10.0)
     #  Paftaya basılan γ, hesabın kullandığı γ ile aynı mı
     for _sekil, _bek in (("V Kanal", 38), ("Yarım Daire Kanal", 25),
                          ("Altı Kesik V Kanal", 38)):
@@ -1027,6 +1039,87 @@ def _denetim_bulgulari(r):
     #  Sapma kaydı bu bulguyu taşıyor
     r.kontrol("E1  sapma kaydında yazılı",
               any("Saptırma kasnağı" in ad for ad, *_ in MK.EXCEL_FARKLARI))
+
+    #  ── E2  xp RAY EKSENİNDEN ölçülmeli  ( TS EN 81-50 Ek C.2.1.1 )
+    #  Fx = k1·gn·( Q·xQ + P·xp )/( n·h ) payı ray eksenine göre devirici
+    #  momenttir;  xQ ray ekseninden ( xQ = xc + D/8 ), xp ise KABİN
+    #  MERKEZİNDEN ölçülüyordu ve ray–kapı arası değişince hiç kımıldamıyordu.
+    def _xcxp(**ek):
+        _s = MK.hesapla(dict({"kabin_derinligi": 1400, "kabin_agirligi": 650}, **ek))
+        if not _s["aktif"]:
+            return None, None, _s
+        _b = [x for x in _s["bolumler"] if x["baslik"].startswith("7 ")][0]
+        _d = {a.get("sembol"): a["deger"] for a in _b["adimlar"] if a.get("sembol")}
+        return _d.get("xc"), _d.get("xp"), _s
+
+    #  Kapının kabin merkezine göre katkısı:  mkapı·( D/2 + pay ) / P
+    _gv = _MG.tamamla(_MG.varsayilanlar())
+    _kapi = _gv["kapi_agirligi"] * (1400 / 2 + _gv["kapi_mekanizma_payi"]) / 650
+    _degerler = []
+    for _rk in (500, 650, 830, 1000):
+        _xc, _xp, _ = _xcxp(ray_kapi_arasi=_rk)
+        _degerler.append((_rk, _xc, _xp))
+        r.kontrol(f"E2  RK={_rk}: xp = xc − mkapı·(D/2+pay)/P",
+                  _xp is not None and abs(_xp - (_xc - _kapi)) < 1e-9,
+                  f"→ xc={_xc}, xp={_xp}, beklenen {_xc - _kapi if _xc is not None else None}")
+    #  ASIL BULGU:  xp artık ray–kapı arasını İZLİYOR  ( eskiden sabitti )
+    r.kontrol("E2  xp ray–kapı arasıyla değişiyor",
+              len({round(x[2], 6) for x in _degerler}) == len(_degerler),
+              f"→ {[(x[0], x[2]) for x in _degerler]}")
+    #  Ray ekseni kabin merkezinden geçerken ( xc = 0 ) xp yalnız kapıdır
+    _xc0, _xp0, _ = _xcxp(ray_kapi_arasi=1400 / 2 + MK.SABIT["kabin_merkez_payi"])
+    r.kontrol("E2  xc = 0 iken xp = −kapı katkısı", abs(_xc0) < 1e-9
+              and abs(_xp0 + _kapi) < 1e-9, f"→ xc={_xc0}, xp={_xp0}")
+    #  EMNİYETSİZ YÖN:  ray kapıya yaklaştıkça devirici moment BÜYÜR
+    _mom = []
+    for _rk in (500, 830):
+        _xc, _xp, _s2 = _xcxp(ray_kapi_arasi=_rk)
+        _b2 = [x for x in _s2["bolumler"] if x["baslik"].startswith("7 ")][0]
+        _mom.append(next(a["deger"] for a in _b2["adimlar"]
+                         if (a.get("formul") or "") == "Fx"))
+    r.kontrol("E2  ray kapıya yaklaşınca Fx büyüyor", abs(_mom[0]) > abs(_mom[1]),
+              f"→ RK=500 Fx={_mom[0]:.1f} , RK=830 Fx={_mom[1]:.1f}")
+    r.kontrol("E2  sapma kaydında yazılı",
+              any("ağırlık merkezi kabin merkezinden" in ad
+                  for ad, *_ in MK.EXCEL_FARKLARI))
+
+    #  ── E3  Yük EN OLUMSUZ konumda  ( TS EN 81-20 m.5.7.2.3.4 )
+    #  Kitap xQ'yu her zaman xc + Dx/8 alıyordu.  xc < 0 iken bu, boş kabinin
+    #  momentini DENGELER ve gerilmeyi olduğundan küçük gösterir.
+    def _b7(**ek):
+        _s = MK.hesapla(dict({"kabin_derinligi": 1400, "kabin_agirligi": 650}, **ek))
+        _b = [x for x in _s["bolumler"] if x["baslik"].startswith("7 ")][0]
+        _xq = next(a["deger"] for a in _b["adimlar"]
+                   if str(a.get("formul") or "").startswith("Durum 1"))
+        _fx = next(a["deger"] for a in _b["adimlar"] if (a.get("formul") or "") == "Fx")
+        _xc = {a.get("sembol"): a["deger"] for a in _b["adimlar"] if a.get("sembol")}["xc"]
+        return _xc, _xq, _fx, _b
+
+    #  Yardımcının kendisi:  momenti büyüten yönü seçmeli
+    r.esit("E3  merkez pozitifken + yön seçiliyor",
+           MK._yuk_merkezi(300.0, 175.0, 630.0, 650.0, 100.0), 475.0)
+    r.esit("E3  merkez negatifken − yön seçiliyor",
+           MK._yuk_merkezi(-300.0, 175.0, 630.0, 650.0, -100.0), -475.0)
+    r.esit("E3  simetrikte ( merkez = 0, kol = 0 ) + yön",
+           MK._yuk_merkezi(0.0, 175.0, 630.0, 650.0, 0.0), 175.0)
+    #  ASIL BULGU:  xc < 0 iken artık − yön seçiliyor ve Fx BÜYÜYOR
+    for _rk, _bek in ((500, +1), (1200, -1)):
+        _xc, _xq, _fx, _ = _b7(ray_kapi_arasi=_rk)
+        r.kontrol(f"E3  RK={_rk}: xQ, xc'den {'+' if _bek > 0 else '−'} yönde kaydı",
+                  (_xq - _xc) * _bek > 0, f"→ xc={_xc}, xQ={_xq}")
+    #  Yalnız + yönle karşılaştırma:  kitabın seçimi HER ZAMAN daha küçük
+    for _rk in (500, 830, 1000, 1200):
+        _xc, _xq, _fx, _ = _b7(ray_kapi_arasi=_rk)
+        _gv = _MG.tamamla(_MG.varsayilanlar())
+        _kitap_xq = _xc + 1400 / 8
+        _kitap = abs(630 * _kitap_xq + 650 * (_xc - _gv["kapi_agirligi"]
+                                              * (700 + _gv["kapi_mekanizma_payi"]) / 650))
+        _bizim = abs(630 * _xq + 650 * (_xc - _gv["kapi_agirligi"]
+                                        * (700 + _gv["kapi_mekanizma_payi"]) / 650))
+        r.kontrol(f"E3  RK={_rk}: seçilen yön kitabınkinden küçük DEĞİL",
+                  _bizim >= _kitap - 1e-9, f"→ bizim {_bizim:.0f}, kitap {_kitap:.0f}")
+    r.kontrol("E3  sapma kaydında yazılı",
+              any("yalnız + yönde" in ad for ad, *_ in MK.EXCEL_FARKLARI))
     return r
 
 

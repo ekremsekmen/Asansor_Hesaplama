@@ -502,11 +502,18 @@ def kanal_nequiv_t(sekil, gama_v=None, beta=None):
     if tur is None:
         return None
     gecis = kanal_gecis_sayisi(sekil) or 1
-    if tur == "V":
+    if tur in ("V", "VK"):
+        #  ÇİZELGE 2'NİN İKİ SATIRI VARDIR:  "V-grooves" ( V açısı γ ile ) ve
+        #  "U-Undercut grooves" ( alt kesme açısı β ile ).  ALTI KESİK V DE
+        #  BİR V KANALDIR:  m.5.11.2.3.1.1 "yarım daire ve altı kesik yarım
+        #  daire" kanalları, m.5.11.2.3.1.2 ise "V kanallar"ı ele alır ve
+        #  altı kesik V açıkça ikincisinin içindedir ( "sertleştirilmemişse
+        #  alt kesme gereklidir" ).  m.5.12.2'nin girişi de kanalları "U- ya
+        #  da V-" diye ikiye ayırır.  Kitap altı kesik V'yi β satırından
+        #  okuyordu:  γ = 38° için 12 yerine β = 90° için 5,0 — Nequiv küçük
+        #  çıkıyor, gereken güvenlik katsayısı da küçülüyordu ( emniyetsiz ).
         taban = _dogrusal_ara(NEQUIV_V, gama_v)
-    elif tur in ("VK", "UK"):
-        #  Altı kesik kanal — V de olsa U da olsa Çizelge 2'nin alt kesilme
-        #  satırı geçerlidir;  belirleyici olan β'dır.
+    elif tur == "UK":
         taban = _dogrusal_ara(NEQUIV_U_ALTI_KESIK, beta)
     else:                                   # 'U' — alt kesilmesiz yarım daire
         taban = 1.0

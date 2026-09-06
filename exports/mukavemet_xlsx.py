@@ -373,6 +373,12 @@ EK_GIRDI_HUCRELERI = (
     ("agirlik_guvenlik_tertibati", 241, "Karşı ağırlıkta güvenlik tertibatı", "—"),
     ("guvenlik_devreye_kuvvet", 242,
      "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )", "N"),
+    #  TS EN 81-50'nin Ek C bağıntılarında bulunup kitapta hiç olmayanlar
+    ("paten_tipi",            243, "Paten tipi  ( m.5.10.5 flanş formülü )", "—"),
+    ("klips_itme_kuvveti",    244,
+     "Fp — konsol klipslerinin itme kuvveti  ( Ek C.2.1.2 )", "N"),
+    ("yapi_sehim_x",          245, "δstr-x — bina yapısının x sehimi", "mm"),
+    ("yapi_sehim_y",          246, "δstr-y — bina yapısının y sehimi", "mm"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -380,8 +386,8 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  dosyasının bir parçasıdır:  σem = 100 ile "UYGUN DEĞİL" çıkan bir proje,
 #  Excel'e aktarılıp geri okunduğunda varsayılan 130'a dönüyor ve "UYGUN"
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
-OFIS_BASLIK = 245
-OFIS_BAS = 247
+OFIS_BASLIK = 249
+OFIS_BAS = 251
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -391,7 +397,8 @@ OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 #  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
 EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
-EK_METIN_ALANLARI = ("toplam_verim", "agirlik_guvenlik_tertibati")
+EK_METIN_ALANLARI = ("toplam_verim", "agirlik_guvenlik_tertibati",
+                     "paten_tipi")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -515,8 +522,11 @@ def _kanal_tablosu(wb, O):
         return
     tb = wb[TABLOLAR]
     for ad, satir in KANAL_TABLO_SATIRI.items():
-        aci = (O["kanal_beta"] if MT.kanal_alti_kesik_mi(ad)
-               else (None if MT.kanal_yarim_daire_mi(ad) else O["kanal_gama_v"]))
+        #  Çizelge 2'de belirleyici açı:  V ve altı kesik V'de γ, altı kesik
+        #  yarım dairede β, alt kesilmesiz yarım dairede yok.
+        _tur = MT.kanal_turu(ad)
+        aci = (O["kanal_beta"] if _tur == "UK"
+               else (None if _tur == "U" else O["kanal_gama_v"]))
         tb[f"F{satir}"] = aci
         tb[f"G{satir}"] = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
 
@@ -684,6 +694,40 @@ def _standarda_uydur(wb, g):
     #  yuvarlı olduğu için burada da standardın formülü yazılır — yoksa
     #  pafta ile kitap binde ikilik bir farkla ayrışırdı.
     ws["AB39"] = _omega_formulu("Z71", str(MT.OMEGA_RM_ALT))
+
+    #  ㉔  BOŞ KABİNİN AĞIRLIK MERKEZİ RAY EKSENİNDEN ÖLÇÜLÜR
+    #  EN 81-50 Ek C.1.2:  "xp, yp is the position of the car mass (P) in
+    #  relation to the guide rail cross coordinates" — xC ve xQ ile AYNI
+    #  orijin.  Kitap xp'yi kabin merkezinden ölçüyor ( yalnız kapı kütlesi ),
+    #  gövdenin ray eksenine göre kaçıklığını ( AH293 = xc ) saymıyordu.
+    #  Formül CANLI bırakılır:  kitapta kabin derinliği ya da ray–kapı arası
+    #  değiştirildiğinde xp de takip etsin.
+    ws["AH295"] = ("=AH293-(('Veri Girişi'!F127*(('Veri Girişi'!C74/2)"
+                   "+'Veri Girişi'!F128))/'Veri Girişi'!C75)")
+
+    #  ㉛  YÜK EN OLUMSUZ KONUMDA  —  EN 81-20 m.5.7.2.3.4
+    #  Kitap yükü yalnız + yönde kaydırır ( xQ = xc + D/8 ).  Madde normatif
+    #  olarak "most unfavourable position" der;  kabin merkezi ray ekseninin
+    #  öbür yanındaysa + yön boş kabinin momentini DENGELER ve gerilmeyi
+    #  olduğundan küçük gösterir.  Formül CANLI kalır:  kitapta kabin ölçüsü
+    #  ya da ray–kapı arası değişince yön kendiliğinden yeniden seçilir.
+    _Q, _P, _xp = "'Veri Girişi'!C59", "'Veri Girişi'!C75", "AH295"
+    _xc, _yc = "AH293", "0"
+    _dx, _dy = "('Veri Girişi'!C74/8)", "('Veri Girişi'!C73/8)"
+    ws["Z309"] = (f"=IF(ABS({_Q}*({_xc}+{_dx})+{_P}*{_xp})"
+                  f">=ABS({_Q}*({_xc}-{_dx})+{_P}*{_xp}),"
+                  f"{_xc}+{_dx},{_xc}-{_dx})")
+    #  Durum 2'de yc = 0 ve yp = 0'dır;  yük momenti simetriktir, iki yön de
+    #  aynı büyüklüğü verir — kitabın + yönü olduğu gibi kalır.
+
+    #  ㉖  Fy'NİN PAYDASI  ( n / 2 ) · h
+    #  EN 81-50 Ek C.2.1.1 b) · C.2.2.1 b) · C.2.3.1 b) üçünde de Fy'yi
+    #  ( n/2 )·h'ye böler.  Kitap yalnız güvenlik tertibatı durumunda doğru
+    #  paydayı kullanıyor, normal işletme · yükleme ve karşı ağırlıkta n·h
+    #  yazıyordu:  Fy gerçeğin YARISI çıkıyordu ( emniyetsiz ).
+    for _h in ("C425", "C445", "C517"):
+        ws[_h] = ws[_h].value.replace("=", "=(", 1).replace("*", "/2)*", 1)
+    ws["AP572"] = "=(T572*W572*AA572*(AF572-AI572))/((Y573/2)*AB573)"
 
     #  ⑭  Kuyu tabanı yükünde ray ağırlığı bir kez sayılır
     #  Kitap  AX611 = gn·Gr·LR/1000 + MY + AU351  yazar;  AU351 ( bölüm 7'nin

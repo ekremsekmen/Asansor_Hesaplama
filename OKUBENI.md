@@ -468,20 +468,20 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**23.744 kontrolün tamamı geçmiştir.**
+**21.658 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **790 / 790** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **439 / 439** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **447 / 447** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **370 / 370** |
-| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.537 / 4.537** |
+| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.577 / 4.577** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
-| **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ve varsayılan açılarda kitapla birebir tutar | **951 / 951** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **yirmi üç sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı denetimin her bulgusu yeniden üretilerek** + girdi reddi | **484 / 484** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **9.354 / 9.354** |
+| **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ( altı kesik V, standardın sınıflandırmasına uyarak **V satırından** okunur — kitap β satırından okuyordu, bkz. sapma ㉕ ) | **969 / 969** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **otuz bir sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı · yedinci · sekizinci denetimin her bulgusu yeniden üretilerek** + girdi reddi | **488 / 488** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır. *( Sapma sayısı arttıkça bu testin doğrudan karşılaştırdığı hücre sayısı düşer — ayrılan hücreler 'kitapla aynı olmalı' döngüsünden çıkıp 'gerçekten ayrışıyor mu' döngüsüne geçer. )* | **7.198 / 7.198** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **242 / 242** |
 
 ### Test 1 neden güçlü bir kanıt?
@@ -645,6 +645,55 @@ bir istisna yoktur, program da standardın düz metnini uygular. Bir imalatçı
 belgesine dayanarak oranı düşürmek proje müellifinin kendi kararıdır ve
 gerekçesi projede ayrıca belgelenmelidir.
 
+#### Yedinci denetim — el hesabıyla karşılaştırma
+
+Piyasada en yaygın kurulumlardan biri girilip **bütün bölümler elle yeniden
+hesaplandı**: 8 kişi / 630 kg · 1,0 m/s · 2:1 dişlisiz · 6 durak · 15 m ·
+kabin 1100 × 1400 ( ISO 4190-1'in 630 kg kabini ) · 5 × Ø8 halat · Ø320
+kasnak · T89/B ray. Motor gücü ayrıca **tork × açısal hız** yolundan bağımsız
+doğrulandı ( iki yol da 4,667 kW ). `Gh · F1 · Ga · Gmax · N · M`, `Sf · S`,
+`α · f · T1 · T2 · e^(fα)`, `Fk · λ · ω · σk · Fx · My · σc · σ · δ`,
+`FKR · FAR · Fkt · Fat` — **hepsi birebir tuttu**. Bir tek yer ayrıldı:
+
+| Bulgu | Etkisi ve düzeltme |
+|---|---|
+| **`xp` ile `xQ` farklı eksenlerden ölçülüyordu.** `xQ = xc + D/8` ray ekseninden, `xp = mkapı·(D/2+pay)/P` ise **kabin merkezinden**; ikisi aynı toplamda moment kolu olarak toplanıyordu | `xc` ray–kapı arasıyla kayar, `xp` **hiç kımıldamıyordu** — kabin gövdesinin ray eksenine göre kaçıklığı sayılmıyordu. Ray ekseni kabin merkezinden geçtiğinde ( `xc = 0` ) iki okuma çakışır ve **kitabın örneği tam oradadır**; ray kaydıkça ayrışır ve **emniyetsiz tarafa da düşer**: 1400 mm derinlikte ray–kapı arası 500 mm iken devirici moment gerçeğin **%79'u**, 1000 mm iken **%36'sı** çıkıyordu. Artık `xp = xc − mkapı·(D/2+pay)/P`;  33 hücre kayıyor, 16'sı sapma kaydına eklendi |
+
+Aynı turda **iki yorum notu** kaydedildi, kod değiştirilmedi:
+
+- **`Nequiv(t)` altı kesik V kanalda β satırından okunuyor** ( Çizelge 2 ). γ = 38° V satırı seçilseydi `Nequiv` 6 → 13 ve gereken `Sf` 15,51 → 20,55 çıkardı ( **%32,5** ), örnek projede asgari halat sayısı 4 → 5 olurdu. Seçim savunulabilir — m.5.11.2.3.1.2 sertleştirilmemiş V kanalda alt kesmeyi zorunlu kılar ve sürtünmeyi de β ile hesaplar — ve varsayılan açılarda ofis kitabıyla birebir tutar; ama **denetim kuruluşları arasında yorum farkı doğabilir**, pafta β'yı ve γ'yı ayrı ayrı yazar.
+- **Yük kaçıklığı yalnız `+D/8` yönünde alınıyor** ( `xQ = xc + D/8` ). `xc` negatifken `−D/8` daha olumsuz olabilir. Ek C'nin şekli elde olmadan yön kabulü doğrulanamadı.
+
+#### Sekizinci denetim — standardın metnine karşı satır satır
+
+Yedinci turun sonunda **TS EN 81-20 ve TS EN 81-50'nin tam metinleri
+bulunup okundu** ( BS sürümleri ). Ek C'nin bütün bağıntıları, Çizelge 2,
+Çizelge 14, m.5.10.5 ve m.5.11.2.3.1 programdakiyle **satır satır**
+karşılaştırıldı.
+
+**Doğrulananlar:** C.2.1.1'in `Fx · Fy · My · Mx · σy · σx`, C.2.1.2'nin
+`σk`, C.2.1.3'ün üç birleşik ölçütü, C.2.1.5'in `0,7·F·l³/(48·E·I)`,
+Çizelge 2'nin bütün değerleri, m.5.11.2.3.1'in sürtünme bağıntıları,
+`xQ = xC + Dx/8` yön kabulü — hepsi aynı. **Sapma ④ da doğrulandı:**
+m.5.10.5'in sembol listesi `l` için *"length of the guide shoe lining"*
+diyor. **Yedinci turun `xp` düzeltmesi de doğrulandı:** Ek C.1.2 `xp`'yi
+*"in relation to the guide rail cross coordinates"* diye tanımlar — `xC` ve
+`xQ` ile aynı orijin.
+
+**Ayrıldığı yedi nokta** yukarıdaki tabloda ㉕ – ㉛'dir. Üçü sayıyı
+değiştirir ve **üçü de emniyetsiz yöndeydi**: altı kesik V kanalda
+`Nequiv(t)` 5,0 yerine 12 ( gereken `Sf` %32,5 artar ), ve normal işletme ·
+yükleme · karşı ağırlıkta `Fy` iki kat ( payda `n·h` değil `( n/2 )·h` ).
+Üçüncüsü, yükün **yalnız + yönde** kaydırılmasıydı: m.5.7.2.3.4 normatif
+olarak *"en olumsuz konum"* der, Ek C'nin Şekil C.2'si ise **bilgilendirici
+bir örnek** olarak tek yön gösterir. Kabin merkezi ray ekseninin öbür
+yanındayken ( `xc < 0` ) + yön, boş kabinin momentini **dengeliyor** ve
+gerilmeyi olduğundan küçük gösteriyordu. 1400 mm derinlikte ray–kapı arası
+1.200 mm iken `Fx` **192 N yerine 2.114 N** ( 11 kat ) çıkıyor ve sehim 5 mm
+sınırını aşıyor. Kalan dördü eksik terim ya da eksik seçenektir;
+varsayılanları sonucu değiştirmez ama tesis bir değer verdiğinde hesaba
+girer.
+
 ### Test yazılırken bulunan ve düzeltilen hatalar
 
 | Bulgu | Etkisi |
@@ -676,7 +725,7 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **yirmi üç** noktada kitap standarttan ( yalnız verim,
+noktasıdır. Aşağıdaki **otuz bir** noktada kitap standarttan ( yalnız verim,
 moment ve denge oranı maddelerinde ofisin kendi kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
@@ -684,6 +733,14 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | # | Konu | Standart | Kitabın yaptığı | Programın yaptığı |
 |---|---|---|---|---|
 | ① | Tahrik kasnağı / halat oranı | **EN 81-20 m.5.5.2.1** — en az **40** | Başlığı "≥ 40" yazar, kontrolü **30** ile yapar | 40 uygulanır |
+| ㉛ | **Yük en olumsuz konumda** | **EN 81-20 m.5.7.2.3.4** — beyan yükü, kabin alanının **en olumsuz** konumdaki 3/4'üne dağıtılır | `xQ`'yu her zaman `xc + Dx/8` alır | ± iki konum denenir, momenti **büyüten** seçilir |
+| ㉕ | **Altı kesik V kanalda Nequiv(t)** | **EN 81-50 Çizelge 2** — iki satır var: `V-grooves (γ)` ve `U-Undercut grooves (β)` | Altı kesik V'yi **β** satırından okur ( β = 90° → 5,0 ) | **V satırı** ( γ = 38° → 12 ). m.5.11.2.3.1.2 altı kesik V'yi *V kanal* sayar |
+| ㉖ | **Fy'nin paydası** | **EN 81-50 Ek C.2.1.1 b) · C.2.2.1 b) · C.2.3.1 b)** — üçünde de `( n/2 )·h` | Yalnız C.2.1'de doğru; C.2.2 · C.2.3 · karşı ağırlıkta `n·h` → **Fy yarısı kadar** | Üç durumda da `( n/2 )·h` |
+| ㉗ | **Normal işletme katsayısı** | **EN 81-20 Çiz. 14** — `k2` (Running) = 1,2; `k3` için sayı **vermez** | İkisini tek bir "k3 = 1,2" ile karıştırır | `k2` çizelgeden; `k3` ofis sabiti oldu |
+| ㉘ | **Fp — klips itme kuvveti** | **EN 81-50 Ek C.2.1.2 · C.2.2.2 · C.2.3.2** — `Fv = … + Fp` | Terim hiç yok | Girdi olarak eklendi ( varsayılan 0 ) |
+| ㉙ | **δstr — bina sehimi** | **EN 81-50 Ek C.2.1.5 · C.2.2.5 · C.2.3.5** — `δ = … + δstr` | Terim hiç yok | δstr-x · δstr-y girdi oldu ( varsayılan 0 ) |
+| ㉚ | **Makaralı paten flanşı** | **EN 81-50 m.5.10.5** — makaralıda `1,85·Fx/c²` | Yalnız kaymalı formülü tanır | Paten tipi girdi oldu; makaralıda σF **%24 büyük** |
+| ㉔ | **Boş kabinin ağırlık merkezi xp** | **EN 81-50 Ek C.2.1.1** — `Fx = k1·gn·(Q·xQ + P·xp)/(n·h)` payı **ray eksenine** göre devirici momenttir | `xp`'yi **kabin merkezinden** ölçer ( yalnız kapı kütlesi ); ray–kapı arası değişse de kımıldamaz | `xp = xc − mkapı·(D/2+pay)/P` — iki moment kolu da ray ekseninden |
 | ㉓ | **Saptırma kasnağı / halat oranı** | **EN 81-20 m.5.5.2.1** — oran *kasnak, makara ve tamburlar* için en az **40** | Yalnız **tahrik** kasnağını sınar; D2 hesaba sadece `Kp = (Dt/Dp)⁴` olarak girer | Saptırma kasnağı varsa `Dp / dh ≥ 40` de denetlenir |
 | ② | Karşı ağırlık rayı σ(My) | **EN 81-50 Ek C.2.1.1** — Fy → Mx → **Wx** | Wy'ye böler | Wx'e bölünür |
 | ③ | Durum 2'de xQ | **EN 81-50 Ek C.2.1.1** | Sabit **0** yazar ( başlığı "xQ = xc" dese de ) | xQ = xc |
@@ -1140,7 +1197,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ### Uygulama projesi — mukavemet
 
-- **Kaynak kitaptan ayrılan yirmi üç nokta** 6. bölümdeki tabloda sayılıdır; her
+- **Kaynak kitaptan ayrılan otuz bir nokta** 6. bölümdeki tabloda sayılıdır; her
   biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
   birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.

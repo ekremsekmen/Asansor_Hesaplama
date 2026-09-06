@@ -50,6 +50,105 @@ EXCEL_FARKLARI = (
      "m.5.5.6.2 c) dengeleme gergi kasnağı ve m.5.6.2.2.1.3 regülatör eşiğidir.",
      "Standardın istediği 40 uygulanır.",
      ()),
+    ("Yük yalnız + yönde kaydırılıyordu",
+     "TS EN 81-20 m.5.7.2.3.4",
+     "xQ'yu her zaman xc + Dx/8 alır.  Ek C'nin Şekil C.2'si kaymayı tek "
+     "yönde gösterir ama Ek C BİLGİLENDİRİCİDİR ve bir örnektir.",
+     "Madde NORMATİFTİR ve şöyle der:  beyan yükü, kabin alanının en "
+     "OLUMSUZ konumdaki dörtte üçüne eşit dağıtılır.  Dx/8 zaten bunun "
+     "geometrik sonucudur ( 3/4 alan yüklenince merkez Dx/2 − 3·Dx/8 = Dx/8 "
+     "kayar );  yön ise SEÇİLMELİDİR.\n"
+     "        Ek C.2.1.1'in payı  Q·xQ + P·xp  bir moment toplamıdır.  Kabin "
+     "merkezi ray ekseninin öbür yanındaysa ( xc < 0 ) boş kabinin momenti "
+     "negatiftir ve yükü + yönde kaydırmak onu DENGELER:  toplam moment "
+     "küçülür, ray gerilmesi ve sehimi olduğundan küçük çıkar, bölüm "
+     "'UYGUNDUR' der.  Yolcular öbür yana yığıldığında ray hesaplanandan "
+     "büyük yük görür — EMNİYETSİZ taraf.\n"
+     "        Artık ± iki konum da denenip momenti büyüten seçilir.  1400 mm "
+     "derinlikte ray–kapı arası 1.200 mm iken Fx 192 N yerine 2.114 N "
+     "çıkıyor ( 11 kat ) ve sehim 5 mm sınırını aşıyor.  Simetrik yerleşimde "
+     "( xc = 0 ) iki yön aynı sonucu verir.",
+     ("Z309",)),
+    ("Altı kesik V kanalda Nequiv(t) yanlış satırdan okunuyordu",
+     "TS EN 81-50 m.5.12.2.2 Çizelge 2",
+     "Altı kesik V kanalı Çizelge 2'nin ALT KESME ( β ) satırından okur:  "
+     "β = 90° için 5,0.  Oysa aynı kanalın V açısı γ = 38°'dir ve V satırı "
+     "12 verir.  Nequiv küçük çıkınca gereken güvenlik katsayısı da küçülür.",
+     "Çizelge 2'nin iki satırı 'V-grooves' ( γ ) ve 'U-Undercut grooves' "
+     "( β )'dir;  altı kesik V için ayrı bir satır YOKTUR.  Standardın kendi "
+     "sınıflandırması nettir:  m.5.11.2.3.1.1 yarım daire ve altı kesik yarım "
+     "daire kanalları, m.5.11.2.3.1.2 ise V kanalları ele alır — ve altı "
+     "kesik V açıkça İKİNCİSİNİN içindedir ( 'sertleştirilmemişse alt kesme "
+     "gereklidir' ).  m.5.12.2'nin girişi de kanalları 'U- ya da V-' diye "
+     "ikiye ayırır.\n"
+     "        Örnek projede gereken Sf 15,51 yerine 20,55 çıkar ( %32,5 ) — "
+     "yani hata EMNİYETSİZ yöndeydi.",
+     ("AH104", "V116", "T125")),
+    ("Normal işletme ve yüklemede Fy'nin paydası",
+     "TS EN 81-50 Ek C.2.2.1 b) / C.2.3.1 b)",
+     "Fy'yi ( n × h )'ye böler.  Oysa standart üç yük durumunda da "
+     "( n / 2 ) × h yazar;  kitap yalnız güvenlik tertibatı durumunda "
+     "( C.2.1.1 b) ) doğru paydayı kullanıyordu.",
+     "Fy = k2·gn·[ Q·(yQ−yS) + P·(yp−yS) ] / ( (n/2)·h ).  Payda yarıya "
+     "inince Fy İKİ KAT büyür;  kitabın değeri gerçeğin YARISIYDI ve hata "
+     "EMNİYETSİZ yöndeydi.  Aynı düzeltme karşı ağırlık rayına da uygulanır.",
+     ("L444", "AU447", "AH498", "L516", "AU519", "AH545", "AP572", "AH603")),
+    ("Normal işletme katsayısı k2 yerine k3 deniyordu",
+     "TS EN 81-20 Çizelge 14  /  TS EN 81-50 Ek C.2.2.1",
+     "Normal işletme eğilme gerilmesinde katsayıya 'k3' der.  Çizelge 14'te "
+     "k2 ( Running ) = 1,2 iken k3 yardımcı donanım katsayısıdır ve çizelge "
+     "ona SAYI VERMEZ:  'the value has to be determined by the manufacturer "
+     "due to the actual installation'.",
+     "Katsayı k2 olarak adlandırılır ( değeri 1,2, çizelgeden ).  k3 ise "
+     "ofis sabiti oldu ( sabitler.k3_yardimci, varsayılan 1,2 ):  standardın "
+     "vermediği bir sayıyı motorda çivilemek yanlıştır.  Sayısal sonuç "
+     "varsayılanda değişmez, ad ve kaynak düzelir.",
+     ()),
+    ("Konsol klipslerinin itme kuvveti Fp hiç yoktu",
+     "TS EN 81-50 Ek C.2.1.2 / C.2.2.2 / C.2.3.2",
+     "Fv'yi 'k1·gn·(P+Q)/n + Mg·gn' ( ya da 'Mg·gn' ) diye kurar;  "
+     "standardın üç bağıntısında da bulunan + Fp terimi yoktur.",
+     "Fp, bir raydaki bütün konsol klipslerinin itme kuvvetidir ( binanın "
+     "oturması, betonun büzülmesi ).  Girdi olarak eklendi;  varsayılanı 0 "
+     "olduğu için normal hesap değişmez, ama tesis bir değer veriyorsa artık "
+     "hesaba girer.",
+     ()),
+    ("Bina yapısının sehimi δstr hiç yoktu",
+     "TS EN 81-50 Ek C.2.1.5 / C.2.2.5 / C.2.3.5",
+     "Sehim ölçütünü 'δ = 0,7·F·l³/(48·E·I) ≤ δperm' diye kurar;  standardın "
+     "üç bağıntısında da bulunan + δstr terimi yoktur.",
+     "δstr binanın kendi sehimidir ve rayın sehimine EKLENİR.  δstr-x ve "
+     "δstr-y girdi oldu;  varsayılanları 0.",
+     ()),
+    ("Makaralı paten flanş formülü hiç yoktu",
+     "TS EN 81-50 m.5.10.5 / Ek C.2.1.4",
+     "Yalnız kaymalı paten formülünü tanır;  paten tipi sorulmaz.",
+     "Madde İKİ formül verir ve hangisinin geçerli olduğunu paten tipi "
+     "söyler:  makaralı patende σF = 1,85·Fx/c².  Paten tipi girdi oldu "
+     "( varsayılan Kaymalı — kitabın kabulü ).  Örnek projede makaralı "
+     "seçilirse σF 13,40 yerine 16,55 N/mm² çıkıyor:  %24 daha büyük, yani "
+     "eksikliği EMNİYETSİZ yöndeydi.",
+     ()),
+    ("Boş kabinin ağırlık merkezi kabin merkezinden ölçülüyordu",
+     "TS EN 81-50 Ek C.2.1.1",
+     "xp'yi yalnız kapı + mekanizma kütlesinin KABİN MERKEZİNE göre "
+     "kaçıklığından kurar:  xp = mkapı·( D/2 + pay ) / P.  Oysa aynı "
+     "toplamdaki xQ ray ekseninden ölçülür ( xQ = xc + D/8 ) ve xc, "
+     "ray–kapı arası değiştikçe kayar.  xp ise HİÇ KIMILDAMAZ:  kabin "
+     "gövdesinin ray eksenine göre kaçıklığı sayılmıyordu.",
+     "Fx = k1·gn·( Q·xQ + P·xp ) / ( n·h ) bağıntısının payı, sistemin RAY "
+     "EKSENİNE göre devirici momentidir;  iki moment kolu da aynı orijinden "
+     "ölçülmek zorundadır.  Boş kabin, gövde ( P − mkapı ) xc'de ve kapı "
+     "( mkapı ) xc − ( D/2 + pay )'da olacak şekilde toplanır:\n"
+     "            xp = xc − mkapı·( D/2 + pay ) / P\n"
+     "        Ray ekseni kabin merkezinden geçtiğinde ( xc = 0 ) iki okuma "
+     "aynı büyüklüğü verir — kitabın örneği oradadır — ama ray kaydıkça "
+     "ayrışır ve EMNİYETSİZ tarafa da düşer:  1400 mm derinlikte ray–kapı "
+     "arası 500 mm iken moment toplamı gerçeğin %79'u, 1000 mm iken %36'sı "
+     "çıkıyordu.",
+     ("AH295", "AY321", "AU324", "Z360", "AJ362", "AH393",
+      "L415", "AU418", "Z461", "AC463", "AH487", "L508", "AU511",
+      "Z530", "AF532", "AH542")),
     ("Saptırma kasnağı / halat oranı denetlenmiyordu",
      "TS EN 81-20 m.5.5.2.1",
      "Yalnız TAHRİK kasnağını sınar.  Saptırma kasnağının çapı ( D2 ) hesaba "
@@ -395,7 +494,11 @@ SABIT = {
     "kanal_acisi":     38,        # γ  sertleştirilmiş kanal      [°]    (11!AH102)
     "alt_kesilme":     90,        # β  alt kesilme açısı          [°]    (11!AH103)
     "E":               206010,    # elastisite modülü           [N/mm²]  (11!AH302)
-    "k3":              1.2,       # normal kullanma darbe katsayısı      (EN 81-20 Çiz.14)
+    #  TS EN 81-20 Çizelge 14.  k2 ÇİZELGEDE YAZILIDIR ( Running = 1,2 );
+    #  k3 için çizelge sayı vermez — "imalatçı tarafından, gerçek tesise göre
+    #  belirlenir" — o yüzden k3 OFİS SABİTİDİR ( sabitler.k3_yardimci ).
+    #  Kitap ikisini tek bir 1,2 ile karıştırıyordu.
+    "k2":              1.2,       # normal kullanma darbe katsayısı  ( Çiz.14 )
     "MY_kabin":        150,       # kabin rayına bağlı donanım    [N]    (11!AH292)
     "MY_agirlik":      50,        # ağırlık rayına bağlı donanım  [N]    (11!AH555)
     "dperm_kabin":     5,         # kabin rayı azami sehim        [mm]   (11!AH306)
@@ -1402,14 +1505,20 @@ def _moment(F, l):
     return SABIT["moment_pay"] * F * l / SABIT["moment_bolen"]
 
 
-def _flans(F, p, balata):
-    """Flanş eğilme gerilmesi  —  TS EN 81-50 m.5.10.5, kaymalı patenler.
+def _flans(F, p, balata, makarali=False):
+    """Flanş eğilme gerilmesi  —  TS EN 81-50 m.5.10.5 / Ek C.2.1.4.
 
-        σF = Fx · ( h1 − b − f ) · 6 / ( c² · ( ℓ + 2·( h1 − f ) ) )
+    Madde İKİ formül verir ve hangisinin geçerli olduğunu PATEN TİPİ söyler:
 
-    ℓ paten balatasının UZUNLUĞUDUR.  Kaynak Excel oraya 1 yazar ( ℓ harfi
-    1 rakamı okunmuş görünüyor );  bu, gerilmeyi olduğundan büyük gösterir.
+        makaralı paten :  σF = 1,85 · Fx / c²
+        kaymalı  paten :  σF = 6 · Fx · ( h1 − b − f ) / ( c² · ( ℓ + 2·( h1 − f ) ) )
+
+    ℓ, maddenin kendi sembol listesinde "the length of the guide shoe
+    lining" — paten balatasının UZUNLUĞUDUR.  Kaynak Excel oraya 1 yazar
+    ( ℓ harfi 1 rakamı okunmuş görünüyor ) ve yalnız kaymalı formülü tanır.
     """
+    if makarali:
+        return 1.85 * F / p["c"] ** 2
     return F * (p["h1_b_f"] * 6) / (p["c"] ** 2 * (balata + 2 * p["h1_f"]))
 
 
@@ -1451,7 +1560,33 @@ def _burkulma_omega(l, ix, rm):
     return lam, MT.omega_en8150(lam, rm)
 
 
-def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar):
+def _yuk_merkezi(merkez, sapma, Q, P, p_kolu, askı=0.0):
+    """Yükün EN OLUMSUZ konumu  —  TS EN 81-20 m.5.7.2.3.4.
+
+    Madde normatiftir:  "the rated load Q of the car shall be evenly
+    distributed over those three quarters of the car area being in the MOST
+    UNFAVOURABLE POSITION".  Kabin alanının 3/4'ü yüklenince yükün ağırlık
+    merkezi kabin merkezinden  Dx/2 − 3·Dx/8 = Dx/8  kadar kayar;  Ek C'nin
+    "xQ = xC + Dx/8" satırı bunun bir ÖRNEĞİDİR ( Ek C bilgilendiricidir ) ve
+    kaymayı tek yönde gösterir.
+
+    Yön SEÇİLMELİDİR.  Ek C.2.1.1'in payı  Q·xQ + P·xp  bir moment
+    toplamıdır;  kabin merkezi ray ekseninin öbür yanındaysa ( xc < 0 ) boş
+    kabinin momenti negatiftir ve yükü inatla + yönde kaydırmak onu
+    DENGELER:  toplam moment küçülür, ray gerilmesi olduğundan küçük çıkar,
+    program "UYGUNDUR" der.  Oysa yolcular öbür yana yığılırsa ray
+    hesaplanandan büyük yük görür — emniyetsiz taraf.
+
+    Bu yüzden ± iki konum da denenir ve momentin BÜYÜKLÜĞÜNÜ büyüteni
+    seçilir.  Simetrik yerleşimde ( xc = 0 ) iki yön aynı sonucu verir.
+    """
+    sabit = P * (p_kolu - askı)
+    arti, eksi = merkez + sapma, merkez - sapma
+    return (arti if abs(Q * (arti - askı) + sabit) >= abs(Q * (eksi - askı) + sabit)
+            else eksi)
+
+
+def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar, dstr=0.0):
     """Bir kuvvet için moment · gerilme satırlarını yazar, ( σ , δ ) döndürür.
 
     ADLANDIRMA TS EN 81-50 Ek C.2.1.1'İN KENDİSİDİR:
@@ -1474,7 +1609,10 @@ def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar):
     #  Kuvvet ve moment satırları işaretini korur — yön bilgisi paftada
     #  kalsın diye;  σ ve δ büyüklük olarak yazılır ve karşılaştırılır.
     sigma = abs(M) / W
-    d = abs(_sehim(F, l, I))
+    #  Ek C.2.1.5 / C.2.2.5 / C.2.3.5:  δ = 0,7·F·l³/(48·E·I) + δstr.
+    #  δstr BİNANIN kendi sehimidir ve rayın sehimine EKLENİR;  kaynak
+    #  kitapta hiç yoktu.  Varsayılan 0 — değeri yapı hesabından gelir.
+    d = abs(_sehim(F, l, I)) + (dstr or 0.0)
     adimlar.extend([
         hesap(f"M{eksen} = 3 × F{kuvvet} × l / 16",
               f"3 × {tr(F)} × {trn(l, 0)} / 16", M, "N·mm", ondalik=0),
@@ -1488,9 +1626,12 @@ def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar):
 #  7 -  KABİN KILAVUZ RAYLARI     ( TS EN 81-50 m.C.2.1 / C.2.2 / C.2.3 )
 # =====================================================================
 def _kabin_raylari(g, o):
-    S, gn = SABIT, SABIT["gn"]
+    S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Q, P = o["Q"], o["P"]
-    k1, k3 = o["k1"], S["k3"]
+    k1, k2, k3 = o["k1"], S["k2"], O["k3_yardimci"]
+    Fp = g["klips_itme_kuvveti"] or 0.0
+    dstr_x, dstr_y = g["yapi_sehim_x"] or 0.0, g["yapi_sehim_y"] or 0.0
+    makarali = g["paten_tipi"] == "Makaralı"
     prof = g["kabin_ray_profili"]
     p = _ray_ozellik(prof)
     n, h, l = g["kabin_ray_sayisi"], g["kabin_paten_arasi"], g["kabin_konsol_arasi"]
@@ -1505,7 +1646,21 @@ def _kabin_raylari(g, o):
 
     xc = (D / 2.0 + S["kabin_merkez_payi"]) - g["ray_kapi_arasi"]
     yc = 0.0
-    xp = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P
+    #  BOŞ KABİNİN AĞIRLIK MERKEZİ DE RAY EKSENİNDEN ÖLÇÜLÜR.
+    #  Ek C.2.1.1'in  Fx = k1·gn·( Q·xQ + P·xp ) / ( n·h )  bağıntısındaki pay,
+    #  sistemin RAY EKSENİNE göre devirici momentidir;  xQ ile xp aynı toplama
+    #  giriyorsa ikisinin de orijini ray merkez çizgisi olmak ZORUNDADIR.
+    #  Kitap xp'yi kabin merkezinden ölçüyordu:  yalnız kapı + mekanizma
+    #  kütlesinin kaçıklığını sayıyor, kabin gövdesinin ray eksenine göre
+    #  kaçıklığını ( xc ) hiç saymıyordu.  Ray ekseni kabin merkezinden
+    #  geçtiğinde ( xc = 0 ) iki okuma çakışır — kitabın örneği oradadır — ama
+    #  ray kaydıkça ayrışır ve EMNİYETSİZ tarafa da düşer:  ray–kapı arası
+    #  500 mm'de moment toplamı gerçeğin %79'u, 1000 mm'de %36'sı çıkıyordu.
+    #      gövde  ( P − mkapı )  →  xc
+    #      kapı   ( mkapı )      →  xc − ( D/2 + mekanizma payı )
+    #      xp = [ (P−mkapı)·xc + mkapı·( xc − (D/2+pay) ) ] / P = xc − xp_kapı
+    xp_kapi = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P
+    xp = xc - xp_kapi
     yp = xs = ys = 0.0
     xi, yi = g["ray_kapi_arasi"], g["kabin_kaciklik"]
     balata, balata_kaynak = _balata_boyu(g, p)
@@ -1515,8 +1670,11 @@ def _kabin_raylari(g, o):
     #  TS EN 81-50 Ek C.2.1.1:  yük yalnız ilgili eksende Dx/8 ya da Dy/8
     #  kadar kaydırılır;  ÖTEKİ eksendeki moment kolu kabin merkezidir.
     #  ( Kaynak Excel Durum 2'de xQ'yu sabit 0 yazar — bkz. EXCEL_FARKLARI. )
-    xQ1, yQ1 = xc + D / S["Dx_bolen"], yc
-    xQ2, yQ2 = xc, yc + W / S["Dy_bolen"]
+    #  Yük ± kaydırılır, momenti büyüten yön seçilir  ( m.5.7.2.3.4 ).
+    #  xs = ys = 0 olduğu için C.2.1 ile C.2.2 aynı yönü seçer;  askı noktası
+    #  ileride sıfırdan farklı olursa yardımcıya `askı` verilerek ayrılır.
+    xQ1, yQ1 = _yuk_merkezi(xc, D / S["Dx_bolen"], Q, P, xp, xs), yc
+    xQ2, yQ2 = xc, _yuk_merkezi(yc, W / S["Dy_bolen"], Q, P, yp, ys)
 
     b = Bolum("7 -  KABİN KILAVUZ RAYLARININ HESAPLANMASI",
               "TS EN 81-50 m.C.2.1 / C.2.2 / C.2.3")
@@ -1548,10 +1706,12 @@ def _kabin_raylari(g, o):
         veri("δperm", "İzin verilen en büyük eğilme miktarı", dperm, "mm",
              "EN 81-20 m.5.7.4.6", 0),
         veri("ℓ", "Paten balatasının uzunluğu", balata, "mm", balata_kaynak, 0),
-        hesap("Durum 1 :  xQ = xc + D / 8",
-              f"{tr(xc)} + {trn(D, 0)} / 8", xQ1, "mm"),
-        hesap("Durum 2 :  yQ = yc + W / 8",
-              f"{tr(yc)} + {trn(W, 0)} / 8", yQ2, "mm"),
+        hesap(f"Durum 1 :  xQ = xc {'+' if xQ1 >= xc else '−'} D / 8",
+              f"{tr(xc)} {'+' if xQ1 >= xc else '−'} {trn(D, 0)} / 8", xQ1, "mm",
+              "EN 81-20 m.5.7.2.3.4  ·  yük en olumsuz konumda"),
+        hesap(f"Durum 2 :  yQ = yc {'+' if yQ2 >= yc else '−'} W / 8",
+              f"{tr(yc)} {'+' if yQ2 >= yc else '−'} {trn(W, 0)} / 8", yQ2, "mm",
+              "EN 81-20 m.5.7.2.3.4  ·  yük en olumsuz konumda"),
     ]
 
     uygunlar = []
@@ -1578,8 +1738,8 @@ def _kabin_raylari(g, o):
             ad.append(hesap("Fx", kaynak, Fx, "N"))
             ad.append(hesap("Fy", kaynak, Fy, "N"))
             #  m.C.2.1.1:  Fx → My → Wy   ·   Fy → Mx → Wx
-            sy, dx = _ray_satirlari("y", "x", Fx, l, p["Wy"], p["Iy"], ad)
-            sx, dy = _ray_satirlari("x", "y", Fy, l, p["Wx"], p["Ix"], ad)
+            sy, dx = _ray_satirlari("y", "x", Fx, l, p["Wy"], p["Iy"], ad, dstr_x)
+            sx, dy = _ray_satirlari("x", "y", Fy, l, p["Wx"], p["Ix"], ad, dstr_y)
             sm = sx + sy
             sc = (kk["Fv"] + kk["k"] * MY) / p["A"] + sm
             ad.append(hesap("σm = σx + σy", f"{tr(sx)} + {tr(sy)}", sm, "N/mm²"))
@@ -1598,20 +1758,25 @@ def _kabin_raylari(g, o):
                 ad.append(kontrol(f"σ = {tr(st)}  ≤  σperm = {trn(sperm, 0)} N/mm²",
                                   st <= sperm))
                 sonuc.append(st <= sperm)
-            sf = abs(_flans(Fx, p, balata))
-            ad.append(hesap("σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-                            f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
-                            f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}",
-                            sf, "N/mm²", "EN 81-50 m.5.10.5"))
+            sf = abs(_flans(Fx, p, balata, makarali))
+            ad.append(hesap(
+                "σF = 1,85 × | Fx | / c²" if makarali else
+                "σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+                (f"1,85 × {tr(Fx)} / {tr(p['c'] ** 2)}" if makarali else
+                 f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
+                 f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
+                sf, "N/mm²", f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"))
             ad.append(kontrol(f"σF = {tr(sf)}  ≤  σperm = {trn(sperm, 0)} N/mm²",
                               sf <= sperm))
-            ad.append(hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |",
-                            f"l = {trn(l, 0)} mm ,  Iy = {trn(p['Iy'], 0)} mm⁴",
+            ad.append(hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) | + δstr-x",
+                            f"l = {trn(l, 0)} mm ,  Iy = {trn(p['Iy'], 0)} mm⁴"
+                            + (f" ,  δstr-x = {tr(dstr_x)} mm" if dstr_x else ""),
                             dx, "mm"))
             ad.append(kontrol(f"δx = {tr(dx)}  ≤  δperm = {trn(dperm, 0)} mm",
                               dx <= dperm))
-            ad.append(hesap("δy = | 0,7 × l³ × Fy / ( 48 × E × Ix ) |",
-                            f"l = {trn(l, 0)} mm ,  Ix = {trn(p['Ix'], 0)} mm⁴",
+            ad.append(hesap("δy = | 0,7 × l³ × Fy / ( 48 × E × Ix ) | + δstr-y",
+                            f"l = {trn(l, 0)} mm ,  Ix = {trn(p['Ix'], 0)} mm⁴"
+                            + (f" ,  δstr-y = {tr(dstr_y)} mm" if dstr_y else ""),
                             dy, "mm"))
             ad.append(kontrol(f"δy = {tr(dy)}  ≤  δperm = {trn(dperm, 0)} mm",
                               dy <= dperm))
@@ -1625,7 +1790,9 @@ def _kabin_raylari(g, o):
         uygunlar.extend(sonuc)
 
     # ── C.2.1  Güvenlik tertibatının çalışması ────────────────────────
-    Fk = k1 * gn * (P + Q) / n + Mg * gn
+    #  Ek C.2.1.2:  Fv = k1·gn·(P+Q)/n + Mg·gn + Fp.  Fp bir raydaki bütün
+    #  konsol klipslerinin itme kuvvetidir;  kaynak kitapta hiç yoktu.
+    Fk = k1 * gn * (P + Q) / n + Mg * gn + Fp
     lam, omega = _burkulma_omega(l, p["ix"], g["ray_celigi_rm"])
     #  MY çarpanı burada da k3'tür ( 11!W354 = 1,2 ) — güvenlik tertibatı
     #  durumunda bile yardımcı donanım normal kullanma katsayısıyla alınır.
@@ -1633,9 +1800,9 @@ def _kabin_raylari(g, o):
     burkulma_uygun = sigma_k is not None and 0 <= sigma_k <= sperm_g
     ad += [
         metin("Güvenlik Tertibatının Çalışması  ( TS EN 81-50 m.C.2.1 ) :", vurgu=True),
-        hesap("Fk = k1 × gn × ( P + Q ) / n + Mg × gn",
+        hesap("Fk = k1 × gn × ( P + Q ) / n + Mg × gn + Fp",
               f"{tr(k1)} × {tr(gn)} × ( {trn(P, 0)} + {trn(Q, 0)} ) / {trn(n, 0)} "
-              f"+ {tr(Mg)} × {tr(gn)}", Fk, "N"),
+              f"+ {tr(Mg)} × {tr(gn)}" + (f" + {tr(Fp)}" if Fp else ""), Fk, "N"),
         hesap("λ = l / ix", f"{trn(l, 0)} / {tr(p['ix'])}", l / p["ix"], ""),
         veri("λ", "Yuvarlanmış burkulma narinliği  ( en az 20 )", lam, "",
              "11!AV355", 0),
@@ -1663,11 +1830,13 @@ def _kabin_raylari(g, o):
              "Z384", "AH401", "AH404")))
 
     # ── C.2.2  Normal çalışma, işletme ────────────────────────────────
-    Fv = Mg * gn
+    #  Ek C.2.2.2 / C.2.3.2:  Fv = Mg·gn + Fp   ( burada ω yoktur )
+    Fv = Mg * gn + Fp
     sigma_v = (Fv + k3 * MY) / p["A"]
     ad += [
         metin("Normal Çalışma, İşletme  ( TS EN 81-50 m.C.2.2 ) :", vurgu=True),
-        hesap("Fv = Mg × gn", f"{tr(Mg)} × {tr(gn)}", Fv, "N"),
+        hesap("Fv = Mg × gn + Fp", f"{tr(Mg)} × {tr(gn)}"
+              + (f" + {tr(Fp)}" if Fp else ""), Fv, "N"),
         hesap("σv = ( Fv + k3 × MY ) / A",
               f"( {tr(Fv)} + {tr(k3)} × {trn(MY, 0)} ) / {trn(p['A'], 0)}",
               sigma_v, "N/mm²"),
@@ -1675,12 +1844,16 @@ def _kabin_raylari(g, o):
                 sigma_v <= sperm_n),
     ]
     uygunlar.append(sigma_v <= sperm_n)
+    #  Ek C.2.2.1 katsayıyı k2 der ( EN 81-20 Çizelge 14:  Running = 1,2 );
+    #  kitap burada "k3" yazıyordu — sayı aynı, AD yanlıştı.
+    #  Fy'nin paydası da C.2.1.1 b) ile aynıdır:  ( n / 2 ) · h.  Kitap
+    #  n·h yazıyordu, yani Fy'yi YARISI kadar gösteriyordu — emniyetsiz.
     _kesim("Eğilme gerilmesi  ( C.2.2 ) :",
-           "k3 × gn × ( Q·(xQ−xs) + P·(xp−xs) ) / ( n × h )",
-           k3 * gn * (Q * (xQ1 - xs) + P * (xp - xs)) / (n * h),
-           k3 * gn * (Q * (yQ1 - ys) + P * (yp - ys)) / (n * h),
-           k3 * gn * (Q * (xQ2 - xs) + P * (xp - xs)) / (n * h),
-           k3 * gn * (Q * (yQ2 - ys) + P * (yp - ys)) / (n * h),
+           "k2 × gn × ( Q·(xQ−xs) + P·(xp−xs) ) / ( n × h )",
+           k2 * gn * (Q * (xQ1 - xs) + P * (xp - xs)) / (n * h),
+           k2 * gn * (Q * (yQ1 - ys) + P * (yp - ys)) / ((n / 2.0) * h),
+           k2 * gn * (Q * (xQ2 - xs) + P * (xp - xs)) / (n * h),
+           k2 * gn * (Q * (yQ2 - ys) + P * (yp - ys)) / ((n / 2.0) * h),
            {"Fv": Fv, "k": k3}, sperm_n, None,
            (("L415", "AU418", "L424", "AU427", "Z461", "AC463", "",
              "Z476", "AH487", "AH490"),
@@ -1689,7 +1862,8 @@ def _kabin_raylari(g, o):
 
     # ── C.2.3  Normal çalışma, yükleme ────────────────────────────────
     Fx3 = (gn * P * (xp - xs) + Fs * (xi - xs)) / (n * h)
-    Fy3 = (gn * P * (yp - ys) + Fs * (yi - ys)) / (n * h)
+    #  Ek C.2.3.1 b) paydası da ( n / 2 ) · h'dir.
+    Fy3 = (gn * P * (yp - ys) + Fs * (yi - ys)) / ((n / 2.0) * h)
     ad.append(metin("Normal Çalışma, Yükleme  ( TS EN 81-50 m.C.2.3 ) :", vurgu=True))
     ad.append(hesap("Fx = ( gn × P × (xp−xs) + Fs × (xi−xs) ) / ( n × h )",
                     f"( {tr(gn)} × {trn(P, 0)} × {tr(xp - xs)} + {tr(Fs)} × "
@@ -1698,11 +1872,11 @@ def _kabin_raylari(g, o):
                     f"( {tr(gn)} × {trn(P, 0)} × {tr(yp - ys)} + {tr(Fs)} × "
                     f"{tr(yi - ys)} ) / ( {trn(n, 0)} × {trn(h, 0)} )", Fy3, "N"))
     #  m.C.2.3:  Fx → My → Wy   ·   Fy → Mx → Wx
-    sy3, dx3 = _ray_satirlari("y", "x", Fx3, l, p["Wy"], p["Iy"], ad)
-    sx3, dy3 = _ray_satirlari("x", "y", Fy3, l, p["Wx"], p["Ix"], ad)
+    sy3, dx3 = _ray_satirlari("y", "x", Fx3, l, p["Wy"], p["Iy"], ad, dstr_x)
+    sx3, dy3 = _ray_satirlari("x", "y", Fy3, l, p["Wx"], p["Ix"], ad, dstr_y)
     sm3 = sx3 + sy3
     sc3 = (Fv + k3 * MY) / p["A"] + sm3
-    sf3 = _flans(Fx3, p, balata)
+    sf3 = abs(_flans(Fx3, p, balata, makarali))
     ad += [
         hesap("σm = σx + σy", f"{tr(sx3)} + {tr(sy3)}", sm3, "N/mm²"),
         kontrol(f"σm = {tr(sm3)}  ≤  σperm = {trn(sperm_n, 0)} N/mm²", sm3 <= sperm_n),
@@ -1756,8 +1930,13 @@ def _kabin_raylari(g, o):
 #  8 -  KARŞI AĞIRLIK KILAVUZ RAYLARI              ( TS EN 81-50 m.5.10 )
 # =====================================================================
 def _agirlik_raylari(g, o):
-    S, gn = SABIT, SABIT["gn"]
-    k3 = S["k3"]
+    S, gn, O = SABIT, SABIT["gn"], o["ofis"]
+    #  k2  normal işletme darbe katsayısı  ( EN 81-20 Çizelge 14 = 1,2 ),
+    #  k3  yardımcı donanım katsayısı  —  çizelge ona sayı vermez, ofis verir.
+    k2, k3 = S["k2"], O["k3_yardimci"]
+    Fp = g["klips_itme_kuvveti"] or 0.0
+    dstr_x, dstr_y = g["yapi_sehim_x"] or 0.0, g["yapi_sehim_y"] or 0.0
+    makarali = g["paten_tipi"] == "Makaralı"
     prof = g["agirlik_ray_profili"]
     p = _ray_ozellik(prof)
     n = g["agirlik_ray_sayisi"]
@@ -1774,8 +1953,9 @@ def _agirlik_raylari(g, o):
     xsa = ysa = 0.0
 
     Mg = o["ray_boyu"] * MT.ray(prof, "Gr")
-    Fx = (k3 * gn * Mcwt * (Dxa - xsa)) / (n * h)
-    Fy = (k3 * gn * Mcwt * (Dya - ysa)) / (n * h)
+    #  Ek C.2.2.1:  katsayı k2'dir ve Fy'nin paydası ( n / 2 ) · h'dir.
+    Fx = (k2 * gn * Mcwt * (Dxa - xsa)) / (n * h)
+    Fy = (k2 * gn * Mcwt * (Dya - ysa)) / ((n / 2.0) * h)
     Mx, My = _moment(Fx, l), _moment(Fy, l)
     #  σ ve δ BÜYÜKLÜKTÜR  ( bkz. _ray_satirlari ).  Karşı ağırlıkta Dxa/Dya
     #  ve Mcwt pozitif olduğu için bugün işaret dönmüyor;  kural yine de
@@ -1783,13 +1963,13 @@ def _agirlik_raylari(g, o):
     #  sessizce ayrışmasın.
     sx, sy = abs(Mx) / p["Wy"], abs(My) / p["Wx"]
     sm = sx + sy
-    Fv = Mg * gn
+    Fv = Mg * gn + Fp
     sv = (Fv + k3 * MY) / p["A"]
     sc = sv + sm
     balata, balata_kaynak = _balata_boyu(g, p)
-    sf = abs(_flans(Fx, p, balata))
-    dx = abs(_sehim(Fx, l, p["Iy"]))
-    dy = abs(_sehim(Fy, l, p["Ix"]))
+    sf = abs(_flans(Fx, p, balata, makarali))
+    dx = abs(_sehim(Fx, l, p["Iy"])) + dstr_x
+    dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_y
     kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm]
 
     #  ------------------------------------------------------------------
@@ -1808,16 +1988,16 @@ def _agirlik_raylari(g, o):
         sperm_g = MT.sigma_perm_guvenlik(g["ray_celigi_rm"])
         lam_a, omega_a = _burkulma_omega(l, p["ix"], g["ray_celigi_rm"])
         Fxg = (k1a * gn * Mcwt * (Dxa - xsa)) / (n * h)
-        Fyg = (k1a * gn * Mcwt * (Dya - ysa)) / (n * h)
+        Fyg = (k1a * gn * Mcwt * (Dya - ysa)) / ((n / 2.0) * h)
         sxg = abs(_moment(Fxg, l)) / p["Wy"]
         syg = abs(_moment(Fyg, l)) / p["Wx"]
         smg = sxg + syg
-        Fkg = (k1a * gn * Mcwt) / n + Mg * gn
+        Fkg = (k1a * gn * Mcwt) / n + Mg * gn + Fp
         skg = ((Fkg + k3 * MY) * omega_a / p["A"]) if omega_a else None
         scg = (skg + S["birlesik_katsayi"] * smg) if skg is not None else None
-        sfg = abs(_flans(Fxg, p, balata))
-        dxg = abs(_sehim(Fxg, l, p["Iy"]))
-        dyg = abs(_sehim(Fyg, l, p["Ix"]))
+        sfg = abs(_flans(Fxg, p, balata, makarali))
+        dxg = abs(_sehim(Fxg, l, p["Iy"])) + dstr_x
+        dyg = abs(_sehim(Fyg, l, p["Ix"])) + dstr_y
         #  Bölüm 9 bunu okur:  kuyu tabanına bildirilen yükte güvenlik
         #  tertibatı tepkisi AYRI bir kalemdir ( EN 81-20 m.5.2.1.8.4 ).
         o["Fk_agirlik"] = Fkg
@@ -1855,12 +2035,12 @@ def _agirlik_raylari(g, o):
         hesap("Mg = ray boyu × Gr",
               f"{tr(o['ray_boyu'])} m × {tr(MT.ray(prof, 'Gr'))} kg/m", Mg, "kg"),
         metin("Eğilme gerilmesi  ( TS EN 81-50 m.C.2.2 ) :", vurgu=True),
-        hesap("Fx = k3 × gn × Mcwt × ( Dxa − xsa ) / ( n × h )",
-              f"{tr(k3)} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dxa)} / "
+        hesap("Fx = k2 × gn × Mcwt × ( Dxa − xsa ) / ( n × h )",
+              f"{tr(k2)} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dxa)} / "
               f"( {trn(n, 0)} × {trn(h, 0)} )", Fx, "N"),
-        hesap("Fy = k3 × gn × Mcwt × ( Dya − ysa ) / ( n × h )",
-              f"{tr(k3)} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dya)} / "
-              f"( {trn(n, 0)} × {trn(h, 0)} )", Fy, "N"),
+        hesap("Fy = k2 × gn × Mcwt × ( Dya − ysa ) / ( ( n / 2 ) × h )",
+              f"{tr(k2)} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dya)} / "
+              f"( {tr(n / 2.0)} × {trn(h, 0)} )", Fy, "N"),
         #  m.C.2.2.1:  Fx → My → Wy   ·   Fy → Mx → Wx
         hesap("My = 3 × Fx × l / 16", f"3 × {tr(Fx)} × {trn(l, 0)} / 16", Mx,
               "N·mm", ondalik=0),

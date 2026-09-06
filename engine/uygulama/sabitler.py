@@ -53,6 +53,12 @@ VARSAYILAN = {
     "k1_kaymali":       2,      # Kaymalı güvenlik tertibatı
     "k1_makarali":      3,      # Ani frenlemeli makaralı
     "k1_ani":           5,      # Ani frenlemeli
+    #  TS EN 81-20 Çizelge 14:  k1 ve k2'nin değeri çizelgede YAZILIDIR
+    #  ( k2 = 1,2 ), k3 için ise çizelge "the value has to be determined by
+    #  the manufacturer due to the actual installation" der — yani standardın
+    #  verdiği bir sayı YOKTUR.  Bu yüzden k3 ofis sabitidir, motorda çivili
+    #  değildir;  kitabın kullandığı 1,2 varsayılan olarak korunur.
+    "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
     "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm     ( 11!S58 )
 
     # ── ③ SIĞINMA PAYLARI  ( kabin / kuyu geometrisi ) ───────────────
@@ -111,7 +117,8 @@ ARALIK = {
     "kanal_gama_yd": (MT.GAMA_ASGARI_U, MT.GAMA_AZAMI),
     "kanal_beta": (0, MT.BETA_AZAMI),
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
-    "k1_ani": (1, 10), "yan_yatak_L_X": (0, 5000),
+    "k1_ani": (1, 10), "k3_yardimci": (1, 10),
+    "yan_yatak_L_X": (0, 5000),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
     "paten_payi": (0, 5000), "tavan_payi": (0, 5000),
     "revizyon_payi": (0, 5000), "etek_payi": (0, 5000),
@@ -138,7 +145,8 @@ GRUPLAR = (
     ("② MUKAVEMET KABULLERİ",
      "makine kaidesi ve ray hesabı — TS EN 81-20 bu yük modelini VERMEZ, "
      "aşağıdakiler ofis kabulüdür",
-     ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani", "yan_yatak_L_X")),
+     ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani", "k3_yardimci",
+      "yan_yatak_L_X")),
     ("③ SIĞINMA PAYLARI",
      "kabin gövde ve kuyu geometrisi — kabin imalatına bağlıdır, "
      "TS EN 81-20 sayısı değildir",
@@ -159,6 +167,9 @@ GRUPLAR = (
 )
 
 ETIKET = {
+    "k3_yardimci": ("Yardımcı donanım darbe katsayısı k3",
+                    "TS EN 81-20 Çizelge 14 k3'e SAYI VERMEZ — "
+                    "'imalatçı tarafından, gerçek tesise göre belirlenir'"),
     "verim_dislisiz": ("Dişlisiz makine verimi η", "MMO 208/7 §2.4 — motor gücü bağıntısındaki η"),
     "verim_disli": ("Dişli makine verimi η", "redüktör kaybı dâhil"),
     "palanga_verim_dususu": ("Palangalı sistemde verim düşüşü Δη", "i > 1 ise η′ = η − Δη  ( MMO/697 §2.4 )"),
