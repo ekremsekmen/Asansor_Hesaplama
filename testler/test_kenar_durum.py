@@ -32,6 +32,12 @@ def g(**kw):
     return d
 
 
+def _yakin_o(a, b, tol=1e-6):
+    if a is None or b is None:
+        return False
+    return abs(float(a) - float(b)) <= tol * max(abs(float(a)), abs(float(b)), 1.0)
+
+
 def calistir():
     print("\n\033[1mTEST 2 — KENAR DURUMLAR VE TABLO SINIRLARI\033[0m")
     r = Rapor("Kenar durumlar")
@@ -1400,6 +1406,70 @@ def calistir():
     r.kontrol("geçersiz katsayı reddediliyor",
               any("sigorta_katsayisi" in x
                   for x in AV.sabitler({"sigorta_katsayisi": 0})["_reddedilen"]))
+
+    #  ------------------------------------------------------------------
+    #  B5  KOLON HATTI AKIMI DA ŞEBEKEDEN ÇEKİLEN GÜÇTEN HESAPLANIR
+    #  ------------------------------------------------------------------
+    #  ηm düzeltmesi makine besleme hattı ( I2 ) için yapılmış, KOLON hattı
+    #  ( I ) için yapılmamıştı.  P_kurulu motorun MİL gücünü taşıyordu;  oysa
+    #  I ≤ Iz kararı kolon hattına aittir ve o hatta Pşeb akar.  Yön
+    #  EMNİYETSİZDİ:  kesit olduğundan küçük seçilebiliyordu.
+    #  Kaynak kitap bunu zaten doğru yapar ( 12-Elk.Hesapları!AT7 = W36×1000 ).
+    _etam = _S0["motor_elektrik_verimi"]
+    r.esit("B5  cetveldeki motor gücü = Pşeb  ( Nsç / ηm )",
+           round(_cet[0]["guc"], 3), round(_s["Nsc"] * 1000 / _etam, 3))
+    r.esit("B5  kurulu güç Pşeb'i içeriyor",
+           round(_s["P_kurulu"], 3),
+           round(_s["g_motor"] + _s["g_kuyu"] + _s["g_kabin"] + _s["g_priz"], 3))
+    r.esit("B5  kolon hattı akımı I = P1 / (√3·U·cosφ)",
+           round(_s["I"], 3),
+           round(_s["P_kurulu"] / (_m.sqrt(3) * 380 * 0.90), 3))
+    r.kontrol("B5  I, ηm'siz eski değerden BÜYÜK",
+              _s["I"] > (_s["Nsc"] * 1000 + _s["g_kuyu"] + _s["g_kabin"]
+                         + _s["g_priz"]) / (_m.sqrt(3) * 380 * 0.90),
+              f"→ {_s['I']}")
+    r.kontrol("B5  ε1 de Pşeb ile hesaplanıyor  ( ε1 ∝ P1 )",
+              _yakin_o(_s["eps1"],
+                       100 * _s["P_kurulu"] * _s["L1"] / (56 * _s["S1"] * 380 ** 2))
+              if all(_s.get(k) is not None for k in ("eps1", "L1", "S1")) else True,
+              f"→ {_s.get('eps1')!r}")
+    #  Denetimin bildirdiği karar çeviren birleşimler
+    for _kw, _s1, _iz in ((22, 6, 41), (30, 10, 57), (55, 25, 101)):
+        _o5 = _av({"Nsc": _kw, "S1": _s1, "S2": _s1})["asansorler"][0]["ozet"]
+        r.kontrol(f"B5  {_kw} kW · S1 = {_s1} mm² → UYGUN DEĞİL  "
+                  f"( I = {_o5['I']:.1f} A > Iz = {_iz} A )",
+                  _o5["akim_uygun"] is False and _o5["Iz"] == _iz,
+                  f"→ I={_o5['I']!r} Iz={_o5['Iz']!r} uygun={_o5['akim_uygun']!r}")
+        r.kontrol(f"B5  {_kw} kW ηm'siz olsaydı 'uygun' görünürdü",
+                  (_o5["P_kurulu"] - _o5["g_motor"] + _o5["g_motor"] * _etam)
+                  / (_m.sqrt(3) * 380 * 0.90) < _iz)
+    #  ε2 de mil gücüyle değil, ŞEBEKEDEN ÇEKİLEN güçle hesaplanır.
+    #  ε ∝ P olduğu için oran doğrudan 1/ηm'dir.
+    _e2 = _s["eps2"]
+    r.kontrol("B5  ε2 Pşeb ile hesaplanıyor  ( mil gücünün 1/ηm katı )",
+              _e2 is not None and _yakin_o(
+                  _e2, 100 * (_s["Nsc"] * 1000 / _etam) * _s["L2"]
+                  / (56 * _s["S2"] * 380 ** 2), 1e-6),
+              f"→ ε2 = {_e2!r}")
+
+    #  ------------------------------------------------------------------
+    #  B18  Nsç = 0 girilince paftada TEK bir motor gücü kalır
+    #  ------------------------------------------------------------------
+    #  Aralık dışı Nsç varsayılana dönüyor;  dönüş UYARI ile bildirilmeli ve
+    #  bölüm 1 ile kurulu güç cetveli AYNI değeri yazmalı — yoksa paftada iki
+    #  farklı motor gücü görünürdü.
+    _s0 = _av({"Nsc": 0})["asansorler"][0]
+    r.kontrol("B18  Nsç = 0 uyarı üretiyor",
+              any("Nsç" in x for x in (_s0.get("uyarilar") or [])),
+              f"→ {_s0.get('uyarilar')}")
+    _b1 = [b for b in _s0["bolumler"] if b["baslik"].startswith("1 ")][0]
+    _nsc_b1 = [a["deger"] for a in _b1["adimlar"] if a.get("sembol") == "Nsç"]
+    _cet0 = [b for b in _s0["bolumler"] if b.get("cetvel")][0]["cetvel"]
+    r.esit("B18  bölüm 1'in Nsç'si özetle aynı", _nsc_b1, [_s0["ozet"]["Nsc"]])
+    r.esit("B18  cetveldeki güç aynı Nsç'den geliyor",
+           round(_cet0[0]["guc"], 3), round(_s0["ozet"]["Nsc"] * 1000 / _etam, 3))
+    r.kontrol("B18  paftada sıfır motor gücü yazmıyor",
+              _s0["ozet"]["Nsc"] > 0 and _cet0[0]["guc"] > 0)
 
     #  --- S2 ( makine besleme ) akım kontrolü
     #  37 kW motor + 1,5 mm² : I2 = 62 A, kablo 17,5 A taşır.  ε2 küçük

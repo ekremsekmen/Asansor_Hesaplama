@@ -20,7 +20,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.uygulama import mukavemet_girdi as MG                  # noqa: E402
 from engine.uygulama import mukavemet_tablolari as MT              # noqa: E402
+from exports import mukavemet_xlsx as MX                   # noqa: E402
 from testler.ortak import Rapor                           # noqa: E402
+
+#  Teslim edilen kitapta karşılığı olan, kaynak kitapta olmayan girdiler
+_EK_ANAHTARLAR = set(MX.EK_GIRDI_ANAHTARLARI)
+_HESAP_ANAHTARLARI = {a for a, _h in MX.HESAP_SAYFASI_GIRDILERI}
 
 KAYNAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "templates", "MUKAVEMET_HESABI.xlsx")
@@ -33,7 +38,6 @@ ESLESME = (
     ("HALAT",             "TABLOLAR",    "A32:F43",  (0, 1, 2, 4, 5)),
     ("NPU_PROFIL",        "TABLOLAR",    "M36:AH53", (0, 9, 10, 11, 12, 13, 14, 15, 16)),
     ("KABIN_ALANI",       "TABLOLAR",    "H78:K99",  (0, 1, 2, 3)),
-    ("KANAL_SEKLI",       "TABLOLAR",    "D47:G52",  (0, 2, 3)),
     ("DARBE_TIPLERI",     "TABLOLAR",    "H32:K35",  (0, 3)),
     ("AGIRLIK_MALZEMESI", "TABLOLAR",    "U61:W62",  (0, 1, 2)),
     ("RAY_CELIGI",        "TEKNİK",      "P2:R4",    (0, 1, 2)),
@@ -55,6 +59,53 @@ GENISLETILEN = {
         "degisen": {320: (4, 0.953, 0.79)},
     },
 }
+
+
+def _kanal_tablosu(r, ws):
+    """Nequiv(t) OFİS AÇILARINDAN türetilir;  varsayılan açılarda kitapla birebir.
+
+    Kitabın tablosu ( D47:G52 ) her kanal şeklinin karşısına tek bir açı ve
+    tek bir Nequiv(t) çiviler.  Modül artık TS EN 81-50 Çizelge 2'yi kullanıp
+    değeri γ / β'dan hesaplıyor.  Burada iki şey denetlenir:
+        · kitabın satırları DEĞİŞMEMİŞ  ( sapmanın dayanağı odur ),
+        · ofisin varsayılan açılarında türetilen değer kitapla AYNI.
+    """
+    from engine.uygulama import sabitler as US
+    O = US.sabitler(None)
+    satir = {}
+    for r_ in range(47, 53):
+        ad = ws[f"D{r_}"].value
+        if ad not in (None, ""):
+            satir[str(ad).strip()] = (ws[f"F{r_}"].value, ws[f"G{r_}"].value)
+    r.esit("kaynak kanal tablosu satır sayısı", len(satir), len(MT.KANAL_SEKLI))
+    for ad, _tur, _gecis in MT.KANAL_SEKLI:
+        aci_x, neq_x = satir.get(ad, (None, None))
+        #  Kitabın "açı" sütunu iki büyüklüğü karıştırır:  V kanalda γ,
+        #  altı kesik kanalda β.  Karşılaştırma buna göre yapılır.
+        bizim_aci = (O["kanal_beta"] if MT.kanal_alti_kesik_mi(ad)
+                     else (None if MT.kanal_yarim_daire_mi(ad)
+                           else O["kanal_gama_v"]))
+        r.kontrol(f"kanal '{ad}' açısı kitapla aynı  ( varsayılan ofis )",
+                  _esit(bizim_aci, aci_x), f"→ modül {bizim_aci!r}, Excel {aci_x!r}")
+        bizim = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
+        r.kontrol(f"kanal '{ad}' Nequiv(t) kitapla aynı  ( varsayılan ofis )",
+                  _esit(bizim, neq_x), f"→ modül {bizim!r}, Excel {neq_x!r}")
+    #  ÇİZELGE 2'NİN KENDİSİ  —  TS EN 81-50 m.5.12.2.2
+    for aci, bek in MT.NEQUIV_V:
+        r.esit(f"Çizelge 2  V kanal γ = {aci}°",
+               MT.kanal_nequiv_t("V Kanal", aci, 90), bek)
+    for aci, bek in MT.NEQUIV_U_ALTI_KESIK:
+        r.esit(f"Çizelge 2  altı kesik β = {aci}°",
+               MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, aci), bek)
+    r.esit("Çizelge 2  alt kesilmesiz yarım daire",
+           MT.kanal_nequiv_t("Yarım Daire Kanal", 38, 90), 1.0)
+    r.esit("çift sarımda iki geçiş",
+           MT.kanal_nequiv_t("Yarım Daire Kanal (Çift Sarım)", 38, 90), 2.0)
+    #  Ara değer:  çizelgenin kendi notu doğrusal ara değere izin verir
+    r.esit("Çizelge 2  ara değer γ = 39°",
+           MT.kanal_nequiv_t("V Kanal", 39, 90), 11.0)
+    r.esit("Çizelge 2  ara değer β = 87,5°",
+           MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, 87.5), 4.4)
 
 
 def _genisletilen_tablo(r, ad, tablo, excel):
@@ -110,6 +161,10 @@ def calistir():
                 continue
             for j, (mv, ev) in enumerate(zip(m, e)):
                 r.kontrol(f"{ad}[{i}][{j}]", _esit(mv, ev), f"→ modül {mv!r}, Excel {ev!r}")
+
+    #  KANAL TABLOSU:  modül artık Nequiv(t)'yi kitaptan değil, ofis
+    #  açılarından ve TS EN 81-50 Çizelge 2'den türetiyor.
+    _kanal_tablosu(r, wb["TABLOLAR"])
 
     #  ω tablosu:  231 satır, λ = 20…250
     om = oku("TABLOLAR", "A47:B277", (0, 1))
@@ -205,11 +260,20 @@ def _girdi_sozlesmesi(r, wb):
         r.kontrol(f"girdi {anahtar}: etiket dolu", bool(etiket and etiket.strip()))
         if not hucre:
             #  Kaynak Excel'in "Veri Girişi" sayfasında KARŞILIĞI OLMAYAN alan.
-            #  Excel bu değerleri ya hesap sayfasına sabit yazar ( Nps · Npr )
-            #  ya da hiç sormaz ( paten balata boyu ).  Varsayılanı Excel'e
-            #  karşı denetlenemez;  yalnız açılır liste taşımadığı doğrulanır.
-            r.kontrol(f"girdi {anahtar}: hücresiz alan açılır liste taşımıyor",
-                      secenekler is None, f"→ {secenekler!r}")
+            #  Excel bu değerleri ya hesap sayfasına sabit yazar ( Nps · Npr ),
+            #  ya hiç sormaz ( paten balata boyu ), ya da programın kendi
+            #  eklediği alandır ( toplam verim · ağırlık güvenlik tertibatı ).
+            #  Varsayılanı Excel'e karşı denetlenemez;  seçenek listesi varsa
+            #  varsayılanın o listede olduğu doğrulanır.
+            if secenekler is not None:
+                r.kontrol(f"girdi {anahtar}: varsayılan seçenek listesinde",
+                          varsayilan in secenekler,
+                          f"→ {varsayilan!r} ∉ {secenekler!r}")
+            #  Bu alanlar teslim edilen kitaba AYRI bir blokta yazılır ve
+            #  geri okunur;  yoksa revizyonda sessizce kaybolurlardı.
+            r.kontrol(f"girdi {anahtar}: teslim kopyasında yeri var",
+                      anahtar in _EK_ANAHTARLAR or anahtar in _HESAP_ANAHTARLARI,
+                      "→ ne EK_GIRDI_HUCRELERI'nde ne de hesap sayfasında")
             continue
         r.kontrol(f"girdi {anahtar}: varsayılan Excel'deki değer ({hucre})",
                   _esit(varsayilan, ws[hucre].value),

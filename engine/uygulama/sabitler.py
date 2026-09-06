@@ -105,7 +105,11 @@ ARALIK = {
     "verim_dislisiz": (0.1, 1), "verim_disli": (0.1, 1),
     "palanga_verim_dususu": (0, 0.5), "Gs": (0, 5000), "q_denge": (0.2, 0.8),
     "halat_pay_m": (0, 100),
-    "kanal_gama_v": (35, 90), "kanal_gama_yd": (25, 90), "kanal_beta": (0, 105),
+    #  Sınırlar tek yerde durur ( mukavemet_tablolari ):  standardın kendi
+    #  m.5.11.2.3.1 sınırlarıdır ve iki dosyada ayrı ayrı yazılırsa ayrışır.
+    "kanal_gama_v": (MT.GAMA_ASGARI_V, MT.GAMA_AZAMI),
+    "kanal_gama_yd": (MT.GAMA_ASGARI_U, MT.GAMA_AZAMI),
+    "kanal_beta": (0, MT.BETA_AZAMI),
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
     "k1_ani": (1, 10), "yan_yatak_L_X": (0, 5000),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
@@ -236,12 +240,20 @@ def sabitler(ozel=None):
     return s
 
 
-def verim(S, makine_tipi, aski_orani=1):
-    """η′  —  ofis sabitlerinden okunan makine verimi + palanga düşüşü."""
+def verim(S, makine_tipi, aski_orani=1, toplam=False):
+    """η′  —  ofis sabitlerinden okunan makine verimi + palanga düşüşü.
+
+    toplam=True ise ofis verimi ZATEN toplam sistem verimidir:  MMO/697
+    §2.4'ün palanga düşüşü ikinci kez uygulanmaz ( askı kaybı o değerin
+    içindedir ).  Avan motorundaki "Girilen η toplam sistem verimidir"
+    kutusunun uygulama projesindeki karşılığıdır.
+    """
     eta = {"Dişlisiz": S.get("verim_dislisiz"),
            "Dişli": S.get("verim_disli")}.get(makine_tipi)
     if eta is None:
         eta = OFIS.VARSAYILAN_VERIM
+    if toplam:
+        return eta
     try:
         palangali = float(aski_orani) > 1
     except (TypeError, ValueError):

@@ -185,8 +185,10 @@ def xlsx_oku_ayrintili(icerik: bytes):
     if ofis:
         g["_ofis"] = ofis
     for anahtar, satir, _et, _b in EK_GIRDI_HUCRELERI:
-        deger = _ek_deger_oku(anahtar, ws[f"B{satir}"].value)
-        if deger is not None:
+        ham = ws[f"B{satir}"].value
+        deger = (str(ham).strip() if anahtar in EK_METIN_ALANLARI and ham not in (None, "")
+                 else _ek_deger_oku(anahtar, ham))
+        if deger not in (None, ""):
             g[anahtar] = deger
     return g, ek_blok
 
@@ -332,6 +334,8 @@ HESAP = "11-Muk. Hesapları"
 HESAP_SAYFASI_GIRDILERI = (("kasnak_tek_yon", "AH105"),
                            ("kasnak_ters_yon", "AH106"))
 GIRDI = GIRDI_SAYFASI
+TABLOLAR = "TABLOLAR"
+ASKI = "Askı Tipleri"
 
 #  ---------------------------------------------------------------------
 #  PROGRAMIN EKLEDİĞİ GİRDİ HÜCRELERİ
@@ -363,6 +367,12 @@ EK_GIRDI_HUCRELERI = (
     ("mk_yok",                237, "Makine dairesiz  ( MRL )",       "EVET / HAYIR"),
     ("mk_uzunluk",            238, "Makine dairesi uzunluğu",        "m"),
     ("mk_genislik",           239, "Makine dairesi genişliği",       "m"),
+    #  Kaynak kitapta karşılığı olmayan üç yeni girdi
+    ("toplam_verim",          240, "Ofis verimi η toplam sistem verimidir",
+     "EVET / HAYIR"),
+    ("agirlik_guvenlik_tertibati", 241, "Karşı ağırlıkta güvenlik tertibatı", "—"),
+    ("guvenlik_devreye_kuvvet", 242,
+     "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )", "N"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -370,11 +380,18 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  dosyasının bir parçasıdır:  σem = 100 ile "UYGUN DEĞİL" çıkan bir proje,
 #  Excel'e aktarılıp geri okunduğunda varsayılan 130'a dönüyor ve "UYGUN"
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
-OFIS_BASLIK = 242
-OFIS_BAS = 244
+OFIS_BASLIK = 245
+OFIS_BAS = 247
+#  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
+#  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
+#  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
+OFIS_ARAMA = range(230, 275)
+OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 #  Onay kutuları Excel'de metin olarak durur — projeci hücreyi elle de
 #  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
 EK_ONAY_ALANLARI = ("mk_yok",)
+#  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
+EK_METIN_ALANLARI = ("toplam_verim", "agirlik_guvenlik_tertibati")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -398,12 +415,22 @@ def _ofis_yaz(vg, g):
         vg[f"C{satir}"] = anahtar
 
 
+def _ofis_basligi(vg):
+    """Ofis sabitleri bloğunun başlık satırını bulur  ( yoksa None )."""
+    for r in OFIS_ARAMA:
+        if str(vg[f"A{r}"].value or "").strip().startswith(OFIS_BASLIK_ONEK):
+            return r
+    return None
+
+
 def _ofis_oku(vg):
     """Teslim kopyasındaki proje sabitlerini geri okur."""
-    if str(vg[f"A{OFIS_BASLIK}"].value or "").strip()[:22] != "PROJENİN OFİS SABİTLER":
+    baslik = _ofis_basligi(vg)
+    if baslik is None:
         return {}
+    bas = baslik + (OFIS_BAS - OFIS_BASLIK)
     d = {}
-    for r in range(OFIS_BAS, OFIS_BAS + len(US.VARSAYILAN) + 2):
+    for r in range(bas, bas + len(US.VARSAYILAN) + 2):
         anahtar = vg[f"C{r}"].value
         if anahtar in (None, ""):
             continue
@@ -475,6 +502,50 @@ BEYAN_LISTE_HUCRE = "C59"
 ELEKTRIK = "12-Elk.Hesapları"
 
 
+#  TABLOLAR!D47:G52  —  kanal şekli · açı · Nequiv(t)
+KANAL_TABLO_SATIRI = {
+    "V Kanal": 47, "Altı Kesik V Kanal": 48, "Yarım Daire Kanal": 49,
+    "Altı Kesik Yarım Daire Kanal": 50, "Yarım Daire Kanal (Çift Sarım)": 52,
+}
+
+
+def _kanal_tablosu(wb, O):
+    """Kanal tablosunu projenin kendi γ / β açılarıyla yeniden yazar."""
+    if TABLOLAR not in wb.sheetnames:
+        return
+    tb = wb[TABLOLAR]
+    for ad, satir in KANAL_TABLO_SATIRI.items():
+        aci = (O["kanal_beta"] if MT.kanal_alti_kesik_mi(ad)
+               else (None if MT.kanal_yarim_daire_mi(ad) else O["kanal_gama_v"]))
+        tb[f"F{satir}"] = aci
+        tb[f"G{satir}"] = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
+
+
+#  'Askı Tipleri' sayfasında MSR'nin ± işaretini taşıyan hücreler.
+#  ( hücre , kitaptaki parça , doğrusu )
+MSR_DUZELTME = (
+    ("M119", "0.5*M130-M131", "0.5*M130+M131"),   # %125 yüklü kabin EN ALTTA
+    ("M120", "0.5*M130+M132", "0.5*M130-M132"),
+    ("N119", "0.5*N130-N131", "0.5*N130+N131"),   # yüklü kabin tampona oturmuş
+    ("N120", "0.5*N130+N132", "0.5*N130-N132"),
+    ("P119", "0.5*P130-P131", "0.5*P130+P131"),   # %100 yüklü kabin EN ALTTA
+    ("P120", "0.5*P130+P132", "0.5*P130-P132"),
+    ("Q119", "0.5*Q130+Q131", "0.5*Q130-Q131"),   # boş kabin EN ÜSTTE
+    ("Q120", "0.5*Q130-Q132", "0.5*Q130+Q132"),
+)
+
+
+def _msr_dagilimi(wb):
+    """Halat kütlesinin taraf dağılımındaki ters ± işaretlerini düzeltir."""
+    if ASKI not in wb.sheetnames:
+        return
+    at = wb[ASKI]
+    for hucre, eski, yeni in MSR_DUZELTME:
+        d = at[hucre].value
+        if isinstance(d, str) and eski in d:
+            at[hucre] = d.replace(eski, yeni)
+
+
 def _elektrik_sayfasi(wb, g):
     """Kitabın elektrik sayfasını programın girdileriyle doldurur.
 
@@ -490,6 +561,7 @@ def _elektrik_sayfasi(wb, g):
     L1, L2 = g.get("kolon_uzunluk"), g.get("makine_uzunluk")
     for hucre, deger in (("W27", L2), ("W28", O["U"]), ("W29", O["eps_max"]),
                          ("W32", O["kappa"]), ("W33", S1), ("W34", S2),
+                         ("W35", O["motor_elektrik_verimi"]),
                          ("X58", O["cosfi"]), ("X63", O["cosfi"])):
         if deger is not None:
             ws[hucre] = deger
@@ -639,6 +711,48 @@ def _standarda_uydur(wb, g):
     #  tipini hiç okumaz.  Teslim kopyasında AQ22 bir FORMÜL olur:  Excel'de
     #  makine tipi ya da askı oranı değiştirilirse verim de takip eder.
     ws["AQ22"] = _verim_formulu(O)
+
+    #  ⑮  KABİN ÖNÜ GİRİNTİSİ TAMAMEN SAYILIR  —  EN 81-20 m.5.4.2.1.3
+    #  Kitap ( 11!X84 ) girintiye kapı genişliğinin YARISINI katıyor ve eşiği
+    #  "≥ 100 mm" tutuyordu.  Standart:  ≤ 100 mm hariç, > 100 mm ise
+    #  "the TOTAL available area shall be included".
+    ws["X84"] = ("=IF('Veri Girişi'!F69>100,"
+                 "(('Veri Girişi'!C73*'Veri Girişi'!C74)"
+                 "+('Veri Girişi'!C71*'Veri Girişi'!F69))/1000000,"
+                 "('Veri Girişi'!C73*'Veri Girişi'!C74)/1000000)")
+
+    #  ⑯  "Sf ≥ Smin" BİR GEÇME ÖLÇÜTÜ DEĞİLDİR  —  EN 81-20 m.5.5.2.2
+    #  Kitap ( 11!AH125 ) bunu UYGUN / UYGUN DEĞİL diye yazıyor ve standarda
+    #  uyan tasarımları reddediyordu.  Tek ölçüt bir altındaki satırdır:
+    #  S ≥ MAX( Sf ; Smin ) — o zaten AH126'da doğru kurulu.
+    ws["AH125"] = ('=IF(T125>=X125,"Sf belirleyicidir  ( ölçüt: S ≥ Sf ).",'
+                   '"Smin belirleyicidir  ( ölçüt: S ≥ Smin ).")')
+
+    #  ⑰  Nequiv(t) OFİS AÇILARINI İZLER  —  EN 81-50 Çizelge 2
+    #  Kitabın tablosu ( TABLOLAR!D47:G52 ) her kanal şeklinin karşısına tek
+    #  bir açı ve tek bir Nequiv(t) çiviler;  ofis sabiti γ ya da β
+    #  değiştiğinde kımıldamaz.  Teslim kopyasında satırlar projenin kendi
+    #  açılarıyla yeniden yazılır.
+    _kanal_tablosu(wb, O)
+
+    #  ⑱  HALAT KÜTLESİNİN TARAF DAĞILIMI  —  EN 81-50 m.5.11.2.2
+    #  Kitap dört yük durumunun üçünde ± işaretini ters yazıyordu:  kabin en
+    #  altta iken halat kütlesinin tamamını karşı ağırlık tarafına koyuyordu.
+    _msr_dagilimi(wb)
+
+    #  ⑲  Mil kuvveti ve moment askı oranına göre indirgenir
+    #  2:1 palangada tahrik kasnağının gördüğü kuvvet Gmax değil Gmax/i'dir.
+    ws["AQ7"] = "=(AQ11-AQ13)/'Veri Girişi'!B100"
+    ws["AQ21"] = "=(AQ9/'Veri Girişi'!B100)*(AQ10/2000)"
+
+    #  ⑳  Regülatör kuvvetinin ikinci sınırı  —  EN 81-20 m.5.6.2.2.1.1 d)
+    #  Kitap ( 11!AA156 ) "2 × Freg" koyar;  Freg halatın statik gergisidir,
+    #  güvenlik tertibatını devreye sokan kuvvet değildir.  O kuvvet
+    #  imalatçıdan gelir;  girilmişse iki katı, girilmemişse yalnız 300 N.
+    _fgt = g.get("guvenlik_devreye_kuvvet")
+    ws["AA156"] = (max(MK.SABIT["reg_kuvvet_asgari"], 2 * _fgt)
+                   if isinstance(_fgt, (int, float)) and not isinstance(_fgt, bool)
+                   and _fgt > 0 else MK.SABIT["reg_kuvvet_asgari"])
 
     #  ⑧  Sığınma açıklıklarının iki alt sınırı  —  EN 81-20 m.5.2.5.7.3 ve
     #  m.5.2.5.8.2 a) 2).  Kitap 1200 / 150 mm ister;  standartta bu sayılar

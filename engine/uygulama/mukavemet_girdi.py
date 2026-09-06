@@ -113,6 +113,14 @@ ALANLAR = (
     ("reg_kanal_acisi",   "F122", "Regülatör kanal açısı",             "°",    "sayi", None, 40),
     ("reg_surtunme",      "F123", "Regülatör sürtünme faktörü  ( μ )", "—",    "sayi", None, 0.2),
     ("reg_gergi_agirligi", "F124", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
+    #  TS EN 81-20 m.5.6.2.2.1.1 d):  regülatörün ürettiği çekme kuvveti,
+    #  "güvenlik tertibatını devreye sokmak için GEREKENİN İKİ KATI" ile
+    #  300 N'un BÜYÜĞÜNDEN az olamaz.  O kuvvet İMALATÇI VERİSİDİR;  kitap
+    #  onun yerine halatın kendi statik gergisinin iki katını koyuyordu
+    #  ( bkz. EXCEL_FARKLARI ).  Boş bırakılırsa yalnız 300 N sınırı
+    #  denetlenir ve pafta eksiği açıkça yazar.
+    ("guvenlik_devreye_kuvvet", "", "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )",
+     "N", "sayi", None, None),
 
     # ── KILAVUZ RAYLAR ────────────────────────────────────────────────
     ("kabin_ray_profili", "E73",  "Kabin rayı profili",                "—",    "secim",
@@ -131,6 +139,14 @@ ALANLAR = (
     #  kendi tablosu ( engine/ortak/ofis.py ) dişli makinede 0,50 der.
     ("makine_tipi",       "B130", "Makine tipi",                       "—",    "secim",
      tuple(OFIS.MAKINE_VERIMLERI), "Dişlisiz"),
+    #  AVAN TARAFIYLA SİMETRİ.  Avan motorunda "Girilen η toplam sistem
+    #  verimidir" kutusu vardır;  işaretliyken MMO/697 §2.4'ün palanga verim
+    #  düşüşü İKİNCİ KEZ uygulanmaz.  Uygulama projesinde karşılığı yoktu:
+    #  imalatçının toplam sistem verimini kullanmak isteyen mühendis bunu
+    #  ancak ofis sabitini değiştirerek yapabiliyordu — ve o değişiklik
+    #  projedeki BÜTÜN asansörleri etkiliyordu.
+    ("toplam_verim",      "",     "Ofis verimi η toplam sistem verimidir", "—", "secim",
+     _s("Hayır", "Evet"), "Hayır"),
     ("kabin_paten_arasi", "B127", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
     ("agirlik_paten_arasi", "B128", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
     ("guvenlik_tertibati", "G36", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
@@ -145,6 +161,12 @@ ALANLAR = (
      MT.AGIRLIK_MALZEMELERI, "Barit"),
     ("agirlik_ray_arasi", "B119", "Ağırlık ray arası",                 "mm",   "secim",
      MT.RAY_ARALARI, 1050),
+    #  TS EN 81-20 m.5.6.1:  karşı ağırlıkta güvenlik tertibatı, kuyunun
+    #  altındaki hacme girilebiliyorsa ZORUNLUDUR.  Varsa ağırlık rayı
+    #  TS EN 81-50 Ek C.2.1'e göre de ( k1 darbe katsayısıyla ) hesaplanmalıdır;
+    #  kitap yalnız C.2.2'yi ( normal işletme ) kuruyordu.
+    ("agirlik_guvenlik_tertibati", "", "Karşı ağırlıkta güvenlik tertibatı", "—", "secim",
+     ("Yok",) + MT.DARBE_TIPLERI_ADLARI, "Yok"),
 
     # ── TAMPONLAR ─────────────────────────────────────────────────────
     ("kabin_tampon_baba",   "F118", "Kabin tamponu baba yüksekliği",   "mm",   "sayi", None, 1000),
@@ -187,7 +209,11 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
 #  hesap OverflowError ile çöküyordu.
 ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 
-OPSIYONEL_ALANLAR = ("paten_balata_boyu",)
+OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet")
+
+#  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
+#  hesaba katılacak azami sürtünme katsayısı.
+REG_MU_AZAMI = 0.2
 
 #  Hesapta BÖLEN olarak geçen alanlar — sıfır kabul edilmez.
 BOLEN_ALANLAR = (
@@ -216,7 +242,9 @@ TABLO_GEREKLI = (
                     ("kopma yükü", MT.halat_kopma)], "halat verisi"),
     ("reg_halat_capi", [("1 m ağırlığı", MT.halat_agirlik),
                         ("kopma yükü", MT.halat_kopma)], "halat verisi"),
-    ("kanal_sekli", [("Nequiv(t)", MT.kanal_nequiv_t)], "kasnak verisi"),
+    #  Nequiv(t) artık şeklin adından değil, ofis açılarından hesaplanır
+    #  ( EN 81-50 Çizelge 2 );  burada yalnız şeklin TANINDIĞI denetlenir.
+    ("kanal_sekli", [("kanal türü", MT.kanal_turu)], "kasnak verisi"),
     ("guvenlik_tertibati", [("k1", MT.darbe_k1)], "darbe katsayısı"),
     ("agirlik_malzemesi", [("derinlik", MT.agirlik_derinlik)], "malzeme verisi"),
     ("agirlik_ray_arasi", [("genişlik", MT.agirlik_genisligi)], "genişlik karşılığı"),
@@ -249,20 +277,21 @@ GRUPLAR = (
      ("motor_gucu", "makine_agirligi", "sap_kasnak_yuk", "makine_yatak_yuk",
       "tahrik_kasnak_capi", "saptirma_kasnak_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
-      "yan_yatak_boyu", "makine_tipi")),
+      "yan_yatak_boyu", "makine_tipi", "toplam_verim")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
       "halat_arasi_yan", "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
      ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
-      "reg_gergi_agirligi")),
+      "reg_gergi_agirligi", "guvenlik_devreye_kuvvet")),
     ("Kılavuz raylar",
      ("kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
       "agirlik_konsol_arasi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
       "ray_celigi_rm", "kabin_paten_arasi", "agirlik_paten_arasi",
       "guvenlik_tertibati", "paten_balata_boyu")),
-    ("Karşı ağırlık", ("agirlik_malzemesi", "agirlik_ray_arasi")),
+    ("Karşı ağırlık", ("agirlik_malzemesi", "agirlik_ray_arasi",
+                       "agirlik_guvenlik_tertibati")),
     ("Tamponlar",
      ("kabin_tampon_baba", "agirlik_tampon_baba", "kabin_tampon_ezilme",
       "kabin_carpma_arasi", "kabin_tampon_boyu", "agirlik_tampon_ezilme",
@@ -446,6 +475,68 @@ def dogrula(g):
         if _sayi(a) and _sayi(b) and _sayi(c) and a - b - c <= 0:
             hata.append("Arka karşı ağırlıkta halat arası pozitif çıkmıyor: "
                         f"KD − RK − (ray-duvar) = {a} − {b} − {c} = {a - b - c} mm.")
+
+    #  ------------------------------------------------------------------
+    #  RAY NARİNLİĞİ  λ = konsol arası / ix        TS EN 81-50 m.5.10.3
+    #  ------------------------------------------------------------------
+    #  ω tablosu YALNIZ 20 ≤ λ ≤ 250 arasında tanımlıdır.  Üst sınırın
+    #  dışında ω yoktur;  motor bunu ham bir Python hatasıyla ( None ile
+    #  çarpım ) bildiriyordu ve kullanıcı hangi alanın sorunlu olduğunu
+    #  göremiyordu.  50 x 50 x 5 rayda sınır 3.845 mm'dir — varsayılan
+    #  3.000 mm konsol aralığına yakın, yani gerçekçi bir girdiyle
+    #  karşılaşılıyordu.
+    #
+    #  ALT SINIRDA HATA YOKTUR:  λ < 20 burkulmanın belirleyici olmadığı
+    #  bölgedir, motor λ'yı 20'ye yuvarlar ( makine kaidesinde de öyle ).
+    for ray_alan, konsol_alan, ne in (
+            ("kabin_ray_profili", "kabin_konsol_arasi", "Kabin"),
+            ("agirlik_ray_profili", "agirlik_konsol_arasi", "Karşı ağırlık")):
+        prof, l = g.get(ray_alan), g.get(konsol_alan)
+        ix = MT.ray(prof, "ix") if prof else None
+        if _sayi(ix) and ix > 0 and _sayi(l) and l > 0:
+            lam = l / ix
+            if lam > MT.OMEGA_LAMBDA_MAX:
+                azami = MT.OMEGA_LAMBDA_MAX * ix
+                hata.append(
+                    f"{ne} rayı fazla narin:  λ = konsol arası / ix = "
+                    f"{l:g} / {ix:g} = {lam:.1f}  >  {MT.OMEGA_LAMBDA_MAX}. "
+                    "TS EN 81-50 m.5.10.3'ün ω tablosu bu narinliğin ötesinde "
+                    f"tanımlı değildir. '{ALAN[konsol_alan][2]}' en çok "
+                    f"{azami:.0f} mm olabilir ( '{prof}' rayı için ), ya da daha "
+                    "büyük kesitli bir ray profili seçilmelidir.")
+
+    #  ------------------------------------------------------------------
+    #  TAHRİK KASNAĞI GEOMETRİSİ            TS EN 81-50 m.5.11.2 / m.5.11.3
+    #  ------------------------------------------------------------------
+    #  Sarılma açısı α = 180° − arctan( ( Ra − 2·R1 ) / B ) bağıntısı TEK
+    #  SARIMLI bir tahrik kasnağını modeller:  halat kasnağın iki yanından
+    #  aşağı iner ve α en çok 180° olur.  Ra < 2·R1 girildiğinde pay
+    #  negatife düşüyor, α 180°'yi aşıyordu ( Ra = 100 mm'de 187,65° ) ve
+    #  hesap sorunsuz devam ediyordu.  Yön EMNİYETSİZDİR:  e^(f·α) sınırı
+    #  α ile büyür, yani tahrik yeteneği olduğundan iyi çıkar.
+    Ra, Dt = g.get("halat_arasi"), g.get("tahrik_kasnak_capi")
+    if _sayi(Ra) and _sayi(Dt) and Dt > 0 and Ra < Dt:
+        hata.append(
+            f"Halat arası ({Ra:g} mm) tahrik kasnağı çapından ({Dt:g} mm) küçük "
+            "olamaz. Tek sarımlı kasnakta halatlar kasnağın iki yanından "
+            "teğet iner; halat arası en az kasnak çapı kadardır. Daha küçük "
+            "bir değer sarılma açısını 180°'nin üstüne çıkarır ve tahrik "
+            "yeteneğini olduğundan İYİ gösterir."
+            + ("  ( Karşı ağırlık arkada:  halat arası KD − RK − ray-duvar'dan "
+               "hesaplanır. )" if g.get("agirlik_yeri") == "Arka" else ""))
+
+    #  ------------------------------------------------------------------
+    #  REGÜLATÖR SÜRTÜNME KATSAYISI       TS EN 81-20 m.5.6.2.2.1.3 b)
+    #  ------------------------------------------------------------------
+    #  Standart bu hesap için sürtünme katsayısının ÜST DEĞERİNİ kendisi
+    #  verir:  "taking into account a friction factor µmax equal to 0,2 for
+    #  traction type overspeed governor".  Alan sınırsızdı;  μ = 5 gibi bir
+    #  değer kabul ediliyordu.
+    mu = g.get("reg_surtunme")
+    if _sayi(mu) and mu > REG_MU_AZAMI:
+        hata.append(f"Regülatör sürtünme katsayısı ({mu:g}) TS EN 81-20 "
+                    f"m.5.6.2.2.1.3 b)'nin verdiği µmax = {REG_MU_AZAMI:g} "
+                    "değerini aşamaz.")
     return hata
 
 

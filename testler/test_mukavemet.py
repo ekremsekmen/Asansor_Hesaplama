@@ -232,12 +232,12 @@ def calistir():
               any(_yakin(a["deger"], MK._moment(
                   1.2 * 9.81 * 1100 * 48 / (2 * 3400), 3000) / p)
                   for a in b[7]["adimlar"] if isinstance(a["deger"], (int, float))))
-    return _girdi_yollari(_sapmalar(r))
+    return _girdi_yollari(_denetim_bulgulari(_sapmalar(r)))
 
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 13)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 19)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -542,6 +542,234 @@ def _sapmalar(r):
     r.kontrol("⑧ bölüm notu açıklıkların standarttan geldiğini söylüyor",
               any("m.5.2.5.7 ve m.5.2.5.8" in x for x in _b10["aciklamalar"]),
               f"→ {_b10['aciklamalar']}")
+    return r
+
+
+def _denetim_bulgulari(r):
+    """BAĞIMSIZ DENETİMDE BULUNAN HATALARIN HER BİRİ YENİDEN ÜRETİLİR.
+
+    Testlerin geçmesi hataların yokluğunu göstermez;  aşağıdaki on bulgunun
+    hiçbirini paketin geri kalanı yakalamıyordu.  Her kontrol, hatanın ESKİ
+    hâlini üreten girdiyle çalışır ve düzeltmenin yerinde durduğunu gösterir.
+    """
+    from engine.uygulama import mukavemet_girdi as _MG
+    from engine.uygulama import mukavemet_tablolari as _MTd
+    from engine.uygulama import sabitler as _USd
+
+    #  ── B1  "Sf ≥ Smin" bir geçme ölçütü değildir  ( EN 81-20 m.5.5.2.2 )
+    #  Dt 400 · dh 8 · yarım daire kanal:  Sf = 7,89 ( < 12 ) ama gerçekleşen
+    #  S = 32,5 — hem Sf'nin hem Smin'in çok üstünde.  Kitap bunu reddediyordu.
+    _b1 = MK.hesapla({"tahrik_kasnak_capi": 400, "saptirma_kasnak_capi": 400,
+                      "halat_capi": 8, "halat_adedi": 8,
+                      "kanal_sekli": "Yarım Daire Kanal"})
+    _s4 = [x for x in _b1["bolumler"] if x["baslik"].startswith("4 ")][0]
+    r.kontrol("B1  Sf < Smin ama S ikisinin de üstünde → bölüm 4 UYGUN",
+              _s4["sonuc"]["uygun"] is True,
+              f"→ Sf={_b1['ozet']['Sf']!r} S={_b1['ozet']['S_gercek']!r} "
+              f"{_s4['sonuc']['metin']!r}")
+    r.kontrol("B1  Sf gerçekten Smin'in altında  ( ölçütün eskiden kestiği yer )",
+              _b1["ozet"]["Sf"] < 12 < _b1["ozet"]["S_gercek"],
+              f"→ {_b1['ozet']['Sf']!r} / {_b1['ozet']['S_gercek']!r}")
+    #  S gerçekten yetersizse bölüm yine kalmalı
+    _b1k = MK.hesapla({"tahrik_kasnak_capi": 400, "saptirma_kasnak_capi": 400,
+                       "halat_capi": 8, "halat_adedi": 2})
+    _s4k = [x for x in _b1k["bolumler"] if x["baslik"].startswith("4 ")][0]
+    r.kontrol("B1  S yetersizse bölüm 4 yine UYGUN DEĞİL",
+              _s4k["sonuc"]["uygun"] is False,
+              f"→ S={_b1k['ozet']['S_gercek']!r}")
+
+    #  ── B2  Sonuç başlığı kontrolün gerçekten kullandığı eşiği yazar
+    r.kontrol("B2  bölüm 4 başlığı 40 eşiğini yazıyor",
+              "40" in _s4["sonuc"]["baslik"] and "30" not in _s4["sonuc"]["baslik"],
+              f"→ {_s4['sonuc']['baslik']!r}")
+    r.kontrol("B2  bölüm 4 başlığı S ≥ max( Sf ; Smin ) diyor",
+              "max( Sf ; Smin )" in _s4["sonuc"]["baslik"],
+              f"→ {_s4['sonuc']['baslik']!r}")
+
+    #  ── B3  ω tanım aralığı dışında ÇÖKME yok, alan adını söyleyen hata var
+    _g3 = _MG.tamamla(dict(_MG.varsayilanlar(),
+                           kabin_ray_profili="50 x 50 x 5",
+                           kabin_konsol_arasi=3900))
+    _h3 = _MG.dogrula(_g3)
+    r.kontrol("B3  λ > 250 girdi doğrulamasında reddediliyor",
+              any("narin" in x and "konsollar arası" in x for x in _h3),
+              f"→ {_h3}")
+    r.kontrol("B3  hata, izin verilen en büyük aralığı söylüyor",
+              any("3.845" in x or "3845" in x for x in _h3), f"→ {_h3}")
+    #  İKİNCİ KALKAN:  doğrulama atlansa bile motor çökmemeli
+    _dog = MK.MG.dogrula
+    try:
+        MK.MG.dogrula = lambda g: []
+        _s3 = MK.hesapla(_g3)
+        _b7 = [x for x in _s3["bolumler"] if x["baslik"].startswith("7 ")][0]
+        r.kontrol("B3  doğrulama atlansa bile motor çökmüyor", _s3["aktif"] is True)
+        r.kontrol("B3  ω yoksa bölüm 7 UYGUN DEĞİL diyor",
+                  _b7["sonuc"]["uygun"] is False)
+    except Exception as _e:                                   # noqa: BLE001
+        r.kontrol("B3  doğrulama atlansa bile motor çökmüyor", False, f"→ {_e!r}")
+    finally:
+        MK.MG.dogrula = _dog
+    #  λ alt sınırda kırpılıyor  ( bölüm 2 zaten öyle yapıyordu )
+    _lam, _om = MK._burkulma_omega(200, 19.48, 370)
+    r.esit("B3  λ en az 20'ye kırpılıyor", _lam, 20)
+    r.kontrol("B3  kırpılan λ'da ω var", _om is not None)
+
+    #  ── B4  Halat kütlesinin taraf dağılımı  ( EN 81-50 m.5.11.2.2 )
+    _o4 = {"ofis": _USd.sabitler(None), "Q": 800.0, "P": 700.0, "r": 2,
+           "nh": 7, "gh": 0.152, "F1": 0.0}
+    _g4 = _MG.varsayilanlar()
+    _tam = _g4["seyir_mesafesi"] * 7 * 0.152
+    for _durum, _alt in (("yukleme", True), ("fren_alt", True),
+                         ("fren_ust", False), ("bloke", False)):
+        _t = MK._terimler(_g4, _o4, _durum)
+        _kabinde = _t["MSRcar"] > _t["MSRcwt"]
+        r.kontrol(f"B4  '{_durum}' — kabin "
+                  + ("EN ALTTA → halat kabin tarafında" if _alt
+                     else "EN ÜSTTE → halat ağırlık tarafında"),
+                  _kabinde is _alt,
+                  f"→ MSRcar={_t['MSRcar']:.2f} MSRcwt={_t['MSRcwt']:.2f}")
+        r.kontrol(f"B4  '{_durum}' toplam halat kütlesi korunuyor",
+                  _yakin(_t["MSRcar"] + _t["MSRcwt"], _tam, 1e-6),
+                  f"→ {_t['MSRcar'] + _t['MSRcwt']:.3f} ≠ {_tam:.3f}")
+    #  Yüksek binada karar değişiyor — düzeltmenin emniyet etkisi
+    _y = {"seyir_mesafesi": 76.0, "durak_yukseklikleri": [4000] * 19 + [3000],
+          "son_kat_yuksekligi": 3000, "halat_capi": 13, "halat_adedi": 8,
+          "aski_orani": 1, "tahrik_kasnak_capi": 640,
+          "saptirma_kasnak_capi": 640, "motor_gucu": 30}
+    _sy = MK.hesapla(_y)
+    r.kontrol("B4  76 m seyirde hesap yapılabiliyor", _sy["aktif"] is True,
+              f"→ {_sy.get('hata')}")
+    if _sy["aktif"]:
+        _t1 = MK._terimler(_sy["girdi"], {"ofis": _USd.sabitler(None),
+                                          "Q": 800.0, "P": 700.0, "r": 1,
+                                          "nh": 8, "gh": 0.64, "F1": 0.0},
+                           "yukleme")
+        r.kontrol("B4  uzun kuyuda halat kütlesi kabin tarafında  ( yükleme )",
+                  _t1["MSRcar"] > 300 and _t1["MSRcwt"] == 0,
+                  f"→ {_t1['MSRcar']!r} / {_t1['MSRcwt']!r}")
+
+    #  ── B6  Sarılma açısı α tek sarımda 180°'yi aşamaz
+    _g6 = _MG.tamamla(dict(_MG.varsayilanlar(), halat_arasi_yan=200))
+    r.kontrol("B6  Ra < Dt girdi doğrulamasında reddediliyor",
+              any("Halat arası" in x and "kasnak" in x for x in _MG.dogrula(_g6)),
+              f"→ {_MG.dogrula(_g6)}")
+    _b6 = [x for x in MK.hesapla()["bolumler"] if x["baslik"].startswith("6 ")][0]
+    r.kontrol("B6  bölüm 6'da α aralık kontrolü var",
+              any("tek sarımlı" in str(a.get("aciklama", ""))
+                  for a in _b6["adimlar"]),
+              "→ α kontrol satırı yok")
+
+    #  ── B7  Nequiv(t) ve pafta γ'sı ofis sabitini izliyor
+    _n38 = MK.hesapla()["_h"]["AH104"]
+    _n45 = MK.hesapla({"_ofis": {"kanal_gama_v": 45}})["_h"]["AH104"]
+    r.esit("B7  γ = 38° → Nequiv(t) = 5  ( altı kesik, β = 90° )", _n38, 5.0)
+    _sb = MK.hesapla({"kanal_sekli": "V Kanal"})["_h"]["AH104"]
+    _sb45 = MK.hesapla({"kanal_sekli": "V Kanal",
+                        "_ofis": {"kanal_gama_v": 45}})["_h"]["AH104"]
+    r.esit("B7  V kanal γ = 38° → 12", _sb, 12.0)
+    r.esit("B7  V kanal γ = 45° → 6,5  ( ofis sabiti izleniyor )", _sb45, 6.5)
+    _b45 = MK.hesapla({"_ofis": {"kanal_beta": 100}})["_h"]["AH104"]
+    r.esit("B7  altı kesik β = 100° → 10", _b45, 10.0)
+    #  Paftaya basılan γ, hesabın kullandığı γ ile aynı mı
+    for _sekil, _bek in (("V Kanal", 38), ("Yarım Daire Kanal", 25),
+                         ("Altı Kesik V Kanal", 38)):
+        _s7 = MK.hesapla({"kanal_sekli": _sekil})
+        _b4x = [x for x in _s7["bolumler"] if x["baslik"].startswith("4 ")][0]
+        _gam = [a["deger"] for a in _b4x["adimlar"] if a.get("sembol") == "γ"]
+        r.esit(f"B7  '{_sekil}' paftada γ = hesabın γ'sı", _gam, [_bek])
+    r.kontrol("B7  V kanalın açısı β sütunundan okunmuyor",
+              _MTd.kanal_acisi("Altı Kesik V Kanal", 38, 25) == 38,
+              "→ altı kesik V kanalda γ hâlâ 90 okunuyor")
+
+    #  ── B8  Mil kuvveti ve moment askı oranına göre iniyor
+    _m1 = MK.hesapla({"aski_orani": 1})["_h"]["AQ21"]
+    _m2 = MK.hesapla({"aski_orani": 2})["_h"]["AQ21"]
+    _p1 = MK.hesapla({"aski_orani": 1})["_h"]["AQ7"]
+    _p2 = MK.hesapla({"aski_orani": 2})["_h"]["AQ7"]
+    _gmax2 = MK.hesapla({"aski_orani": 2})["_h"]["AQ9"]
+    r.kontrol("B8  2:1'de moment = ( Gmax / 2 ) × Dt/2",
+              _yakin(_m2, _gmax2 / 2 * 240 / 2000), f"→ {_m2!r} / {_gmax2!r}")
+    r.kontrol("B8  askı oranı momenti değiştiriyor", _m1 != _m2 and _p1 != _p2,
+              f"→ M {_m1!r}/{_m2!r} · Pm {_p1!r}/{_p2!r}")
+
+    #  ── B9  "Ofis verimi toplam sistem verimidir" kutusu
+    _v0 = MK.hesapla({"aski_orani": 2})["_h"]["AQ22"]
+    _v1 = MK.hesapla({"aski_orani": 2, "toplam_verim": "Evet"})["_h"]["AQ22"]
+    r.kontrol("B9  toplam verim seçilince palanga düşüşü ikinci kez inmiyor",
+              _yakin(_v1, _v0 + _USd.VARSAYILAN["palanga_verim_dususu"]),
+              f"→ {_v0!r} → {_v1!r}")
+    r.kontrol("B9  1:1 askıda kutunun etkisi yok",
+              _yakin(MK.hesapla({"aski_orani": 1})["_h"]["AQ22"],
+                     MK.hesapla({"aski_orani": 1,
+                                 "toplam_verim": "Evet"})["_h"]["AQ22"]))
+
+    #  ── B10  Kabin önü girintisi  ( EN 81-20 m.5.4.2.1.3 )
+    _a90 = MK.hesapla({"uzun_pervaz": 90})["ozet"]["kabin_alani"]
+    _a100 = MK.hesapla({"uzun_pervaz": 100})["ozet"]["kabin_alani"]
+    _a300 = MK.hesapla({"uzun_pervaz": 300})["ozet"]["kabin_alani"]
+    _kuru = 1450 * 1350 / 1e6
+    r.kontrol("B10  pervaz ≤ 100 mm alana katılmıyor",
+              _yakin(_a90, _kuru) and _yakin(_a100, _kuru),
+              f"→ 90:{_a90!r} 100:{_a100!r} kuru:{_kuru!r}")
+    r.kontrol("B10  pervaz > 100 mm ise girintinin TAMAMI katılıyor",
+              _yakin(_a300, _kuru + 900 * 300 / 1e6),
+              f"→ {_a300!r} ≠ {_kuru + 0.27!r}")
+
+    #  ── B12  Regülatör kuvvetinin ikinci sınırı imalatçıdan gelir
+    _b5 = [x for x in MK.hesapla()["bolumler"] if x["baslik"].startswith("5 ")][0]
+    r.esit("B12  imalatçı kuvveti yoksa sınır 300 N",
+           MK.hesapla()["_h"]["AA156"], 300)
+    r.kontrol("B12  imalatçı kuvveti yoksa bölüm bunu açıkça söylüyor",
+              any("tip inceleme" in x for x in (_b5.get("notlar") or [])),
+              f"→ {_b5.get('notlar')}")
+    r.esit("B12  imalatçı kuvveti girilince sınır 2 katı",
+           MK.hesapla({"guvenlik_devreye_kuvvet": 900})["_h"]["AA156"], 1800)
+    r.esit("B12  küçük imalatçı kuvvetinde 300 N belirleyici",
+           MK.hesapla({"guvenlik_devreye_kuvvet": 100})["_h"]["AA156"], 300)
+
+    #  ── B13  Karşı ağırlıkta güvenlik tertibatı  ( EN 81-50 Ek C.2.1 )
+    _yok = MK.hesapla()["bolumler"][7]
+    _var = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı"})["bolumler"][7]
+    r.kontrol("B13  tertibat yokken C.2.1 hesaplanmıyor",
+              "C.2.1" not in _yok["baslik"] + str(_yok.get("kaynak", "")),
+              f"→ {_yok['baslik']!r}")
+    r.kontrol("B13  tertibat varken C.2.1 adımları geliyor",
+              any("m.C.2.1" in str(a.get("deger", "")) for a in _var["adimlar"]),
+              "→ C.2.1 başlığı yok")
+    r.kontrol("B13  C.2.1 adım sayısını artırıyor",
+              len(_var["adimlar"]) > len(_yok["adimlar"]) + 10,
+              f"→ {len(_yok['adimlar'])} → {len(_var['adimlar'])}")
+    #  k1 büyüdükçe ray zorlanır:  ani frenlemeli tertibatta 50x50x5 kalmalı
+    r.kontrol("B13  ani frenlemeli tertibatta ince ray UYGUN DEĞİL",
+              MK.hesapla({"agirlik_guvenlik_tertibati": "Ani Frenlemeli"}
+                         )["bolumler"][7]["sonuc"]["uygun"] is False)
+
+    #  ── B16  Regülatör μ'sünün üst sınırı  ( EN 81-20 m.5.6.2.2.1.3 b) )
+    _g16 = _MG.tamamla(dict(_MG.varsayilanlar(), reg_surtunme=5))
+    r.kontrol("B16  μ > 0,2 reddediliyor",
+              any("µmax" in x or "0.2" in x or "0,2" in x
+                  for x in _MG.dogrula(_g16)), f"→ {_MG.dogrula(_g16)}")
+    r.esit("B16  sınır standardın verdiği değer", _MG.REG_MU_AZAMI, 0.2)
+
+    #  ── B14  C.2.2'de ω YOKTUR — denetimin şüphesi yersizdi
+    #  EN 81-50 Ek C.2.2.2:  σv = ( Fv + k3·Maux ) / A.  ω yalnız C.2.1.2'de
+    #  geçer.  Motor bunu doğru yapıyor;  burada geri dönmediği denetlenir.
+    _sc = MK.hesapla()
+    _pc = _MTd.ray("89 x 62 x 15,88", "A")
+    _fv = _sc["ozet"]["Mg_kabin"] * 9.81
+    _bek = (_fv + 1.2 * 150) / _pc                    # ω YOK
+    _b7c = [x for x in _sc["bolumler"] if x["baslik"].startswith("7 ")][0]
+    _sv = [a["deger"] for a in _b7c["adimlar"]
+           if str(a.get("formul", "")).startswith("σv = ")]
+    r.esit("B14  C.2.2'de tek bir σv satırı var", len(_sv), 1)
+    r.kontrol("B14  C.2.2'de burkulma ω'sız  ( EN 81-50 Ek C.2.2.2 )",
+              bool(_sv) and _yakin(_sv[0], _bek),
+              f"→ σv = {_sv!r}, ω'sız beklenen {_bek!r}")
+    #  C.2.1'de ω VARDIR — iki durumun ayrıldığı da denetlenir
+    _sk = [a["deger"] for a in _b7c["adimlar"]
+           if str(a.get("formul", "")).startswith("σk = ")]
+    r.kontrol("B14  C.2.1'de ω uygulanıyor  ( iki durum ayrı )",
+              bool(_sk) and _sk[0] > _bek, f"→ σk = {_sk!r}")
     return r
 
 

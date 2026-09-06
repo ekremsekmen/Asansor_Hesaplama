@@ -360,21 +360,103 @@ def kabin_asgari_alan(beyan_yuku):
 
 
 # =====================================================================
-#  TAHRİK KASNAĞI KANAL ŞEKLİ   ( açı · Nequiv(t) )   [ TABLOLAR!D47:G52 ]
+#  TAHRİK KASNAĞI KANAL ŞEKLİ            [ TABLOLAR!D47:G52 ]
 # =====================================================================
+#  KANAL AÇISI ARTIK TABLODA DEĞİL, OFİS SABİTİDİR.
+#
+#  Kitabın tablosu her kanal şeklinin karşısına TEK bir açı ve TEK bir
+#  Nequiv(t) yazar ( V → 38° / 12 ,  altı kesik → 90° / 5 ).  O sütun
+#  aslında iki ayrı büyüklüğü karıştırır:  V kanalda γ ( kanal açısı ),
+#  altı kesik kanalda β ( alt kesilme açısı ).  Üstelik ikisi de DONDURULMUŞ:
+#  ofis sabitlerinden γ = 45° seçilse bile tablo 38 yazmaya, Nequiv(t) 12
+#  kalmaya devam ediyordu — pafta hesabın kullandığı sayıyı yazmıyordu.
+#
+#  TS EN 81-50 m.5.12.2.2 Çizelge 2 Nequiv(t)'yi doğrudan bu açıların
+#  fonksiyonu verir ve "çizelgede olmayan açılar için doğrusal ara değer"
+#  ister.  Tablo artık şeklin YALNIZ TÜRÜNÜ tutar;  açılar ofis
+#  sabitlerinden gelir ve Nequiv(t) onlardan hesaplanır.
+#
+#     tür    anlamı                             f bağıntısı ( m.5.11.2.3.1 )
+#     'V'    V kanal, alt kesilmesiz            m.5.11.2.3.1.2   ( β = 0 )
+#     'VK'   V kanal, altı kesik                m.5.11.2.3.1.2   ( β )
+#     'U'    yarım daire, alt kesilmesiz        m.5.11.2.3.1.1   ( β = 0 )
+#     'UK'   yarım daire, altı kesik            m.5.11.2.3.1.1   ( β )
+#
+#  ( ad , tür , tahrik kasnağı üzerinden geçiş sayısı )
 KANAL_SEKLI = (
-    ('V Kanal', 38, 12),
-    ('Altı Kesik V Kanal', 90, 5),
-    ('Yarım Daire Kanal', None, 1),
-    ('Altı Kesik Yarım Daire Kanal', 90, 5),
-    ('Yarım Daire Kanal (Çift Sarım)', None, 2),
+    ('V Kanal',                       'V',  1),
+    ('Altı Kesik V Kanal',            'VK', 1),
+    ('Yarım Daire Kanal',             'U',  1),
+    ('Altı Kesik Yarım Daire Kanal',  'UK', 1),
+    #  Çift sarımda halat tahrik kasnağının üzerinden İKİ kez geçer;  her
+    #  geçiş bir basit eğilmedir, bu yüzden Nequiv(t) iki katıdır.
+    ('Yarım Daire Kanal (Çift Sarım)', 'U', 2),
 )
 
 KANAL_SEKILLERI = tuple(s[0] for s in KANAL_SEKLI)
 
 
-def kanal_acisi(sekil):
+def kanal_turu(sekil):
+    """Kanalın türü:  'V' · 'VK' · 'U' · 'UK'  ( bilinmeyen şekilde None )."""
     return _ara(KANAL_SEKLI, sekil, 1)
+
+
+def kanal_gecis_sayisi(sekil):
+    """Halatın tahrik kasnağı üzerinden geçiş sayısı  ( çift sarımda 2 )."""
+    return _ara(KANAL_SEKLI, sekil, 2)
+
+
+# ---------------------------------------------------------------------
+#  TS EN 81-50 m.5.12.2.2  Çizelge 2  —  Nequiv(t)
+# ---------------------------------------------------------------------
+#      V kanal          γ  35°   36°   38°   40°   42°   45°   50°
+#                  Nequiv(t) 18,5   16    12    10     8   6,5     5
+#      Altı kesik U     β  75°   80°   85°   90°   95°  100°  105°
+#                  Nequiv(t)  2,5   3,0   3,8   5,0   6,7  10,0  15,2
+#      Alt kesilmesiz U         Nequiv(t) = 1
+#  "Values for angles not in the table may be determined by linear
+#   interpolation."  —  çizelgenin kendi notu.
+NEQUIV_V = ((35, 18.5), (36, 16.0), (38, 12.0), (40, 10.0),
+            (42, 8.0), (45, 6.5), (50, 5.0))
+NEQUIV_U_ALTI_KESIK = ((75, 2.5), (80, 3.0), (85, 3.8), (90, 5.0),
+                       (95, 6.7), (100, 10.0), (105, 15.2))
+
+#  m.5.11.2.3.1.1 / m.5.11.2.3.1.2'nin kendi sınırları
+BETA_AZAMI = 105.0        # "shall not exceed 105° (1,83 rad)"
+GAMA_ASGARI_U = 25.0      # yarım daire:  "in no case … less than 25°"
+GAMA_ASGARI_V = 35.0      # V kanal:  "in no case, angle γ shall be less than 35°"
+GAMA_AZAMI = 90.0         # γ bir kanal açısıdır;  90°'yi aşamaz
+
+
+def _dogrusal_ara(tablo, x):
+    """Çizelge 2 için doğrusal ara değer;  aralık dışında uç değere sabitler."""
+    if not _sayi(x):
+        return None
+    if x <= tablo[0][0]:
+        return tablo[0][1]
+    if x >= tablo[-1][0]:
+        return tablo[-1][1]
+    for (x0, y0), (x1, y1) in zip(tablo, tablo[1:]):
+        if x0 <= x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return None
+
+
+def kanal_acisi(sekil, gama_v=None, gama_yd=None):
+    """Hesapta KULLANILAN γ  ( kanal açısı ).  Alt kesilme açısı β değildir.
+
+    Kitabın tablosu altı kesik kanallarda bu sütuna β yazıyordu;  pafta
+    "γ = 90°" basıp hesapta 38° kullanıyordu.
+    """
+    tur = kanal_turu(sekil)
+    if tur is None:
+        return None
+    return gama_yd if tur in ("U", "UK") else gama_v
+
+
+def kanal_beta(sekil, beta=None):
+    """Alt kesilme açısı β.  Alt kesilmesi olmayan kanalda 0'dır."""
+    return beta if kanal_alti_kesik_mi(sekil) else 0.0
 
 
 #  ---------------------------------------------------------------------
@@ -396,10 +478,9 @@ def kanal_acisi(sekil):
 #  Kaynak kitap kanal şeklinden BAĞIMSIZ olarak hep V kanal bağıntısını
 #  kullanıyordu;  yarım daire seçilebildiği hâlde onun maddesi hiç
 #  uygulanmıyordu ( bkz. EXCEL_FARKLARI ).
-KANAL_YARIM_DAIRE = ("Yarım Daire Kanal", "Altı Kesik Yarım Daire Kanal",
-                     "Yarım Daire Kanal (Çift Sarım)")
+KANAL_YARIM_DAIRE = tuple(a for a, t, _g in KANAL_SEKLI if t in ("U", "UK"))
 #  Altı kesik olanlar:  β = alt kesilme açısı;  ötekilerde β = 0.
-KANAL_ALTI_KESIK = ("Altı Kesik V Kanal", "Altı Kesik Yarım Daire Kanal")
+KANAL_ALTI_KESIK = tuple(a for a, t, _g in KANAL_SEKLI if t in ("VK", "UK"))
 
 
 def kanal_yarim_daire_mi(sekil):
@@ -410,9 +491,26 @@ def kanal_alti_kesik_mi(sekil):
     return sekil in KANAL_ALTI_KESIK
 
 
-def kanal_nequiv_t(sekil):
-    """Kasnakların eşdeğer sayısı Nequiv(t)  ( TS EN 81-50 )."""
-    return _ara(KANAL_SEKLI, sekil, 2)
+def kanal_nequiv_t(sekil, gama_v=None, beta=None):
+    """Kasnakların eşdeğer sayısı Nequiv(t)  ( TS EN 81-50 Çizelge 2 ).
+
+    Kitap bunu kanalın ADINA bağlı sabit bir tablodan okuyordu;  ofis
+    sabiti γ ya da β değiştiğinde kımıldamıyordu.  Çizelge 2 ise Nequiv(t)'yi
+    doğrudan o açıların fonksiyonu verir.
+    """
+    tur = kanal_turu(sekil)
+    if tur is None:
+        return None
+    gecis = kanal_gecis_sayisi(sekil) or 1
+    if tur == "V":
+        taban = _dogrusal_ara(NEQUIV_V, gama_v)
+    elif tur in ("VK", "UK"):
+        #  Altı kesik kanal — V de olsa U da olsa Çizelge 2'nin alt kesilme
+        #  satırı geçerlidir;  belirleyici olan β'dır.
+        taban = _dogrusal_ara(NEQUIV_U_ALTI_KESIK, beta)
+    else:                                   # 'U' — alt kesilmesiz yarım daire
+        taban = 1.0
+    return None if taban is None else taban * gecis
 
 
 # =====================================================================
@@ -562,9 +660,21 @@ def sigma_perm_guvenlik(rm):
 
 
 # =====================================================================
-#  KANAL İŞLEME ŞEKLİ → SÜRTÜNME KATSAYISI  μ   [ Veri Girişi!T42:W43 ]
+#  KANAL İŞLEME ŞEKLİ → SÜRTÜNME ÇARPANI  f     [ Veri Girişi!T42:W43 ]
 #      yükleme · durdurma tertibatı ( fren ) · kabinin bloke edilmesi
 # =====================================================================
+#  DİKKAT — BU SÜTUNLAR μ DEĞİL f'DİR.  Kitap satırı "sürtünme katsayısı μ"
+#  diye adlandırır ama içindeki sayılar sürtünme ÇARPANIDIR:  sertleştirilmiş
+#  kanalın yükleme değeri 0,30716 = 0,1 / sin( 38° / 2 ), yani μ = 0,1'in
+#  f'ye dönüşmüş hâlidir.  ( μ'nün kendisi 0,1 · 0,1/(1+v/10) · 0,2'dir ve
+#  SABIT sözlüğünde durur. )
+#
+#  DEĞERLER ÇİVİLİDİR:  γ = 38° ve β = 90° ile hesaplanmışlardır.  Ofis
+#  sabitleri değişince bunlar değişmez — bu yüzden motor bu tabloyu HİÇ
+#  kullanmaz, f'yi her seferinde m.5.11.2.3.1'den kendisi hesaplar
+#  ( mukavemet._tahrik ).  Tablo yalnız kitabın hücreleriyle karşılaştırma
+#  testi için durur;  ekrandaki tablo da f'yi ofis sabitlerinden üretir
+#  ( engine/uygulama/tablolar_gorunum.py ).
 KANAL_ISLEME = (
     ('Sertleştirilmemiş', 0.20525235013903476, 0.1865930455809407, 0.6143106973514485),
     ('Sertleştirilmiş', 0.30715534867572425, 0.27923213515974926, 0.6143106973514485),
@@ -575,5 +685,10 @@ _SURTUNME_SUTUN = {"yukleme": 1, "fren": 2, "bloke": 3}
 
 
 def surtunme(isleme_sekli, durum):
-    """durum: yukleme | fren | bloke"""
+    """Kitabın çivili f değeri  ( γ = 38° · β = 90° ).  durum: yukleme | fren | bloke
+
+    Yeni kodda kullanmayın:  f kanal şekline ve ofis açılarına bağlıdır,
+    bkz. mukavemet._tahrik.  Bu işlev yalnız kitabın hücrelerini doğrulayan
+    test için durur.
+    """
     return _ara(KANAL_ISLEME, isleme_sekli, _SURTUNME_SUTUN[durum])

@@ -12,15 +12,38 @@ Burası o boşluğu kapatır.  Tablolar KOPYALANMAZ;  motorun kullandığı
 sözlüklerden okunur, yalnız sunum bilgisi ( başlık · sütun adları · kaynak )
 eklenir.  Böylece ekrandaki tablo ile hesaba giren tablo bir daha ayrışamaz.
 """
+import math
+
 from engine.uygulama import mukavemet_tablolari as MT
+from engine.uygulama import sabitler as US
 
 
 def _satirlar(kayitlar):
     return [[("" if h is None else h) for h in k] for k in kayitlar]
 
 
-def arayuz_tablolari():
-    """Ekranın çizeceği tabloların tamamı."""
+def _f_yukleme(sekil, mu, gama_d, beta_d, sert):
+    """TS EN 81-50 m.5.11.2.3.1'in sürtünme çarpanı  —  motorla AYNI bağıntı."""
+    beta = math.radians(beta_d)
+    gama = math.radians(gama_d)
+    if MT.kanal_yarim_daire_mi(sekil):
+        pay = 4 * (math.cos(gama / 2.0) - math.sin(beta / 2.0))
+        payda = (math.pi - beta - gama - math.sin(beta) + math.sin(gama))
+        return mu * pay / payda
+    if sert:
+        return mu / math.sin(gama / 2.0)
+    return mu * 4 * (1 - math.sin(beta / 2.0)) / (math.pi - beta - math.sin(beta))
+
+
+def arayuz_tablolari(ofis=None):
+    """Ekranın çizeceği tabloların tamamı.
+
+    ``ofis``:  projenin ofis sabitleri.  Kanal açıları γ / β ve onlardan
+    türeyen Nequiv(t) ile f, PROJENİN kendi sabitlerinden hesaplanır — ekranda
+    donmuş bir tablo görünüp hesabın başka bir sayı kullanması, denetimde
+    bulunan hatalardan biriydi.
+    """
+    O = US.sabitler(ofis)
     t = []
 
     t.append({
@@ -86,18 +109,47 @@ def arayuz_tablolari():
     })
     t.append({
         "ad": "Tahrik kanalı",
-        "kaynak": "TS EN 81-50 m.5.11.2.2",
-        "aciklama": "Kanal şekli → kanal açısı γ ve alt kesilme açısı β.",
-        "basliklar": ["Kanal şekli", "γ  ( ° )", "β  ( ° )"],
-        "satirlar": _satirlar(MT.KANAL_SEKLI),
+        "kaynak": "TS EN 81-50 m.5.11.2.3.1  ·  m.5.12.2.2 Çizelge 2",
+        "aciklama": ("γ ve β OFİS SABİTLERİDİR ( Sabitler sekmesi );  Nequiv(t) "
+                     "onlardan Çizelge 2'ye göre hesaplanır.  Kaynak kitap bu "
+                     "sütunları çiviliyordu:  ofis açısı değişse bile tablo ve "
+                     "pafta eski sayıyı yazmaya devam ediyordu."),
+        "basliklar": ["Kanal şekli", "Tür", "γ  ( ° )", "β  ( ° )", "Nequiv(t)"],
+        "satirlar": [[ad,
+                      {"V": "V kanal", "VK": "V kanal, altı kesik",
+                       "U": "yarım daire", "UK": "yarım daire, altı kesik"}[tur],
+                      MT.kanal_acisi(ad, O["kanal_gama_v"], O["kanal_gama_yd"]),
+                      MT.kanal_beta(ad, O["kanal_beta"]),
+                      round(MT.kanal_nequiv_t(ad, O["kanal_gama_v"],
+                                              O["kanal_beta"]), 2)]
+                     for ad, tur, _gecis in MT.KANAL_SEKLI],
     })
     t.append({
-        "ad": "Kanal işleme",
-        "kaynak": "TS EN 81-50 m.5.11.2",
-        "aciklama": "Sertleştirilmiş kanalda sürtünme katsayısı farklıdır.",
-        "basliklar": ["İşleme", "f  ( yükleme )", "f  ( acil frenleme )"],
-        "satirlar": [[k[0], round(k[1], 5), round(k[2], 5)]
-                     for k in MT.KANAL_ISLEME],
+        "ad": "Nequiv(t)  —  eşdeğer kasnak sayısı",
+        "kaynak": "TS EN 81-50 m.5.12.2.2 Çizelge 2",
+        "aciklama": ("Çizelgede olmayan açılar için doğrusal ara değer alınır "
+                     "( çizelgenin kendi notu ).  Alt kesilmesiz yarım daire "
+                     "kanalda Nequiv(t) = 1'dir."),
+        "basliklar": ["Kanal", "Açı  ( ° )", "Nequiv(t)"],
+        "satirlar": ([["V kanal  ( γ )", a, n] for a, n in MT.NEQUIV_V]
+                     + [["Altı kesik  ( β )", a, n]
+                        for a, n in MT.NEQUIV_U_ALTI_KESIK]),
+    })
+    t.append({
+        "ad": "Kanal işleme  →  sürtünme çarpanı f  ( kabinin yüklenmesi )",
+        "kaynak": "TS EN 81-50 m.5.11.2.3.1  ·  μ = 0,1  ( m.5.11.2.3.2 )",
+        "aciklama": ("f, kanal ŞEKLİNE ve ofis açılarına göre değişir.  "
+                     "Sertleştirme yalnız V kanalda fark yaratır — yarım daire "
+                     "kanalın kendi maddesinde ( m.5.11.2.3.1.1 ) sertleştirme "
+                     "geçmez."),
+        "basliklar": ["Kanal şekli"] + list(MT.KANAL_ISLEME_SEKILLERI),
+        "satirlar": [[ad] + [round(_f_yukleme(
+            ad, 0.1,
+            MT.kanal_acisi(ad, O["kanal_gama_v"], O["kanal_gama_yd"]),
+            MT.kanal_beta(ad, O["kanal_beta"]),
+            isleme == "Sertleştirilmiş"), 5)
+            for isleme in MT.KANAL_ISLEME_SEKILLERI]
+            for ad, _t, _g in MT.KANAL_SEKLI],
     })
     t.append({
         "ad": "Güvenlik tertibatı  —  darbe katsayısı k1",

@@ -309,7 +309,9 @@ def calistir():
                      "son_kat_yuksekligi": 3100, "seyir_mesafesi": 2.8}),
         ("20 durak", {"durak_yukseklikleri": [3000] * 19 + [4200],
                       "son_kat_yuksekligi": 4200, "seyir_mesafesi": 57}),
-        ("ondalıklı değerler", {"beyan_hizi": 1.6, "reg_surtunme": 0.25,
+        #  reg_surtunme, TS EN 81-20 m.5.6.2.2.1.3 b)'nin µmax = 0,2 sınırına
+        #  bağlıdır;  ondalık taşıma sınırın ALTINDA bir değerle sınanır.
+        ("ondalıklı değerler", {"beyan_hizi": 1.6, "reg_surtunme": 0.15,
                                 "acil_frenleme_a": 1.25, "halat_capi": 6.5}),
     ]
     for _ad, _ek in _senaryolar:
@@ -365,7 +367,10 @@ def calistir():
     _EK = {"paten_balata_boyu": 66, "kuyu_genisligi": 1900, "kolon_kesit": 25,
            "kolon_uzunluk": 33, "makine_kesit": 10, "makine_uzunluk": 44,
            "temel_a": 12.5, "temel_b": 8.5, "serit_L": 40, "mk_yok": False,
-           "mk_uzunluk": 3.5, "mk_genislik": 2.5}
+           "mk_uzunluk": 3.5, "mk_genislik": 2.5,
+           #  Bağımsız denetimden sonra eklenen üç girdi
+           "toplam_verim": "Evet", "agirlik_guvenlik_tertibati": "Kaymalı",
+           "guvenlik_devreye_kuvvet": 850}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

@@ -22,6 +22,7 @@ from engine.avan import hesap as AV                          # noqa: E402
 from engine.uygulama import mukavemet as MK                     # noqa: E402
 from engine.uygulama import hesap as UY                      # noqa: E402
 from engine.uygulama import girdi as UG                # noqa: E402
+from engine.uygulama import sabitler as US             # noqa: E402
 from testler.ortak import Rapor                        # noqa: E402
 
 #  Topraklama ve kolon hattı olmadan elektrik bölümlerinin bir kısmı boş kalır
@@ -413,7 +414,11 @@ def calistir():
         _c = [b for b in _bt["bolumler"] if "KURULU GÜÇ" in b["baslik"]][0]["cetvel"][0]
         r.kontrol("taşan sigorta hücresinde proje adı yok",
                   not _kalip.search(str(_c["sigorta"])), f"→ {_c['sigorta']!r}")
-        r.esit("taşan sigortada güç değeri bozulmadı", _c["guc"], 400_000)
+        #  Cetvele MİL gücü değil, ŞEBEKEDEN ÇEKİLEN güç yazılır
+        #  ( Pşeb = Pm / ηm ) — kolon hattında akan odur.
+        _etam = US.VARSAYILAN["motor_elektrik_verimi"]
+        r.esit("taşan sigortada güç değeri bozulmadı", _c["guc"],
+               400_000 / _etam)
 
     #  Ofis standardı köprüden geçiyor mu
     y = UY.hesapla(dict(TAM, _ofis={"kuyu_armatur_lm": 1000}))

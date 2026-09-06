@@ -132,6 +132,10 @@ AVAN_SABIT = {
     "UL":                 "C36",
     "IDn":                "C37",
     "lc":                 "C38",
+    #  ŞEBEKEDEN ÇEKİLEN GÜÇ.  Nsç motorun MİL gücüdür;  kolon ve makine
+    #  besleme hatlarında Pşeb = Nsç / ηm akar ve kesitler ondan seçilir.
+    #  Şablonun E102 ve E126 hücreleri bu sabite böler.
+    "motor_elektrik_verimi": "C39",
 }
 AVAN_AYD_SUTUN_SAYFA = "TABLOLAR"
 AVAN_AYD_SUTUN_HUCRE = "B19"

@@ -1333,8 +1333,12 @@ def calistir():
                  "KURULU GÜÇ CETVELİ", "GERİLİM DÜŞÜMÜ", "TOPRAKLAYICI",
                  "SONUÇ ÖZETİ", "Hesabı yapan"):
         r.kontrol(f"uygulama PDF: {_ara}", _ara in _um)
+    #  Kurulu güç PAFTADAN değil, HESAPTAN okunur:  elle yazılmış bir sayı
+    #  motor değiştiğinde sessizce bayatlar ( ηm düzeltmesinde öyle oldu ).
+    from engine.ortak.steps import trn as _trn
+    _pk = _trn(_uy["ozet"]["P_kurulu"], 0)
     r.kontrol("uygulama PDF elektrik sayılarını taşıyor",
-              "6.105" in _um, "→ kurulu güç paftada yok")
+              _pk in _um, f"→ kurulu güç ({_pk} W) paftada yok")
     _ubos = PE.uygulama_pdf(_UY.hesapla({"kabin_agirligi": None}), PROJE)
     r.kontrol("hatalı girdide uygulama PDF'i sebebini yazıyor",
               "boş bırakılamaz" in _metin(_ubos))
