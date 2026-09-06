@@ -268,18 +268,75 @@ EXCEL_FARKLARI = (
      "girmez, yalnız paftaya basılır — ama paftadan moment okuyup makine "
      "seçen bir okuyucuya iki katı bir sayı yazılıyordu.",
      ("AQ7", "AQ21")),
-    ("Regülatör kuvvetinin ikinci alt sınırı",
-     "TS EN 81-20 m.5.6.2.2.1.1 d)",
-     "Sınırı  max( 300 N ; 2 × Freg )  alır ( 11!AA156 );  Freg halatın "
-     "kendi statik gergisidir.",
-     "Standart 'twice that necessary to ENGAGE THE SAFETY GEAR, or 300 N' "
-     "der.  O kuvvet güvenlik tertibatını devreye sokan kuvvettir ve "
-     "imalatçıdan / tip inceleme belgesinden gelir;  halatın statik gergisiyle "
-     "ilgisi yoktur.  Kitabın ölçütü e^(f·α') ≥ 2 demeye geliyordu ve "
-     "standardın istemediği bir koşulla tasarımları reddedebiliyordu.\n"
-     "        İmalatçı kuvveti artık bir girdidir;  girilmişse iki katı, "
-     "girilmemişse yalnız 300 N denetlenir ve bölüm bunu açıkça yazar.",
-     ("AA156",)),
+    ("Regülatör çekme kuvveti ve ikinci alt sınırı",
+     "TS EN 81-20 m.5.6.2.2.1.1 d)  /  m.5.6.2.2.1.3 b)",
+     "Sınırı  max( 300 N ; 2 × Freg )  alır ( 11!AA156 ) ve bu sınırı "
+     "halattaki TOPLAM gerginlikle ( F'reg, 11!U156 = J156 ) karşılaştırır.  "
+     "Freg halatın kendi statik gergisidir.",
+     "Standardın İKİ AYRI maddesi iki AYRI kuvvetten söz eder:\n"
+     "            m.5.6.2.2.1.1 d)  'the tensile force … produced BY THE "
+     "GOVERNOR … at least the greater of twice that necessary to ENGAGE THE "
+     "SAFETY GEAR, or 300 N'\n"
+     "            m.5.6.2.2.1.3 b)  'the minimum breaking load … related by a "
+     "safety factor of at least 8 to the tensile force produced IN THE ROPE'\n"
+     "        Birincisi regülatörün ÜRETTİĞİ çekme kuvvetidir — kasnağın iki "
+     "yanındaki gerginlik FARKI:  Fçekme = F'reg − Freg.  Güvenlik tertibatı "
+     "mekanizmasını çeken odur;  halatın statik gergisi Freg zaten oradadır ve "
+     "hiçbir şeyi çekmez.  İkincisi halattaki EN BÜYÜK gerginliktir ( F'reg ) "
+     "ve emniyet katsayısı ona karşı hesaplanır.\n"
+     "        Kitap ikisini de F'reg ile yapıyor, üstelik sınıra 2·Freg "
+     "koyuyordu — yani ölçüt e^(f·α') ≥ 2 demeye geliyor ve standardın "
+     "istemediği bir koşulla tasarımları reddedebiliyordu.\n"
+     "        Devreye sokma kuvveti İMALATÇI VERİSİDİR ( tip inceleme "
+     "belgesi ).  Girilmezse bu madde DENETLENEMEZ:  bölüm 'HESAP EKSİK' der "
+     "ve proje 'uygundur' çıkmaz — teslim edilen kitap da aynısını yazar.",
+     ("AA156", "U156")),
+    ("Ray gerilmesi ve sehimi işaretli karşılaştırılıyor",
+     "TS EN 81-50 Ek C.2.1  /  m.5.10.6",
+     "σ ve δ'yı İŞARETLİ karşılaştırır:  'δ ≤ δperm' ve 'σ ≤ σperm'.  "
+     "Ayrıca σm = σx + σy'yi işaretli toplar.",
+     "Fx / Fy işaretlidir ve işaret YÖNÜ gösterir — kabin merkezi ray "
+     "ekseninin öbür yanındaysa ( xc < 0 ) kuvvet de moment de negatife "
+     "düşer.  Rayın gördüğü gerilme ile yaptığı sehim ise yönden bağımsız "
+     "BÜYÜKLÜKLERDİR.\n"
+     "        İşaretli karşılaştırma iki ayrı yerde emniyetsizdi:\n"
+     "            · δ = −5,59 mm, sınır 5 mm iken SESSİZCE geçiyordu "
+     "( −5,59 ≤ 5 doğrudur );\n"
+     "            · σm = σx + σy toplamında ters işaretli iki eğilme "
+     "birbirini GÖTÜRÜYOR, σm olduğundan küçük çıkıyor ve σc = σv + σm "
+     "ile birleşik gerilme de küçülüyordu.\n"
+     "        Kuvvet ve moment satırları işaretini korur;  σ ve δ büyüklük "
+     "olarak yazılır ve karşılaştırılır.  En olumsuz lif iki eğilmeyi de "
+     "toplayarak görür.",
+     ()),
+    ("Karşı ağırlık güvenlik tertibatının taban tepkisi",
+     "TS EN 81-20 m.5.2.1.8.4",
+     "Karşı ağırlıkta güvenlik tertibatı diye bir girdisi yoktur;  kuyu "
+     "tabanına bildirilen FAR yalnız ray kütlesi ile yardımcı donanımı "
+     "sayar ( 11!AN616 ).",
+     "Standart kalemleri tek tek sayar ve 'the REACTION at the moment of "
+     "operation of the safety gear' ayrı bir kalemdir — kabin rayında "
+     "sayılıyor, karşı ağırlıkta sayılmıyordu.  Tertibat 'Kaymalı' "
+     "seçilse bile FAR değişmiyordu.\n"
+     "        Örnek projede eksik tepki  k1·gn·Mcwt/n = 2 × 9,81 × 1.100 / 2 "
+     "= 10.791 N/ray;  taban 1.015,50 yerine 11.806,50 N/ray görmeliydi.  "
+     "Kuyu tabanı yükü İNŞAAT PROJESİNE bildirilen sayıdır ve OLDUĞUNDAN "
+     "DÜŞÜK bildiriliyordu.  Ray kütlesinin payı burada da bir kez sayılır "
+     "( Fk − Mg·gn ).",
+     ()),
+    ("Karşı ağırlık denge oranı q",
+     "MMO 208/7 - 2.4  ( ofis standardı )",
+     "C80 formülü  'kabin ağırlığı + beyan yükü / 2'  diye ÇİVİLİDİR;  "
+     "ofis q'yu değiştirse bile 0,50 kalır.",
+     "Ofisin denge oranı q bir sabittir ve bölüm 1 Ga'yı  P + q·Q  ile "
+     "kurar.  Karşı ağırlık kütlesi ise C80'den geliyordu:  q = 0,60'ta "
+     "AYNI PROJEDE İKİ FARKLI karşı ağırlık oluşuyordu — motor ve ağırlık "
+     "tamponu 1.180 kg, tahrik ve ağırlık rayı 1.100 kg.  Aynı fiziksel "
+     "parçanın kütlesi her hesapta aynı olmalıdır.\n"
+     "        Kütle artık tek yerden türer ( mukavemet_girdi.tamamla ) ve "
+     "bölüm 1 de onu okur;  teslim edilen kitabın C80 formülü de projenin "
+     "q'suyla yazılır.",
+     ()),
     ("Sığınma açıklıklarının iki alt sınırı",
      "TS EN 81-20 m.5.2.5.7.3  /  m.5.2.5.8.2 a) 2)",
      "Kabin üstü serbest yüksekliğini 1200 mm, ray dibi açıklığını 150 mm "
@@ -437,7 +494,10 @@ def _motor(g, o):
         lh *= 2
     Gh = gh * lh * nh
     F1 = Q + P + Gh                       # kabin ve aksesuarlarının yükü
-    Ga = P + O["q_denge"] * Q             # karşı ağırlık yükü
+    #  KARŞI AĞIRLIK TEK YERDEN GELİR  ( MG.tamamla → 'karsi_agirlik' ).
+    #  Burada ikinci kez  P + q·Q  hesaplansaydı, q değiştiğinde bu bölüm ile
+    #  tahrik / ray / tampon bölümleri ayrışırdı — nitekim ayrışıyordu.
+    Ga = g["karsi_agirlik"]               # karşı ağırlık yükü
     Gmax = F1 + O["Gs"] - Ga              # maksimum artan yük
     #  MİL KUVVETİ VE MOMENT ASKI ORANINA GÖRE İNDİRGENİR.
     #  Kitap bu iki satırı kabin tarafındaki yükle yazıyordu.  2:1 palangalı
@@ -458,9 +518,13 @@ def _motor(g, o):
     toplam_verim = str(g.get("toplam_verim") or "").strip().lower() == "evet"
     eta_taban = US.verim(O, g.get("makine_tipi"), 1)
     eta = US.verim(O, g.get("makine_tipi"), r, toplam=toplam_verim)
-    N = Gmax * v / (eta * S["motor_sabiti"])
-    HP = N * S["hp_carpani"]
-    uygun = g["motor_gucu"] >= N
+    #  İKİNCİ KALKAN.  Girdi doğrulaması η′ ≤ 0'ı ve negatif halat boyunu
+    #  zaten reddediyor;  motor doğrudan çağrılırsa ( testler ) sıfıra
+    #  bölünmesin ve fiziksel olmayan bir güç "uygun" sayılmasın.
+    hesaplanabilir = eta > 0 and lh > 0
+    N = (Gmax * v / (eta * S["motor_sabiti"])) if hesaplanabilir else None
+    HP = N * S["hp_carpani"] if N is not None else None
+    uygun = bool(N is not None and N > 0 and g["motor_gucu"] >= N)
 
     o.update(Q=Q, P=P, v=v, gh=gh, lh=lh, Gh=Gh, F1=F1, Ga=Ga, Gmax=Gmax,
              N_hesap=N, motor_uygun=uygun, r=r, nh=nh, dh=dh, Dt=Dt)
@@ -472,7 +536,8 @@ def _motor(g, o):
     b["adimlar"] = [
         veri("v", "Kabin hızı", v, "m/s", "GİRİŞ"),
         veri("Q", "Beyan yükü", Q, "kg", "GİRİŞ"),
-        veri("P", "Boş kabin ağırlığı", P, "kg", "GİRİŞ"),
+        veri("P", "Boş kabin ağırlığı", P, "kg",
+             g.get("kabin_agirligi_kaynak") or "GİRİŞ"),
         veri("dh", "Halat çapı", dh, "mm", "GİRİŞ"),
         veri("nh", "Halat sayısı", nh, "adet", "GİRİŞ"),
         veri("gh", "Halatın 1 m'deki ağırlığı", gh, "kg/m",
@@ -536,8 +601,13 @@ def _motor(g, o):
                    "üzerine kuruludur — karşı ağırlık kütlesi tahrik, ray ve "
                    "tampon hesaplarına da aynı yerden girer."]
     b["sonuc"] = {"baslik": "KONTROL      Nsç  ≥  N",
-                  "metin": "UYGUNDUR." if uygun else "UYGUN DEĞİLDİR — motoru büyütün",
+                  "metin": "UYGUNDUR." if uygun else
+                           ("HESAP YAPILAMADI — sistem verimi ya da halat boyu "
+                            "fiziksel değil" if not hesaplanabilir
+                            else "UYGUN DEĞİLDİR — motoru büyütün"),
                   "uygun": bool(uygun)}
+    if not hesaplanabilir:
+        b["eksik_hesap"] = b["sonuc"]["metin"]
     return b
 
 
@@ -861,12 +931,13 @@ def _regulator(g, o):
     sinir_metni = (f"max( {trn(S['reg_kuvvet_asgari'], 0)} N ; 2 × "
                    f"{tr(F_devreye)} N )" if devreye_var
                    else f"{trn(S['reg_kuvvet_asgari'], 0)} N")
-    kuvvet_uygun = Freg2 >= sinir
+    Fcekme = Freg2 - Freg
+    kuvvet_uygun = devreye_var and Fcekme >= sinir
     kat = Tmin / Freg2
     kat_uygun = kat >= S["reg_kat_asgari"]
 
     _kay(o, AI134=gh, AI136=Tmin, J142=oran, W146=f, AF146=efa, W151=Freg,
-         J156=Freg2, AA156=sinir, G161=kat)
+         J156=Freg2, U156=Fcekme, AA156=sinir, G161=kat)
 
     b = Bolum("5 -  HIZ REGÜLATÖRÜ HALATININ HESAPLANMASI",
               "TS EN 81-20 m.5.6.2.2.1  /  TS EN 81-50 m.5.11.2.3")
@@ -894,14 +965,28 @@ def _regulator(g, o):
         hesap("Freg = gn × ( gh + Gra ) / 2",
               f"{tr(gn)} × ( {tr(gh)} + {trn(Gra, 0)} ) / 2", Freg, "N"),
         hesap("F'reg = Freg × e^(f·α')", f"{tr(Freg)} × {tr(efa)}", Freg2, "N"),
-        kontrol(f"F'reg = {tr(Freg2)} N  ≥  {sinir_metni} = {tr(sinir)} N",
-                kuvvet_uygun),
+        hesap("Fçekme = F'reg − Freg",
+              f"{tr(Freg2)} − {tr(Freg)}", Fcekme, "N",
+              "regülatörün ÜRETTİĞİ çekme kuvveti  —  m.5.6.2.2.1.1 d)"),
+        #  İMALATÇI KUVVETİ YOKSA BU SATIR "UYGUN DEĞİL" DEMEZ.
+        #  Sınırın kendisi bilinmiyor;  sağlanmış bir eşitsizliğin yanına
+        #  "UYGUN DEĞİL" yazmak paftada çelişki gibi okunurdu
+        #  ( Fçekme = 1.981 N ≥ 300 N doğrudur ).  Doğrusu:  DENETLENEMEDİ.
+        kontrol(f"Fçekme = {tr(Fcekme)} N  ≥  {sinir_metni} = {tr(sinir)} N",
+                kuvvet_uygun) if devreye_var else
+        kontrol(f"Fçekme = {tr(Fcekme)} N  ≥  max( "
+                f"{trn(S['reg_kuvvet_asgari'], 0)} N ; 2 × devreye sokma "
+                "kuvveti )", False,
+                "DENETLENEMEDİ — imalatçı kuvveti girilmedi"),
         metin("Regülatör halatı emniyet katsayısı :"),
         hesap("T'min / F'reg", f"{trn(Tmin, 0)} / {tr(Freg2)}", kat, ""),
         kontrol(f"T'min / F'reg = {tr(kat)}  ≥  {S['reg_kat_asgari']}", kat_uygun),
     ]
+    #  Başlık, imalatçı kuvveti yokken SAYI yazmaz:  sınır bilinmiyor.
+    _baslik_sinir = sinir_metni if devreye_var else (
+        f"max( {trn(S['reg_kuvvet_asgari'], 0)} N ; 2 × devreye sokma kuvveti )")
     b["sonuc"] = {"baslik": (f"KONTROL      Dreg/dreg ≥ {trn(S['Dreg_dreg_asgari'], 0)}"
-                             f"   ·   F'reg ≥ {sinir_metni}"
+                             f"   ·   Fçekme ≥ {_baslik_sinir}"
                              f"   ·   T'min/F'reg ≥ {trn(S['reg_kat_asgari'], 0)}"),
                   "metin": "UYGUNDUR." if (oran_uygun and kuvvet_uygun and kat_uygun)
                            else "UYGUN DEĞİLDİR",
@@ -917,11 +1002,16 @@ def _regulator(g, o):
         "sınırlıdır:  emniyet katsayısı hesabında bundan büyük bir sürtünme "
         "varsayılamaz."]
     if not devreye_var:
+        b["sonuc"]["metin"] = "HESAP EKSİK — güvenlik tertibatını devreye sokma kuvveti girilmedi"
+        b["eksik_hesap"] = b["sonuc"]["metin"]
         b["notlar"] = [
-            "⚠ 'Güvenlik tertibatını devreye sokma kuvveti' girilmedi;  bu "
-            "yüzden yalnız 300 N sınırı denetlendi.  İkinci sınır "
-            "( 2 × o kuvvet ) güvenlik tertibatı ile regülatörün tip inceleme "
-            "belgelerinden okunmalı ve buraya girilmelidir."]
+            "⚠ 'Güvenlik tertibatını devreye sokma kuvveti' GİRİLMEDİ.  "
+            "TS EN 81-20 m.5.6.2.2.1.1 d) sınırı  max( 300 N ; 2 × o kuvvet )  "
+            "olarak verir;  ikinci terim bilinmediği için sınırın kendisi "
+            "bilinmiyor ve madde DENETLENEMİYOR.  Bu yüzden bölüm 'uygun "
+            "değil' değil, HESAP EKSİK sayılır ve proje 'uygundur' çıkmaz.  "
+            "Kuvvet, güvenlik tertibatı ile regülatörün TİP İNCELEME "
+            "BELGELERİNDEN okunup buraya girilmelidir."]
     return b
 
 
@@ -1332,13 +1422,21 @@ def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar):
     bu, olmayan bir hata gibi görünüyordu.
     """
     M = _moment(F, l)
-    sigma = M / W
-    d = _sehim(F, l, I)
+    #  GERİLME VE SEHİM BİRER BÜYÜKLÜKTÜR.
+    #  Fx / Fy işaretlidir ve işaret YÖNÜ gösterir:  kabin merkezi ray
+    #  ekseninin öbür yanındaysa ( xc < 0 ) kuvvet de moment de negatife
+    #  düşer.  Ama rayın gördüğü gerilme ile yaptığı sehim, yönden bağımsız
+    #  büyüklüklerdir;  "δ ≤ 5 mm" karşılaştırması işaretli yapılırsa
+    #  −5,59 mm SESSİZCE geçer ( sınır 5 mm olmasına rağmen ).
+    #  Kuvvet ve moment satırları işaretini korur — yön bilgisi paftada
+    #  kalsın diye;  σ ve δ büyüklük olarak yazılır ve karşılaştırılır.
+    sigma = abs(M) / W
+    d = abs(_sehim(F, l, I))
     adimlar.extend([
         hesap(f"M{eksen} = 3 × F{kuvvet} × l / 16",
               f"3 × {tr(F)} × {trn(l, 0)} / 16", M, "N·mm", ondalik=0),
-        hesap(f"σ{eksen} = M{eksen} / W{eksen}",
-              f"{trn(M, 0)} / {trn(W, 0)}", sigma, "N/mm²"),
+        hesap(f"σ{eksen} = | M{eksen} | / W{eksen}",
+              f"| {trn(M, 0)} | / {trn(W, 0)}", sigma, "N/mm²"),
     ])
     return sigma, d
 
@@ -1457,19 +1555,19 @@ def _kabin_raylari(g, o):
                 ad.append(kontrol(f"σ = {tr(st)}  ≤  σperm = {trn(sperm, 0)} N/mm²",
                                   st <= sperm))
                 sonuc.append(st <= sperm)
-            sf = _flans(Fx, p, balata)
-            ad.append(hesap("σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+            sf = abs(_flans(Fx, p, balata))
+            ad.append(hesap("σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
                             f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
                             f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}",
                             sf, "N/mm²", "EN 81-50 m.5.10.5"))
             ad.append(kontrol(f"σF = {tr(sf)}  ≤  σperm = {trn(sperm, 0)} N/mm²",
                               sf <= sperm))
-            ad.append(hesap("δx = 0,7 × l³ × Fx / ( 48 × E × Iy )",
+            ad.append(hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |",
                             f"l = {trn(l, 0)} mm ,  Iy = {trn(p['Iy'], 0)} mm⁴",
                             dx, "mm"))
             ad.append(kontrol(f"δx = {tr(dx)}  ≤  δperm = {trn(dperm, 0)} mm",
                               dx <= dperm))
-            ad.append(hesap("δy = 0,7 × l³ × Fy / ( 48 × E × Ix )",
+            ad.append(hesap("δy = | 0,7 × l³ × Fy / ( 48 × E × Ix ) |",
                             f"l = {trn(l, 0)} mm ,  Ix = {trn(p['Ix'], 0)} mm⁴",
                             dy, "mm"))
             ad.append(kontrol(f"δy = {tr(dy)}  ≤  δperm = {trn(dperm, 0)} mm",
@@ -1636,14 +1734,19 @@ def _agirlik_raylari(g, o):
     Fx = (k3 * gn * Mcwt * (Dxa - xsa)) / (n * h)
     Fy = (k3 * gn * Mcwt * (Dya - ysa)) / (n * h)
     Mx, My = _moment(Fx, l), _moment(Fy, l)
-    sx, sy = Mx / p["Wy"], My / p["Wx"]
+    #  σ ve δ BÜYÜKLÜKTÜR  ( bkz. _ray_satirlari ).  Karşı ağırlıkta Dxa/Dya
+    #  ve Mcwt pozitif olduğu için bugün işaret dönmüyor;  kural yine de
+    #  kabin rayıyla AYNI tutulur — geometri kabulü değişirse iki bölüm
+    #  sessizce ayrışmasın.
+    sx, sy = abs(Mx) / p["Wy"], abs(My) / p["Wx"]
     sm = sx + sy
     Fv = Mg * gn
     sv = (Fv + k3 * MY) / p["A"]
     sc = sv + sm
     balata, balata_kaynak = _balata_boyu(g, p)
-    sf = _flans(Fx, p, balata)
-    dx, dy = _sehim(Fx, l, p["Iy"]), _sehim(Fy, l, p["Ix"])
+    sf = abs(_flans(Fx, p, balata))
+    dx = abs(_sehim(Fx, l, p["Iy"]))
+    dy = abs(_sehim(Fy, l, p["Ix"]))
     kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm]
 
     #  ------------------------------------------------------------------
@@ -1663,13 +1766,18 @@ def _agirlik_raylari(g, o):
         lam_a, omega_a = _burkulma_omega(l, p["ix"], g["ray_celigi_rm"])
         Fxg = (k1a * gn * Mcwt * (Dxa - xsa)) / (n * h)
         Fyg = (k1a * gn * Mcwt * (Dya - ysa)) / (n * h)
-        sxg, syg = _moment(Fxg, l) / p["Wy"], _moment(Fyg, l) / p["Wx"]
+        sxg = abs(_moment(Fxg, l)) / p["Wy"]
+        syg = abs(_moment(Fyg, l)) / p["Wx"]
         smg = sxg + syg
         Fkg = (k1a * gn * Mcwt) / n + Mg * gn
         skg = ((Fkg + k3 * MY) * omega_a / p["A"]) if omega_a else None
         scg = (skg + S["birlesik_katsayi"] * smg) if skg is not None else None
-        sfg = _flans(Fxg, p, balata)
-        dxg, dyg = _sehim(Fxg, l, p["Iy"]), _sehim(Fyg, l, p["Ix"])
+        sfg = abs(_flans(Fxg, p, balata))
+        dxg = abs(_sehim(Fxg, l, p["Iy"]))
+        dyg = abs(_sehim(Fyg, l, p["Ix"]))
+        #  Bölüm 9 bunu okur:  kuyu tabanına bildirilen yükte güvenlik
+        #  tertibatı tepkisi AYRI bir kalemdir ( EN 81-20 m.5.2.1.8.4 ).
+        o["Fk_agirlik"] = Fkg
         kg = {"k1": k1a, "sperm": sperm_g, "lam": lam_a, "omega": omega_a,
               "Fx": Fxg, "Fy": Fyg, "sx": sxg, "sy": syg, "sm": smg,
               "Fk": Fkg, "sk": skg, "sc": scg, "sF": sfg, "dx": dxg, "dy": dyg}
@@ -1846,7 +1954,14 @@ def _kuyu_tabani(g, o):
     #  tepkisi ( k1·gn·(P+Q)/n ) ve varsa klips itme kuvveti kalır.
     guvenlik_tepkisi = o["Fk_kabin"] - o["Mg_kabin"] * gn
     FKR = ray_agirlik + S["MY_kabin"] + guvenlik_tepkisi
-    FAR = (gn * Gr_a * LR / 1000.0) + S["MY_agirlik"]
+    #  KARŞI AĞIRLIKTA GÜVENLİK TERTİBATI VARSA TEPKİSİ DE TABANA GELİR.
+    #  Kabin tarafında bu kalem sayılıyordu, karşı ağırlıkta sayılmıyordu:
+    #  tertibat "Kaymalı" seçilse bile FAR değişmiyordu.  Kuyu tabanı yükü
+    #  OLDUĞUNDAN DÜŞÜK bildiriliyordu — inşaat projesine giden sayı budur.
+    #  Ray kütlesinin payı burada da bir kez sayılır ( Fk − Mg·gn ).
+    agirlik_tepkisi = (o["Fk_agirlik"] - o["Mg_agirlik"] * gn
+                       if o.get("Fk_agirlik") is not None else 0.0)
+    FAR = (gn * Gr_a * LR / 1000.0) + S["MY_agirlik"] + agirlik_tepkisi
     Fkt = S["tampon_katsayi"] * gn * (P + Q)
     Fat = S["tampon_katsayi"] * gn * (P + o["ofis"]["q_denge"] * Q)
 
@@ -1863,9 +1978,17 @@ def _kuyu_tabani(g, o):
              guvenlik_tepkisi, "N",
              "ray kütlesi ayrı kalemdir, iki kez sayılmaz"),
         metin("Ağırlık raylarına gelen kuvvetler :"),
-        hesap("FAR = gn × Gar × Lar / 1000 + Ma",
+        hesap("FAR = gn × Gar × Lar / 1000 + Ma"
+              + ("  +  Fgt" if agirlik_tepkisi else ""),
               f"{tr(gn)} × {tr(Gr_a)} × {trn(LR, 0)} / 1000 + "
-              f"{trn(S['MY_agirlik'], 0)}", FAR, "N"),
+              f"{trn(S['MY_agirlik'], 0)}"
+              + (f" + {tr(agirlik_tepkisi)}" if agirlik_tepkisi else ""),
+              FAR, "N", "EN 81-20 m.5.2.1.8.4"),
+        veri("Fgt", "Karşı ağırlık güvenlik tertibatı çalışma tepkisi",
+             agirlik_tepkisi if agirlik_tepkisi else "tertibat yok",
+             "N" if agirlik_tepkisi else "",
+             (f"{g['agirlik_guvenlik_tertibati']}  ·  Fk − Mg·gn"
+              if agirlik_tepkisi else "karşı ağırlıkta güvenlik tertibatı seçilmedi")),
         metin("Kabin tamponlarına gelen kuvvetler :"),
         hesap("Fkt = 4 × gn × ( P + Q )",
               f"4 × {tr(gn)} × ( {trn(P, 0)} + {trn(Q, 0)} )", Fkt, "N"),
@@ -2036,6 +2159,7 @@ def hesapla(veriler=None):
             "FKR": o.get("FKR"), "FAR": o.get("FAR"),
             "Fkt": o.get("Fkt"), "Fat": o.get("Fat"),
             "tumu_uygun": all(uygunlar),
+            "eksik_hesap": [b["eksik_hesap"] for b in bolumler if b.get("eksik_hesap")],
         },
         "uyarilar": [],
         #  Kaynak Excel doğrulaması için  { hücre adresi : hesaplanan değer }

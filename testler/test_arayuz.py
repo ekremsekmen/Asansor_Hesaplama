@@ -160,17 +160,22 @@ def calistir():
         #  Beklenen davranış budur.
         r.kontrol("uygulama hesabı koştu", pg.evaluate("SON.m && SON.m.aktif"),
                   f"→ {pg.evaluate('SON.m && SON.m.hata')}")
+        #    · HIZ REGÜLATÖRÜ — m.5.6.2.2.1.1 d)'nin ikinci sınırı imalatçının
+        #      "devreye sokma kuvveti"ni ister;  kitabın örneğinde yoktur, o
+        #      yüzden madde denetlenemez ve bölüm HESAP EKSİK der ( sapma ⑲ ).
         _kalan = pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
                              "b.sonuc.uygun===false).map(b=>b.baslik)")
-        r.esit("varsayılanda iki bölüm kalıyor", len(_kalan), 2)
-        r.kontrol("kalanlar motor gücü ve askı halatları",
-                  sorted(x[:1] for x in _kalan) == ["1", "4"], f"→ {_kalan}")
-        #  İkisi de giderilince hepsi geçmeli
+        r.esit("varsayılanda üç bölüm kalıyor", len(_kalan), 3)
+        r.kontrol("kalanlar motor gücü, askı halatları ve regülatör",
+                  sorted(x[:1] for x in _kalan) == ["1", "4", "5"], f"→ {_kalan}")
+        #  Üçü de giderilince hepsi geçmeli
         pg.fill("#m_tahrik_kasnak_capi", "280")
         pg.fill("#m_saptirma_kasnak_capi", "280")
         pg.fill("#m_motor_gucu", "7.5")
+        pg.fill("#m_guvenlik_devreye_kuvvet", "200")
         pg.wait_for_timeout(1500)
-        r.kontrol("kasnak 280 mm ve motor 7,5 kW olunca bütün bölümler uygun",
+        r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti girilince "
+                  "bütün bölümler uygun",
                   pg.evaluate("SON.m.ozet.tumu_uygun === true"),
                   f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
         r.esit("on dört hesap bölümü çizildi",
@@ -222,18 +227,52 @@ def calistir():
         r.esit("seyir mesafesi geri döndü",
                pg.input_value("#m_seyir_mesafesi"), "21")
 
-        #  Boş zorunlu alan → hesap durmalı, sebebi ekranda yazmalı
+        #  BOŞ KABİN AĞIRLIĞI ARTIK ZORUNLU DEĞİL — boş bırakılırsa ofis
+        #  tablosundan dolar ( beyan yükü 800 kg → 800 kg ) ve paftada
+        #  kaynağı "OFİS TABLOSU" yazar.
         pg.fill("#m_kabin_agirligi", "")
         pg.wait_for_timeout(1400)
-        r.kontrol("boş kabin ağırlığı hesabı durduruyor",
+        r.kontrol("boş kabin ağırlığı hesabı durdurmuyor",
+                  pg.evaluate("SON.m.aktif === true"),
+                  f"→ {pg.evaluate('SON.m && SON.m.hata')}")
+        r.esit("boş bırakılan kabin ağırlığı tablodan doluyor",
+               pg.evaluate("SON.m.girdi.kabin_agirligi"), 800)
+        r.kontrol("paftada kaynağı ofis tablosu yazıyor",
+                  "OFİS TABLOSU" in pg.evaluate(
+                      "SON.m.girdi.kabin_agirligi_kaynak"),
+                  f"→ {pg.evaluate('SON.m.girdi.kabin_agirligi_kaynak')!r}")
+
+        #  Boş ZORUNLU alan → hesap durmalı, sebebi ekranda yazmalı
+        pg.fill("#m_makine_agirligi", "")
+        pg.wait_for_timeout(1400)
+        r.kontrol("boş makine ağırlığı hesabı durduruyor",
                   pg.evaluate("SON.m.aktif === false"))
         r.kontrol("hata ekranda görünüyor",
                   "boş bırakılamaz" in pg.inner_text("#m_sonuc"),
                   f"→ {pg.inner_text('#m_sonuc')[:140]!r}")
+        pg.fill("#m_makine_agirligi", "300")      # sözleşmenin varsayılanı
         pg.fill("#m_kabin_agirligi", "700")
         pg.wait_for_timeout(1400)
         r.kontrol("düzeltilince hesap geri geliyor",
                   pg.evaluate("SON.m.aktif === true"))
+
+        #  BEYAN YÜKÜ DEĞİŞİNCE KABİN AĞIRLIĞI TABLODAN YENİLENİR
+        #  ( avandaki trafik → kapasite izlemesinin aynısı )
+        pg.select_option("#m_beyan_yuku", "1275")
+        pg.wait_for_timeout(1600)
+        r.esit("beyan yükü değişince kabin ağırlığı tablodan geliyor",
+               pg.input_value("#m_kabin_agirligi"), "1100")
+        #  Elle girilen değer, beyan yükü değişmedikçe korunur
+        pg.fill("#m_kabin_agirligi", "1150")
+        pg.wait_for_timeout(1400)
+        r.esit("elle girilen kabin ağırlığı korunuyor",
+               pg.input_value("#m_kabin_agirligi"), "1150")
+        pg.select_option("#m_beyan_yuku", "800")
+        pg.wait_for_timeout(1600)
+        r.esit("beyan yükü yeniden değişince tablo yine izliyor",
+               pg.input_value("#m_kabin_agirligi"), "800")
+        pg.fill("#m_kabin_agirligi", "700")
+        pg.wait_for_timeout(1400)
         #  Standarda uyan kasnak korunuyor — testin geri kalanı temiz koşsun
         r.kontrol("kasnak 280 mm hâlâ yerinde",
                   pg.input_value("#m_tahrik_kasnak_capi") == "280")

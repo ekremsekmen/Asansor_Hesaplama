@@ -166,17 +166,25 @@ def calistir():
     #      Kitap sabit η = 0,92 ile 4,81 kW deyip "uygun" gösteriyordu
     #      ( sapma ⑨ ).
     #  Beklenen davranış budur — geri dönerse test bağırır.
+    #    · HIZ REGÜLATÖRÜ — TS EN 81-20 m.5.6.2.2.1.1 d)'nin ikinci sınırı
+    #      "güvenlik tertibatını devreye sokmak için gerekenin iki katı"dır ve
+    #      o kuvvet İMALATÇI VERİSİDİR.  Kitabın örneğinde yoktur;  madde
+    #      denetlenemediği için bölüm "HESAP EKSİK" der ( sapma ⑲ ).
     _kalan = [x["baslik"] for x in b if (x.get("sonuc") or {}).get("uygun") is False]
-    r.esit("örnek proje iki bölümden kalıyor", len(_kalan), 2)
-    r.kontrol("kalan bölümler motor gücü ve askı halatları",
-              sorted(x[:1] for x in _kalan) == ["1", "4"], f"→ {_kalan}")
+    r.esit("örnek proje üç bölümden kalıyor", len(_kalan), 3)
+    r.kontrol("kalan bölümler motor gücü, askı halatları ve regülatör",
+              sorted(x[:1] for x in _kalan) == ["1", "4", "5"], f"→ {_kalan}")
+    r.kontrol("regülatör bölümü EKSİK diyor, UYGUN DEĞİL değil",
+              any("HESAP EKSİK" in (x.get("sonuc") or {}).get("metin", "")
+                  for x in b if x["baslik"].startswith("5 ")))
     r.esit("Dt/dh eşiği standarda göre 40", MK.SABIT["Dt_dh_asgari"], 40)
     _oran = 240 / 6.5
     r.kontrol("örnek proje 40 eşiğini sağlamıyor", _oran < 40, f"→ {_oran}")
     #  İkisi de giderilince bütün bölümler uygun olmalı
     _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280,
-                     "motor_gucu": 7.5})
-    r.kontrol("kasnak 280 mm ve motor 7,5 kW olunca bütün bölümler uygun",
+                     "motor_gucu": 7.5, "guvenlik_devreye_kuvvet": 200})
+    r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti girilince "
+              "bütün bölümler uygun",
               _d["aktif"] and _d["ozet"]["tumu_uygun"],
               "→ " + ", ".join(x["baslik"] for x in (_d.get("bolumler") or [])
                                if (x.get("sonuc") or {}).get("uygun") is False))
@@ -237,7 +245,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 19)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 22)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -715,17 +723,57 @@ def _denetim_bulgulari(r):
               _yakin(_a300, _kuru + 900 * 300 / 1e6),
               f"→ {_a300!r} ≠ {_kuru + 0.27!r}")
 
-    #  ── B12  Regülatör kuvvetinin ikinci sınırı imalatçıdan gelir
-    _b5 = [x for x in MK.hesapla()["bolumler"] if x["baslik"].startswith("5 ")][0]
-    r.esit("B12  imalatçı kuvveti yoksa sınır 300 N",
-           MK.hesapla()["_h"]["AA156"], 300)
-    r.kontrol("B12  imalatçı kuvveti yoksa bölüm bunu açıkça söylüyor",
-              any("tip inceleme" in x for x in (_b5.get("notlar") or [])),
+    #  ── B12  Regülatör:  ÇEKME kuvveti ve ikinci sınır imalatçıdan gelir
+    #  m.5.6.2.2.1.1 d) regülatörün ÜRETTİĞİ kuvveti sınırlar — kasnağın iki
+    #  yanındaki gerginlik FARKI ( Fçekme = F'reg − Freg ).  m.5.6.2.2.1.3 b)
+    #  ise halattaki EN BÜYÜK gerginliği ( F'reg ) emniyet katsayısına sokar.
+    #  Kitap ikisini de F'reg ile yapıyordu.
+    _s5 = MK.hesapla()
+    _b5 = [x for x in _s5["bolumler"] if x["baslik"].startswith("5 ")][0]
+    _h5 = _s5["_h"]
+    r.kontrol("B12  Fçekme = F'reg − Freg",
+              _yakin(_h5["U156"], _h5["J156"] - _h5["W151"]),
+              f"→ {_h5['U156']!r} ≠ {_h5['J156'] - _h5['W151']!r}")
+    r.kontrol("B12  Fçekme halattaki toplam gerginlikten KÜÇÜK",
+              0 < _h5["U156"] < _h5["J156"], f"→ {_h5['U156']!r} / {_h5['J156']!r}")
+    r.kontrol("B12  emniyet katsayısı F'reg ile hesaplanıyor  ( m.5.6.2.2.1.3 b )",
+              _yakin(_h5["G161"], _h5["AI136"] / _h5["J156"]),
+              f"→ {_h5['G161']!r}")
+    r.esit("B12  imalatçı kuvveti yoksa sınır 300 N", _h5["AA156"], 300)
+    #  Girilmemişse madde DENETLENEMEZ:  bölüm 'HESAP EKSİK' der ve proje
+    #  'uygundur' çıkmaz.
+    r.kontrol("B12  imalatçı kuvveti yoksa bölüm HESAP EKSİK diyor",
+              _b5["sonuc"]["uygun"] is False
+              and "HESAP EKSİK" in _b5["sonuc"]["metin"],
+              f"→ {_b5['sonuc']!r}")
+    r.esit("B12  eksik hesap özete giriyor", _s5["ozet"]["eksik_hesap"],
+           [_b5["sonuc"]["metin"]])
+    r.kontrol("B12  eksik hesapla proje uygun çıkmıyor",
+              _s5["ozet"]["tumu_uygun"] is False)
+    r.kontrol("B12  imalatçı kuvveti yoksa bölüm sebebini yazıyor",
+              any("İNCELEME" in x.upper() for x in (_b5.get("notlar") or [])),
               f"→ {_b5.get('notlar')}")
     r.esit("B12  imalatçı kuvveti girilince sınır 2 katı",
            MK.hesapla({"guvenlik_devreye_kuvvet": 900})["_h"]["AA156"], 1800)
     r.esit("B12  küçük imalatçı kuvvetinde 300 N belirleyici",
            MK.hesapla({"guvenlik_devreye_kuvvet": 100})["_h"]["AA156"], 300)
+    #  Kuvvet girilince bölüm yeniden hesaplanabilir hâle gelir
+    _b5v = [x for x in MK.hesapla({"guvenlik_devreye_kuvvet": 200})["bolumler"]
+            if x["baslik"].startswith("5 ")][0]
+    r.kontrol("B12  kuvvet girilince bölüm hesaplanıyor",
+              _b5v["sonuc"]["uygun"] is True and "EKSİK" not in _b5v["sonuc"]["metin"],
+              f"→ {_b5v['sonuc']!r}")
+    #  Ölçüt gerçekten Fçekme ile:  çok büyük bir imalatçı kuvvetinde kalmalı
+    _b5r = [x for x in MK.hesapla({"guvenlik_devreye_kuvvet": 9000})["bolumler"]
+            if x["baslik"].startswith("5 ")][0]
+    r.kontrol("B12  aşırı imalatçı kuvvetinde bölüm kalıyor",
+              _b5r["sonuc"]["uygun"] is False)
+
+    # Toplam gerginin geçtiği, NET çekmenin kaldığı gerçek regresyon aralığı.
+    _net = MK.hesapla({"guvenlik_devreye_kuvvet": 1100})
+    r.kontrol("B12 net çekme yetersizken toplam gerilme uygunluk vermez",
+              _net["_h"]["J156"] > 2200 > _net["_h"]["U156"]
+              and _net["bolumler"][4]["sonuc"]["uygun"] is False)
 
     #  ── B13  Karşı ağırlıkta güvenlik tertibatı  ( EN 81-50 Ek C.2.1 )
     _yok = MK.hesapla()["bolumler"][7]
@@ -770,6 +818,157 @@ def _denetim_bulgulari(r):
            if str(a.get("formul", "")).startswith("σk = ")]
     r.kontrol("B14  C.2.1'de ω uygulanıyor  ( iki durum ayrı )",
               bool(_sk) and _sk[0] > _bek, f"→ σk = {_sk!r}")
+
+    #  ══════════════════════════════════════════════════════════════
+    #  ÜÇÜNCÜ TUR  —  SAYISAL FİZİK DENETİMİNDE BULUNANLAR
+    #  ══════════════════════════════════════════════════════════════
+    #  ── C1  σ ve δ BÜYÜKLÜKTÜR;  işaretli karşılaştırma emniyetsizdi
+    #  Kabin merkezi ray ekseninin öbür yanına düşünce ( xc < 0 ) Fx negatife
+    #  iner;  δ = −5,59 mm iken "δ ≤ 5" SESSİZCE geçiyordu.
+    _c1 = MK.hesapla({"kabin_genisligi": 900, "ray_kapi_arasi": 1200,
+                      "kabin_konsol_arasi": 3800})
+    r.kontrol("C1  negatif geometrili proje hesaplanabiliyor", _c1["aktif"],
+              f"→ {_c1.get('hata')}")
+    _b7c1 = [x for x in _c1["bolumler"] if x["baslik"].startswith("7 ")][0]
+    _sayilar = [a["deger"] for a in _b7c1["adimlar"]
+                if isinstance(a["deger"], (int, float))
+                and not isinstance(a["deger"], bool)]
+    r.kontrol("C1  Fx işaretini koruyor  ( yön bilgisi paftada kalıyor )",
+              any(x < 0 for x in _sayilar), "→ hiç negatif kuvvet yok")
+    for _ad, _on in (("σ", "σ"), ("δ", "δ")):
+        _deg = [a["deger"] for a in _b7c1["adimlar"]
+                if str(a.get("formul", "")).startswith(_on)
+                and isinstance(a["deger"], (int, float))]
+        r.kontrol(f"C1  hiçbir {_ad} negatif yazılmıyor",
+                  all(x >= 0 for x in _deg), f"→ {[x for x in _deg if x < 0]}")
+    _dx = [a for a in _b7c1["adimlar"]
+           if str(a.get("aciklama", "")).startswith("δx")]
+    r.kontrol("C1  δ = 5,59 mm  >  5 mm  →  UYGUN DEĞİL",
+              any(a["deger"] == "UYGUN DEĞİL" for a in _dx),
+              f"→ {[(a['aciklama'][:34], a['deger']) for a in _dx]}")
+    r.kontrol("C1  bölüm 7 bu geometride kalıyor",
+              _b7c1["sonuc"]["uygun"] is False, f"→ {_b7c1['sonuc']}")
+    #  σm artık iki eğilmeyi TOPLUYOR  ( ters işaretliler birbirini götürmüyor )
+    _sm = [a["deger"] for a in _b7c1["adimlar"]
+           if str(a.get("formul", "")).startswith("σm = ")]
+    r.kontrol("C1  σm = |σx| + |σy|  ( götürme yok )",
+              bool(_sm) and all(x >= 0 for x in _sm), f"→ {_sm}")
+
+    #  ── C2  Karşı ağırlık tertibatının tepkisi kuyu tabanına gelir
+    _far0 = MK.hesapla()["ozet"]["FAR"]
+    _mc = MK.hesapla()["girdi"]["karsi_agirlik"]
+    _n = MK.hesapla()["girdi"]["agirlik_ray_sayisi"]
+    for _tip in ("Kaymalı", "Ani Frenlemeli Makaralı", "Ani Frenlemeli"):
+        _k1 = _MTd.darbe_k1(_tip)
+        _far = MK.hesapla({"agirlik_guvenlik_tertibati": _tip})["ozet"]["FAR"]
+        _bek2 = _far0 + _k1 * MK.SABIT["gn"] * _mc / _n
+        r.kontrol(f"C2  '{_tip}' tepkisi FAR'a giriyor  "
+                  f"( {_far0:.0f} → {_far:.0f} N )",
+                  _yakin(_far, _bek2), f"→ {_far!r} ≠ {_bek2!r}")
+    r.kontrol("C2  tertibat yokken FAR değişmiyor",
+              _yakin(MK.hesapla({"agirlik_guvenlik_tertibati": "Yok"}
+                                )["ozet"]["FAR"], _far0))
+    #  RAY KÜTLESİ BURADA DA BİR KEZ SAYILIR.  Bölüm 8'in Fk'si  Mg·gn'i
+    #  içerir;  tabana giden tepki  Fk − Mg·gn  olmalıdır — yoksa ray hattının
+    #  ağırlığı FAR'da iki kez görünürdü ( kabin tarafında düzeltilen ⑬ ).
+    _s2 = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı"})
+    _mg_a = _s2["ozet"]["Mg_agirlik"] * MK.SABIT["gn"]
+    _tepki = _s2["ozet"]["FAR"] - _far0
+    r.kontrol("C2  tepkide ray kütlesi yok  ( Fk − Mg·gn )",
+              _yakin(_tepki, 2 * MK.SABIT["gn"] * _mc / _n),
+              f"→ tepki {_tepki!r},  Mg·gn = {_mg_a!r}")
+    r.kontrol("C2  FAR özet ile hücre aynı", _yakin(_s2["_h"]["AN616"],
+                                                   _s2["ozet"]["FAR"]))
+
+    #  ── C3  Karşı ağırlık kütlesi TEK yerden türer  ( ofis q'su )
+    for _q in (0.40, 0.45, 0.50, 0.55, 0.60):
+        _s3 = MK.hesapla({"kabin_agirligi": 700, "beyan_yuku": 800,
+                          "_ofis": {"q_denge": _q}})
+        _ga = _s3["_h"]["AQ13"]            # bölüm 1  —  motor · ağırlık tamponu
+        _mcwt = _s3["girdi"]["karsi_agirlik"]   # bölüm 6 tahrik · bölüm 8 ray
+        r.esit(f"C3  q = {_q}  →  Ga = Mcwt", (_ga, _mcwt),
+               (700 + _q * 800, 700 + _q * 800))
+        #  Ağırlık tamponu da aynı kütleyi görür
+        r.kontrol(f"C3  q = {_q}  ağırlık tamponu aynı kütleyle",
+                  _yakin(_s3["ozet"]["Fat"],
+                         MK.SABIT["tampon_katsayi"] * MK.SABIT["gn"] * _mcwt),
+                  f"→ {_s3['ozet']['Fat']!r}")
+
+    #  ══════════════════════════════════════════════════════════════
+    #  DÖRDÜNCÜ TUR  —  SINIR DURUMLARI
+    #  ══════════════════════════════════════════════════════════════
+    #  ── D1  Sistem verimi η′ fiziksel olmalı  ( 0 < η′ ≤ 1 )
+    #  Verim ile palanga kaybı ayrı ayrı geçerli, ama İLİŞKİLERİ
+    #  denetlenmiyordu:  η = 0,10 · Δη = 0,10 → sıfıra bölme;
+    #  Δη = 0,20 → η′ = −0,10 ve N = −44,26 kW, her motor "uygun".
+    for _dus, _ne in ((0.10, "η′ = 0  ( sıfıra bölme )"),
+                      (0.20, "η′ = −0,10  ( negatif güç )")):
+        _d1 = MK.hesapla({"_ofis": {"verim_dislisiz": 0.10,
+                                    "palanga_verim_dususu": _dus}})
+        r.kontrol(f"D1  {_ne} reddediliyor", _d1["aktif"] is False,
+                  f"→ {_d1.get('ozet', {}).get('tumu_uygun')}")
+        r.kontrol(f"D1  hata iki sabiti de adıyla söylüyor  ( Δη = {_dus} )",
+                  any("η′" in x and "palanga" in x for x in (_d1.get("hata") or [])),
+                  f"→ {_d1.get('hata')}")
+    #  Toplam sistem verimi seçilince palanga düşüşü inmez — geçerli olmalı
+    _d1t = MK.hesapla({"toplam_verim": "Evet",
+                       "_ofis": {"verim_dislisiz": 0.10,
+                                 "palanga_verim_dususu": 0.20}})
+    r.kontrol("D1  toplam verim seçiliyken aynı sabitler geçerli",
+              _d1t["aktif"] is True, f"→ {_d1t.get('hata')}")
+    r.kontrol("D1  η′ = 1 sınırı kabul ediliyor",
+              MK.hesapla({"toplam_verim": "Evet",
+                          "_ofis": {"verim_dislisiz": 1.0}})["aktif"] is True)
+    #  İKİNCİ KALKAN:  doğrulama atlansa bile sıfıra bölünmemeli
+    _dog1 = MK.MG.dogrula
+    try:
+        MK.MG.dogrula = lambda g: []
+        _d1x = MK.hesapla({"_ofis": {"verim_dislisiz": 0.10,
+                                     "palanga_verim_dususu": 0.10}})
+        r.kontrol("D1  doğrulama atlansa bile sıfıra bölünmüyor",
+                  _d1x["aktif"] is True
+                  and _d1x["ozet"]["tumu_uygun"] is False)
+        r.kontrol("D1  bölüm 1 'HESAP YAPILAMADI' diyor",
+                  any("HESAP YAPILAMADI" in (x.get("sonuc") or {}).get("metin", "")
+                      for x in _d1x["bolumler"]))
+    except Exception as _e:                                   # noqa: BLE001
+        r.kontrol("D1  doğrulama atlansa bile sıfıra bölünmüyor", False,
+                  f"→ {_e!r}")
+    finally:
+        MK.MG.dogrula = _dog1
+
+    #  ── D2  Tampon / paten yığını kuyuya sığmalı  ( halat boyu > 0 )
+    #  30 m paten arasında lh = −4,82 m, Gh = −5,13 kg;  negatif ağırlık
+    #  yükten DÜŞÜLÜYOR — motor gücünü azaltıp Sf'yi yükseltiyordu.
+    _d2 = MK.hesapla({"kabin_paten_arasi": 30000})
+    r.kontrol("D2  yığın kuyuya sığmıyorsa reddediliyor", _d2["aktif"] is False)
+    r.kontrol("D2  hata yığını ve kuyu boyunu sayıyor",
+              any("yığını" in x and "kuyu boyundan" in x
+                  for x in (_d2.get("hata") or [])), f"→ {_d2.get('hata')}")
+    #  SINIRDA da reddedilmeli:  yığın TAM kuyu boyuna eşitken halat boyu
+    #  ( paydan önce ) sıfırdır — fiziksel değildir.
+    _gv = _MG.tamamla(_MG.varsayilanlar())
+    _tam = (_gv["kuyu_boyu"] - _gv["agirlik_tampon_baba"]
+            - _gv["agirlik_carpma_arasi"] + _gv["agirlik_tampon_ezilme"]
+            - _gv["agirlik_paten_arasi"])
+    r.kontrol("D2  sınırda ( yığın = kuyu boyu ) da reddediliyor",
+              MK.hesapla({"kabin_paten_arasi": _tam})["aktif"] is False,
+              f"→ kabin paten arası {_tam:g} mm")
+    r.kontrol("D2  sınırın 1 mm altı kabul ediliyor",
+              MK.hesapla({"kabin_paten_arasi": _tam - 1})["aktif"] is True)
+    #  Normal geometri geçmeye devam ediyor
+    r.kontrol("D2  normal paten arası kabul ediliyor",
+              MK.hesapla({"kabin_paten_arasi": 3400})["aktif"] is True)
+    _dog2 = MK.MG.dogrula
+    try:
+        MK.MG.dogrula = lambda g: []
+        _d2x = MK.hesapla({"kabin_paten_arasi": 30000})
+        r.kontrol("D2  doğrulama atlansa bile negatif halat 'uygun' olmuyor",
+                  _d2x["ozet"]["tumu_uygun"] is False)
+        r.kontrol("D2  negatif halat boyunda güç hesaplanmıyor",
+                  _d2x["_h"].get("AQ23") is None, f"→ {_d2x['_h'].get('AQ23')!r}")
+    finally:
+        MK.MG.dogrula = _dog2
     return r
 
 

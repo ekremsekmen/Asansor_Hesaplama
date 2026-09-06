@@ -77,6 +77,7 @@ def hesapla(veriler=None):
     if not muk.get("aktif"):                       # olmamalı — dogrula geçti
         return {"aktif": False, "hata": muk.get("hata") or [], "girdi": g}
 
+    eksik.extend(muk.get("ozet", {}).get("eksik_hesap", []))
     av = E_AVAN.hesapla(UG.kopru(g))
     asansor = (av.get("asansorler") or [{}])[0]
     uyarilar = list(muk.get("uyarilar") or [])

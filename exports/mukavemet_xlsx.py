@@ -745,14 +745,48 @@ def _standarda_uydur(wb, g):
     ws["AQ7"] = "=(AQ11-AQ13)/'Veri Girişi'!B100"
     ws["AQ21"] = "=(AQ9/'Veri Girişi'!B100)*(AQ10/2000)"
 
-    #  ⑳  Regülatör kuvvetinin ikinci sınırı  —  EN 81-20 m.5.6.2.2.1.1 d)
-    #  Kitap ( 11!AA156 ) "2 × Freg" koyar;  Freg halatın statik gergisidir,
-    #  güvenlik tertibatını devreye sokan kuvvet değildir.  O kuvvet
-    #  imalatçıdan gelir;  girilmişse iki katı, girilmemişse yalnız 300 N.
-    _fgt = g.get("guvenlik_devreye_kuvvet")
-    ws["AA156"] = (max(MK.SABIT["reg_kuvvet_asgari"], 2 * _fgt)
-                   if isinstance(_fgt, (int, float)) and not isinstance(_fgt, bool)
-                   and _fgt > 0 else MK.SABIT["reg_kuvvet_asgari"])
+    #  ⑳  REGÜLATÖR:  ÇEKME KUVVETİ VE İKİNCİ SINIR
+    #      m.5.6.2.2.1.1 d)  regülatörün ÜRETTİĞİ kuvveti sınırlar — kasnağın
+    #                        iki yanındaki gerginlik FARKI:  F'reg − Freg.
+    #                        Güvenlik tertibatını çeken odur;  halatın statik
+    #                        gergisi Freg zaten oradadır ve bir şey çekmez.
+    #      m.5.6.2.2.1.3 b)  halattaki EN BÜYÜK gerginliği ( F'reg ) emniyet
+    #                        katsayısına sokar.
+    #  Kitap ikisini de F'reg ile yapıyor ( U156 = J156 ) ve sınıra "2 × Freg"
+    #  koyuyordu.  Devreye sokma kuvveti İMALATÇI VERİSİDİR;  girilmezse madde
+    #  denetlenemez ve kitap da "HESAP EKSİK" yazar.
+    #
+    #  SINIR DA FORMÜLDÜR:  kitabı Excel'de açıp B242'yi dolduran biri doğru
+    #  sonucu görsün — sabit yazılsaydı karar satırı değişir, sınır 300'de
+    #  kalırdı.
+    _B242 = "'Veri Girişi'!B242"
+    _eksik = f'OR({_B242}="",{_B242}<=0)'
+    ws["Q156"] = "Fçekme"
+    ws["U156"] = "=J156-W151"
+    ws["G161"] = "=AI136/J156"
+    ws["AA156"] = (f'=IF({_eksik},{MK.SABIT["reg_kuvvet_asgari"]},'
+                   f'MAX({MK.SABIT["reg_kuvvet_asgari"]},2*{_B242}))')
+    ws["AM156"] = (f'=IF({_eksik},"HESAP EKSİK",'
+                   'IF(U156>=AA156,"UYGUNDUR.","UYGUN DEĞİLDİR."))')
+
+    #  ㉑  KARŞI AĞIRLIK DENGE ORANI  —  ofis sabiti q
+    #  Kitabın C80 formülü "C75 + C59/2" diye ÇİVİLİDİR;  ofis q'yu
+    #  değiştirse bile 0,50 kalır ve teslim edilen kitap ekrandan başka bir
+    #  karşı ağırlık kullanır.  Formül projenin q'suyla yazılır — sayı değil
+    #  FORMÜL, kitap kendi kendini hesaplamaya devam etsin diye.
+    vg["C80"] = f"=C75+(C59*{repr(float(O['q_denge']))})"
+
+    #  ㉒  KARŞI AĞIRLIK GÜVENLİK TERTİBATININ TABAN TEPKİSİ
+    #  Kitapta karşı ağırlık güvenlik tertibatı diye bir girdi yoktur;  bu
+    #  yüzden AN616 ( FAR ) tepkiyi hiç saymaz.  Tertibat seçilmişse tepki
+    #  ayrı bir kalem olarak eklenir ( EN 81-20 m.5.2.1.8.4 ).
+    _agt = MK.US.darbe_k1(O, g.get("agirlik_guvenlik_tertibati")) \
+        if (g.get("agirlik_guvenlik_tertibati") or "Yok") != "Yok" else None
+    if _agt:
+        #  k1 · gn · Mcwt / n   —  ray kütlesi bu kalemde YOKTUR
+        ws["AN616"] = ("=(U616*Y616*AC616/U617)+AG616+"
+                       f"({repr(float(_agt))}*{MK.SABIT['gn']}"
+                       "*'Veri Girişi'!C80/'Veri Girişi'!B116)")
 
     #  ⑧  Sığınma açıklıklarının iki alt sınırı  —  EN 81-20 m.5.2.5.7.3 ve
     #  m.5.2.5.8.2 a) 2).  Kitap 1200 / 150 mm ister;  standartta bu sayılar

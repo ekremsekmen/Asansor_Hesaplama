@@ -293,6 +293,14 @@ opsiyonel alanlar tablo değerini kullanır.
    **Durak yükseklikleri** kendi düzenleyicisindedir ( ekle / sil, en çok 20 ).
    *Seyir mesafesi* ve *son kat yüksekliği* bu listeden **kendiliğinden** dolar —
    Excel'de ikisi de elle giriliyor ve sessizce çelişebiliyordu.
+   **Kabin ağırlığı da beyan yükünü izler:** yükü değiştirdiğinizde ofis
+   tablosundan dolar ( 1275 kg → 1100 kg ). Elle yazdığınız değer, beyan yükünü
+   yeniden değiştirene kadar korunur — avan tarafındaki *trafik → kapasite*
+   izlemesinin aynısıdır. Tablo **tahmindir**, standardın sayısı değildir;
+   kesin tasarımda imalatçı verisiyle değiştirin ( bkz. §7 ).
+   **Regülatörün "devreye sokma kuvveti"** imalatçının tip inceleme
+   belgesinden gelir; girilmezse o madde denetlenemez ve bölüm
+   *"HESAP EKSİK"* der — proje *uygundur* çıkmaz ( bkz. §7 ).
 4. Sağ panelde bütün bölümler, hangisinin takıldığı, **kuyu tabanına gelen
    yükler** ( inşaat projesine bildirilecek FKR · FAR · Fkt · Fat ), asansörün
    kurulu gücü, gerilim düşümü ve topraklama direnci görünür.
@@ -460,21 +468,21 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**23.585 kontrolün tamamı geçmiştir.**
+**23.693 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
-| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı** | **777 / 777** |
+| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **790 / 790** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **424 / 424** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması | **364 / 364** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası ve **teslim edilen kitabın paftayla birebir aynı olduğu** | **427 / 427** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **370 / 370** |
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.537 / 4.537** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ve varsayılan açılarda kitapla birebir tutar | **951 / 951** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **on dokuz sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci denetimin on bulgusunun her biri yeniden üretilerek** + girdi reddi | **419 / 419** |
-| **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **9.352 / 9.352** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri** | **184 / 184** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **yirmi iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü denetimin her bulgusu yeniden üretilerek** + girdi reddi | **470 / 470** |
+| **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **9.354 / 9.354** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği** | **217 / 217** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -554,7 +562,7 @@ okundu:
 | Nokta | Sonuç |
 |---|---|
 | `Nequiv(t) = 12` ( V kanal, γ = 38° ) doğru mu | **Doğru.** EN 81-50 Çizelge 2: γ = 35 · 36 · 38 · 40 · 42 · 45 · 50° → 18,5 · 16 · **12** · 10 · 8 · 6,5 · 5. Çizelgenin tamamı programa girdi |
-| Regülatör kuvvet ölçütü | **Bulgu doğruydu.** m.5.6.2.2.1.1 d) *"twice that necessary to **engage the safety gear**, or 300 N"* der; kitap halatın statik gergisinin iki katını koyuyordu. İmalatçı kuvveti artık bir girdi; girilmemişse yalnız 300 N denetlenir ve bölüm bunu açıkça yazar |
+| Regülatör kuvvet ölçütü | **Bulgu doğruydu — ve bir katman daha derindi.** Standardın iki ayrı maddesi iki ayrı kuvvetten söz ediyor: m.5.6.2.2.1.1 d) regülatörün **ürettiği** kuvveti sınırlar ( *"produced **by the governor**"* ) — bu, kasnağın iki yanındaki gerginlik **farkıdır**: `Fçekme = F′reg − Freg`. Güvenlik tertibatı mekanizmasını çeken odur; halatın statik gergisi Freg zaten oradadır ve hiçbir şeyi çekmez. m.5.6.2.2.1.3 b) ise **halattaki** en büyük gerginliği ( `F′reg` ) emniyet katsayısına sokar ( *"produced **in the rope**"* ). Kitap ikisini de F′reg ile yapıyor, üstelik sınıra `2 × Freg` koyuyordu. Devreye sokma kuvveti **imalatçı verisidir**; girilmezse madde denetlenemez ve bölüm **"HESAP EKSİK"** der — proje *uygundur* çıkmaz |
 | Karşı ağırlıkta güvenlik tertibatı modellenmiyor | **Bulgu doğruydu.** Bölüm 8 yalnız C.2.2'yi ( normal işletme, k3 = 1,2 ) kuruyordu. Tertibat varsa belirleyici durum **C.2.1**'dir ve orada k1 = 2 · 3 · 5 geçer. Karşı ağırlık güvenlik tertibatı girdi oldu; seçilirse C.2.1 de hesaplanır |
 | Bölüm 7 C.2.2'de burkulma ω'sız | **Bulgu yersizdi — program doğru.** EN 81-50 Ek **C.2.2.2** `σv = ( Fv + k3·Maux ) / A` der; ω yalnız **C.2.1.2**'de geçer. İki durumun ayrıldığı artık ayrıca denetleniyor |
 | `reg_surtunme` μ üst sınırsız | **Bulgu doğruydu.** m.5.6.2.2.1.3 b) hesaba katılacak değeri kendisi verir: **µmax = 0,2**. Üstü reddediliyor |
@@ -562,6 +570,32 @@ okundu:
 | Ölü ve yanıltıcı kod | `KANAL_ISLEME` gerçekten yanlış adlandırılmıştı — içindeki sayılar μ değil **f**'dir ( 0,1 / sin 19° = 0,30716 ). Başlık düzeltildi ve tablonun **çivili** olduğu ( γ = 38° · β = 90° ) açıkça yazıldı; motor onu hiç kullanmaz, ekrandaki tablo da artık f'yi ofis açılarından üretir |
 | `DURAK_AZAMI = 20` — trafik 30 katı destekliyor | Sınır kaynak kitabın **kendi düzeninden** gelir ( `Veri Girişi`!G12:G34 ). Kapsam farkı bilinçlidir ve arayüz bunu söyler; 20 duraktan fazlası uygulama projesinde hesaplanamaz |
 | Sigorta ↔ kablo koordinasyonu | `I2 ≤ Iz2` kontrolü ( ve artık `I ≤ Iz` de doğru güçle ) çoğu durumu yakalıyor. IEC 60364-4-43'ün `In ≤ Iz` şartı ayrıca denetlenmiyor — **bilinen sınırdır**, bkz. §7 |
+
+#### Üçüncü denetim — sayısal fizik kontrolleri
+
+Kuvvet dengesi ve sınır kontrollerini sınayan hesaplarla üç sorun daha
+bulundu. Olumlu kontrol olarak kuvvet iki katına çıkarılınca eğilme momenti
+**2 kat**, açıklık iki katına çıkarılınca sehim **8 kat** çıkıyor — temel
+bağıntılar tutarlı.
+
+| Bulgu | Yön | Etkisi ve düzeltme |
+|---|---|---|
+| **Negatif sehim ve gerilme, sınırı aşsa da "uygun" sayılıyordu** ( böl. 7 ) | **emniyetsiz** | Kabin merkezi ray ekseninin öbür yanına düşünce ( `xc < 0` ) Fx negatife iner. `δ = −5,59 mm` iken sınır 5 mm olmasına rağmen `δ ≤ 5` **sessizce geçiyordu**. Aynı hata bir yerde daha vardı: `σm = σx + σy` işaretli toplanınca ters işaretli iki eğilme **birbirini götürüyor**, `σc = σv + σm` de küçülüyordu ( örnekte σm = −19,87 yerine **71,44 N/mm²** ). Fx ve moment işaretini korur — yön bilgisidir; **σ ve δ büyüklük olarak** yazılır ve karşılaştırılır |
+| **Karşı ağırlık güvenlik tertibatının tepkisi kuyu tabanına aktarılmıyordu** ( böl. 9 ) | **emniyetsiz** | Kabin rayında bu kalem sayılıyor, karşı ağırlıkta sayılmıyordu: tertibat *"Kaymalı"* seçilse bile **FAR değişmiyordu** ( 1.015,50 N ). Eksik tepki `k1·gn·Mcwt/n = 2 × 9,81 × 1.100 / 2 = 10.791 N/ray`; taban **11.806,50 N/ray** görmeliydi. Bu sayı **inşaat projesine** bildirilir ve olduğundan düşük gidiyordu. Ray kütlesinin payı burada da bir kez sayılır ( `Fk − Mg·gn` ) |
+| **Denge oranı değişince aynı projede iki farklı karşı ağırlık** | tutarsızlık | Kitabın `C80` formülü *"kabin ağırlığı + beyan yükü / 2"* diye çivili; bölüm 1 ise `Ga = P + q·Q` kuruyordu. `q = 0,60`'ta motor ve ağırlık tamponu **1.180 kg**, tahrik ve ağırlık rayı **1.100 kg** kullanıyordu. Kütle artık **tek yerden** türer ve bölüm 1 de onu okur; teslim edilen kitabın `C80` formülü de projenin q'suyla yazılır |
+
+#### Dördüncü denetim — sınır durumları
+
+Fiziksel olarak geçersiz girdilerin **güvenilir görünen sonuç üretmesi**. Bu
+iki bulgu normal girdilerde hesabı etkilemez; kalkanların eksikliğidir.
+
+| Bulgu | Etkisi ve düzeltme |
+|---|---|
+| **Sıfır ya da negatif sistem verimi kabul ediliyordu.** Verim ile palanga kaybı ayrı ayrı geçerli sayılıyor, **aralarındaki ilişki** denetlenmiyordu | η = 0,10 · Δη = 0,10 → η′ = 0 → **sıfıra bölme**. Δη = 0,20 → η′ = **−0,10** ve gereken güç **−44,26 kW**; `Nsç ≥ N` her motoru geçiriyor, temiz bir projede genel sonuç **"UYGUN"** çıkıyordu. Artık hesaptan önce `0 < η′ ≤ 1` denetleniyor ve hata **iki sabiti de adıyla** söylüyor. *( Avan motorunda bu kalkan zaten vardı — eksik olan uygulama tarafıydı. )* |
+| **İmkânsız geometri negatif halat ağırlığı üretiyordu.** Kabin paten arası 30.000 mm verildiğinde halat boyu **−4,82 m**, ağırlığı **−5,13 kg** | Negatif ağırlık yükten **düşülüyor**: motor gücünü azaltıyor, halat güvenlik katsayısını **yükseltiyor** — imkânsız geometri hesabı *iyileştiriyordu*. Artık tampon/paten yığınının kuyuya sığması denetleniyor; hata toplama giren beş ölçüyü tek tek yazıyor |
+
+Her ikisinde de **ikinci kalkan** var: girdi doğrulaması atlansa bile motor
+çökmüyor, bölüm 1 *"HESAP YAPILAMADI"* diyor ve proje *uygundur* çıkmıyor.
 
 ### Test yazılırken bulunan ve düzeltilen hatalar
 
@@ -594,8 +628,8 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **on dokuz** noktada kitap standarttan ( yalnız verim
-ve moment maddelerinde ofisin kendi kabulünden ) sapıyor — program
+noktasıdır. Aşağıdaki **yirmi iki** noktada kitap standarttan ( yalnız verim,
+moment ve denge oranı maddelerinde ofisin kendi kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
 
@@ -619,7 +653,10 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | ⑯ | **Nequiv(t)** | **EN 81-50 m.5.12.2.2 Çizelge 2** — γ ve β'nın fonksiyonu | Kanalın **adına** bağlı sabit tablo;  ofis açısı değişse kımıldamaz | Çizelge 2'den, ofis açılarından, doğrusal ara değerle |
 | ⑰ | **Halat kütlesinin taraf dağılımı** | **EN 81-50 m.5.11.2.2** — ± işareti kabinin konumundan | Dört yük durumunun **üçünde** ters;  kabin en altta iken halat karşı ağırlıkta | Kabin en altta → halat kabin tarafında ( en olumsuz durum ) |
 | ⑱ | **Mil kuvveti ve moment** | Ofis kabulü ( MMO 208/7 - 2.4 ) | `Pm = F1 − Ga` · `M = Gmax·Dt/2` — askı oranı hiç girmez | 2:1'de kasnak tarafındaki büyüklükler **yarıya** iner |
-| ⑲ | **Regülatör kuvvetinin ikinci sınırı** | **EN 81-20 m.5.6.2.2.1.1 d)** — güvenlik tertibatını **devreye sokan** kuvvetin iki katı | Halatın **statik gergisinin** iki katını koyar | İmalatçı kuvveti girdi;  yoksa yalnız 300 N denetlenir ve bu yazılır |
+| ⑳ | **Ray σ ve δ'sinin işareti** | **EN 81-50 Ek C.2.1** · **m.5.10.6** | σ ve δ'yı işaretli karşılaştırır;  σm = σx + σy'yi işaretli toplar | σ ve δ **büyüklüktür**;  en olumsuz lif iki eğilmeyi de toplayarak görür |
+| ㉑ | **Karşı ağırlık tertibatının taban tepkisi** | **EN 81-20 m.5.2.1.8.4** — tepki ayrı kalem | Karşı ağırlıkta güvenlik tertibatı girdisi yok;  FAR tepkiyi hiç saymaz | Tertibat varsa `k1·gn·Mcwt/n` FAR'a girer |
+| ㉒ | **Karşı ağırlık denge oranı q** | Ofis kabulü ( MMO 208/7 - 2.4 ) | `C80 = C75 + C59/2` **çivili** — ofis q'yu değiştirse bile 0,50 | Kütle tek yerden, projenin q'suyla türer |
+| ⑲ | **Regülatör çekme kuvveti ve ikinci sınır** | **EN 81-20 m.5.6.2.2.1.1 d)** ve **m.5.6.2.2.1.3 b)** — biri regülatörün **ürettiği** kuvveti, öteki **halattaki** gerginliği sınırlar | İkisini de F′reg ile yapar;  sınıra da **2 × Freg** koyar | `Fçekme = F′reg − Freg` maddeye, `F′reg` emniyet katsayısına girer;  imalatçı kuvveti yoksa **HESAP EKSİK** |
 
 **①'in pratik sonucu:** kitabın kendi örneğinde tahrik kasnağı 240 mm, halat
 6,5 mm → oran **36,9**. Kitap 30 eşiğiyle "uygun" der; **standardın 40 eşiğine
@@ -1041,7 +1078,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ### Uygulama projesi — mukavemet
 
-- **Kaynak kitaptan ayrılan on dokuz nokta** 6. bölümdeki tabloda sayılıdır; her
+- **Kaynak kitaptan ayrılan yirmi iki nokta** 6. bölümdeki tabloda sayılıdır; her
   biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
   birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.
@@ -1095,6 +1132,18 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   noktada **#SAYI/0!** verir ).
 - **Kabin alanı tablosu** mukavemet kitabının kendi tablosudur ve avandakinden
   **bilerek ayrıdır** — 320 kg satırı burada vardır, avanın Tablo-11'inde yoktur.
+- **Boş kabin ağırlığı ( P ) bir TAHMİNDİR — standardın sayısı değildir.**
+  TS EN 81-20 ve TS EN 81-50 P'yi geçtiği dokuz yerin hiçbirinde tablolamaz;
+  hep *"the mass of the empty car and components supported by the car"* diye
+  **girdi** olarak tanımlar. ISO 4190-1 aynı yük serisi için kabin
+  **ölçülerini** verir, kütle vermez. Program boş bırakılan alanı ofisin
+  kendi tablosundan doldurur ( `engine/ortak/ofis.py` ) ve paftaya kaynağını
+  *"OFİS TABLOSU"* diye basar. **Uygulama projesinde imalatçı verisiyle
+  değiştirilmelidir**:  P hatası iki yönde birden emniyetsizdir — 100 kg fark
+  ray kuvvetini, kuyu tabanı yükünü ve tampon kuvvetini %5–7 **artırır**
+  ( yani küçük almak emniyetsiz ), buna karşılık tahrik oranı T1/T2'yi %3
+  **düşürür** ( yani büyük almak tahriki olduğundan iyi gösterir ). Motor
+  gücü etkilenmez:  P, Gmax = F1 + Gs − Ga bağıntısında sadeleşir.
 - Uygulama projesi **tek asansör** içindir. Grup projesinde her asansör için
   ayrı koşturulup ayrı pafta alınır.
 - **Elektrik hesapları avan motorunun aynısıdır** ( `engine/avan/hesap.py` ) — avan
@@ -1137,8 +1186,11 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   ama seçilen kademe kablo kapasitesiyle ayrıca karşılaştırılmalıdır.
 - **Regülatörün ikinci kuvvet sınırı imalatçı verisi ister.** TS EN 81-20
   m.5.6.2.2.1.1 d) *"güvenlik tertibatını devreye sokmak için gerekenin iki
-  katı"* der; bu kuvvet tertibatın **tip inceleme belgesinden** gelir. Girilirse
-  denetlenir, girilmezse yalnız 300 N sınırı denetlenir ve pafta bunu yazar.
+  katı"* der; bu kuvvet tertibatın **tip inceleme belgesinden** gelir.
+  Girilmezse madde **denetlenemez**: bölüm *"HESAP EKSİK"* der ve proje
+  **uygundur çıkmaz**. Sınır, regülatörün ÜRETTİĞİ kuvvete uygulanır
+  ( `Fçekme = F′reg − Freg` ) — halattaki toplam gerginliğe değil; halatın
+  emniyet katsayısı ( ≥ 8 ) ise `F′reg`'e karşı hesaplanır ( m.5.6.2.2.1.3 b ).
 
 ---
 
@@ -1164,6 +1216,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 | Grup | İçindekiler |
 |---|---|
 | ① Makine ve motor | dişlisiz / dişli verimi, palanga düşüşü, Gs, q, halat payı, **kanal açıları γ ve β** |
+| — | Boş kabin kütlesi tablosu **ekrandan değiştirilmez** ( `engine/ortak/ofis.py` · `GK_TABLOSU` ) — iki proje de aynı tablodan okur |
 | ② **Mukavemet kabulleri** | **σem**, **k1** (kaymalı · makaralı · ani), yan yatak mesnet payı |
 | ③ Sığınma payları | kabin gövde yüksekliği, kabin üstü kotu, tavan / etek / ray altı payları |
 | ④ Aydınlatma | kabin · kuyu armatürleri, azami aralık, tablo sütunu |
@@ -1316,6 +1369,7 @@ AVAN HESAPLAMA PROGRAMI/
 | **Avanın elektrik motoru** | Uygulama projesindeki aydınlatma · kurulu güç · gerilim düşümü · topraklama, avanın `engine/avan/hesap.py`'sini **çağırır**. Kopyalanmaz — iki kopya zamanla ayrışır |
 
 | `engine/ortak/ofis.py` | **Fabrika ayarı** — iki projenin ofis standardı da buradan başlar. Ayrı ayrı değiştirilebilirler, ama sıfır noktaları ortaktır |
+| **Boş kabin kütlesi tablosu** ( `ofis.py` · `GK_TABLOSU` ) | Aynı asansör iki projede aynı kabin kütlesiyle hesaplansın. İki kopya tutulsaydı biri güncellenir, öteki unutulurdu |
 
 | Paylaşılmayan | Niçin |
 |---|---|

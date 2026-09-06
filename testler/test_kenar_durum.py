@@ -603,8 +603,27 @@ def calistir():
         _k = str(_adim["kaynak"])
         r.kontrol(f"{_ad} kaynağı MMO tablosuna atfedilmiyor",
                   not any(x in _k for x in ("Tablo-4", "Tablo-11", "s.21")), f"→ {_k!r}")
+    #  Kaynak metni hem OFİS tablosu olduğunu söylemeli hem de standart
+    #  sayısı OLMADIĞINI açıkça yazmalı:  TS EN 81-20 / 81-50 boş kabin
+    #  kütlesini hep GİRDİ olarak tanımlar, çizelge vermez.
     r.kontrol("Gk kaynağı ofis tablosu olduğunu söylüyor",
-              "fis" in T.GK_KAYNAGI and "dışı" in T.GK_KAYNAGI)
+              "TABLOSU" in T.GK_KAYNAGI.upper()
+              and "değildir" in T.GK_KAYNAGI
+              and T.GK_KAYNAGI.upper().startswith("OF"),
+              f"→ {T.GK_KAYNAGI!r}")
+    #  TABLO TEK KAYNAKTAN OKUNUR.  Avan ile uygulama aynı asansöre aynı
+    #  kabin kütlesini vermelidir;  iki kopya tutulsaydı biri güncellenip
+    #  öteki unutulurdu.
+    from engine.ortak import ofis as _OF
+    r.esit("Gk tablosu ortak dosyadan okunuyor",
+           [tuple(x) for x in T.TABLO_11], [tuple(x) for x in _OF.GK_TABLOSU])
+    for _q, _bek in ((450, 500), (630, 650), (800, 800), (1000, 950),
+                     (1125, 1020), (1275, 1100), (1600, 1350), (2000, 1600),
+                     (2500, 1900)):
+        r.esit(f"Gk( {_q} kg )", T.tablo11_Gk(_q), _bek)
+    r.esit("Gk ara değer  ( 700 kg )", T.tablo11_Gk(700), 710)
+    r.esit("Gk tablo altında uç değere sabitlenir", T.tablo11_Gk(225), 500)
+    r.esit("Gk tablo üstünde uç değere sabitlenir", T.tablo11_Gk(5000), 1900)
 
     #  v2.8 — ARMATÜR IŞIK AKISI TABLO-4'TEN GELİR VE KAYNAĞI PAFTADA YAZAR.
     #  Kuyu / makine dairesi varsayılanı eskiden kaynağı belirsiz 2600 lm idi

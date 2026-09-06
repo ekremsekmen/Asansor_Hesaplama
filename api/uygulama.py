@@ -105,6 +105,10 @@ def _mukavemet_girdi(veri: dict):
             _BELIRSIZ.append(f"{etiket} = {str(ham).strip()}")
         if secenekler is None:
             g[anahtar] = _sayi(ham) if tur == "sayi" else ham
+            # Boş kütle tablodan doldurulabilir; bozuk giriş boş sayılamaz.
+            if (anahtar == "kabin_agirligi" and g[anahtar] is None
+                    and ham is not None and str(ham).strip()):
+                g[anahtar] = ham
             continue
         #  Seçenek listesi:  önce birebir, sonra sayısal eşleşme aranır
         if ham in secenekler:

@@ -19,6 +19,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.avan import hesap as AV                          # noqa: E402
+from engine.avan import tablolar as AVT                      # noqa: E402
 from engine.uygulama import mukavemet as MK                     # noqa: E402
 from engine.uygulama import hesap as UY                      # noqa: E402
 from engine.uygulama import girdi as UG                # noqa: E402
@@ -260,7 +261,11 @@ def calistir():
               not (0 <= -1 <= 130), "→ karşılaştırma yalnız ≤ ile yapılıyor")
 
     #  ②  GENEL SONUÇ ENGELLEYİCİ UYARILARI SAYIYOR
-    _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280, motor_gucu=7.5)
+    #  "TEMİZ PROJE" için imalatçı kuvveti de gerekir:  TS EN 81-20
+    #  m.5.6.2.2.1.1 d)'nin ikinci sınırı onsuz DENETLENEMEZ ve bölüm
+    #  "HESAP EKSİK" der ( sapma ⑲ ).
+    _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280,
+                  motor_gucu=7.5, guvenlik_devreye_kuvvet=200)
     _t = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)))
     r.kontrol("② temiz proje uygun", _t["ozet"]["tumu_uygun"] is True)
     #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil
@@ -291,6 +296,19 @@ def calistir():
     r.kontrol("② eksik hesap ayrı listede",
               len(_ek["ozet"].get("eksik_hesap") or []) >= 1,
               f"→ {_ek['ozet'].get('eksik_hesap')}")
+    #  İMALATÇI KUVVETİ YOKSA REGÜLATÖR MADDESİ DENETLENEMEZ  →  EKSİK
+    _rg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)
+                                | {"guvenlik_devreye_kuvvet": None}))
+    r.kontrol("② imalatçı kuvveti yoksa proje uygun çıkmıyor",
+              _rg["ozet"]["tumu_uygun"] is False)
+    r.kontrol("② regülatör eksiği eksik_hesap listesinde",
+              any("devreye sokma" in x
+                  for x in (_rg["ozet"].get("eksik_hesap") or [])),
+              f"→ {_rg['ozet'].get('eksik_hesap')}")
+    r.kontrol("② eksik olan bölüm UYGUN DEĞİL değil, HESAP EKSİK diyor",
+              any("HESAP EKSİK" in (b.get("sonuc") or {}).get("metin", "")
+                  for b in _rg["bolumler"]))
+
     #  BİLGİLENDİRİCİ uyarı uygunluğu ENGELLEMEZ
     _bg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
                                      _ofis={"cosfi": 99})))
@@ -449,9 +467,43 @@ def calistir():
                   any("MAKİNE DAİRESİ" in a for a in _bolum_adlari(s)))
 
     #  Mukavemet girdisi geçersizse uygulama da durmalı
-    s = UY.hesapla({"kabin_agirligi": None})
+    #  ( kabin ağırlığı ARTIK boş bırakılabilir — ofis tablosundan dolar;
+    #    burada gerçekten geçersiz bir geometri kullanılıyor )
+    s = UY.hesapla({"yan_yatak_boyu": 0})
     r.kontrol("geçersiz mukavemet girdisi uygulamayı da durduruyor",
-              not s["aktif"])
+              not s["aktif"], f"→ {s.get('hata')}")
+
+    #  ------------------------------------------------------------------
+    #  BOŞ KABİN AĞIRLIĞI OFİS TABLOSUNDAN DOLAR  —  AVANLA AYNI TABLODAN
+    #  ------------------------------------------------------------------
+    #  Standartlarda böyle bir çizelge yoktur:  TS EN 81-20 / 81-50 boş kabin
+    #  kütlesini ( P ) hep GİRDİ olarak tanımlar.  Tablo ofisin kendi imalatçı
+    #  deneyimidir ve İKİ PROJE DE aynı yerden okur ( engine/ortak/ofis.py ) —
+    #  ayrı kopyalar tutulsaydı aynı asansör iki projede iki farklı kabin
+    #  kütlesiyle hesaplanırdı.
+    for _q in (450, 630, 800, 1000, 1125, 1275, 1600, 2000, 2500):
+        _u = MK.hesapla({"beyan_yuku": _q, "kabin_agirligi": None})
+        if not r.kontrol(f"[Gk] {_q} kg için hesap koşuyor", _u["aktif"],
+                         f"→ {_u.get('hata')}"):
+            continue
+        r.esit(f"[Gk] {_q} kg → uygulama = avan tablosu",
+               _u["girdi"]["kabin_agirligi"], float(AVT.tablo11_Gk(_q)))
+        #  Karşı ağırlık da onunla birlikte türer
+        r.esit(f"[Gk] {_q} kg → karşı ağırlık P + Q/2",
+               _u["girdi"]["karsi_agirlik"],
+               _u["girdi"]["kabin_agirligi"] + _q / 2.0)
+    #  Elle girilen değer HER ZAMAN önceliklidir
+    _el = MK.hesapla({"beyan_yuku": 1275, "kabin_agirligi": 1234})
+    r.esit("[Gk] elle girilen değer korunuyor",
+           _el["girdi"]["kabin_agirligi"], 1234)
+    #  Paftada kaynağı yazıyor:  tahmin mi, giriş mi
+    def _p_kaynagi(s):
+        b1 = [x for x in s["bolumler"] if x["baslik"].startswith("1 ")][0]
+        return next(a["kaynak"] for a in b1["adimlar"] if a.get("sembol") == "P")
+    r.esit("[Gk] elle girilende kaynak GİRİŞ", _p_kaynagi(_el), "GİRİŞ")
+    _tb = MK.hesapla({"beyan_yuku": 1275, "kabin_agirligi": None})
+    r.kontrol("[Gk] tablodan gelende kaynak ofis tablosu",
+              "OFİS TABLOSU" in _p_kaynagi(_tb), f"→ {_p_kaynagi(_tb)!r}")
 
     #  Mukavemet sonucu tek başına koşturulanla AYNI olmalı  ( kirlenme yok )
     tek = MK.hesapla(TAM)

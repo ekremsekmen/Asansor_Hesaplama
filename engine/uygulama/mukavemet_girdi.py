@@ -41,6 +41,13 @@ ALANLAR = (
     ("beyan_hizi",        "C61",  "Beyan hızı",                        "m/s",  "secim",
      _s(0.63, 0.8, 1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6), 1),
     ("seyir_mesafesi",    "C63",  "Seyir mesafesi",                    "m",    "sayi", None, 21),
+    #  BOŞ BIRAKILIRSA OFİS TABLOSUNDAN DOLAR  ( engine/ortak/ofis.py ).
+    #  Standartlarda böyle bir çizelge yoktur — TS EN 81-20 / 81-50 kabin
+    #  kütlesini ( P ) hep GİRDİ olarak tanımlar;  tablo ofisin kendi
+    #  imalatçı deneyimidir ve avan tarafında da aynı yerden okunur.
+    #  VARSAYILANI 700'DÜR:  kaynak kitabın örnek projesinin değeri ( C75 ) ve
+    #  bütün Excel karşılaştırma testlerinin dayanağı odur.  Beyan yükü
+    #  değiştirildiğinde arayüz alanı tablodan günceller.
     ("kabin_agirligi",    "C75",  "Kabin ağırlığı",                    "kg",   "sayi", None, 700),
     ("karsi_agirlik",     "C80",  "Karşı ağırlık",                     "kg",   "hesap", None, None),
     ("aski_orani",        "B100", "Askı oranı  ( 1 : n )",             "—",    "secim", _s(1, 2), 2),
@@ -209,6 +216,9 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
 #  hesap OverflowError ile çöküyordu.
 ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 
+#  kabin_agirligi BURADA DEĞİLDİR:  tamamla() onu ofis tablosundan doldurur
+#  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
+#  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
 OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
@@ -336,9 +346,32 @@ def tamamla(g):
                          yan ağırlıkta   elle girilen F109
     """
     g = dict(g)
-    ka, by = g.get("kabin_agirligi"), g.get("beyan_yuku")
+    #  BOŞ KABİN KÜTLESİ:  girilmemişse ofis tablosundan doldurulur.
+    #  Kaynak kitapta bu hücre ( C75 ) elle doldurulur;  program aynı tabloyu
+    #  avan tarafında da kullandığı için iki proje aynı asansöre aynı kütleyi
+    #  verir.  Elle girilen değer HER ZAMAN önceliklidir.
+    by = g.get("beyan_yuku")
+    if g.get("kabin_agirligi") is None or (
+            isinstance(g.get("kabin_agirligi"), str)
+            and not g["kabin_agirligi"].strip()):
+        g["kabin_agirligi"] = OFIS.bos_kabin_kutlesi(by)
+        g["kabin_agirligi_kaynak"] = OFIS.GK_KAYNAGI
+    else:
+        g["kabin_agirligi_kaynak"] = "GİRİŞ"
+    ka = g.get("kabin_agirligi")
+    #  KARŞI AĞIRLIK DENGE ORANI OFİS SABİTİDİR.
+    #  Kaynak kitabın C80 formülü "kabin ağırlığı + beyan yükü / 2" diye
+    #  ÇİVİLİDİR;  ofis q'yu değiştirse bile 0,50 kalır.  Oysa bölüm 1
+    #  Ga'yı  P + q·Q  ile kurar.  q = 0,60'ta aynı projede İKİ FARKLI karşı
+    #  ağırlık oluşuyordu:  motor ve ağırlık tamponu 1.180 kg, tahrik ve
+    #  ağırlık rayı 1.100 kg.  Aynı fiziksel parçanın kütlesi her hesapta
+    #  aynı olmalıdır.
+    q = (g.get("_ofis") or {}).get("q_denge")
+    if not _sayi(q):
+        from engine.uygulama import sabitler as _US
+        q = _US.VARSAYILAN["q_denge"]
     if _sayi(ka) and _sayi(by):
-        g["karsi_agirlik"] = ka + by / 2.0
+        g["karsi_agirlik"] = ka + q * by
     sm, sk, kd = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi"), g.get("kuyu_dibi")
     if _sayi(sm) and _sayi(sk) and _sayi(kd):
         g["kuyu_boyu"] = sm * 1000.0 + sk + kd
@@ -524,6 +557,62 @@ def dogrula(g):
             "yeteneğini olduğundan İYİ gösterir."
             + ("  ( Karşı ağırlık arkada:  halat arası KD − RK − ray-duvar'dan "
                "hesaplanır. )" if g.get("agirlik_yeri") == "Arka" else ""))
+
+    #  ------------------------------------------------------------------
+    #  SİSTEM VERİMİ  η′  FİZİKSEL OLMALI            0 < η′ ≤ 1
+    #  ------------------------------------------------------------------
+    #  Verim ile palanga kaybı AYRI AYRI kabul ediliyor ( ARALIK ikisini de
+    #  geçerli sayar ) ama ARALARINDAKİ İLİŞKİ denetlenmiyordu.  Palangalı
+    #  sistemde η′ = η − Δη;  η = 0,10 ve Δη = 0,10 seçilirse η′ = 0 çıkıp
+    #  N = Gmax·v/(η′·102) SIFIRA BÖLÜNÜYOR;  Δη = 0,20'de η′ = −0,10 olup
+    #  gereken güç −44,26 kW çıkıyor ve "Nsç ≥ N" her motoru geçiriyordu —
+    #  temiz bir projede genel sonuç "UYGUN" görünüyordu.
+    #  ( Avan motoru bu kalkanı zaten taşıyor;  uygulama tarafında yoktu. )
+    from engine.uygulama import sabitler as _USv
+    _O = _USv.sabitler(g.get("_ofis"))
+    _tip = g.get("makine_tipi")
+    _toplam = str(g.get("toplam_verim") or "").strip().lower() == "evet"
+    _etap = _USv.verim(_O, _tip, g.get("aski_orani"), toplam=_toplam)
+    if not (_sayi(_etap) and 0 < _etap <= 1):
+        _eta0 = _USv.verim(_O, _tip, 1)
+        hata.append(
+            f"Sistem verimi η′ = {_etap} fiziksel değil — 0 < η′ ≤ 1 olmalı. "
+            f"'{_tip}' makine verimi {_eta0}"
+            + ("" if _toplam else
+               f", palanga verim düşüşü {_O.get('palanga_verim_dususu')}")
+            + ". Sabitler sekmesinden düzeltin"
+            + ("" if _toplam else
+               "  ( ya da 'Ofis verimi η toplam sistem verimidir' kutusunu "
+               "işaretleyin — o zaman palanga düşüşü ikinci kez inmez )")
+            + ".")
+
+    #  ------------------------------------------------------------------
+    #  HALAT BOYU POZİTİF OLMALI  —  tampon / paten yığını kuyuya sığmalı
+    #  ------------------------------------------------------------------
+    #  lh = ( kuyu boyu − yığın ) / 1000 + pay.  Yığın kuyu boyunu aşarsa
+    #  halat boyu NEGATİF çıkıyor ( 30 m paten arasında −4,82 m ) ve halat
+    #  ağırlığı Gh = −5,13 kg oluyor.  Negatif ağırlık yükten DÜŞÜLÜYOR:
+    #  motor gücünü azaltıyor, halat güvenlik katsayısını yükseltiyor —
+    #  yani imkânsız bir geometri hesabı İYİLEŞTİRİYORDU.
+    _yigin_ad = ("agirlik_tampon_baba", "agirlik_carpma_arasi",
+                 "agirlik_tampon_ezilme", "agirlik_paten_arasi",
+                 "kabin_paten_arasi")
+    _y = {a: g.get(a) for a in _yigin_ad}
+    _kb = g.get("kuyu_boyu")
+    if _sayi(_kb) and all(_sayi(v) for v in _y.values()):
+        _yigin = (_y["agirlik_tampon_baba"] + _y["agirlik_carpma_arasi"]
+                  - _y["agirlik_tampon_ezilme"] + _y["agirlik_paten_arasi"]
+                  + _y["kabin_paten_arasi"])
+        if _kb - _yigin <= 0:
+            hata.append(
+                f"Tampon / paten yığını ({_yigin:g} mm) kuyu boyundan "
+                f"({_kb:g} mm) büyük — halat boyu negatif çıkar. "
+                "Toplama giren ölçüler:  ağırlık tampon babası "
+                f"{_y['agirlik_tampon_baba']:g} + ağırlık çarpma arası "
+                f"{_y['agirlik_carpma_arasi']:g} − ağırlık tampon ezilmesi "
+                f"{_y['agirlik_tampon_ezilme']:g} + ağırlık paten arası "
+                f"{_y['agirlik_paten_arasi']:g} + kabin paten arası "
+                f"{_y['kabin_paten_arasi']:g}.")
 
     #  ------------------------------------------------------------------
     #  REGÜLATÖR SÜRTÜNME KATSAYISI       TS EN 81-20 m.5.6.2.2.1.3 b)

@@ -1106,7 +1106,9 @@ def calistir():
               "Makine tipi" in _mm and "η′" in _mm, "→ verim satırları basılmamış")
 
     #  Hesap durduran girdide de GEÇERLİ belge çıkmalı, sebebi yazmalı
-    _mbos = PE.mukavemet_pdf(_MK.hesapla({"kabin_agirligi": None}), PROJE)
+    #  ( kabin ağırlığı ARTIK boş bırakılabilir — ofis tablosundan dolar;
+    #    burada gerçekten zorunlu bir alan boş bırakılıyor )
+    _mbos = PE.mukavemet_pdf(_MK.hesapla({"makine_agirligi": None}), PROJE)
     r.kontrol("hatalı girdide de PDF üretiliyor", len(_mbos) > 1000)
     r.kontrol("hatalı girdide PDF sebebi yazıyor",
               "boş bırakılamaz" in _metin(_mbos), f"→ {_metin(_mbos)[:120]!r}")
@@ -1339,12 +1341,12 @@ def calistir():
     _pk = _trn(_uy["ozet"]["P_kurulu"], 0)
     r.kontrol("uygulama PDF elektrik sayılarını taşıyor",
               _pk in _um, f"→ kurulu güç ({_pk} W) paftada yok")
-    _ubos = PE.uygulama_pdf(_UY.hesapla({"kabin_agirligi": None}), PROJE)
+    _ubos = PE.uygulama_pdf(_UY.hesapla({"makine_agirligi": None}), PROJE)
     r.kontrol("hatalı girdide uygulama PDF'i sebebini yazıyor",
               "boş bırakılamaz" in _metin(_ubos))
 
     #  Hesap durduran girdide DOSYA DEĞİL, açık hata dönmeli
-    _yh = _MM.indir_uygulama_xlsx({"girdiler": dict(_mg, kabin_agirligi=None)})
+    _yh = _MM.indir_uygulama_xlsx({"girdiler": dict(_mg, makine_agirligi=None)})
     r.kontrol("hatalı girdide XLSX yerine hata dönüyor",
               _yh.media_type != XLSX_TUR
               and "boş bırakılamaz" in _yh.body.decode("utf-8"),

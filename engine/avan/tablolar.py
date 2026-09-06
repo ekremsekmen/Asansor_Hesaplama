@@ -5,7 +5,7 @@ kaynaklı tablolar.  Değerler ASANSOR_TRAFIK_HESABI_v2_1.xlsx ve
 ASANSOR AVAN HESAPLARI.xlsx dosyalarındaki tablolarla BİREBİR aynıdır.
 """
 from engine.ortak import ofis as _OFIS
-from engine.ortak.steps import excel_round, sayi_mi
+from engine.ortak.steps import sayi_mi
 
 # ---------------------------------------------------------------- TABLO - 1
 # Binada sürekli bulunan insan sayısı katsayıları (MMO/697 s.13)
@@ -313,36 +313,27 @@ def ayd_verim(k, sutun=2):
 
 
 # --------------- ANMA YÜKÜNE GÖRE ORTALAMA BOŞ KABİN KÜTLESİ  ( ofis tablosu )
+#  TABLO ARTIK ORTAK DOSYADADIR  ( engine/ortak/ofis.py ):  uygulama projesi de
+#  boş kabin ağırlığını aynı tablodan doldurur.  İki kopya tutulsaydı biri
+#  güncellenip öteki unutulur, aynı asansör iki projede iki farklı kabin
+#  kütlesiyle hesaplanırdı.
+#
 #  DİKKAT:  Bu tablo MMO/697'nin Tablo-11'i DEĞİLDİR.  Kitabın Tablo-11'i
 #  "TS EN 81-20'ye göre kullanılabilir kabin alanı / beyan yükü" tablosudur
-#  ( ör. 450 kg → en fazla 1,84 m² ) ve boş kabin kütlesi vermez.
-#  Aşağıdaki Gk değerleri ofisin imalatçı deneyiminden gelir; paftada kaynağı
-#  da öyle yazılır.  ( Eskiden "Tablo-11" diye gösteriliyordu — yanlış atıf. )
-GK_TABLOSU = [(450, 500), (630, 650), (800, 800), (1000, 950), (1125, 1020),
-            (1275, 1100), (1600, 1350), (2000, 1600), (2500, 1900)]
-
+#  ve boş kabin kütlesi vermez.  Gk değerleri ofisin imalatçı deneyiminden
+#  gelir;  paftada kaynağı da öyle yazılır.  ( Eskiden "Tablo-11" diye
+#  gösteriliyordu — yanlış atıf. )
+GK_TABLOSU = [tuple(satir) for satir in _OFIS.GK_TABLOSU]
 
 #  Geriye dönük ad ( şablon denetimi ve testler bu adı kullanır )
 TABLO_11 = GK_TABLOSU
 
-GK_KAYNAGI = "Ofis tablosu — ortalama boş kabin kütlesi ( MMO/697 dışı )"
+GK_KAYNAGI = _OFIS.GK_KAYNAGI
 
 
 def tablo11_Gk(Q):
     """Ara yükler doğrusal enterpolasyonla; sonuç 10 kg'a yuvarlanır (Excel ROUND)."""
-    if Q is None:
-        return None
-    xs = [a for a, _ in GK_TABLOSU]
-    ys = [b for _, b in GK_TABLOSU]
-    if Q <= xs[0]:
-        return excel_round(ys[0], -1)
-    if Q >= xs[-1]:
-        return excel_round(ys[-1], -1)
-    for i in range(len(xs) - 1):
-        if xs[i] <= Q <= xs[i + 1]:
-            y = ys[i] + (Q - xs[i]) * (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
-            return excel_round(y, -1)
-    return None
+    return _OFIS.bos_kabin_kutlesi(Q) if sayi_mi(Q) else None
 
 
 # --------------- MMO/697 Tablo-11  ( = TS EN 81-20 )

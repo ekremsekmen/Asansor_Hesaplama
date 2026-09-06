@@ -259,6 +259,17 @@ function mTuretilenleriDoldur(){
 }
 
 /* ---- hesap ---- */
+/*  BOŞ KABİN AĞIRLIĞI BEYAN YÜKÜNÜ İZLER.
+    Beyan yükü değiştiğinde kabin ağırlığı ofis tablosundan yenilenir
+    ( engine/ortak/ofis.py — avan tarafının da okuduğu tablo ).  Avandaki
+    "trafik → kapasite" izlemesinin aynısıdır:  türetilen alan kaynağını
+    izler, elle girilen değer beyan yükü değişmediği sürece korunur.
+
+    TABLO TARAYICIDA TUTULMAZ.  Alan boş gönderilir, sunucu doldurur ve
+    dönen değer alana yazılır;  yoksa aynı tablonun ikinci bir kopyası
+    JS'de durur ve motorunkiyle ayrışırdı. */
+let MUK_GK_TAZELE = false;
+
 function mukavemetGirdi(){
   const g = {};
   for(const gr of MUK.gruplar) for(const f of gr.alanlar){
@@ -266,11 +277,13 @@ function mukavemetGirdi(){
     const e = $(M_ID(f.anahtar));
     if(e) g[f.anahtar] = (e.type === 'checkbox') ? e.checked : e.value;
   }
+  if(MUK_GK_TAZELE) g.kabin_agirligi = '';      // sunucu tablodan doldursun
   return g;
 }
 
 let mZaman = null;
-function mukavemetPlanla(){
+function mukavemetPlanla(hedef){
+  if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = true;
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);
@@ -286,6 +299,12 @@ async function hesapMukavemet(){
                             sabitler: ofisSabitleri()})})).json();
     if(sira !== ISTEK.mukavemet) return;      // daha yeni istek var
     SON.m = r;
+    if(MUK_GK_TAZELE){
+      MUK_GK_TAZELE = false;
+      const gk = $('m_kabin_agirligi');
+      const yeni = r.girdi && r.girdi.kabin_agirligi;
+      if(gk && yeni !== null && yeni !== undefined){ gk.value = mSayi(yeni); yaz(); }
+    }
     cizMukavemet(r);
     const hatali = !r.aktif;
     sekmeRozeti('mukavemet', hatali, hatali ? 0 : (r.uyarilar||[]).length);
