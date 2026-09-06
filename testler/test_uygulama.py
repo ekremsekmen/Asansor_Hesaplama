@@ -579,6 +579,25 @@ def calistir():
                   _bb.extmin.x <= _mrk.x <= _bb.extmax.x
                   and _bb.extmin.y <= _mrk.y <= _bb.extmax.y,
                   f"→ görünüm {_mrk}, çizim {_bb.extmin}-{_bb.extmax}")
+    # Geçersiz q: türetilen kütle ve bütün yük hesapları aynı değeri kullanır.
+    for q, beklenen in ((2, 1100), (-1, 1100), (0.6, 1180), (0.2, 860), (0.8, 1340)):
+        sonuc = MK.hesapla({"_ofis": {"q_denge": q}})
+        r.esit(f"denge {q}: türetilen kütle", sonuc["girdi"]["karsi_agirlik"], beklenen)
+        r.esit(f"denge {q}: motor kütlesi", sonuc["_h"]["AQ13"], beklenen)
+        r.kontrol(f"denge {q}: tampon yükü aynı kütleden",
+                  abs(sonuc["ozet"]["Fat"] - 4 * 9.81 * beklenen) < 1e-7)
+
+    from engine.ortak import ofis as _OF
+    otomatik = UY.hesapla({"kabin_agirligi": None})
+    p_satiri = next(a for a in otomatik["bolumler"][0]["adimlar"] if a.get("sembol") == "P")
+    r.esit("otomatik kabin kütlesi hesap satırında kaynak korur",
+           p_satiri["kaynak"], _OF.GK_KAYNAGI)
+    tekrar = UG.tamamla(otomatik["girdi"])
+    r.esit("tekrar tamamlamada kaynak korunur", tekrar["kabin_agirligi_kaynak"], _OF.GK_KAYNAGI)
+    tekrar["kabin_agirligi"] = 777
+    r.esit("elle değiştirilmiş kütle giriş olarak işaretlenir",
+           UG.tamamla(tekrar)["kabin_agirligi_kaynak"], "GİRİŞ")
+
     return r
 
 

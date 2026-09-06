@@ -245,7 +245,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 22)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 23)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -969,6 +969,64 @@ def _denetim_bulgulari(r):
                   _d2x["_h"].get("AQ23") is None, f"→ {_d2x['_h'].get('AQ23')!r}")
     finally:
         MK.MG.dogrula = _dog2
+
+    #  ══════════════════════════════════════════════════════════════
+    #  BEŞİNCİ TUR  —  SAPTIRMA KASNAĞI
+    #  ══════════════════════════════════════════════════════════════
+    #  ── E1  Dp / dh ≥ 40 denetlenmiyordu  ( TS EN 81-20 m.5.5.2.1 )
+    #  Madde oranı "kasnak, makara ve tamburlar" için ister;  kitap yalnız
+    #  TAHRİK kasnağını sınıyordu.  Dt/dh = 400/8 = 50 ama Dp/dh = 240/8 = 30
+    #  olan tesiste halat bölümü UYGUN çıkıyordu.
+    _e_g = {"halat_capi": 8, "tahrik_kasnak_capi": 400, "saptirma_kasnak_capi": 240}
+
+    def _b4(**ek):
+        _s = MK.hesapla(dict(_e_g, **ek))
+        if not _s["aktif"]:
+            return None, _s
+        return [x for x in _s["bolumler"] if x["baslik"].startswith("4 ")][0], _s
+
+    _e1b, _e1s = _b4()
+    r.kontrol("E1  denetimin girdisi hesaplanabiliyor", _e1b is not None,
+              f"→ {_e1s.get('hata')}")
+    r.kontrol("E1  Dp/dh = 30 halat bölümünü DÜŞÜRÜYOR",
+              _e1b["sonuc"]["uygun"] is False)
+    r.kontrol("E1  gerekçe saptırma kasnağını adıyla söylüyor",
+              "saptırma kasnağı" in _e1b["sonuc"]["metin"],
+              f"→ {_e1b['sonuc']['metin']!r}")
+    r.kontrol("E1  bölüm başlığı Dp/dh ölçütünü duyuruyor",
+              "Dp/dh" in _e1b["sonuc"]["baslik"], f"→ {_e1b['sonuc']['baslik']!r}")
+    _dpsat = [a for a in _e1b["adimlar"]
+              if "Dp / dh" in str(a.get("aciklama") or "")]
+    r.kontrol("E1  paftada Dp/dh kontrol satırı var", bool(_dpsat),
+              f"→ {[a.get('aciklama') for a in _e1b['adimlar']][:6]}")
+    r.kontrol("E1  o satır UYGUN DEĞİL diyor",
+              bool(_dpsat) and _dpsat[0]["deger"] == "UYGUN DEĞİL",
+              f"→ {_dpsat[0]['deger'] if _dpsat else None!r}")
+    #  SINIR:  tam 40 geçer, 1 mm altı geçmez  ( dh = 8 → Dp = 320 )
+    r.kontrol("E1  Dp/dh = 40 tam sınırı kabul ediliyor",
+              _b4(saptirma_kasnak_capi=320)[0]["sonuc"]["uygun"] is True)
+    r.kontrol("E1  sınırın 1 mm altı reddediliyor",
+              _b4(saptirma_kasnak_capi=319)[0]["sonuc"]["uygun"] is False)
+    #  Tahrik kasnağı denetimi bozulmadı
+    r.kontrol("E1  tahrik kasnağı denetimi yerinde duruyor",
+              _b4(tahrik_kasnak_capi=240, saptirma_kasnak_capi=320)[0]
+              ["sonuc"]["uygun"] is False)
+    #  KASNAK YOKSA denetlenecek kasnak da yoktur
+    _e1y = _b4(kasnak_tek_yon=0, kasnak_ters_yon=0)[0]
+    r.kontrol("E1  kasnak yokken Dp oranı aranmıyor",
+              _e1y["sonuc"]["uygun"] is True and "Dp/dh" not in _e1y["sonuc"]["baslik"],
+              f"→ {_e1y['sonuc']['baslik']!r}")
+    r.kontrol("E1  kasnak yokken pafta bunu YAZIYOR",
+              any("kasnak yok" in str(a.get("deger") or "") for a in _e1y["adimlar"]),
+              f"→ {[a.get('deger') for a in _e1y['adimlar']][:4]}")
+    #  Varsayılan proje bu yüzden düşmemeli  ( Dt = Dp = 240, dh = 10 → 24 )
+    _v = MK.hesapla({})
+    _vb4 = [x for x in _v["bolumler"] if x["baslik"].startswith("4 ")][0]
+    r.kontrol("E1  varsayılan projede iki oran da AYNI sonucu veriyor",
+              ("Dt/dh" in _vb4["sonuc"]["baslik"]) and ("Dp/dh" in _vb4["sonuc"]["baslik"]))
+    #  Sapma kaydı bu bulguyu taşıyor
+    r.kontrol("E1  sapma kaydında yazılı",
+              any("Saptırma kasnağı" in ad for ad, *_ in MK.EXCEL_FARKLARI))
     return r
 
 

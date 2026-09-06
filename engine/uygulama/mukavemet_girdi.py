@@ -356,7 +356,10 @@ def tamamla(g):
             and not g["kabin_agirligi"].strip()):
         g["kabin_agirligi"] = OFIS.bos_kabin_kutlesi(by)
         g["kabin_agirligi_kaynak"] = OFIS.GK_KAYNAGI
-    else:
+    elif not (g.get("kabin_agirligi_kaynak") == OFIS.GK_KAYNAGI
+              and g.get("kabin_agirligi") == OFIS.bos_kabin_kutlesi(by)):
+        # Tekrar tamamlanırken otomatik değerin kaynağını koru.
+        # Kütle değiştirilmişse artık elle girilen değerdir.
         g["kabin_agirligi_kaynak"] = "GİRİŞ"
     ka = g.get("kabin_agirligi")
     #  KARŞI AĞIRLIK DENGE ORANI OFİS SABİTİDİR.
@@ -366,10 +369,10 @@ def tamamla(g):
     #  ağırlık oluşuyordu:  motor ve ağırlık tamponu 1.180 kg, tahrik ve
     #  ağırlık rayı 1.100 kg.  Aynı fiziksel parçanın kütlesi her hesapta
     #  aynı olmalıdır.
-    q = (g.get("_ofis") or {}).get("q_denge")
-    if not _sayi(q):
-        from engine.uygulama import sabitler as _US
-        q = _US.VARSAYILAN["q_denge"]
+    from engine.uygulama import sabitler as _US
+    # Motor, tahrik ve tampon aynı doğrulanmış denge oranını kullanmalı.
+    # Ham sözlüğü koru: reddedilen girdiler uyarılarda gösterilmeye devam eder.
+    q = _US.sabitler(g.get("_ofis"))["q_denge"]
     if _sayi(ka) and _sayi(by):
         g["karsi_agirlik"] = ka + q * by
     sm, sk, kd = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi"), g.get("kuyu_dibi")

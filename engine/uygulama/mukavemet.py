@@ -50,6 +50,20 @@ EXCEL_FARKLARI = (
      "m.5.5.6.2 c) dengeleme gergi kasnağı ve m.5.6.2.2.1.3 regülatör eşiğidir.",
      "Standardın istediği 40 uygulanır.",
      ()),
+    ("Saptırma kasnağı / halat oranı denetlenmiyordu",
+     "TS EN 81-20 m.5.5.2.1",
+     "Yalnız TAHRİK kasnağını sınar.  Saptırma kasnağının çapı ( D2 ) hesaba "
+     "sadece Kp = (Dt/Dp)⁴ olarak girer;  kendi oranına hiç bakılmaz.  "
+     "Dt/dh = 400/8 = 50 ama Dp/dh = 240/8 = 30 olan bir tesiste halat "
+     "bölümü de genel sonuç da UYGUN çıkıyordu.",
+     "m.5.5.2.1 oranı 'kasnak, makara ve tamburlar' için ister — tahrik "
+     "kasnağına özel değildir.  Saptırma kasnağı bulunan projelerde "
+     "Dp / dh ≥ 40 da denetlenir;  kasnak yoksa ( Nps = Npr = 0 ) denetlenecek "
+     "bir kasnak da yoktur.\n"
+     "        Dp girdisi kasnakların ORTALAMA çapıdır, denetim de ortalamaya "
+     "uygulanır:  çapları birbirinden farklı bir düzende en küçük kasnak "
+     "ayrıca gözden geçirilmelidir.",
+     ()),
     ("Karşı ağırlık rayında Fy'nin mukavemet momenti",
      "TS EN 81-50 Ek C.2.2.1",
      "Fy'den gelen gerilme için Wy'ye böler.",
@@ -781,6 +795,15 @@ def _aski_halatlari(g, o):
     oran_uygun = oran >= S["Dt_dh_asgari"]
 
     Nps, Npr = g["kasnak_tek_yon"], g["kasnak_ters_yon"]
+    #  SAPTIRMA KASNAĞI DA m.5.5.2.1 KAPSAMINDADIR.
+    #  Madde oranı "kasnak, makara ve tamburlar" için ister;  tahrik kasnağına
+    #  özel değildir.  Kitap yalnız Dt'yi sınıyordu:  Dp hesaba SADECE
+    #  Kp = (Dt/Dp)⁴ olarak giriyor, kendi oranı hiç bakılmıyordu — Dt/dh = 50
+    #  ama Dp/dh = 30 olan bir tesis "UYGUN" çıkıyordu.
+    #  Kasnak yoksa ( Nps = Npr = 0 ) ortada denetlenecek kasnak da yoktur.
+    kasnak_var = (Nps or 0) + (Npr or 0) > 0
+    oran_p = Dp / dh
+    oran_p_uygun = (not kasnak_var) or oran_p >= S["Dt_dh_asgari"]
     #  Nequiv(t) OFİS AÇILARINDAN HESAPLANIR  ( EN 81-50 Çizelge 2 ).
     #  Kitap bunu kanalın ADINA bağlı sabit bir tablodan okuyordu:  ofis
     #  sabiti γ = 45° yapılsa bile Nequiv(t) 12 kalıyor, pafta γ = 38° yazmayı
@@ -815,6 +838,13 @@ def _aski_halatlari(g, o):
         metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
         kontrol(f"Dt / dh = {tr(oran)}  ≥  {S['Dt_dh_asgari']}", oran_uygun),
+    ] + ([
+        hesap("Dp / dh", f"{trn(Dp, 0)} / {tr(dh)}", oran_p, ""),
+        kontrol(f"Dp / dh = {tr(oran_p)}  ≥  {S['Dt_dh_asgari']}", oran_p_uygun),
+    ] if kasnak_var else [
+        metin("Tahrik kasnağı dışında kasnak yok  ( Nps = Npr = 0 ) — "
+              "saptırma kasnağı oranı denetlenmedi."),
+    ]) + [
         metin("Halat güvenlik katsayısının hesaplanması :"),
         veri("", "Kanal tipi", sekil),
         veri("γ", "Kanal açısı  ( hesapta kullanılan )", gama, "°",
@@ -854,19 +884,32 @@ def _aski_halatlari(g, o):
               Sger, ""),
         kontrol(f"S = {tr(Sger)}  ≥  max( Sf ; Smin ) = {tr(sinir)}", s_uygun),
     ]
-    b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {trn(S['Dt_dh_asgari'], 0)}"
-                             "   ·   S ≥ max( Sf ; Smin )"),
-                  "metin": "UYGUNDUR." if (oran_uygun and s_uygun)
+    _esik = trn(S["Dt_dh_asgari"], 0)
+    b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {_esik}"
+                             + (f"   ·   Dp/dh ≥ {_esik}" if kasnak_var else "")
+                             + "   ·   S ≥ max( Sf ; Smin )"),
+                  "metin": "UYGUNDUR." if (oran_uygun and oran_p_uygun and s_uygun)
                            else ("UYGUN DEĞİLDİR — "
                                  + " ve ".join(
                                      ([f"tahrik kasnağı çapını büyütün ya da halat çapını "
                                        f"küçültün ( Dt/dh = {tr(oran)} )"]
                                       if not oran_uygun else [])
+                                     + ([f"saptırma kasnağı çapını büyütün ya da halat "
+                                         f"çapını küçültün ( Dp/dh = {tr(oran_p)} )"]
+                                        if not oran_p_uygun else [])
                                      + (["halat çapını / adedini artırın"]
                                         if not s_uygun else []))),
-                  "uygun": bool(oran_uygun and s_uygun)}
+                  "uygun": bool(oran_uygun and oran_p_uygun and s_uygun)}
+    b["notlar"] = []
+    if kasnak_var:
+        b["notlar"].append(
+            "▪ Dp, tahrik kasnağı DIŞINDAKİ kasnakların ORTALAMA çapıdır; "
+            f"Dp / dh ≥ {trn(S['Dt_dh_asgari'], 0)} denetimi de ortalamaya "
+            "uygulanır ( TS EN 81-20 m.5.5.2.1 ). Çapları birbirinden farklı "
+            "bir askı düzeninde EN KÜÇÜK kasnağı ayrıca denetleyin — ortalama "
+            "sınırı geçse de tek bir kasnak geçemiyor olabilir.")
     if r > 1 and Nps < 2:
-        b["notlar"] = [
+        b["notlar"] += [
             "⚠ Palangalı ( 1:" + trn(r, 0) + " ) sistemde halatın en olumsuz "
             "kesiti genelde tahrik kasnağı + EN AZ İKİ kabin kasnağı üzerinden "
             "geçer ( EN 81-50 Ek E ). Tek yönde bükülmeli kasnak sayısı "

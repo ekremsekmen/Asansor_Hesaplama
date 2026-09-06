@@ -468,21 +468,21 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**23.711 kontrolün tamamı geçmiştir.**
+**23.744 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **790 / 790** |
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **438 / 438** |
+| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **439 / 439** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **370 / 370** |
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.537 / 4.537** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ve varsayılan açılarda kitapla birebir tutar | **951 / 951** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **yirmi iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü denetimin her bulgusu yeniden üretilerek** + girdi reddi | **470 / 470** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **yirmi üç sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı denetimin her bulgusu yeniden üretilerek** + girdi reddi | **484 / 484** |
 | **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır | **9.354 / 9.354** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **224 / 224** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **242 / 242** |
 
 ### Test 1 neden güçlü bir kanıt?
 
@@ -502,11 +502,12 @@ sistemler ve topraklama varyasyonları.
 
 Testlerin geçmesi hataları dışlamaz. Aşağıdakiler **testlerin yakalamadığı**,
 ayrı denetimlerde bulunup yeniden üretilen hatalardır; her biri artık kendi
-regresyon kontrolüyle korunuyor. Beş tur yapıldı: birincisi programın
+regresyon kontrolüyle korunuyor. Altı tur yapıldı: birincisi programın
 **davranışını** ( girdi–çıktı, dosya akışı, uyarılar ), ikincisi doğrudan
 **hesap motorlarını** standardın metnine karşı, üçüncüsü **sayısal fiziği**,
-dördüncüsü **sınır durumlarını**, beşincisi de **teslim edilen çizimin
-AutoCAD'de açıldığını** denetledi.
+dördüncüsü **sınır durumlarını**, beşincisi **teslim edilen çizimin
+AutoCAD'de açıldığını**, altıncısı da yeniden **hesabın eksik kalan
+kontrollerini** denetledi.
 
 #### Birinci denetim — davranış ve dosya akışı
 
@@ -632,6 +633,18 @@ paftada gerçekten geçtiği ( ölçüt boş kalmasın ), sınırların hesaplan
 görünümün çizimin üstünde olduğu. Düzeltilmiş çizim, aynı kaynak paftalardan
 yeniden üretilip **AutoCAD 2027'de açılarak** doğrulandı.
 
+#### Altıncı denetim — saptırma kasnağı denetlenmiyordu
+
+| Bulgu | Etkisi ve düzeltme |
+|---|---|
+| **Saptırma kasnağının halata göre çapı hiç sınanmıyordu.** Program yalnız tahrik kasnağını denetliyordu | Halat Ø8 · tahrik kasnağı Ø400 · saptırma kasnağı Ø240 girildiğinde `Dt/dh = 50` geçiyor, ama `Dp/dh = **30**` olmasına rağmen halat bölümü **UYGUN** çıkıyordu. TS EN 81-20 **m.5.5.2.1** oranı *"kasnak, makara ve tamburlar"* için ister — tahrik kasnağına özel değildir. Saptırma kasnağı bulunan projelerde artık `Dp / dh ≥ 40` da denetleniyor; kasnak yoksa ( `Nps = Npr = 0` ) pafta bunu ayrıca yazıyor. `Dp` girdisi kasnakların **ortalama** çapı olduğu için denetim ortalamaya uygulanır — çapları farklı bir düzende **en küçük kasnak ayrıca gözden geçirilmelidir**, pafta bunu da söyler |
+
+Bulguyla birlikte gelen "üreticinin TÜV belgesi küçük oranları özel şartlarla
+gerekçelendiriyor" savı **uygulanmadı**: EN 81-20 m.5.5.2.1'in metninde böyle
+bir istisna yoktur, program da standardın düz metnini uygular. Bir imalatçı
+belgesine dayanarak oranı düşürmek proje müellifinin kendi kararıdır ve
+gerekçesi projede ayrıca belgelenmelidir.
+
 ### Test yazılırken bulunan ve düzeltilen hatalar
 
 | Bulgu | Etkisi |
@@ -663,7 +676,7 @@ Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
 Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
 gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **yirmi iki** noktada kitap standarttan ( yalnız verim,
+noktasıdır. Aşağıdaki **yirmi üç** noktada kitap standarttan ( yalnız verim,
 moment ve denge oranı maddelerinde ofisin kendi kabulünden ) sapıyor — program
 standardı uyguluyor. Liste kodda tek yerde durur
 ( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
@@ -671,6 +684,7 @@ standardı uyguluyor. Liste kodda tek yerde durur
 | # | Konu | Standart | Kitabın yaptığı | Programın yaptığı |
 |---|---|---|---|---|
 | ① | Tahrik kasnağı / halat oranı | **EN 81-20 m.5.5.2.1** — en az **40** | Başlığı "≥ 40" yazar, kontrolü **30** ile yapar | 40 uygulanır |
+| ㉓ | **Saptırma kasnağı / halat oranı** | **EN 81-20 m.5.5.2.1** — oran *kasnak, makara ve tamburlar* için en az **40** | Yalnız **tahrik** kasnağını sınar; D2 hesaba sadece `Kp = (Dt/Dp)⁴` olarak girer | Saptırma kasnağı varsa `Dp / dh ≥ 40` de denetlenir |
 | ② | Karşı ağırlık rayı σ(My) | **EN 81-50 Ek C.2.1.1** — Fy → Mx → **Wx** | Wy'ye böler | Wx'e bölünür |
 | ③ | Durum 2'de xQ | **EN 81-50 Ek C.2.1.1** | Sabit **0** yazar ( başlığı "xQ = xc" dese de ) | xQ = xc |
 | ④ | Flanş eğilmesinde ℓ | **EN 81-50 m.5.10.5** — ℓ = paten balatası **uzunluğu** | Paydaya **1** yazar ( ℓ harfi 1 rakamı okunmuş ) | ℓ girdi; boşsa 2·b'den türetilir |
@@ -1126,7 +1140,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ### Uygulama projesi — mukavemet
 
-- **Kaynak kitaptan ayrılan yirmi iki nokta** 6. bölümdeki tabloda sayılıdır; her
+- **Kaynak kitaptan ayrılan yirmi üç nokta** 6. bölümdeki tabloda sayılıdır; her
   biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
   birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.
