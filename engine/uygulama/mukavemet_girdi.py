@@ -503,6 +503,28 @@ def dogrula(g):
             hata.append(f"{ALAN[anahtar][2]}: {alt}° ile {ust}° arasında "
                         f"olmalıdır ( {d} girildi ).")
 
+    #  OPSİYONEL ALANLARIN POZİTİFLİK VE FİZİKSEL SINIRLARI
+    #  Boş bırakılabilirler;  ama girilmişse pozitif ve fiziksel olmalıdır.
+    #  paten_balata_boyu = 0 girildiğinde motor bunu sessizce türetilene
+    #  çeviriyor, 0,001 mm girildiğinde ise formül paydası pozitif kaldığı
+    #  için mikroskobik balatayla "UYGUN" çıkıyordu.
+    #  ( 20 mm alt sınırı standart maddesi değil;  yazılımsal koruma, sınır
+    #  değer kontrolü / sanitization ve fiziksel tutarlılık kalkanıdır. )
+    pbb = g.get("paten_balata_boyu")
+    if pbb is not None and pbb != "":
+        if not _sayi(pbb) or pbb <= 0:
+            hata.append(f"{ALAN['paten_balata_boyu'][2]}: sıfırdan büyük olmalıdır ( {pbb!r} girildi ).")
+        elif pbb < 20:
+            hata.append(f"Paten balatası uzunluğu ({pbb:g} mm) fiziksel değil — balata boyu en az 20 mm olmalıdır.")
+        else:
+            kpa = g.get("kabin_paten_arasi")
+            if _sayi(kpa) and pbb >= kpa:
+                hata.append(f"Paten balatası uzunluğu ({pbb:g} mm) kabin patenler arası mesafeden ({kpa:g} mm) küçük olmalıdır.")
+    gdk = g.get("guvenlik_devreye_kuvvet")
+    if gdk is not None and gdk != "":
+        if not _sayi(gdk) or gdk <= 0:
+            hata.append(f"{ALAN['guvenlik_devreye_kuvvet'][2]}: sıfırdan büyük olmalıdır ( {gdk!r} girildi ).")
+
     #  MAKİNE KAİDESİ GEOMETRİSİ.  Bölüm 2 basit kiriş modelidir:  açıklığı L
     #  olan kirişte tekil yük, A mesnedinden X = L − mesnet payı uzaklıktadır.
     #  Model 0 < X < L gerektirir.  L mesnet payından küçükse X NEGATİF çıkar;

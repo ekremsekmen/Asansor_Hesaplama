@@ -1705,7 +1705,11 @@ def _kabin_raylari(g, o):
              "EN 81-20 m.5.7.3.1", 0),
         veri("δperm", "İzin verilen en büyük eğilme miktarı", dperm, "mm",
              "EN 81-20 m.5.7.4.6", 0),
-        veri("ℓ", "Paten balatasının uzunluğu", balata, "mm", balata_kaynak, 0),
+        veri("ℓ", "Paten balatasının uzunluğu",
+             "—" if makarali else balata,
+             "" if makarali else "mm",
+             "Makaralı paten  ( EN 81-50 m.5.10.5 makara formülü geçerlidir )"
+             if makarali else balata_kaynak, 0),
         hesap(f"Durum 1 :  xQ = xc {'+' if xQ1 >= xc else '−'} D / 8",
               f"{tr(xc)} {'+' if xQ1 >= xc else '−'} {trn(D, 0)} / 8", xQ1, "mm",
               "EN 81-20 m.5.7.2.3.4  ·  yük en olumsuz konumda"),
@@ -1936,6 +1940,15 @@ def _agirlik_raylari(g, o):
     k2, k3 = S["k2"], O["k3_yardimci"]
     Fp = g["klips_itme_kuvveti"] or 0.0
     dstr_x, dstr_y = g["yapi_sehim_x"] or 0.0, g["yapi_sehim_y"] or 0.0
+    #  YAN AĞIRLIKTA BİNA SEHİM EKSENLERİ RAYA GÖRE DÖNER.
+    #  Kabin rayları kuyu yan duvarındadır ( ray x'i genişlik, y'si derinlik ).
+    #  Karşı ağırlık yanda ( Sağ / Sol ) olduğunda raylar 90° dönük monte edilir:
+    #  binanın X sehimi ağırlık rayının Y eksenine ( sırtına ), Y sehimi ise
+    #  rayın X eksenine ( flanşına ) etki eder.  Arka ağırlıkta eksenler paraleldir.
+    if g.get("agirlik_yeri") in ("Sağ", "Sol"):
+        dstr_ray_x, dstr_ray_y = dstr_y, dstr_x
+    else:
+        dstr_ray_x, dstr_ray_y = dstr_x, dstr_y
     makarali = g["paten_tipi"] == "Makaralı"
     prof = g["agirlik_ray_profili"]
     p = _ray_ozellik(prof)
@@ -1944,7 +1957,13 @@ def _agirlik_raylari(g, o):
     Mcwt = g["karsi_agirlik"]
     MY = S["MY_agirlik"]
     sperm = MT.sigma_perm_normal(g["ray_celigi_rm"])
-    dperm = S["dperm_agirlik"]
+
+    gt = g.get("agirlik_guvenlik_tertibati") or "Yok"
+    gt_var = gt != "Yok"
+    #  TS EN 81-20 m.5.7.4.6:  İzin verilen azami sehim ( δperm )
+    #  a) Güv. tertibatlı kabin ve GÜV. TERTİBATLI KARŞI AĞIRLIK raylarında: 5 mm
+    #  b) Güv. tertibatsız karşı ağırlık raylarında: 10 mm
+    dperm = S["dperm_kabin"] if gt_var else S["dperm_agirlik"]
 
     derinlik = MT.agirlik_derinlik(g["agirlik_malzemesi"])
     genislik = MT.agirlik_genisligi(g["agirlik_ray_arasi"])
@@ -1968,8 +1987,8 @@ def _agirlik_raylari(g, o):
     sc = sv + sm
     balata, balata_kaynak = _balata_boyu(g, p)
     sf = abs(_flans(Fx, p, balata, makarali))
-    dx = abs(_sehim(Fx, l, p["Iy"])) + dstr_x
-    dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_y
+    dx = abs(_sehim(Fx, l, p["Iy"])) + dstr_ray_x
+    dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_ray_y
     kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm]
 
     #  ------------------------------------------------------------------
@@ -1980,8 +1999,6 @@ def _agirlik_raylari(g, o):
     #  C.2.2'ye ( normal işletme, k3 ) göre kuruyordu;  k1 hiç girmiyordu.
     #  Tertibat varsa rayın asıl belirleyici yük durumu odur:  k1 = 2 … 5,
     #  yani ray kuvvetleri iki ila dört kat büyür.
-    gt = g.get("agirlik_guvenlik_tertibati") or "Yok"
-    gt_var = gt != "Yok"
     kg = None
     if gt_var:
         k1a = US.darbe_k1(o["ofis"], gt)
@@ -1996,8 +2013,8 @@ def _agirlik_raylari(g, o):
         skg = ((Fkg + k3 * MY) * omega_a / p["A"]) if omega_a else None
         scg = (skg + S["birlesik_katsayi"] * smg) if skg is not None else None
         sfg = abs(_flans(Fxg, p, balata, makarali))
-        dxg = abs(_sehim(Fxg, l, p["Iy"])) + dstr_x
-        dyg = abs(_sehim(Fyg, l, p["Ix"])) + dstr_y
+        dxg = abs(_sehim(Fxg, l, p["Iy"])) + dstr_ray_x
+        dyg = abs(_sehim(Fyg, l, p["Ix"])) + dstr_ray_y
         #  Bölüm 9 bunu okur:  kuyu tabanına bildirilen yükte güvenlik
         #  tertibatı tepkisi AYRI bir kalemdir ( EN 81-20 m.5.2.1.8.4 ).
         o["Fk_agirlik"] = Fkg
@@ -2031,7 +2048,11 @@ def _agirlik_raylari(g, o):
         veri("xsa", "Askı noktasının x mesafesi", xsa, "mm"),
         veri("ysa", "Askı noktasının y mesafesi", ysa, "mm"),
         veri("MY", "Raylara bağlı yardımcı donanım", MY, "N", "Ofis kabulü", 0),
-        veri("ℓ", "Paten balatasının uzunluğu", balata, "mm", balata_kaynak, 0),
+        veri("ℓ", "Paten balatasının uzunluğu",
+             "—" if makarali else balata,
+             "" if makarali else "mm",
+             "Makaralı paten  ( EN 81-50 m.5.10.5 makara formülü geçerlidir )"
+             if makarali else balata_kaynak, 0),
         hesap("Mg = ray boyu × Gr",
               f"{tr(o['ray_boyu'])} m × {tr(MT.ray(prof, 'Gr'))} kg/m", Mg, "kg"),
         metin("Eğilme gerilmesi  ( TS EN 81-50 m.C.2.2 ) :", vurgu=True),
@@ -2049,7 +2070,8 @@ def _agirlik_raylari(g, o):
               "N·mm", ondalik=0),
         hesap("σx = Mx / Wx", f"{trn(My, 0)} / {trn(p['Wx'], 0)}", sy, "N/mm²"),
         metin("Burkulma :"),
-        hesap("Fv = Mg × gn", f"{tr(Mg)} × {tr(gn)}", Fv, "N"),
+        hesap("Fv = Mg × gn + Fp" if Fp else "Fv = Mg × gn",
+              f"{tr(Mg)} × {tr(gn)}" + (f" + {tr(Fp)}" if Fp else ""), Fv, "N"),
         hesap("σv = ( Fv + k3 × MY ) / A",
               f"( {tr(Fv)} + {tr(k3)} × {trn(MY, 0)} ) / {trn(p['A'], 0)}", sv, "N/mm²"),
         metin("Birleşik gerilme :"),
@@ -2058,15 +2080,22 @@ def _agirlik_raylari(g, o):
         hesap("σc = σv + σm", f"{tr(sv)} + {tr(sm)}", sc, "N/mm²"),
         kontrol(f"σc = {tr(sc)}  ≤  σperm = {trn(sperm, 0)} N/mm²", sc <= sperm),
         metin("Flanş eğilmesi :"),
-        hesap("σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-              f"Fx = {tr(Fx)} N", sf, "N/mm²"),
+        hesap("σF = 1,85 × | Fx | / c²" if makarali else
+              "σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+              (f"1,85 × {tr(Fx)} / {tr(p['c'] ** 2)}" if makarali else
+               f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
+               f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
+              sf, "N/mm²",
+              f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"),
         kontrol(f"σF = {tr(sf)}  ≤  σperm = {trn(sperm, 0)} N/mm²", sf <= sperm),
         metin("Sehim miktarları :"),
-        hesap("δx = 0,7 × l³ × Fx / ( 48 × E × Iy )",
-              f"Iy = {trn(p['Iy'], 0)} mm⁴", dx, "mm"),
+        hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |" + (" + δstr-x" if dstr_ray_x else ""),
+              f"l = {trn(l, 0)} mm ,  Iy = {trn(p['Iy'], 0)} mm⁴"
+              + (f" ,  δstr = {tr(dstr_ray_x)} mm" if dstr_ray_x else ""), dx, "mm"),
         kontrol(f"δx = {tr(dx)}  ≤  δperm = {trn(dperm, 0)} mm", dx <= dperm),
-        hesap("δy = 0,7 × l³ × Fy / ( 48 × E × Ix )",
-              f"Ix = {trn(p['Ix'], 0)} mm⁴", dy, "mm"),
+        hesap("δy = | 0,7 × l³ × Fy / ( 48 × E × Ix ) |" + (" + δstr-y" if dstr_ray_y else ""),
+              f"l = {trn(l, 0)} mm ,  Ix = {trn(p['Ix'], 0)} mm⁴"
+              + (f" ,  δstr = {tr(dstr_ray_y)} mm" if dstr_ray_y else ""), dy, "mm"),
         kontrol(f"δy = {tr(dy)}  ≤  δperm = {trn(dperm, 0)} mm", dy <= dperm),
     ]
     if kg:
@@ -2083,18 +2112,19 @@ def _agirlik_raylari(g, o):
                   f"( {trn(n, 0)} × {trn(h, 0)} )", kg["Fx"], "N"),
             hesap("σy = My / Wy        ( My = 3 × Fx × l / 16 )",
                   f"Wy = {trn(p['Wy'], 0)} mm³", kg["sx"], "N/mm²"),
-            hesap("Fy = k1 × gn × Mcwt × ( Dya − ysa ) / ( n × h )",
+            hesap("Fy = k1 × gn × Mcwt × ( Dya − ysa ) / ( ( n / 2 ) × h )",
                   f"{tr(kg['k1'])} × {tr(gn)} × {trn(Mcwt, 0)} × {tr(Dya)} / "
-                  f"( {trn(n, 0)} × {trn(h, 0)} )", kg["Fy"], "N"),
+                  f"( {tr(n / 2.0)} × {trn(h, 0)} )", kg["Fy"], "N"),
             hesap("σx = Mx / Wx        ( Mx = 3 × Fy × l / 16 )",
                   f"Wx = {trn(p['Wx'], 0)} mm³", kg["sy"], "N/mm²"),
             hesap("σm = σx + σy", f"{tr(kg['sy'])} + {tr(kg['sx'])}",
                   kg["sm"], "N/mm²"),
             kontrol(f"σm = {tr(kg['sm'])}  ≤  σperm = {trn(sg, 0)} N/mm²",
                     kg["sm"] <= sg),
-            hesap("Fk = k1 × gn × Mcwt / n + Mg × gn",
+            hesap("Fk = k1 × gn × Mcwt / n + Mg × gn + Fp" if Fp else
+                  "Fk = k1 × gn × Mcwt / n + Mg × gn",
                   f"{tr(kg['k1'])} × {tr(gn)} × {trn(Mcwt, 0)} / {trn(n, 0)} "
-                  f"+ {tr(Mg)} × {tr(gn)}", kg["Fk"], "N"),
+                  f"+ {tr(Mg)} × {tr(gn)}" + (f" + {tr(Fp)}" if Fp else ""), kg["Fk"], "N"),
             veri("λ", "Yuvarlanmış burkulma narinliği  ( en az 20 )",
                  kg["lam"], "", "", 0),
             veri("ω", "Omega değeri", kg["omega"], "",
@@ -2110,16 +2140,23 @@ def _agirlik_raylari(g, o):
                   "EN 81-50 m.5.10.4"),
             kontrol(f"σ = {tr(kg['sc'])}  ≤  σperm = {trn(sg, 0)} N/mm²",
                     kg["sc"] is not None and kg["sc"] <= sg),
-            hesap("σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-                  f"Fx = {tr(kg['Fx'])} N", kg["sF"], "N/mm²", "EN 81-50 m.5.10.5"),
+            hesap("σF = 1,85 × | Fx | / c²" if makarali else
+                  "σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+                  (f"1,85 × {tr(kg['Fx'])} / {tr(p['c'] ** 2)}" if makarali else
+                   f"{tr(kg['Fx'])} × {tr(p['h1_b_f'] * 6)} / "
+                   f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
+                  kg["sF"], "N/mm²",
+                  f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"),
             kontrol(f"σF = {tr(kg['sF'])}  ≤  σperm = {trn(sg, 0)} N/mm²",
                     kg["sF"] <= sg),
-            hesap("δx = 0,7 × l³ × Fx / ( 48 × E × Iy )",
-                  f"Iy = {trn(p['Iy'], 0)} mm⁴", kg["dx"], "mm"),
+            hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |" + (" + δstr-x" if dstr_ray_x else ""),
+                  f"l = {trn(l, 0)} mm ,  Iy = {trn(p['Iy'], 0)} mm⁴"
+                  + (f" ,  δstr = {tr(dstr_ray_x)} mm" if dstr_ray_x else ""), kg["dx"], "mm"),
             kontrol(f"δx = {tr(kg['dx'])}  ≤  δperm = {trn(dperm, 0)} mm",
                     kg["dx"] <= dperm),
-            hesap("δy = 0,7 × l³ × Fy / ( 48 × E × Ix )",
-                  f"Ix = {trn(p['Ix'], 0)} mm⁴", kg["dy"], "mm"),
+            hesap("δy = | 0,7 × l³ × Fy / ( 48 × E × Ix ) |" + (" + δstr-y" if dstr_ray_y else ""),
+                  f"l = {trn(l, 0)} mm ,  Ix = {trn(p['Ix'], 0)} mm⁴"
+                  + (f" ,  δstr = {tr(dstr_ray_y)} mm" if dstr_ray_y else ""), kg["dy"], "mm"),
             kontrol(f"δy = {tr(kg['dy'])}  ≤  δperm = {trn(dperm, 0)} mm",
                     kg["dy"] <= dperm),
         ]

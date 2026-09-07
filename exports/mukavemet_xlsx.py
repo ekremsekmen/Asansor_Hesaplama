@@ -736,6 +736,20 @@ def _standarda_uydur(wb, g):
     #  tek sayar:  ray kütlesi ayrı, güvenlik tertibatı tepkisi ayrıdır.
     ws["AO611"] = "=AU351-AK351*AM351"
 
+    #  ㉜  Fp ( KLİPS İTME KUVVETİ ) CANLI HÜCRELERE BAĞLANIR
+    #  Ek C.2.1.2 / C.2.2.2 / C.2.3.2 uyarınca Fv = Mg·gn + Fp'dir.  Şablonda
+    #  bu hücreler ( AP351, X452, X580 ) sabit 0 yazılıydı.  Artık Veri Girişi'ndeki
+    #  B244 hücresine canlı bağlanır.
+    ws["AP351"] = "='Veri Girişi'!B244"
+    ws["X452"] = "='Veri Girişi'!B244"
+    ws["X580"] = "='Veri Girişi'!B244"
+
+    #  ㉝  KARŞI AĞIRLIKTA GÜVENLİK TERTİBATI VARSA δperm = 5 mm
+    #  TS EN 81-20 m.5.7.4.6 a) uyarınca karşı ağırlıkta güvenlik tertibatı
+    #  varsa izin verilen sehim 10 mm değil 5 mm'dir.
+    ws["AL600"] = "=IF('Veri Girişi'!B241=\"Yok\",10,5)"
+    ws["AL603"] = "=IF('Veri Girişi'!B241=\"Yok\",10,5)"
+
     #  ⑬  ELEKTRİK SAYFASI PROGRAMIN GİRDİLERİNİ KULLANIR
     #  Kitabın '12-Elk.Hesapları' sayfası kendi sabitleriyle çalışıyordu:
     #  L2 = 5 m · U = 400 V · S1 = 6 · S2 = 4 mm² · cosφ = 0,8 ve kablo

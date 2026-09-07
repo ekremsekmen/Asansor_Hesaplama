@@ -1185,6 +1185,47 @@ def _girdi_yollari(r):
         if s["aktif"]:
             r.kontrol(f"varyant 10 bölüm üretti: {list(ek)[0]}",
                       len(s["bolumler"]) == 10)
+
+    #  ── Fiziksel sınır kalkanları ve yeni 4 girdi testleri
+    #  1. Balata boyu fiziksel sınırları: 0, 10 mm ve paten aralığını aşanlar reddedilmeli
+    r.kontrol("balata boyu = 0 reddediliyor", not MK.hesapla({"paten_balata_boyu": 0})["aktif"])
+    r.kontrol("balata boyu < 20 mm reddediliyor", not MK.hesapla({"paten_balata_boyu": 10})["aktif"])
+    r.kontrol("balata boyu > paten arası reddediliyor", not MK.hesapla({"paten_balata_boyu": 4000})["aktif"])
+    r.kontrol("balata boyu 60 mm geçerli", MK.hesapla({"paten_balata_boyu": 60})["aktif"])
+
+    #  2. Güv. devreye sokma kuvveti sıfır olamaz
+    r.kontrol("güv. devreye sokma kuvveti = 0 reddediliyor",
+              not MK.hesapla({"guvenlik_devreye_kuvvet": 0})["aktif"])
+
+    #  3. Karşı ağırlıkta güvenlik tertibatı varsa dperm = 5 mm (TS EN 81-20 m.5.7.4.6)
+    s_yok = MK.hesapla({"agirlik_guvenlik_tertibati": "Yok"})
+    b8_yok = [x for x in s_yok["bolumler"] if x["baslik"].startswith("8 ")][0]
+    r.kontrol("güv. tertibatsız karşı ağırlıkta dperm = 10 mm",
+              any("δperm = 10" in a.get("aciklama", "") for a in b8_yok["adimlar"]))
+
+    s_var = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı"})
+    b8_var = [x for x in s_var["bolumler"] if x["baslik"].startswith("8 ")][0]
+    r.kontrol("güv. tertibatlı karşı ağırlıkta dperm = 5 mm (TS EN 81-20 m.5.7.4.6)",
+              any("δperm = 5" in a.get("aciklama", "") for a in b8_var["adimlar"]))
+
+    #  4. Yan ağırlıkta (Sağ) bina sehimi rayın yerel eksenlerine göre döner
+    s_sag = MK.hesapla({"agirlik_yeri": "Sağ", "yapi_sehim_x": 3.0, "yapi_sehim_y": 1.0})
+    b8_sag = [x for x in s_sag["bolumler"] if x["baslik"].startswith("8 ")][0]
+    # Yan ağırlıkta ray x'i bina y'sini (1.0), ray y'si bina x'ini (3.0) almalı
+    dx_sag = next(a["deger"] for a in b8_sag["adimlar"] if a.get("formul", "").startswith("δx ="))
+    dy_sag = next(a["deger"] for a in b8_sag["adimlar"] if a.get("formul", "").startswith("δy ="))
+    s_arka = MK.hesapla({"agirlik_yeri": "Arka", "yapi_sehim_x": 3.0, "yapi_sehim_y": 1.0})
+    b8_arka = [x for x in s_arka["bolumler"] if x["baslik"].startswith("8 ")][0]
+    dx_arka = next(a["deger"] for a in b8_arka["adimlar"] if a.get("formul", "").startswith("δx ="))
+    dy_arka = next(a["deger"] for a in b8_arka["adimlar"] if a.get("formul", "").startswith("δy ="))
+    r.kontrol("yan ağırlıkta bina sehimi eksen dönüşümü çalışıyor",
+              abs((dx_arka - dx_sag) - (3.0 - 1.0)) < 1e-6)
+
+    #  5. Makaralı patende balata adımı ve Bölüm 8 formül adı
+    s_mak = MK.hesapla({"paten_tipi": "Makaralı", "agirlik_guvenlik_tertibati": "Kaymalı"})
+    b8_mak = [x for x in s_mak["bolumler"] if x["baslik"].startswith("8 ")][0]
+    r.kontrol("makaralı patende B8 flanş formülü 1,85 yazıyor",
+              any("1,85" in a.get("formul", "") for a in b8_mak["adimlar"]))
     return r
 
 
