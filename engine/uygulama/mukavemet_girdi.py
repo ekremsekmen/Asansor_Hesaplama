@@ -492,6 +492,10 @@ def dogrula(g):
         if _sayi(d) and float(d) != int(d):
             hata.append(f"{ALAN[anahtar][2]}: adet tam sayı olmalıdır "
                         f"( {d} girildi ).")
+    nh = g.get("halat_adedi")
+    if _sayi(nh) and nh < 2:
+        hata.append("Askı halatı adedi en az 2 olmalıdır "
+                    "(TS EN 81-20 m.5.5.1.3).")
     for anahtar in POZITIF_ALANLAR:
         d = g.get(anahtar)
         if anahtar in ALAN and d is not None and (not _sayi(d) or d <= 0):

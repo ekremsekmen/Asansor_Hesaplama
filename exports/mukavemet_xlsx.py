@@ -786,6 +786,11 @@ def _standarda_uydur(wb, g):
     ws["AH125"] = ('=IF(T125>=X125,"Sf belirleyicidir  ( ölçüt: S ≥ Sf ).",'
                    '"Smin belirleyicidir  ( ölçüt: S ≥ Smin ).")')
 
+    # Asgari adet, kopma güvenliğinden bağımsızdır. Excel'deki elle
+    # değişiklikler de tek halatı uygun gösterememeli.
+    ws["AH110"] = '=IF(AQ20=2,16,12)'
+    ws["AH126"] = '=IF(OR(AQ20<2,AQ20<>INT(AQ20)),"UYGUN DEĞİLDİR — en az 2 tam adet askı halatı",IF(T126>=X126,"UYGUNDUR.","UYGUN DEĞİLDİR."))'
+
     #  ⑰  Nequiv(t) OFİS AÇILARINI İZLER  —  EN 81-50 Çizelge 2
     #  Kitabın tablosu ( TABLOLAR!D47:G52 ) her kanal şeklinin karşısına tek
     #  bir açı ve tek bir Nequiv(t) çiviler;  ofis sabiti γ ya da β

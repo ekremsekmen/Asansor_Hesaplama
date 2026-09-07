@@ -917,7 +917,8 @@ def _aski_halatlari(g, o):
     beta = MT.kanal_beta(sekil, O["kanal_beta"])
     Nequiv_t = MT.kanal_nequiv_t(sekil, O["kanal_gama_v"], O["kanal_beta"])
     Tmin = MT.halat_kopma(dh)
-    Smin = 16 if nh < 3 else 12
+    nh_uygun = nh >= 2 and float(nh).is_integer()
+    Smin = 16 if nh == 2 else 12
     Kp = (Dt / Dp) ** 4
     Nequiv_p = Kp * (Nps + 4 * Npr)
     Nequiv = Nequiv_t + Nequiv_p
@@ -938,6 +939,7 @@ def _aski_halatlari(g, o):
 
     b = Bolum("4 -  ASKI HALATLARININ HESAPLANMASI", "TS EN 81-50 m.5.12")
     b["adimlar"] = [
+        kontrol(f"Askı halatı adedi nh = {tr(nh)} ≥ 2  ( TS EN 81-20 m.5.5.1.3 )", nh_uygun),
         metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
         kontrol(f"Dt / dh = {tr(oran)}  ≥  {S['Dt_dh_asgari']}", oran_uygun),
@@ -969,7 +971,7 @@ def _aski_halatlari(g, o):
         veri("r", "Halat askı oranı", r, "", "GİRİŞ", 0),
         veri("Tmin", "Halatın en küçük kopma değeri", Tmin, "N", "TS 12385-5", 0),
         veri("Smin", "Asgari halat güvenlik katsayısı", Smin, "",
-             "EN 81-20 m.5.5.2.2  ( nh < 3 ise 16 )", 0),
+             "EN 81-20 m.5.5.2.2  ( nh = 2 ise 16 )", 0),
         hesap("Kp = ( Dt / Dp )⁴", f"( {trn(Dt, 0)} / {trn(Dp, 0)} )⁴", Kp, "", ondalik=4),
         hesap("Nequiv(p) = Kp × ( Nps + 4 × Npr )",
               f"{tr(Kp)} × ( {trn(Nps, 0)} + 4 × {trn(Npr, 0)} )", Nequiv_p, "",
@@ -991,7 +993,7 @@ def _aski_halatlari(g, o):
     b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {_esik}"
                              + (f"   ·   Dp/dh ≥ {_esik}" if kasnak_var else "")
                              + "   ·   S ≥ max( Sf ; Smin )"),
-                  "metin": "UYGUNDUR." if (oran_uygun and oran_p_uygun and s_uygun)
+                  "metin": "UYGUNDUR." if (nh_uygun and oran_uygun and oran_p_uygun and s_uygun)
                            else ("UYGUN DEĞİLDİR — "
                                  + " ve ".join(
                                      ([f"tahrik kasnağı çapını büyütün ya da halat çapını "
@@ -1000,9 +1002,10 @@ def _aski_halatlari(g, o):
                                      + ([f"saptırma kasnağı çapını büyütün ya da halat "
                                          f"çapını küçültün ( Dp/dh = {tr(oran_p)} )"]
                                         if not oran_p_uygun else [])
+                                     + (["en az iki bağımsız askı halatı kullanın"] if not nh_uygun else [])
                                      + (["halat çapını / adedini artırın"]
                                         if not s_uygun else []))),
-                  "uygun": bool(oran_uygun and oran_p_uygun and s_uygun)}
+                  "uygun": bool(nh_uygun and oran_uygun and oran_p_uygun and s_uygun)}
     b["notlar"] = []
     if kasnak_var:
         b["notlar"].append(

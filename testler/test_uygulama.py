@@ -598,6 +598,23 @@ def calistir():
     r.esit("elle değiştirilmiş kütle giriş olarak işaretlenir",
            UG.tamamla(tekrar)["kabin_agirligi_kaynak"], "GİRİŞ")
 
+    # Tek kalın halatın yüksek kopma dayanımı asgari adedi geçiremez.
+    _halat_g = dict(halat_capi=16, tahrik_kasnak_capi=640,
+                    saptirma_kasnak_capi=640, beyan_yuku=225, kabin_agirligi=200)
+    _tek = MK.hesapla(dict(_halat_g, halat_adedi=1))
+    r.kontrol("tek askı halatı girişte reddedilir", not _tek["aktif"])
+    r.kontrol("tek halat hatası asgari adedi bildirir",
+              any("en az 2" in h for h in _tek["hata"]))
+    for _n, _smin in ((2, 16), (3, 12)):
+        _s = MK.hesapla(dict(_halat_g, halat_adedi=_n))
+        r.esit(f"{_n} halatta doğru güvenlik alt sınırı", _s["_h"]["AH110"], _smin)
+    # Doğrulamayı atlayan doğrudan bölüm çağrısında da uygunluk engellenir.
+    _g = UG.tamamla(dict(UG.varsayilanlar(), **_halat_g, halat_adedi=1))
+    _o = {"ofis": US.sabitler()}
+    MK._motor(_g, _o)
+    _b = MK._aski_halatlari(_g, _o)
+    r.kontrol("tek halat bölümde de reddedilir", _b["sonuc"]["uygun"] is False)
+
     return r
 
 
