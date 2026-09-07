@@ -468,7 +468,7 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**21.658 kontrolün tamamı geçmiştir.**
+**21.667 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
@@ -480,7 +480,7 @@ Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
 | **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.577 / 4.577** |
 | **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
 | **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ( altı kesik V, standardın sınıflandırmasına uyarak **V satırından** okunur — kitap β satırından okuyordu, bkz. sapma ㉕ ) | **969 / 969** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **otuz bir sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı · yedinci · sekizinci denetimin her bulgusu yeniden üretilerek** + girdi reddi | **488 / 488** |
+| **9 · Mukavemet motoru** | 100 sonuç hücresi + **otuz bir sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı · yedinci · sekizinci denetimin her bulgusu yeniden üretilerek** + girdi reddi | **497 / 497** |
 | **10 · Mukavemet ↔ Excel** | **78 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır. *( Sapma sayısı arttıkça bu testin doğrudan karşılaştırdığı hücre sayısı düşer — ayrılan hücreler 'kitapla aynı olmalı' döngüsünden çıkıp 'gerçekten ayrışıyor mu' döngüsüne geçer. )* | **7.198 / 7.198** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **242 / 242** |
 
@@ -1201,6 +1201,22 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
   birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.
+- **Boş kabinin ağırlık merkezi ( xp ) bir MODELLEME KABULÜDÜR.** TS EN 81-20
+  m.5.7.2.3.2 `xp` için *"the mass centre of gravity"* der — yani kabinin
+  GERÇEK ağırlık merkezi. Program bunu ölçemez; kabin gövdesini kabin
+  merkezinde simetrik, tek kaçıklığı da **kapı + mekanizma kütlesi** kabul
+  eder:  `xp = xc − mkapı·( D/2 + pay ) / P`. Pafta bu kabulü satırın
+  kaynağında yazar. Kabinde başka büyük bir asimetri varsa ( yan konsollu
+  makine, tek yana yığılmış donanım, panoramik cam cephe ) `xp` gerçekten
+  sapar ve ray kuvvetleri değişir — böyle bir kabinde ağırlık merkezi
+  imalatçıdan alınıp **kapı ağırlığı ve mekanizma payı** o merkezi verecek
+  şekilde girilmelidir.
+- **Yardımcı donanım darbe katsayısı k3 bir OFİS SABİTİDİR.** EN 81-20
+  Çizelge 14 k1 ve k2'nin değerini verir ama k3 için *"the value has to be
+  determined by the manufacturer due to the actual installation"* der. Ofisin
+  varsayılanı **1,2**'dir ( kitabın kullandığı sayı ); paftada değeri ve
+  "standart sayı vermez" notu birlikte basılır. Tesise özgü bir değer varsa
+  ofis sabitlerinden değiştirilmelidir.
 - **Paten balatası uzunluğu ( ℓ )** flanş eğilmesine girer ( EN 81-50 m.5.10.5 ).
   Boş bırakılırsa ray tablosundaki balata yarı genişliğinden **2·b** olarak
   türetilir — kare balata kabulüdür, gerilmeyi emniyetli tarafta ( büyük )

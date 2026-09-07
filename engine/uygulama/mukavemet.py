@@ -1686,9 +1686,22 @@ def _kabin_raylari(g, o):
         hesap("Mg = ray boyu × Gr", f"{tr(ray_boyu)} m × {tr(MT.ray(prof, 'Gr'))} kg/m",
               Mg, "kg"),
         veri("MY", "Raylara bağlı yardımcı donanım kütlesi", MY, "N", "Ofis kabulü", 0),
+        #  DARBE KATSAYILARI PAFTADA GÖRÜNSÜN.  k1 ve k2'nin değeri EN 81-20
+        #  Çizelge 14'te YAZILIDIR;  k3 için çizelge sayı vermez ( "imalatçı
+        #  tarafından, gerçek tesise göre belirlenir" ) — hangi sayının
+        #  kullanıldığı denetçiye görünmelidir.
+        veri("k1", "Güvenlik tertibatı darbe katsayısı", k1, "",
+             f"EN 81-20 Çizelge 14  ·  {g['guvenlik_tertibati']}", 0),
+        veri("k2", "Normal işletme darbe katsayısı", k2, "",
+             "EN 81-20 Çizelge 14  ·  Running", 1),
+        veri("k3", "Yardımcı donanım darbe katsayısı", k3, "",
+             "OFİS STANDARDI  —  Çizelge 14 sayı vermez, imalatçı belirler", 1),
         veri("xc", "Kabin merkezinin x mesafesi", xc, "mm"),
         veri("yc", "Kabin merkezinin y mesafesi", yc, "mm"),
-        veri("xp", "Boş kabin ağırlık merkezinin x mesafesi", xp, "mm"),
+        veri("xp", "Boş kabin ağırlık merkezinin x mesafesi", xp, "mm",
+             f"xc − kapı katkısı  ( {trn(g['kapi_agirligi'], 0)} kg × "
+             f"{trn(D / 2 + g['kapi_mekanizma_payi'], 0)} mm / {trn(P, 0)} kg )  ·  "
+             "gövde kabin merkezinde kabul edilir"),
         veri("yp", "Boş kabin ağırlık merkezinin y mesafesi", yp, "mm"),
         veri("xs", "Askı noktasının x mesafesi", xs, "mm"),
         veri("ys", "Askı noktasının y mesafesi", ys, "mm"),
