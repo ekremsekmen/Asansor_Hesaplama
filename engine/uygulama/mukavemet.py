@@ -955,6 +955,11 @@ def _aski_halatlari(g, o):
 
     b = Bolum("4 -  ASKI HALATLARININ HESAPLANMASI", "TS EN 81-50 m.5.12")
     b["adimlar"] = [
+        #  PAFTADA KONTROL SATIRI YALNIZ KARARINI BASAR ( "UYGUN" ).  Neyin
+        #  kontrolü olduğunu ÖNÜNDEKİ değer satırı söyler;  o olmadan pafta
+        #  bölümün başında bağlamsız bir "UYGUN" gösteriyordu.
+        metin("Askı halatı sayısı  ( TS EN 81-20 m.5.5.1.3 ) :"),
+        veri("nh", "Askı halatı adedi", nh, "adet", "GİRİŞ", 0),
         kontrol(f"Askı halatı adedi nh = {tr(nh)} ≥ 2  ( TS EN 81-20 m.5.5.1.3 )", nh_uygun),
         metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
