@@ -140,6 +140,12 @@ def senaryolar():
 
     #  Geometri  →  xc · xp · Dxa · sığınma
     E("ray-kapı arası 500", ray_kapi_arasi=500)
+    #  RAY EKSENİ KABİN MERKEZİNİ GEÇİYOR  →  xc ≤ 0, kuvvetler NEGATİFE düşer.
+    #  Bu bölge kapsam dışıydı ve iki hatayı gizliyordu:  kitabın σ/δ
+    #  hücreleri işaretli hesaplıyordu ( negatif sehim sessizce geçiyordu ) ve
+    #  kapı konumu xi ham mesafe olarak yazılıyordu.
+    E("ray-kapı arası 830  ( xc = 0 )", ray_kapi_arasi=830)
+    E("ray-kapı arası 1200 ( xc < 0 )", ray_kapi_arasi=1200)
     E("kabin kaçıklığı 60", kabin_kaciklik=60)
     E("ağır kabin kapısı", kapi_agirligi=180, kapi_mekanizma_payi=90)
     E("dar konsol aralığı", kabin_konsol_arasi=2000, agirlik_konsol_arasi=2000)

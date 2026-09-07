@@ -50,6 +50,22 @@ EXCEL_FARKLARI = (
      "m.5.5.6.2 c) dengeleme gergi kasnağı ve m.5.6.2.2.1.3 regülatör eşiğidir.",
      "Standardın istediği 40 uygulanır.",
      ()),
+    ("Kapı konumu xi ham mesafe olarak yazılıyordu",
+     "TS EN 81-50 Ek C.1.2 / C.2.3.1",
+     "xi'ye ray–kapı arasını HAM MESAFE olarak yazar ( hep artı ).  Oysa aynı "
+     "toplamdaki xp ray ekseninden ölçülen İŞARETLİ bir konumdur.",
+     "Ek C.1.2 xi'yi 'the position of the car door' diye, xC · xp · xQ · xS "
+     "ile AYNI Kartezyen sistemde tanımlar.  Kapı düzlemi ray ekseninin "
+     "kabin merkezine göre TERS tarafındadır:  kabin merkezi +xc'de ise kapı "
+     "−RK'dedir.  Ray ekseni kabin merkezini geçtiğinde ( xc < 0 ) eşik "
+     "kuvveti Fs ile boş kabinin momenti yanlış yönde toplanıyor ve "
+     "birbirini DENGELİYORDU.\n"
+     "        1400 mm derinlikte ray–kapı arası 1.200 mm iken yükleme "
+     "durumunun Fx'i 8,2 N çıkıyor, doğrusu 864,4 N — 105 kat, EMNİYETSİZ "
+     "taraf.  Ray ekseni kabin merkezinin kapı tarafındayken ( xc > 0 ) "
+     "kitabın değeri fazla emniyetliydi.",
+     ("AH299", "L508", "AU511", "L516", "AU519", "Z530", "AF532", "Z537",
+      "AH542", "AH545")),
     ("Yük yalnız + yönde kaydırılıyordu",
      "TS EN 81-20 m.5.7.2.3.4",
      "xQ'yu her zaman xc + Dx/8 alır.  Ek C'nin Şekil C.2'si kaymayı tek "
@@ -1665,7 +1681,16 @@ def _kabin_raylari(g, o):
     xp_kapi = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P
     xp = xc - xp_kapi
     yp = xs = ys = 0.0
-    xi, yi = g["ray_kapi_arasi"], g["kabin_kaciklik"]
+    #  KAPI KONUMU DA RAY EKSENİNDEN ÖLÇÜLÜR  ( Ek C.1.2 ).
+    #  C.2.3'ün payı  gn·P·(xp − xs) + Fs·(xi − xs)  bir moment toplamıdır;
+    #  xp ray ekseninden ölçülen İŞARETLİ bir konumdur, xi de öyle olmalıdır.
+    #  Kitap oraya ray–kapı arasını HAM MESAFE olarak yazıyordu ( hep artı ).
+    #  Kapı, ray ekseninin kabin merkezinin TERS tarafındadır:  kabin merkezi
+    #  +xc'de ise kapı düzlemi −RK'dedir.  Ray ekseni kabin merkezini geçince
+    #  ( xc < 0 ) iki terim yanlış yönde toplanıyor ve eşik kuvveti boş
+    #  kabinin momentini DENGELİYORDU:  1400 mm derinlikte RK = 1.200 mm iken
+    #  Fx 8,2 N çıkıyor, doğrusu 864,4 N — 105 kat, EMNİYETSİZ taraf.
+    xi, yi = -g["ray_kapi_arasi"], g["kabin_kaciklik"]
     balata, balata_kaynak = _balata_boyu(g, p)
     Fs = ((S["Fs_alt"] if Q < S["Fs_sinir"] else S["Fs_ust"]) * gn * Q)
 

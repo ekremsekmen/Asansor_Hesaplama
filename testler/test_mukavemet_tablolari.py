@@ -111,7 +111,26 @@ def _kanal_tablosu(r, ws):
                MT.kanal_nequiv_t("Altı Kesik V Kanal", aci, 90), bek)
     r.esit("altı kesik V'de β Nequiv'i değiştirmez",
            MT.kanal_nequiv_t("Altı Kesik V Kanal", 38, 105), 12.0)
-    r.esit("Çizelge 2  alt kesilmesiz yarım daire",
+    # ------------------------------------------------------------------
+    #  TS EN 81-50 Ek E  —  STANDARDIN KENDİ ÇÖZÜMLÜ ÖRNEKLERİ
+    #  Ek E üç sayısal örnek verir;  üçü de burada yeniden üretilir.
+    #  E.1'de standart Kp'yi 2,07'ye YUVARLAYIP çarpar ( 2,07 × 2 = 4,14 );
+    #  tam değer 2,0736 → 4,1472'dir.  Program yuvarlamaz, bu yüzden
+    #  karşılaştırma standardın kendi yuvarlamasına tolerans tanır.
+    # ------------------------------------------------------------------
+    for _ad, _kanal, _g, _b, _Dt, _Dp, _nps, _npr, _nt, _neq in (
+            ("E.1  2:1 · V kanal", "V Kanal", 40, 90, 600, 500, 2, 0, 10.0, 14.14),
+            ("E.2  1:1 · altı kesik U", "Altı Kesik Yarım Daire Kanal",
+             38, 90, 600, 400, 1, 0, 5.0, 10.06),
+            ("E.3  1:1 çift sarım · U", "Yarım Daire Kanal (Çift Sarım)",
+             38, 90, 600, 600, 2, 0, 2.0, 4.0)):
+        _t = MT.kanal_nequiv_t(_kanal, _g, _b)
+        r.esit(f"Ek E {_ad}: Nequiv(t)", _t, _nt)
+        _kp = (_Dt / _Dp) ** 4
+        _n = _t + _kp * (_nps + 4 * _npr)
+        r.kontrol(f"Ek E {_ad}: Nequiv = {_neq}", abs(_n - _neq) <= 0.01,
+                  f"→ program {_n:.4f}, standart {_neq}")
+        r.esit("Çizelge 2  alt kesilmesiz yarım daire",
            MT.kanal_nequiv_t("Yarım Daire Kanal", 38, 90), 1.0)
     r.esit("çift sarımda iki geçiş",
            MT.kanal_nequiv_t("Yarım Daire Kanal (Çift Sarım)", 38, 90), 2.0)

@@ -247,7 +247,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 31)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 32)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
         #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
@@ -1120,6 +1120,38 @@ def _denetim_bulgulari(r):
                   _bizim >= _kitap - 1e-9, f"→ bizim {_bizim:.0f}, kitap {_kitap:.0f}")
     r.kontrol("E3  sapma kaydında yazılı",
               any("yalnız + yönde" in ad for ad, *_ in MK.EXCEL_FARKLARI))
+
+    #  ── E4  Kapı konumu xi RAY EKSENİNDEN  ( TS EN 81-50 Ek C.1.2 )
+    #  C.2.3'ün payı  gn·P·(xp−xs) + Fs·(xi−xs)  bir moment toplamıdır;
+    #  kitap xi'ye ray–kapı arasını HAM MESAFE ( hep artı ) yazıyordu.
+    #  xc < 0 iken eşik kuvveti boş kabinin momentini DENGELİYORDU.
+    def _yuk_fx(**ek):
+        _s = MK.hesapla(dict({"kabin_derinligi": 1400, "kabin_agirligi": 650}, **ek))
+        _b = [x for x in _s["bolumler"] if x["baslik"].startswith("7 ")][0]
+        _d = {a.get("sembol"): a["deger"] for a in _b["adimlar"] if a.get("sembol")}
+        _fx = next(a["deger"] for a in _b["adimlar"]
+                   if str(a.get("formul") or "").startswith("Fx = ( gn"))
+        return _d.get("xi"), _d.get("xp"), _fx
+
+    for _rk in (500, 830, 1200):
+        _xi, _xp, _fx = _yuk_fx(ray_kapi_arasi=_rk)
+        r.esit(f"E4  RK={_rk}: xi ray ekseninden ( −RK )", _xi, -_rk)
+    #  ASIL BULGU:  ray ekseni kabin merkezini geçince kuvvet BÜYÜMELİ
+    _, _, _f830 = _yuk_fx(ray_kapi_arasi=830)
+    _, _, _f1200 = _yuk_fx(ray_kapi_arasi=1200)
+    r.kontrol("E4  ray ekseni kabin merkezini geçince yükleme Fx'i büyüyor",
+              abs(_f1200) > abs(_f830) > 100,
+              f"→ RK=830 {_f830:.1f} N , RK=1200 {_f1200:.1f} N")
+    #  Kitabın ham mesafesiyle karşılaştırma:  xc < 0'da onunki KÜÇÜK kalıyordu
+    _gv = _MG.tamamla(_MG.varsayilanlar())
+    for _rk in (830, 1200):
+        _xi, _xp, _fx = _yuk_fx(ray_kapi_arasi=_rk)
+        _Fs = 0.4 * 9.81 * _gv["beyan_yuku"]
+        _kitap = abs(9.81 * 650 * _xp + _Fs * (+_rk)) / (2 * _gv["kabin_paten_arasi"])
+        r.kontrol(f"E4  RK={_rk}: doğrusu kitabınkinden BÜYÜK",
+                  abs(_fx) > _kitap, f"→ bizim {abs(_fx):.1f} , kitap {_kitap:.1f}")
+    r.kontrol("E4  sapma kaydında yazılı",
+              any("Kapı konumu xi" in ad for ad, *_ in MK.EXCEL_FARKLARI))
     return r
 
 

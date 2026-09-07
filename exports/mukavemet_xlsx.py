@@ -705,6 +705,35 @@ def _standarda_uydur(wb, g):
     ws["AH295"] = ("=AH293-(('Veri Girişi'!F127*(('Veri Girişi'!C74/2)"
                    "+'Veri Girişi'!F128))/'Veri Girişi'!C75)")
 
+    #  ㉜ ( devamı )  YÜKLEME DURUMUNDA σ VE δ BÜYÜKLÜKTÜR
+    #  xi işaretli hâle gelince Fx negatife düşebiliyor.  Gerilme ve sehim
+    #  YÖNDEN BAĞIMSIZ büyüklüklerdir ( üçüncü denetim, motorda abs ile );
+    #  kitabın hücreleri işaretli hesaplıyordu:  "δ ≤ 5 mm" karşılaştırması
+    #  negatif bir sehimi SESSİZCE geçirirdi.  Kuvvet satırları ( L508 · L516 )
+    #  işaretini korur — yön bilgisi paftada kalsın diye.
+    #  ÜÇ YÜK DURUMUNUN DA σ ve δ HÜCRELERİ.  Kuvvet ve moment satırları
+    #  ( AY321 · L415 · L508 … ) işaretini KORUR — yön bilgisi paftada
+    #  kalsın diye;  yalnız büyüklük olan satırlar sarılır.
+    for _h in (
+            #  C.2.1  güvenlik tertibatı  ( Durum 1 · Durum 2 )
+            "AU324", "AU330", "Z360", "AJ362", "AE365", "Z379", "AH393", "AH396",
+            "AU338", "AU347", "Z369", "AJ371", "AE374", "Z384", "AH401", "AH404",
+            #  C.2.2  normal işletme
+            "AU418", "AU427", "Z461", "AC463", "Z476", "AH487", "AH490",
+            "AU438", "AU447", "Z468", "AH470", "Z481", "AH495", "AH498",
+            #  C.2.3  yükleme
+            "AU511", "AU519", "Z530", "AF532", "Z537", "AH542", "AH545",
+            #  karşı ağırlık rayı
+            "AU575", "Z588", "AF590", "AH603", "AH606"):
+        _f = ws[_h].value
+        if isinstance(_f, str) and _f.startswith("=") and not _f.startswith("=ABS("):
+            ws[_h] = "=ABS(" + _f[1:] + ")"
+
+    #  ㉜  KAPI KONUMU xi RAY EKSENİNDEN ÖLÇÜLÜR  —  EN 81-50 Ek C.1.2
+    #  Kitap oraya ray–kapı arasını HAM MESAFE yazar;  oysa aynı toplamdaki
+    #  xp işaretli bir konumdur ve kapı, ray ekseninin ters tarafındadır.
+    ws["AH299"] = "=-'Veri Girişi'!F112"
+
     #  ㉛  YÜK EN OLUMSUZ KONUMDA  —  EN 81-20 m.5.7.2.3.4
     #  Kitap yükü yalnız + yönde kaydırır ( xQ = xc + D/8 ).  Madde normatif
     #  olarak "most unfavourable position" der;  kabin merkezi ray ekseninin
