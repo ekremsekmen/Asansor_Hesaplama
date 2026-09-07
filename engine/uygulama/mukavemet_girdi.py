@@ -128,6 +128,10 @@ ALANLAR = (
     #  denetlenir ve pafta eksiği açıkça yazar.
     ("guvenlik_devreye_kuvvet", "", "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )",
      "N", "sayi", None, None),
+    #  TS EN 81-20 m.5.6.2.2.1.1 a):  devreye girme hızı beyan hızının en az
+    #  %115'i ve tertibat tipine göre belirlenen üst sınırın ALTINDA olmalı.
+    #  Değer regülatörün TİP İNCELEME belgesinden gelir.
+    ("reg_devreye_hizi",  "",     "Regülatör devreye girme hızı  ( imalatçı )", "m/s", "sayi", None, None),
 
     # ── KILAVUZ RAYLAR ────────────────────────────────────────────────
     ("kabin_ray_profili", "E73",  "Kabin rayı profili",                "—",    "secim",
@@ -232,7 +236,8 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 #  kabin_agirligi BURADA DEĞİLDİR:  tamamla() onu ofis tablosundan doldurur
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
-OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet")
+OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet",
+                     "reg_devreye_hizi")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
 #  hesaba katılacak azami sürtünme katsayısı.
@@ -307,7 +312,8 @@ GRUPLAR = (
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
      ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
-      "reg_gergi_agirligi", "guvenlik_devreye_kuvvet")),
+      "reg_gergi_agirligi", "guvenlik_devreye_kuvvet",
+      "reg_devreye_hizi")),
     ("Kılavuz raylar",
      ("kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
       "agirlik_konsol_arasi", "kabin_ray_sayisi", "agirlik_ray_sayisi",

@@ -502,6 +502,15 @@ SABIT = {
     "Dreg_dreg_asgari": 30,       # regülatör kasnağı / halat oranı      (11!N142)
     "reg_kat_asgari":  8,         # regülatör halatı emniyet katsayısı   (11!K161)
     "reg_kuvvet_asgari": 300,     # F'reg alt sınırı              [N]    (11!AA156)
+    #  TS EN 81-20 m.5.6.2.2.1.1 a) — devreye girme hızı penceresi
+    "reg_hiz_alt_carpan": 1.15,   # "at least 115 % of the rated speed"
+    "reg_hiz_ust_ani":    0.80,   # ani frenlemeli ( makaralı hariç )
+    "reg_hiz_ust_makara": 1.00,   # ani frenlemeli makaralı
+    "reg_hiz_ust_kaymali": 1.50,  # kaymalı, v ≤ 1,0 m/s
+    #  m.5.6.2.1.2.1 b) — ani frenlemeli kabin tertibatı üst hız sınırı
+    "ani_tertibat_azami_v": 0.63,
+    #  m.5.6.2.1.2.3 — karşı ağırlık tertibatı bu hızın üstünde KAYMALI olmalı
+    "agirlik_kaymali_esigi": 1.0,
     "reg_sarilma_aci": 180,       # α'  regülatör kasnağı sarılma [°]    (11!AI133)
     "Nps":             1,         # tek yönde bükülmeli kasnak sayısı    (11!AH105)
     "Npr":             0,         # ters yönde bükülmeli kasnak sayısı   (11!AH106)
@@ -1103,6 +1112,33 @@ def _regulator(g, o):
                    else f"{trn(S['reg_kuvvet_asgari'], 0)} N")
     Fcekme = Freg2 - Freg
     kuvvet_uygun = devreye_var and Fcekme >= sinir
+
+    #  ── TS EN 81-20 m.5.6.2.1.2.1 b)  ve  m.5.6.2.2.1.1 a) ────────────
+    #  Kitap ikisini de hiç denetlemiyordu:  2,5 m/s'lik bir asansöre ani
+    #  frenlemeli tertibat konsa da, regülatör hangi hızda devreye girerse
+    #  girsin bölüm "UYGUNDUR" diyordu.
+    v = g["beyan_hizi"]
+    tertibat = g["guvenlik_tertibati"]
+    ani = tertibat.startswith("Ani Frenlemeli")
+    makarali = tertibat == "Ani Frenlemeli Makaralı"
+    #  m.5.6.2.1.2.1 b):  ani frenlemeli KABİN tertibatı yalnız v ≤ 0,63 m/s
+    tip_uygun = (not ani) or v <= S["ani_tertibat_azami_v"]
+    #  m.5.6.2.2.1.1 a):  alt sınır 1,15·v ;  üst sınır tertibat tipine bağlı
+    v_alt = S["reg_hiz_alt_carpan"] * v
+    if ani:
+        v_ust = S["reg_hiz_ust_makara"] if makarali else S["reg_hiz_ust_ani"]
+        ust_dayanak = ("m.5.6.2.2.1.1 a) 2)  ani frenlemeli makaralı" if makarali
+                       else "m.5.6.2.2.1.1 a) 1)  ani frenlemeli")
+    elif v <= 1.0:
+        v_ust = S["reg_hiz_ust_kaymali"]
+        ust_dayanak = "m.5.6.2.2.1.1 a) 3)  kaymalı, v ≤ 1,0 m/s"
+    else:
+        v_ust = 1.25 * v + 0.25 / v
+        ust_dayanak = "m.5.6.2.2.1.1 a) 4)  1,25·v + 0,25/v"
+    v_dev = g.get("reg_devreye_hizi")
+    hiz_var = isinstance(v_dev, (int, float)) and not isinstance(v_dev, bool) \
+        and v_dev > 0
+    hiz_uygun = (v_alt <= v_dev < v_ust) if hiz_var else True
     kat = Tmin / Freg2
     kat_uygun = kat >= S["reg_kat_asgari"]
 
@@ -1125,6 +1161,23 @@ def _regulator(g, o):
              "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if devreye_var
              else "İMALATÇI VERİSİ — girilmediği için 2·Fgt sınırı denetlenemedi"),
         veri("T'min", "Halatın en küçük kopma yükü", Tmin, "N", "TS 12385-5", 0),
+        metin("Güvenlik tertibatı tipi & beyan hızı  ( m.5.6.2.1.2.1 ) :"),
+        veri("", "Kabin güvenlik tertibatı tipi", tertibat, "", "GİRİŞ"),
+        kontrol(f"{tertibat} tertibat, v = {tr(v)} m/s"
+                + (f"  ≤  {tr(S['ani_tertibat_azami_v'])} m/s"
+                   if ani else "  ( kaymalı — hız sınırı yok )"), tip_uygun),
+        metin("Regülatör devreye girme hızı  ( m.5.6.2.2.1.1 a) ) :"),
+        hesap("v_alt = 1,15 × v", f"1,15 × {tr(v)}", v_alt, "m/s",
+              "en az beyan hızının %115'i", 3),
+        hesap("v_üst", ust_dayanak, v_ust, "m/s", "tertibat tipine bağlı", 3),
+        veri("v_dev", "Regülatör devreye girme hızı",
+             v_dev if hiz_var else "seçilecek", "m/s" if hiz_var else "",
+             "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if hiz_var
+             else f"İMALATÇI ŞARTI — [{tr(v_alt)}, {tr(v_ust)}) m/s aralığında olmalıdır", 3 if hiz_var else None),
+        kontrol(f"{tr(v_alt)} ≤ v_dev = {tr(v_dev)} < {tr(v_ust)} m/s", hiz_uygun)
+        if hiz_var else
+        kontrol(f"Şart:  {tr(v_alt)} m/s  ≤  v_dev  <  {tr(v_ust)} m/s", True,
+                "Regülatör bu aralıkta seçilmelidir"),
         metin("Regülatör kasnağı & halat oranı :"),
         hesap("Dreg / dreg", f"{trn(Dreg, 0)} / {tr(dreg)}", oran, ""),
         kontrol(f"Dreg / dreg = {tr(oran)}  ≥  {S['Dreg_dreg_asgari']}", oran_uygun),
@@ -1158,9 +1211,16 @@ def _regulator(g, o):
     b["sonuc"] = {"baslik": (f"KONTROL      Dreg/dreg ≥ {trn(S['Dreg_dreg_asgari'], 0)}"
                              f"   ·   Fçekme ≥ {_baslik_sinir}"
                              f"   ·   T'min/F'reg ≥ {trn(S['reg_kat_asgari'], 0)}"),
-                  "metin": "UYGUNDUR." if (oran_uygun and kuvvet_uygun and kat_uygun)
-                           else "UYGUN DEĞİLDİR",
-                  "uygun": bool(oran_uygun and kuvvet_uygun and kat_uygun)}
+                  "metin": "UYGUNDUR." if (tip_uygun and hiz_uygun and oran_uygun
+                                            and kuvvet_uygun and kat_uygun)
+                           else ("UYGUN DEĞİLDİR"
+                                 + (f" — {tertibat} tertibat en çok "
+                                    f"{tr(S['ani_tertibat_azami_v'])} m/s'de kullanılır "
+                                    f"( m.5.6.2.1.2.1 b) )" if not tip_uygun
+                                    else (" — regülatör devreye girme hızı izin verilen sınırların dışındadır"
+                                          if not hiz_uygun else ""))),
+                  "uygun": bool(tip_uygun and hiz_uygun and oran_uygun
+                                and kuvvet_uygun and kat_uygun)}
     b["aciklamalar"] = [
         "TS EN 81-20 m.5.6.2.2.1.1 d):  'the tensile force in the overspeed "
         "governor rope produced by the governor, when tripped, shall be at "
@@ -2006,6 +2066,13 @@ def _agirlik_raylari(g, o):
 
     gt = g.get("agirlik_guvenlik_tertibati") or "Yok"
     gt_var = gt != "Yok"
+    #  TS EN 81-20 m.5.6.2.1.2.3:  karşı ağırlık ( ya da dengeleme ağırlığı )
+    #  güvenlik tertibatı, BEYAN HIZI 1 m/s'yi AŞIYORSA kaymalı olmak
+    #  zorundadır;  altında ani frenlemeli de olabilir.  Kitap tertibat tipini
+    #  hiç sınamıyordu — 2,5 m/s'lik bir asansöre ani frenlemeli tertibat
+    #  konsa da bölüm "UYGUNDUR" diyordu.
+    gt_tip_uygun = (not gt_var or not gt.startswith("Ani Frenlemeli")
+                    or g["beyan_hizi"] <= S["agirlik_kaymali_esigi"])
     #  TS EN 81-20 m.5.7.4.6:  İzin verilen azami sehim ( δperm )
     #  a) Güv. tertibatlı kabin ve GÜV. TERTİBATLI KARŞI AĞIRLIK raylarında: 5 mm
     #  b) Güv. tertibatsız karşı ağırlık raylarında: 10 mm
@@ -2035,7 +2102,8 @@ def _agirlik_raylari(g, o):
     sf = abs(_flans(Fx, p, balata, makarali))
     dx = abs(_sehim(Fx, l, p["Iy"])) + dstr_ray_x
     dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_ray_y
-    kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm]
+    kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm,
+                  gt_tip_uygun]
 
     #  ------------------------------------------------------------------
     #  KARŞI AĞIRLIKTA GÜVENLİK TERTİBATI      TS EN 81-50 Ek C.2.1
@@ -2081,6 +2149,10 @@ def _agirlik_raylari(g, o):
         veri("h", "Ağırlık paten arası", h, "mm", "GİRİŞ"),
         veri("l", "Ağırlık rayı konsollar arası en uzun mesafe", l, "mm", "GİRİŞ"),
         veri("Mcwt", "Karşı ağırlık kütlesi", Mcwt, "kg"),
+        veri("", "Karşı ağırlıkta güvenlik tertibatı", gt, "", "GİRİŞ"),
+        kontrol(f"{gt} tertibat, beyan hızı {tr(g['beyan_hizi'])} m/s"
+                + ("  ( m.5.6.2.1.2.3:  v > 1 m/s ise KAYMALI olmalı )"
+                   if gt_var else "  ( tertibat yok )"), gt_tip_uygun),
         veri("", "Karşı ağırlık malzemesi", g["agirlik_malzemesi"]),
         veri("", "Karşı ağırlık derinliği", derinlik, "mm",
              f"Ağırlık malzemesi tablosu  ·  {g['agirlik_malzemesi']}", 0),
@@ -2209,7 +2281,10 @@ def _agirlik_raylari(g, o):
     b["sonuc"] = {"baslik": ("KONTROL      σm · σc · σF ≤ σperm   ve   δ ≤ δperm"
                              + ("   ( C.2.2 ve C.2.1 )" if gt_var else "")),
                   "metin": "UYGUNDUR." if all(kontroller)
-                           else "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün",
+                           else ("UYGUN DEĞİLDİR — karşı ağırlık güvenlik tertibatı v > 1,0 m/s "
+                                 "için kaymalı tip olmalıdır ( TS EN 81-20 m.5.6.2.1.2.3 )"
+                                 if not gt_tip_uygun else
+                                 "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün"),
                   "uygun": bool(all(kontroller))}
     _not8 = _ray_tutarsizlik_notu(prof)
     if _not8:

@@ -379,6 +379,7 @@ EK_GIRDI_HUCRELERI = (
      "Fp — konsol klipslerinin itme kuvveti  ( Ek C.2.1.2 )", "N"),
     ("yapi_sehim_x",          245, "δstr-x — bina yapısının x sehimi", "mm"),
     ("yapi_sehim_y",          246, "δstr-y — bina yapısının y sehimi", "mm"),
+    ("reg_devreye_hizi",      247, "Regülatör devreye girme hızı  ( imalatçı )", "m/s"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 

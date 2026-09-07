@@ -787,6 +787,33 @@ def _denetim_bulgulari(r):
               _net["_h"]["J156"] > 2200 > _net["_h"]["U156"]
               and _net["bolumler"][4]["sonuc"]["uygun"] is False)
 
+    #  ── B12.2  Kabin tertibatı hız sınırı  ( TS EN 81-20 m.5.6.2.1.2.1 b) )
+    _b5_ani_hizli = MK.hesapla({"beyan_hizi": 1.0, "guvenlik_tertibati": "Ani Frenlemeli",
+                                "guvenlik_devreye_kuvvet": 400})["bolumler"][4]
+    r.kontrol("B12.2  v > 0,63 iken ani frenlemeli kabin tertibatı reddedilir",
+              _b5_ani_hizli["sonuc"]["uygun"] is False
+              and "0,63" in _b5_ani_hizli["sonuc"]["metin"],
+              f"→ {_b5_ani_hizli['sonuc']!r}")
+
+    _b5_ani_yavas = MK.hesapla({"beyan_hizi": 0.63, "guvenlik_tertibati": "Ani Frenlemeli",
+                                "guvenlik_devreye_kuvvet": 400})["bolumler"][4]
+    r.kontrol("B12.2  v ≤ 0,63 iken ani frenlemeli kabin tertibatı kabul edilir",
+              _b5_ani_yavas["sonuc"]["uygun"] is True,
+              f"→ {_b5_ani_yavas['sonuc']!r}")
+
+    #  ── B12.3  Regülatör devreye girme hızı penceresi  ( m.5.6.2.2.1.1 a) )
+    _b5_reg_dusuk = MK.hesapla({"beyan_hizi": 1.0, "guvenlik_devreye_kuvvet": 400,
+                                "reg_devreye_hizi": 1.05})["bolumler"][4]
+    r.kontrol("B12.3  v_dev < 1,15·v reddedilir",
+              _b5_reg_dusuk["sonuc"]["uygun"] is False,
+              f"→ {_b5_reg_dusuk['sonuc']!r}")
+
+    _b5_reg_uygun = MK.hesapla({"beyan_hizi": 1.0, "guvenlik_devreye_kuvvet": 400,
+                                "reg_devreye_hizi": 1.25})["bolumler"][4]
+    r.kontrol("B12.3  1,15·v ≤ v_dev < v_üst kabul edilir",
+              _b5_reg_uygun["sonuc"]["uygun"] is True,
+              f"→ {_b5_reg_uygun['sonuc']!r}")
+
     #  ── B13  Karşı ağırlıkta güvenlik tertibatı  ( EN 81-50 Ek C.2.1 )
     _yok = MK.hesapla()["bolumler"][7]
     _var = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı"})["bolumler"][7]
@@ -803,6 +830,22 @@ def _denetim_bulgulari(r):
     r.kontrol("B13  ani frenlemeli tertibatta ince ray UYGUN DEĞİL",
               MK.hesapla({"agirlik_guvenlik_tertibati": "Ani Frenlemeli"}
                          )["bolumler"][7]["sonuc"]["uygun"] is False)
+
+    #  ── B13.2  Karşı ağırlık tertibatı hız sınırı  ( TS EN 81-20 m.5.6.2.1.2.3 )
+    _b8_ani_hizli = MK.hesapla({"beyan_hizi": 1.6,
+                                "agirlik_guvenlik_tertibati": "Ani Frenlemeli",
+                                "agirlik_ray_profili": "70 x 65 x 9"})["bolumler"][7]
+    r.kontrol("B13.2  v > 1,0 iken ani frenlemeli karşı ağırlık tertibatı reddedilir",
+              _b8_ani_hizli["sonuc"]["uygun"] is False
+              and "kaymalı tip olmalıdır" in _b8_ani_hizli["sonuc"]["metin"],
+              f"→ {_b8_ani_hizli['sonuc']!r}")
+
+    _b8_kaymali_hizli = MK.hesapla({"beyan_hizi": 1.6,
+                                    "agirlik_guvenlik_tertibati": "Kaymalı",
+                                    "agirlik_ray_profili": "70 x 65 x 9"})["bolumler"][7]
+    r.kontrol("B13.2  v > 1,0 iken kaymalı karşı ağırlık tertibatı kabul edilir",
+              _b8_kaymali_hizli["sonuc"]["uygun"] is True,
+              f"→ {_b8_kaymali_hizli['sonuc']!r}")
 
     #  ── B16  Regülatör μ'sünün üst sınırı  ( EN 81-20 m.5.6.2.2.1.3 b) )
     _g16 = _MG.tamamla(dict(_MG.varsayilanlar(), reg_surtunme=5))

@@ -374,7 +374,8 @@ def calistir():
            #  Standardın metnine karşı denetimden sonra eklenen dört girdi
            #  ( TS EN 81-50 m.5.10.5 · Ek C.2.1.2 · Ek C.2.1.5 )
            "paten_tipi": "Makaralı", "klips_itme_kuvveti": 275,
-           "yapi_sehim_x": 1.5, "yapi_sehim_y": 0.8}
+           "yapi_sehim_x": 1.5, "yapi_sehim_y": 0.8,
+           "reg_devreye_hizi": 1.25}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))
