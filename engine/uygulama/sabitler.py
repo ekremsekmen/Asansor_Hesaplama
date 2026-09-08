@@ -28,6 +28,14 @@ VARSAYILAN = {
     # ── ① MAKİNE VE MOTOR ────────────────────────────────────────────
     "verim_dislisiz":   OFIS.MAKINE_VERIMLERI["Dişlisiz"],
     "verim_disli":      OFIS.MAKINE_VERIMLERI["Dişli"],
+    #  Denge ( kompanzasyon ) zinciri TAKILDIĞINDA halat dengesizliğinin
+    #  yüzde kaçını karşıladığı.  Zincir halatı dengelemek için takılır ve
+    #  halat ağırlığına göre seçilir — bu yüzden varsayılan TAM DENGELEMEDİR.
+    #  Zincirin metre ağırlığı sahada ölçülemediği için bir OFİS KABULÜDÜR:
+    #  tedarikçisi bilerek hafif zincir takan bir ofis bu değeri düşürür ve
+    #  bütün projeleri birden düzeltir.  Paftada λ satırında görünür.
+    #  Tam dengeleme için gereken zincir:  askı oranı × halat kg/m × adet.
+    "denge_zinciri_orani": 100,  # λ, %                       ( zincir VARSA )
     "Gs":               0,      # Sürtünme yükü, kg          ( 11!AQ8 )
     "q_denge":          0.50,   # Karşı ağırlık denge oranı  ( 11!AA627 )
     "halat_pay_m":      5,      # Halat boyu payı, m         ( 11!AQ19 )
@@ -108,7 +116,7 @@ METIN = ("kablo_tipi",)
 
 ARALIK = {
     "verim_dislisiz": (0.1, 1), "verim_disli": (0.1, 1),
-    "Gs": (0, 5000), "q_denge": (0.2, 0.8),
+    "denge_zinciri_orani": (0, 100), "Gs": (0, 5000), "q_denge": (0.2, 0.8),
     "halat_pay_m": (0, 100),
     #  Sınırlar tek yerde durur ( mukavemet_tablolari ):  standardın kendi
     #  m.5.11.2.3.1 sınırlarıdır ve iki dosyada ayrı ayrı yazılırsa ayrışır.
@@ -138,7 +146,7 @@ ARALIK = {
 GRUPLAR = (
     ("① MAKİNE VE MOTOR",
      "TS EN 81-50 · MMO 208/7 — motor gücü ve verim",
-     ("verim_dislisiz", "verim_disli",
+     ("verim_dislisiz", "verim_disli", "denge_zinciri_orani",
       "Gs", "q_denge", "halat_pay_m",
       "kanal_gama_v", "kanal_gama_yd", "kanal_beta")),
     ("② MUKAVEMET KABULLERİ",
@@ -173,6 +181,9 @@ ETIKET = {
                        "askı ( palanga ) kaybı DÂHİL — N = Gmax·v/(η·102)"),
     "verim_disli": ("Dişli makine TOPLAM sistem verimi η",
                     "redüktör ve askı ( palanga ) kaybı DÂHİL"),
+    "denge_zinciri_orani": ("Denge zinciri dengeleme oranı λ (%)",
+                            "zincir VARSA halat dengesizliğinin yüzde kaçını "
+                            "karşıladığı — %100 = tam dengeleme"),
     "Gs": ("Sürtünme yükü Gs (kg)", "Gmax = F1 + Gs − Ga"),
     "q_denge": ("Denge faktörü q", "karşı ağırlık = P + q·Q;  kitabın tamamı q = 0,50 üzerine kuruludur"),
     "halat_pay_m": ("Halat boyu payı (m)", "kuyu boyuna eklenen pay"),

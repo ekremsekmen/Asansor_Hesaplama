@@ -383,8 +383,10 @@ def calistir():
            "makine_tst": 3400,
            #  Katalog halat verisi  ( TS 12385-5 tablosunu ezer )
            "halat_birim_kutle": 0.179, "halat_kopma_kN": 31.5,
-           #  λ — denge ( kompanzasyon ) zinciri oranı
-           "kompanzasyon_orani": 100}
+           #  λ — denge ( kompanzasyon ) zinciri
+           "denge_zinciri": "Var",
+           #  Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( m.5.5.2.1 )
+           "saptirma_kasnak_min_capi": 320}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

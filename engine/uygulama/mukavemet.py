@@ -715,7 +715,14 @@ def _motor(g, o):
     #  ( bölüm 6 ) ve Tst bunlara dayanır — dengesizlikle karıştırılmamalıdır.
     H = g["seyir_mesafesi"]                          # seyahat mesafesi, m
     MSR = r * H * gh * nh                            # dengesiz halat kütlesi
-    lam = (g.get("kompanzasyon_orani") or 0) / 100.0  # denge zinciri oranı
+    #  DENGE ZİNCİRİ VAR / YOK.  Zincir halatı dengelemek için takılır ve
+    #  halat ağırlığına göre seçilir;  bu yüzden "var" TAM DENGELEME kabulüdür
+    #  ( λ = 1 ).  Zincirin metre ağırlığı sahada ölçülemediği için ofis
+    #  kabulü olarak alınır — bilerek hafif seçilmiş bir zincir gerçek güç
+    #  ihtiyacını bu hesabın üstüne çıkarır.  Kabul, paftada λ satırında
+    #  görünür.
+    lam = ((O["denge_zinciri_orani"] or 0) / 100.0
+           if str(g.get("denge_zinciri") or "").strip() == "Var" else 0.0)
     MCR = lam * MSR                                  # zincirin dengelediği
     mt = sum(MT.kablo_agirligi(g.get(k)) or 0.0
              for k in ("kablo_tipi_1", "kablo_tipi_2"))
@@ -738,7 +745,16 @@ def _motor(g, o):
     #  İmalatçının kasnak için verdiği azami statik yük aşılmamalıdır;
     #  program bunu HİÇ denetlemiyordu — motor gücü "UYGUN" çıkan bir seçim
     #  kasnak yükünü aşmış olabilirdi.
-    Tst_h = (F1 + Ga) / r
+    #
+    #  DENGE ZİNCİRİ DE KASNAĞA BİNER.  Zincir kabin ile karşı ağırlık
+    #  arasında asılıdır;  ağırlığı ikisine paylaşılır ve halatlar üzerinden
+    #  kasnağa ulaşır.  Gmax'ta zincir dengesizliği AZALTIR ( eksi işaretli ),
+    #  statik yükte ise ARTIRIR — ikisi ayrı büyüklüktür.  Zincir hesaba
+    #  girmezse Tst olduğundan küçük çıkar ve kasnak yükü aşılmış bir makine
+    #  "UYGUN" görünebilir;  bu EMNİYETSİZ taraftır.  Karşı ağırlık koluna
+    #  eklenir ( EN 81-20/50 şablonlarının T2 = gn·( Mcwt + MCR )/r bağıntısı
+    #  ile aynı kabul ).
+    Tst_h = (F1 + Ga + MCR) / r
     Tst = g.get("makine_tst")
     Tst_verildi = isinstance(Tst, (int, float)) and not isinstance(Tst, bool) and Tst > 0
     tst_uygun = (Tst >= Tst_h) if Tst_verildi else None
@@ -760,6 +776,9 @@ def _motor(g, o):
     uygun = bool(N is not None and N > 0 and g["motor_gucu"] >= N
                  and tst_uygun is not False)
 
+    #  λ ve zincir kütlesi TEK YERDE hesaplanır ( burada ) ve tahrik bölümü
+    #  buradan okur — iki yerde ayrı türetilirse ayrışırlar.
+    o.update(lam=lam, MCR=MCR, MSR_dengesiz=MSR)
     o.update(Q=Q, P=P, v=v, gh=gh, lh=lh, Gh=Gh, F1=F1, Ga=Ga, Gmax=Gmax,
              N_hesap=N, motor_uygun=uygun, r=r, nh=nh, dh=dh, Dt=Dt,
              Tst_hesap=Tst_h, Tst=Tst if Tst_verildi else None,
@@ -796,7 +815,11 @@ def _motor(g, o):
               (f"{trn(r, 0)} × {tr(H)} × {tr(gh)} × {trn(nh, 0)}" if r != 1
                else f"{tr(H)} × {tr(gh)} × {trn(nh, 0)}"), MSR, "kg",
               "dengesiz halat kütlesi  ( kabin en altta )"),
-        veri("λ", "Denge ( kompanzasyon ) zinciri oranı", lam * 100, "%", "GİRİŞ", 0),
+        veri("", "Denge ( kompanzasyon ) zinciri",
+             "Var" if lam else "Yok", "", "GİRİŞ"),
+        veri("λ", "Dengeleme oranı", lam, "—",
+             f"OFİS STANDARDI  ·  %{trn(O['denge_zinciri_orani'], 0)}"
+             if lam else "zincir yok", 2),
         hesap("MCR = λ × MSR", f"{tr(lam)} × {tr(MSR)}", MCR, "kg",
               "zincirin dengelediği kütle"),
         hesap("MTrav = 0,5 × H × mt",
@@ -823,10 +846,11 @@ def _motor(g, o):
         hesap("HP = N × 1,34", f"{tr(N)} × 1,34", HP, "HP"),
         veri("Nsç", "Kullanılan motor gücü", g["motor_gucu"], "kW", "GİRİŞ"),
         metin("Tahrik kasnağına gelen statik yük :"),
-        hesap("Tst-h = ( F1 + Ga ) / i" if r != 1 else "Tst-h = F1 + Ga",
-              (f"( {tr(F1)} + {tr(Ga)} ) / {trn(r, 0)}" if r != 1
-               else f"{tr(F1)} + {tr(Ga)}"), Tst_h, "kg",
-              "kasnağın taşıdığı toplam halat yükü"),
+        hesap("Tst-h = ( F1 + Ga + MCR ) / i" if r != 1
+              else "Tst-h = F1 + Ga + MCR",
+              (f"( {tr(F1)} + {tr(Ga)} + {tr(MCR)} ) / {trn(r, 0)}" if r != 1
+               else f"{tr(F1)} + {tr(Ga)} + {tr(MCR)}"), Tst_h, "kg",
+              "kasnağın taşıdığı toplam yük  ( halatlar + denge zinciri )"),
     ] + ([
         veri("Tst", "Makinenin azami kasnak statik yükü", Tst, "kg",
              "GİRİŞ — imalatçı kataloğu", 0),
@@ -851,8 +875,10 @@ def _motor(g, o):
         "asıldığı için tam dengeleme ( λ = %100 ) tam bu kütleyi ister."]
     b["notlar"] = [f"Binada en az {tr(N)} kW ( {tr(HP)} HP ) gücünde makine "
                    "motor kullanılacaktır.",
-                   "Tst, kasnağın taşıdığı TOPLAM halat yüküdür ( iki kol "
-                   "birden ) ve makinenin katalog sınırıyla karşılaştırılır. "
+                   "Tst, kasnağın taşıdığı TOPLAM yüktür ( iki halat kolu "
+                   "artı denge zinciri ) ve makinenin katalog sınırıyla "
+                   "karşılaştırılır. Denge zinciri Gmax'ta dengesizliği "
+                   "AZALTIR ama statik yükte ARTIRIR — iki ayrı büyüklüktür. "
                    "Makinenin kendi ağırlığı buna girmez — o, kaide "
                    "hesabındadır ( bölüm 2 ).",
                    "Bu güç KARARLI REJİM gücüdür:  beyan hızındaki dengesiz "
@@ -1046,7 +1072,13 @@ def _kabin_alani(g, o):
 def _aski_halatlari(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Dt, dh, nh, r = o["Dt"], o["dh"], o["nh"], o["r"]
-    Dp = g["saptirma_kasnak_capi"]
+    Dp = g["saptirma_kasnak_capi"]                       # ORTALAMA — Kp için
+    #  Ds — EN KÜÇÜK kasnak çapı.  m.5.5.2.1'in D/dr ≥ 40 sınırı HER kasnak
+    #  için geçerlidir;  Kp = (Dt/Dp)⁴ ise ortalama bükülme şiddetidir.
+    #  Girilmezse ortalamaya düşülür — eski davranış, sonuç değişmez.
+    Ds = g.get("saptirma_kasnak_min_capi")
+    Ds_verildi = _pozitif(Ds)
+    Ds = float(Ds) if Ds_verildi else Dp
     oran = Dt / dh
     oran_uygun = oran >= S["Dt_dh_asgari"]
 
@@ -1058,7 +1090,7 @@ def _aski_halatlari(g, o):
     #  ama Dp/dh = 30 olan bir tesis "UYGUN" çıkıyordu.
     #  Kasnak yoksa ( Nps = Npr = 0 ) ortada denetlenecek kasnak da yoktur.
     kasnak_var = (Nps or 0) + (Npr or 0) > 0
-    oran_p = Dp / dh
+    oran_p = Ds / dh
     oran_p_uygun = (not kasnak_var) or oran_p >= S["Dt_dh_asgari"]
     #  Nequiv(t) OFİS AÇILARINDAN HESAPLANIR  ( EN 81-50 Çizelge 2 ).
     #  Kitap bunu kanalın ADINA bağlı sabit bir tablodan okuyordu:  ofis
@@ -1102,8 +1134,10 @@ def _aski_halatlari(g, o):
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
         kontrol(f"Dt / dh = {tr(oran)}  ≥  {S['Dt_dh_asgari']}", oran_uygun),
     ] + ([
-        hesap("Dp / dh", f"{trn(Dp, 0)} / {tr(dh)}", oran_p, ""),
-        kontrol(f"Dp / dh = {tr(oran_p)}  ≥  {S['Dt_dh_asgari']}", oran_p_uygun),
+        veri("Ds", "Kasnakların EN KÜÇÜK çapı", Ds, "mm",
+             "GİRİŞ" if Ds_verildi else "girilmedi — ortalama çap kullanıldı", 0),
+        hesap("Ds / dh", f"{trn(Ds, 0)} / {tr(dh)}", oran_p, ""),
+        kontrol(f"Ds / dh = {tr(oran_p)}  ≥  {S['Dt_dh_asgari']}", oran_p_uygun),
     ] if kasnak_var else [
         metin("Tahrik kasnağı dışında kasnak yok  ( Nps = Npr = 0 ) — "
               "saptırma kasnağı oranı denetlenmedi."),
@@ -1149,7 +1183,7 @@ def _aski_halatlari(g, o):
     ]
     _esik = trn(S["Dt_dh_asgari"], 0)
     b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {_esik}"
-                             + (f"   ·   Dp/dh ≥ {_esik}" if kasnak_var else "")
+                             + (f"   ·   Ds/dh ≥ {_esik}" if kasnak_var else "")
                              + "   ·   S ≥ max( Sf ; Smin )"),
                   "metin": "UYGUNDUR." if (nh_uygun and oran_uygun and oran_p_uygun and s_uygun)
                            else ("UYGUN DEĞİLDİR — "
@@ -1158,7 +1192,7 @@ def _aski_halatlari(g, o):
                                        f"küçültün ( Dt/dh = {tr(oran)} )"]
                                       if not oran_uygun else [])
                                      + ([f"saptırma kasnağı çapını büyütün ya da halat "
-                                         f"çapını küçültün ( Dp/dh = {tr(oran_p)} )"]
+                                         f"çapını küçültün ( Ds/dh = {tr(oran_p)} )"]
                                         if not oran_p_uygun else [])
                                      + (["en az iki bağımsız askı halatı kullanın"] if not nh_uygun else [])
                                      + (["halat çapını / adedini artırın"]
@@ -1167,11 +1201,13 @@ def _aski_halatlari(g, o):
     b["notlar"] = []
     if kasnak_var:
         b["notlar"].append(
-            "▪ Dp, tahrik kasnağı DIŞINDAKİ kasnakların ORTALAMA çapıdır; "
-            f"Dp / dh ≥ {trn(S['Dt_dh_asgari'], 0)} denetimi de ortalamaya "
-            "uygulanır ( TS EN 81-20 m.5.5.2.1 ). Çapları birbirinden farklı "
-            "bir askı düzeninde EN KÜÇÜK kasnağı ayrıca denetleyin — ortalama "
-            "sınırı geçse de tek bir kasnak geçemiyor olabilir.")
+            "▪ İKİ AYRI ÇAP KULLANILIR:  Kp = (Dt/Dp)⁴ ORTALAMA çapı ister "
+            "( ortalama bükülme şiddeti ), m.5.5.2.1'in D/dr ≥ "
+            f"{trn(S['Dt_dh_asgari'], 0)} sınırı ise HER kasnak için geçerli "
+            "olduğundan EN KÜÇÜK çapa ( Ds ) uygulanır. Ds girilmezse "
+            "ortalamaya düşülür;  çapları farklı bir askı düzeninde Ds'yi "
+            "mutlaka girin — ortalama sınırı geçse de tek bir küçük kasnak "
+            "geçemiyor olabilir.")
     if r > 1 and Nps < 2:
         b["notlar"] += [
             "⚠ Palangalı ( 1:" + trn(r, 0) + " ) sistemde halatın en olumsuz "
@@ -1426,19 +1462,37 @@ def _terimler(g, o, durum):
     kisa_car = (0.5 * H - ycar) * nh * gh     # kabin EN ÜSTTE  ( ycar = H/2 → 0 )
     uzun_cwt = (0.5 * H + ycwt) * nh * gh     # ağırlık EN ALTTA ( kabin üstte )
     kisa_cwt = (0.5 * H - ycwt) * nh * gh
+    #  ------------------------------------------------------------------
+    #  DENGE ZİNCİRİ  MCRcar / MCRcwt        EN 81-50 m.5.11.2
+    #  ------------------------------------------------------------------
+    #  Terimler _T1 / _T2'de ZATEN vardı ama hiçbir yerde atanmıyordu:  tahrik
+    #  hesabı zincirden habersizdi.  Zincir kabin altından kuyu dibine sarkıp
+    #  karşı ağırlığa çıkar;  dağılımı HALATIN TAM TERSİDİR:
+    #      kabin EN ALTTA  →  zincir kabin tarafında KISA ( kabin kuyu dibinde ),
+    #                          karşı ağırlık tarafında UZUN
+    #      kabin EN ÜSTTE  →  tam tersi
+    #  Toplamı her konumda sabittir ve motor bölümündeki MCR'ye eşittir.
+    #  ( λ ve MCR bölüm 1'den okunur — tek kaynak.  Bölüm 1 her zaman önce
+    #    çalışır;  motor tek başına çağrılırsa zincirsiz duruma düşülür. )
+    mu_zincir = (o.get("lam") or 0.0) * r * gh * nh    # zincirin metre kütlesi
+    zincir_uzun = (0.5 * H + ycar) * mu_zincir         # = H · mu  = MCR
+    zincir_kisa = (0.5 * H - ycar) * mu_zincir         # = 0
     #  MTrav:  gezici kablonun indirgenmiş kütlesi
     trav = (0.25 * H + 0.5 * ycar) * w_kablo
 
     if durum == "yukleme":                    # sütun M — %125 yüklü kabin EN ALTTA
         t["Q"] = 1.25 * Q
         t["MSRcar"], t["MSRcwt"] = uzun_car, kisa_cwt
+        t["MCRcar"], t["MCRcwt"] = zincir_kisa, zincir_uzun
     elif durum == "fren_alt":                 # sütun P — %100 yüklü kabin EN ALTTA
         t["Q"] = Q
         t["a"] = a_in
         t["MSRcar"], t["MSRcwt"] = uzun_car, kisa_cwt
+        t["MCRcar"], t["MCRcwt"] = zincir_kisa, zincir_uzun
     elif durum == "fren_ust":                 # sütun Q — boş kabin EN ÜSTTE
         t["a"] = a_in
         t["MSRcar"], t["MSRcwt"] = kisa_car, uzun_cwt
+        t["MCRcar"], t["MCRcwt"] = zincir_uzun, zincir_kisa
         t["MTrav"] = trav
     elif durum == "bloke":                    # sütun O — boş kabin EN ÜSTTE
         t["Mcwt"] = 0.0
@@ -1446,6 +1500,7 @@ def _terimler(g, o, durum):
         #  kabin üstte, halat kütlesi karşı ağırlık tarafında.  O120 bunu
         #  "ns × H × gh" diye yazar;  ( 0,5·H + H/2 )·ns·gh ile birebir aynıdır.
         t["MSRcar"], t["MSRcwt"] = kisa_car, uzun_cwt
+        t["MCRcar"], t["MCRcwt"] = zincir_uzun, zincir_kisa
         t["MTrav"] = trav
     return t
 

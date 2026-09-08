@@ -744,6 +744,83 @@ def _denetim_bulgulari(r):
     r.kontrol("B9  'toplam_verim' anahtarı artık girdi listesinde yok",
               "toplam_verim" not in [a[0] for a in MK.MG.ALANLAR])
 
+    #  ── B9b  Tst  —  kasnak statik yükü, denge zinciri DÂHİL
+    #  Zincir Gmax'ta dengesizliği AZALTIR ama kasnak statik yükünde ARTIRIR;
+    #  ikisi ayrı büyüklüktür.  Zincir Tst'ye girmezse yük olduğundan küçük
+    #  çıkar ve kasnak yükü aşılmış bir makine "UYGUN" görünür — EMNİYETSİZ.
+    _t0 = MK.hesapla({"aski_orani": 2, "denge_zinciri": "Yok"})["ozet"]
+    _t1 = MK.hesapla({"aski_orani": 2, "denge_zinciri": "Var"})["ozet"]
+    r.kontrol("B9b denge zinciri Tst'yi ARTIRIYOR",
+              _t1["Tst_hesap"] > _t0["Tst_hesap"],
+              f"→ λ=0 {_t0['Tst_hesap']!r} · λ=100 {_t1['Tst_hesap']!r}")
+    r.kontrol("B9b aynı zincir Gmax'ı AZALTIYOR  ( ters yönde )",
+              _t1["N_hesap"] < _t0["N_hesap"],
+              f"→ λ=0 {_t0['N_hesap']!r} · λ=100 {_t1['N_hesap']!r}")
+    #  Artış tam olarak MCR/i kadar olmalı
+    _g9 = MK.hesapla({"aski_orani": 2, "denge_zinciri": "Var"})["girdi"]
+    _MCR = 2 * _g9["seyir_mesafesi"] * MK.MT.halat_agirlik(_g9["halat_capi"]) \
+           * _g9["halat_adedi"]
+    r.kontrol("B9b artış tam olarak MCR / i kadar",
+              _yakin(_t1["Tst_hesap"] - _t0["Tst_hesap"], _MCR / 2),
+              f"→ {_t1['Tst_hesap'] - _t0['Tst_hesap']!r} ≠ {_MCR / 2!r}")
+    #  ── B9c  Ds ( EN KÜÇÜK kasnak )  ile  Dp ( ORTALAMA )  AYRI kullanılır
+    #  Kp = (Dt/Dp)⁴ ortalama bükülme şiddetidir;  m.5.5.2.1'in D/dr ≥ 40
+    #  sınırı ise HER kasnak için geçerlidir — en küçüğe uygulanmalı.
+    _dsz = {"tahrik_kasnak_capi": 320, "halat_capi": 8,
+            "saptirma_kasnak_capi": 295, "kasnak_tek_yon": 2, "motor_gucu": 11}
+    _d_bos = MK.hesapla(dict(_dsz))
+    _d_320 = MK.hesapla(dict(_dsz, saptirma_kasnak_min_capi=320))
+    _d_200 = MK.hesapla(dict(_dsz, saptirma_kasnak_min_capi=200))
+    _b4 = lambda x: [b for b in x["bolumler"] if b["baslik"].startswith("4")][0]
+    r.kontrol("B9c Ds boşken ORTALAMA çapa düşülüyor  ( eski davranış )",
+              _b4(_d_bos)["sonuc"]["uygun"] is False,
+              "→ 295/8 = 36,9 < 40 olmalıydı")
+    r.kontrol("B9c Ds = 320 girilince oran kontrolü ONA uygulanıyor",
+              _b4(_d_320)["sonuc"]["uygun"] is True,
+              f"→ {_b4(_d_320)['sonuc']['metin']}")
+    r.kontrol("B9c Ds = 200 girilince reddediliyor",
+              _b4(_d_200)["sonuc"]["uygun"] is False)
+    r.kontrol("B9c Ds, Sf'yi DEĞİŞTİRMİYOR  ( Kp hâlâ ortalamadan )",
+              _yakin(_d_bos["ozet"]["Sf"], _d_320["ozet"]["Sf"])
+              and _yakin(_d_bos["ozet"]["Sf"], _d_200["ozet"]["Sf"]),
+              f"→ {_d_bos['ozet']['Sf']!r} · {_d_320['ozet']['Sf']!r} · "
+              f"{_d_200['ozet']['Sf']!r}")
+
+    #  ── B9d  Denge zinciri TAHRİK hesabına da girer  ( EN 81-50 m.5.11.2 )
+    #  MCRcar / MCRcwt terimleri _T1 / _T2'de vardı ama hiç atanmıyordu.
+    #  Zincirin dağılımı HALATIN TAM TERSİDİR ve toplamı her konumda sabittir.
+    def _ter(zincir, durum):
+        _g = MK.hesapla({"aski_orani": 2, "denge_zinciri": zincir})["girdi"]
+        _o = {"ofis": MK.US.sabitler(None)}
+        MK._motor(_g, _o)
+        return MK._terimler(_g, _o, durum), _o
+    for _d in ("yukleme", "fren_alt", "fren_ust", "bloke"):
+        _t0, _ = _ter("Yok", _d)
+        r.kontrol(f"B9d zincirsizde MCR terimleri sıfır  ( {_d} )",
+                  _t0["MCRcar"] == 0.0 and _t0["MCRcwt"] == 0.0,
+                  f"→ {_t0['MCRcar']!r} / {_t0['MCRcwt']!r}")
+    _talt, _o1 = _ter("Var", "yukleme")     # kabin EN ALTTA
+    _tust, _ = _ter("Var", "bloke")         # kabin EN ÜSTTE
+    _MCR = _o1["MCR"]
+    r.kontrol("B9d kabin EN ALTTA → zincir KARŞI AĞIRLIK tarafında",
+              _yakin(_talt["MCRcar"], 0.0) and _yakin(_talt["MCRcwt"], _MCR),
+              f"→ car {_talt['MCRcar']!r} · cwt {_talt['MCRcwt']!r} · MCR {_MCR!r}")
+    r.kontrol("B9d kabin EN ÜSTTE → zincir KABİN tarafında",
+              _yakin(_tust["MCRcar"], _MCR) and _yakin(_tust["MCRcwt"], 0.0),
+              f"→ car {_tust['MCRcar']!r} · cwt {_tust['MCRcwt']!r}")
+    r.kontrol("B9d zincir kütlesi her konumda KORUNUYOR",
+              _yakin(_talt["MCRcar"] + _talt["MCRcwt"],
+                     _tust["MCRcar"] + _tust["MCRcwt"]))
+    r.kontrol("B9d zincir dağılımı HALATIN TERSİ",
+              (_talt["MSRcar"] > _talt["MSRcwt"]) != (_talt["MCRcar"] > _talt["MCRcwt"]),
+              f"→ MSR {_talt['MSRcar']:.1f}/{_talt['MSRcwt']:.1f} · "
+              f"MCR {_talt['MCRcar']:.1f}/{_talt['MCRcwt']:.1f}")
+
+    r.kontrol("B9b Tst girilmezse kontrol yapılmıyor, karar bozulmuyor",
+              MK.hesapla({"motor_gucu": 11})["bolumler"][0]["sonuc"]["uygun"] is True
+              and MK.hesapla({"motor_gucu": 11, "makine_tst": 100000}
+                             )["bolumler"][0]["sonuc"]["uygun"] is True)
+
     #  ── B10  Kabin önü girintisi  ( EN 81-20 m.5.4.2.1.3 )
     _a90 = MK.hesapla({"uzun_pervaz": 90})["ozet"]["kabin_alani"]
     _a100 = MK.hesapla({"uzun_pervaz": 100})["ozet"]["kabin_alani"]
@@ -1057,22 +1134,24 @@ def _denetim_bulgulari(r):
     _e1b, _e1s = _b4()
     r.kontrol("E1  denetimin girdisi hesaplanabiliyor", _e1b is not None,
               f"→ {_e1s.get('hata')}")
-    r.kontrol("E1  Dp/dh = 30 halat bölümünü DÜŞÜRÜYOR",
+    r.kontrol("E1  Ds/dh = 30 halat bölümünü DÜŞÜRÜYOR",
               _e1b["sonuc"]["uygun"] is False)
     r.kontrol("E1  gerekçe saptırma kasnağını adıyla söylüyor",
               "saptırma kasnağı" in _e1b["sonuc"]["metin"],
               f"→ {_e1b['sonuc']['metin']!r}")
-    r.kontrol("E1  bölüm başlığı Dp/dh ölçütünü duyuruyor",
-              "Dp/dh" in _e1b["sonuc"]["baslik"], f"→ {_e1b['sonuc']['baslik']!r}")
+    #  Oran kontrolü artık EN KÜÇÜK kasnak çapına ( Ds ) uygulanır;  Ds
+    #  girilmezse ortalamaya düşülür, yani bu senaryoda sonuç değişmez.
+    r.kontrol("E1  bölüm başlığı Ds/dh ölçütünü duyuruyor",
+              "Ds/dh" in _e1b["sonuc"]["baslik"], f"→ {_e1b['sonuc']['baslik']!r}")
     _dpsat = [a for a in _e1b["adimlar"]
-              if "Dp / dh" in str(a.get("aciklama") or "")]
-    r.kontrol("E1  paftada Dp/dh kontrol satırı var", bool(_dpsat),
+              if "Ds / dh" in str(a.get("aciklama") or "")]
+    r.kontrol("E1  paftada Ds/dh kontrol satırı var", bool(_dpsat),
               f"→ {[a.get('aciklama') for a in _e1b['adimlar']][:6]}")
     r.kontrol("E1  o satır UYGUN DEĞİL diyor",
               bool(_dpsat) and _dpsat[0]["deger"] == "UYGUN DEĞİL",
               f"→ {_dpsat[0]['deger'] if _dpsat else None!r}")
     #  SINIR:  tam 40 geçer, 1 mm altı geçmez  ( dh = 8 → Dp = 320 )
-    r.kontrol("E1  Dp/dh = 40 tam sınırı kabul ediliyor",
+    r.kontrol("E1  Ds/dh = 40 tam sınırı kabul ediliyor",
               _b4(saptirma_kasnak_capi=320)[0]["sonuc"]["uygun"] is True)
     r.kontrol("E1  sınırın 1 mm altı reddediliyor",
               _b4(saptirma_kasnak_capi=319)[0]["sonuc"]["uygun"] is False)
@@ -1082,8 +1161,8 @@ def _denetim_bulgulari(r):
               ["sonuc"]["uygun"] is False)
     #  KASNAK YOKSA denetlenecek kasnak da yoktur
     _e1y = _b4(kasnak_tek_yon=0, kasnak_ters_yon=0)[0]
-    r.kontrol("E1  kasnak yokken Dp oranı aranmıyor",
-              _e1y["sonuc"]["uygun"] is True and "Dp/dh" not in _e1y["sonuc"]["baslik"],
+    r.kontrol("E1  kasnak yokken Ds oranı aranmıyor",
+              _e1y["sonuc"]["uygun"] is True and "Ds/dh" not in _e1y["sonuc"]["baslik"],
               f"→ {_e1y['sonuc']['baslik']!r}")
     r.kontrol("E1  kasnak yokken pafta bunu YAZIYOR",
               any("kasnak yok" in str(a.get("deger") or "") for a in _e1y["adimlar"]),
@@ -1092,7 +1171,7 @@ def _denetim_bulgulari(r):
     _v = MK.hesapla({})
     _vb4 = [x for x in _v["bolumler"] if x["baslik"].startswith("4 ")][0]
     r.kontrol("E1  varsayılan projede iki oran da AYNI sonucu veriyor",
-              ("Dt/dh" in _vb4["sonuc"]["baslik"]) and ("Dp/dh" in _vb4["sonuc"]["baslik"]))
+              ("Dt/dh" in _vb4["sonuc"]["baslik"]) and ("Ds/dh" in _vb4["sonuc"]["baslik"]))
     #  Sapma kaydı bu bulguyu taşıyor
     r.kontrol("E1  sapma kaydında yazılı",
               any("Saptırma kasnağı" in ad for ad, *_ in MK.EXCEL_FARKLARI))

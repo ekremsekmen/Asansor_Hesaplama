@@ -388,7 +388,9 @@ EK_GIRDI_HUCRELERI = (
     #  Katalog halat verisi ( boşsa TS 12385-5 tablosu kullanılır )
     ("halat_birim_kutle",     251, "Askı halatı 1 m ağırlığı  ( imalatçı )", "kg/m"),
     ("halat_kopma_kN",        252, "Askı halatı kopma yükü  ( imalatçı )",  "kN"),
-    ("kompanzasyon_orani",    253, "λ — denge zinciri oranı",              "%"),
+    ("denge_zinciri",         253, "Denge ( kompanzasyon ) zinciri",       "—"),
+    ("saptirma_kasnak_min_capi", 254,
+     "Ds — saptırma kasnaklarının EN KÜÇÜK çapı", "mm"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -398,8 +400,8 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
 #  Blok, yukarıdaki ek girdi listesi büyüdükçe aşağı kayar;  konum yalnız
 #  YAZMA içindir, okuma başlığı arayarak bulur ( _ofis_basligi ).
-OFIS_BASLIK = 257
-OFIS_BAS = 259
+OFIS_BASLIK = 259
+OFIS_BAS = 261
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -410,7 +412,7 @@ OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
 EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
-                     "siginma_tipi_ust", "siginma_tipi_dip")
+                     "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -869,13 +871,27 @@ def _standarda_uydur(wb, g):
     #  denge zinciri ve gezici kablo hiç girmez.  Teslim kopyası motorla aynı
     #  bağıntıyı kurar:
     #      Gmax = ( Q + P − Ga ) + Gs + i·H·gh·ns·( 1 − λ ) + 0,5·H·mt
-    _lam = f"IF(ISNUMBER('Veri Girişi'!B{_ek_satir('kompanzasyon_orani')})," \
-           f"'Veri Girişi'!B{_ek_satir('kompanzasyon_orani')}/100,0)"
+    _lam = (f"IF('Veri Girişi'!B{_ek_satir('denge_zinciri')}=\"Var\","
+            f"{float(O['denge_zinciri_orani']) / 100.0!r},0)")
     _mt = ("(IFERROR(VLOOKUP('Veri Girişi'!B107,TABLOLAR!$D$61:$G$64,4,0),0)"
            "+IFERROR(VLOOKUP('Veri Girişi'!B108,TABLOLAR!$D$61:$G$64,4,0),0))")
     ws["AQ9"] = (f"=(AQ14+AQ15)-AQ13+AQ8"
                  f"+AQ18*AQ20*'Veri Girişi'!B100*'Veri Girişi'!C63*(1-{_lam})"
                  f"+0.5*'Veri Girişi'!C63*{_mt}")
+
+    #  ㉟  SIĞINMA HACMİ TİPİ  —  beyan edilen duruş kitaba da yazılır.
+    #  Kitapta ölçüler ve "( EN 81-20 Çizelge 3 - çömelmiş duruş )" açıklaması
+    #  hücreye ÇİVİLİDİR.  Program duruşu girdiden alıyor;  yamalanmazsa pafta
+    #  "Yatarak" derken teslim edilen kitap çömelme ölçülerini yazar ve
+    #  okuyucu hangi duruşun beyan edildiğini yanlış öğrenir.
+    for anahtar, konum, (jh, mh, ph, rh) in (
+            ("siginma_tipi_ust", "ust", ("J639", "M639", "P639", "R639")),
+            ("siginma_tipi_dip", "dip", ("J644", "M644", "P644", "R644"))):
+        tip = g.get(anahtar) or "Çömelme"
+        olcu = MT.siginma_hacmi(tip, konum) or MT.siginma_hacmi("Çömelme", konum)
+        ws[jh], ws[mh], ws[ph] = olcu
+        ws[rh] = ("m ebatlarında güvenlik boşluğu "
+                  f"( TS EN 81-20 m.5.2.5.7.1 / m.5.2.5.8.1 — {tip.lower()} )")
 
     #  ㉞  KATALOG HALAT VERİSİ tabloyu ezer  ( bkz. mukavemet._halat_verisi ).
     #  TS 12385-5 yalnız lif özlü halatları kapsar;  imalatçı değeri girildiyse

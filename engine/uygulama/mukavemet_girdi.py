@@ -83,7 +83,14 @@ ALANLAR = (
     ("sap_kasnak_yuk",    "F97",  "C  ( sap. kasnak yükü )",           "mm",   "sayi", None, 230),
     ("makine_yatak_yuk",  "F98",  "D  ( makine yatak yükü )",          "mm",   "sayi", None, 172),
     ("tahrik_kasnak_capi", "F99", "D1 ( tahrik kasnağı çapı )",        "mm",   "sayi", None, 240),
-    ("saptirma_kasnak_capi", "F100", "D2 ( saptırma kasnağı çapı )",   "mm",   "sayi", None, 240),
+    ("saptirma_kasnak_capi", "F100", "D2 — saptırma kasnaklarının ORTALAMA çapı", "mm", "sayi", None, 240),
+    #  Ds — EN KÜÇÜK kasnak çapı.  Sf formülündeki Kp = (Dt/Dp)⁴ ORTALAMA
+    #  bükülme şiddetini temsil eder;  EN 81-20 m.5.5.2.1'in D/dr ≥ 40 sınırı
+    #  ise HER kasnak için ayrı ayrı geçerlidir — ortalama sınırı geçse bile
+    #  tek bir küçük kasnak geçemiyor olabilir.  Boş bırakılırsa ortalama çap
+    #  kullanılır ( eski davranış ).
+    ("saptirma_kasnak_min_capi", "", "Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( boşsa ortalama )",
+     "mm", "sayi", None, None),
     ("sase_yuksekligi",   "F101", "Şase yüksekliği",                   "mm",   "sayi", None, 1100),
     ("dikine_kiris",      "F102", "E  ( dikine kiriş ölçüsü )",        "—",    "secim",
      MT.NPU_OLCULERI, 120),
@@ -108,8 +115,8 @@ ALANLAR = (
     #  dengesizliği karşılar.  Program bunu HİÇ bilmiyordu:  zincirli bir
     #  tesiste motoru gereğinden büyük hesaplıyordu ( 120 m seyirde 20,7 kW
     #  yerine 39,3 kW ).  %0 = zincir yok  ·  %100 = tam dengeleme.
-    ("kompanzasyon_orani", "",     "λ — denge zinciri oranı  ( %0 = zincir yok )",
-     "%", "sayi", None, 0),
+    ("denge_zinciri",     "",     "Denge ( kompanzasyon ) zinciri",     "—",    "secim",
+     ("Yok", "Var"), "Yok"),
     ("halat_birim_kutle", "",     "Askı halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
      "kg/m", "sayi", None, None),
     ("halat_kopma_kN",    "",     "Askı halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
@@ -268,7 +275,8 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
 OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet",
                      "reg_devreye_hizi", "makine_tst",
-                     "halat_birim_kutle", "halat_kopma_kN")
+                     "halat_birim_kutle", "halat_kopma_kN",
+                     "saptirma_kasnak_min_capi")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
 #  hesaba katılacak azami sürtünme katsayısı.
@@ -335,12 +343,13 @@ GRUPLAR = (
       "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
      ("motor_gucu", "makine_agirligi", "sap_kasnak_yuk", "makine_yatak_yuk",
-      "tahrik_kasnak_capi", "saptirma_kasnak_capi", "sase_yuksekligi",
+      "tahrik_kasnak_capi", "saptirma_kasnak_capi",
+      "saptirma_kasnak_min_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
       "yan_yatak_boyu", "makine_tipi", "makine_tst")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
-      "halat_birim_kutle", "halat_kopma_kN", "kompanzasyon_orani",
+      "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
       "halat_arasi_yan", "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
@@ -575,7 +584,7 @@ def dogrula(g):
     for _ad, _alt, _ust in (("halat_birim_kutle", 0.02, 5.0),
                             ("halat_kopma_kN", 5.0, 2000.0),
                             ("makine_tst", 100.0, 100000.0),
-                            ("kompanzasyon_orani", 0.0, 100.0)):
+                            ):
         _v = g.get(_ad)
         if _v is None or _v == "":
             continue
