@@ -96,7 +96,7 @@ async function mukavemetKur(){
     if(acik.length) ic += mSatir(acik);
     if(!ic) continue;                       // bütün alanları proje geneli olan grup
     h += `<div class="m-grup" data-grup="${i}" data-ad="${kacis(g.ad)}">
-            <button type="button" class="m-grup-bas" onclick="mGrupAc(${i})">
+            <button type="button" class="m-grup-bas" onclick="mGrupDegistir(${i})">
               <span class="m-grup-ok">▸</span>
               <span class="m-grup-ad">${kacis(g.ad)}</span>
               <span class="m-grup-adet" data-toplam="${g.alanlar.filter(
@@ -380,7 +380,10 @@ async function hesapMukavemet(){
       if(gk && yeni !== null && yeni !== undefined){ gk.value = mSayi(yeni); yaz(); }
     }
     cizMukavemet(aktif);
-    if((c.asansorler || []).length > 1) mAsansorOzetiEkle(c);
+    //  Asansör listesi YALNIZ PROJE sekmesindedir.  Bir süre her asansörün
+    //  sonuç panelinin başına da basılıyordu;  ASANSÖR 1 sekmesinde "1 · 2"
+    //  listesi görmek, o sekmenin zaten 1 nolu asansöre ait olduğunu bile
+    //  bile tekrar söylemektir — hangi sekmede olduğun üstteki şeritte yazılı.
     mProjeOzetiCiz(c);
     //  Genel rozet PROJE sekmesindedir:  asansör sekmelerininki kendilerine
     //  aittir ( bkz. mAsansorSekmeleriTazele ).
@@ -489,6 +492,29 @@ function mGrupAc(i, sessiz){
     const gr = document.querySelector(`#m_form .m-grup[data-grup="${i}"]`);
     if(gr) gr.scrollIntoView({block:'nearest', behavior:'smooth'});
   }
+}
+
+/*  BAŞLIĞA TIKLAMA AÇ/KAPADIR.  Açık gruba yeniden tıklamak eskiden hiçbir
+    şey yapmıyordu ( mGrupAc her zaman AÇIYORDU ) — üç kez tıklayıp "bozuk mu"
+    diye bakılıyordu.  Kapatmak son seçili grubu DEĞİŞTİRMEZ:  sayfa
+    yenilendiğinde aynı grup yine açık gelir, hepsi kapalı bir form değil. */
+function mGrupDegistir(i){
+  const gr = document.querySelector(`#m_form .m-grup[data-grup="${i}"]`);
+  if(gr && gr.classList.contains('acik')){ mGruplariKapat(); return; }
+  mGrupAc(i);
+}
+
+function mGruplariKapat(){
+  const ara = $('m_ara');
+  if(ara && ara.value){ ara.value = ''; }
+  document.querySelectorAll('#m_form .m-grup').forEach(gr=>{
+    gr.classList.remove('acik');
+    gr.querySelector('.m-grup-ic').hidden = true;
+    gr.querySelector('.m-grup-ok').textContent = '▸';
+    gr.querySelectorAll('.alan[hidden]').forEach(a=>{ a.hidden = false; });
+    const sy = gr.querySelector('.m-grup-adet');
+    if(sy) sy.textContent = sy.dataset.toplam;
+  });
 }
 
 /*  BÜTÜN grupları açar.  Otomatik testler alanları id ile doldurur;
@@ -669,34 +695,6 @@ function mukavemetIstek(){
   return {asansorler, proje_geneli: pg, sabitler: ofisSabitleri()};
 }
 
-
-/*  ÇOKLU SONUÇ ÖZETİ.  Sonuç panelinin başına bütün asansörlerin durumunu
-    koyar;  satıra tıklayınca o asansöre geçilir.  Ayrıntı hep AKTİF
-    asansörün — dört asansörün bütün bölümlerini alt alta basmak paneli
-    okunamaz hâle getirirdi, o iş paftanın. */
-function mAsansorOzetiEkle(c){
-  const kutu = $('m_sonuc'); if(!kutu) return;
-  const liste = (c.ozet && c.ozet.asansorler) || [];
-  let h = `<div class="serit"><span>ASANSÖRLER</span>
-             <span class="kaynak">${liste.length} asansör · ayrıntı aktif olanın</span></div>
-           <div class="kaydir"><table class="veri">
-             <tr><th>No</th><th>Asansör</th><th>N ( kW )</th><th>Sonuç</th></tr>`;
-  liste.forEach(a=>{
-    const sinif = a.aktif === false ? 'hata'
-                : (a.tumu_uygun === true ? 'ok' : (a.tumu_uygun === false ? 'hata' : ''));
-    const metin = a.aktif === false ? 'HESAP YAPILAMADI'
-                : (a.tumu_uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR');
-    h += `<tr class="m-gidilir${a.no - 1 === MUK_AKTIF ? ' etkin' : ''}"
-              onclick="mAsansorSec(${a.no - 1})">
-            <td class="etiket">${a.no}</td>
-            <td>${kacis(a.tanim || '')}</td>
-            <td>${a.N_hesap == null ? '—' : tr(a.N_hesap)}</td>
-            <td class="${sinif}">${metin}</td></tr>`;
-  });
-  h += '</table></div>';
-  const ic = kutu.querySelector('.kart-ic') || kutu.firstElementChild || kutu;
-  ic.insertAdjacentHTML('afterbegin', h);
-}
 
 /*  PROJE sekmesinin sağ sütunu:  bütün asansörlerin durumu bir arada.
     Ayrıntı asansör sekmelerinde;  burada yalnız "hangisi kaldı" görünür. */

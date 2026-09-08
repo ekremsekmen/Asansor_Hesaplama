@@ -67,6 +67,20 @@ EK_ALAN = {a[0]: a for a in EK_ALANLAR}
 EK_GRUP = ("Elektrik ve topraklama  ( uygulama projesi )",
            tuple(a[0] for a in EK_ALANLAR))
 
+#  ELEKTRİK BÖLÜMLERİNİN GİRDİ GRUPLARI  ( mukavemet_girdi.BOLUM_GRUBU'nun
+#  devamı — oradaki 1-10 mukavemet bölümleridir ).  Numaralar sabittir:
+#  mukavemetin 10 bölümünden sonra elektrik hep 11-12-13-14 sırasıyla gelir
+#  ( bkz. hesap.ELEKTRIK_BOLUMLERI ).  Buradan sonrası — makine dairesi
+#  aydınlatması ve topraklama — PROJE GENELİDİR;  girdileri asansör
+#  formunda değil PROJE sekmesinde durur ve numaraları makine dairesinin
+#  olup olmamasına göre kayar, o yüzden eşlenmezler.
+EK_BOLUM_GRUBU = {
+    "11": ("Kabin ve kapı",),                       # kabin aydınlatma ← kabin ölçüleri
+    "12": (EK_GRUP[0], "Durak ve kuyu"),            # kuyu aydınlatma  ← KG · kuyu boyu
+    "13": ("Makine ve motor", EK_GRUP[0]),          # kurulu güç       ← Nsç · armatürler
+    "14": (EK_GRUP[0], "Makine ve motor"),          # gerilim düşümü   ← S1 · L1 · S2 · L2
+}
+
 
 def arayuz_alanlari():
     """Formun kendini üretmesi için tüm gruplar  ( mukavemet + elektrik )."""
@@ -78,6 +92,8 @@ def arayuz_alanlari():
                      "varsayilan": v}
                     for a, et, b, t, s, v in EK_ALANLAR],
     })
+    veri["bolum_grubu"].update({no: list(gr)
+                                for no, gr in EK_BOLUM_GRUBU.items()})
     return veri
 
 

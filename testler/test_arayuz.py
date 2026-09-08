@@ -177,7 +177,7 @@ def calistir():
         #  10. bölümün kuyu dibi sığınma yüksekliği ise TAMPONLAR'daki baba
         #  yüksekliğinden gelir.  Eskiden tek grup açılıyordu ve mühendis
         #  aradığı alanı açılan grupta bulamıyordu.
-        for _no in ("1", "2", "4", "7", "10"):
+        for _no in ("1", "2", "4", "7", "10", "11", "12", "14"):
             pg.evaluate(f"mGirdiyeGit('{_no}')")
             r.esit(f"bölüm {_no} → girdi grupları",
                    sorted(pg.eval_on_selector_all(
@@ -199,8 +199,29 @@ def calistir():
         r.esit("atlamadan sonra yalnız eşlemedeki gruplar açık",
                pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length"),
                len(pg.evaluate("mBolumGruplari('10')")))
-        r.kontrol("sonuç tablosunda bölüm satırları tıklanabilir",
-                  pg.eval_on_selector_all("#m_sonuc tr.m-gidilir", "e=>e.length") >= 10)
+        #  BAŞLIK AÇ/KAPADIR.  Açık gruba yeniden tıklamak eskiden hiçbir şey
+        #  yapmıyordu — grup bir açıldı mı kapanmıyordu.
+        pg.evaluate("mGrupAc(5)")
+        _ac1 = pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length")
+        pg.click('#m_form .m-grup[data-grup="5"] .m-grup-bas')
+        pg.wait_for_timeout(300)
+        _ac2 = pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length")
+        pg.click('#m_form .m-grup[data-grup="5"] .m-grup-bas')
+        pg.wait_for_timeout(300)
+        _ac3 = pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length")
+        r.esit("başlığa tıklamak grubu açıp kapatıyor", [_ac1, _ac2, _ac3], [1, 0, 1])
+        #  Kapalıyken de okunan girdi kümesi AYNI kalmalı  ( görünüm ≠ hesap )
+        pg.evaluate("mGruplariKapat()")
+        r.esit("hepsi kapalıyken okunan girdi kümesi değişmiyor",
+               pg.evaluate("Object.keys(mukavemetGirdi()).length"), _ga)
+        #  ON DÖRT BÖLÜMÜN HEPSİ TIKLANABİLİR.  Elektrik bölümleri ( 11-14 )
+        #  bir süre eşlemede yoktu:  mukavemet satırları girdisine götürüyor,
+        #  aydınlatma ve gerilim düşümü satırları ölü duruyordu.
+        r.esit("sonuç tablosunda bölüm satırlarının hepsi tıklanabilir",
+               pg.eval_on_selector_all(
+                   "#m_sonuc tr.m-gidilir td.etiket",
+                   "e=>e.map(x=>x.textContent.trim().split(' ')[0])"),
+               [str(_i) for _i in range(1, 15)])
 
         #  ── ÇOKLU ASANSÖR  ( 1 - 4 asansör, tek proje )
         #  Asansör adedi SEÇİLİR ( ekle/sil değil ):  bir binada kaç asansör
@@ -260,6 +281,20 @@ def calistir():
         r.esit("çoklu: özetteki adlar",
                pg.evaluate("SON.mc.ozet.asansorler.map(a=>a.tanim)"),
                ["İnsan 1", "Yük"])
+        #  ASANSÖR LİSTESİ YALNIZ PROJE SEKMESİNDE.  Bir süre her asansörün
+        #  sonuç panelinin başına da basılıyordu;  ASANSÖR 2 sekmesinde "1 · 2"
+        #  listesi görmek, o sekmenin zaten 2 nolu asansöre ait olduğunu bile
+        #  bile tekrar söylemekti — hangi sekmede olunduğu üstteki şeritte yazılı.
+        r.kontrol("asansör listesi hesap sayfasında YOK",
+                  "ASANSÖRLER" not in pg.inner_text("#m_sonuc"))
+        r.esit("hesap panelinin ilk şeridi bölüm sonuçları",
+               pg.eval_on_selector("#m_sonuc .serit span", "e=>e.textContent.trim()"),
+               "BÖLÜM SONUÇLARI")
+        r.kontrol("asansör listesi PROJE sekmesinde duruyor",
+                  "PROJE ÖZETİ" in pg.inner_text("#p_ozet"),
+                  f"→ {pg.inner_text('#p_ozet')[:60]!r}")
+        r.esit("proje özeti iki asansörü listeliyor",
+               pg.eval_on_selector_all("#p_ozet table tr", "e=>e.length"), 3)
         #  HER ASANSÖR KENDİ GİRDİSİYLE hesaplanır:  sonuçta girdi de dönüyor,
         #  aktif asansörün girdisi ikisine birden gönderilmiş olsa iki motor
         #  gücü aynı görünürdü.
