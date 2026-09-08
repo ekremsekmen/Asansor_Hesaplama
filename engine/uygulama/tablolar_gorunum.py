@@ -168,15 +168,6 @@ def arayuz_tablolari(ofis=None):
         "satirlar": _satirlar(MT.AGIRLIK_MALZEMESI),
     })
     t.append({
-        "ad": "Ray arası  →  karşı ağırlık genişliği",
-        "kaynak": "kaynak çalışma kitabı TABLOLAR",
-        "aciklama": "",
-        "basliklar": ["Ray arası  ( mm )", "Ağırlık genişliği  ( mm )"],
-        #  Tablo iki satırlık bir eşlemedir:  ( ray araları ) → ( genişlikler ).
-        #  Motorun kendi arama işlevinden okunur ki ekran ile hesap ayrışmasın.
-        "satirlar": [[a, MT.agirlik_genisligi(a)] for a in MT.RAY_ARALARI],
-    })
-    t.append({
         "ad": "Gezici kablo  ( bükülgen )",
         "kaynak": "kaynak çalışma kitabı TABLOLAR",
         "aciklama": "Kablo tipi → ağırlık · çap · kesit.",

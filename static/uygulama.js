@@ -417,8 +417,22 @@ function mukavemetGirdi(){
 }
 
 let mZaman = null;
+/*  MALZEME SEÇİNCE DERİNLİK KUTUSU DOLAR — hesabı bu doldurmaz.
+    Motor yalnız kutudaki sayıyı okur ( TS EN 81-50 Ek C.2.2 karşı ağırlığın
+    KENDİ ölçüsünü ister ).  Ama malzeme seçince ekranda hiçbir şeyin
+    değişmemesi sessiz bir tuzaktı:  eskiden derinliği malzeme belirliyordu,
+    "Pik Döküm" seçen biri 100 mm ile hesaplandığını sanmaya devam ederdi. */
+function mMalzemeDerinligi(){
+  const tablo = (MUK && MUK.malzeme_derinligi) || {};
+  const m = $(M_ID('agirlik_malzemesi')), d = $(M_ID('agirlik_derinligi'));
+  if(!m || !d) return;
+  const v = tablo[m.value];
+  if(v !== undefined && v !== null) d.value = mSayi(v);
+}
+
 function mukavemetPlanla(hedef){
   if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = true;
+  if(hedef && hedef.id === M_ID('agirlik_malzemesi')) mMalzemeDerinligi();
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);

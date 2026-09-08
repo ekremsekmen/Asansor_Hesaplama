@@ -247,7 +247,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 33)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 34)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
         #    · TS EN 81-20 / 81-50 maddesi

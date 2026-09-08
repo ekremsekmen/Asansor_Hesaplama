@@ -324,6 +324,44 @@ def calistir():
                   f"→ {pg.inner_text('#p_ozet')[:60]!r}")
         r.esit("proje özeti iki asansörü listeliyor",
                pg.eval_on_selector_all("#p_ozet table tr", "e=>e.length"), 3)
+        #  ── KARŞI AĞIRLIĞIN ÖLÇÜLERİ  ( TS EN 81-50 Ek C.2.2 · Gx · Gy )
+        #  Eskiden ikisi de türetiliyordu:  genişlik RAY ARASINDAN ( üç
+        #  değere kilitli açılır liste ), derinlik MALZEMEDEN.  Standart
+        #  karşı ağırlığın KENDİ ölçülerini veri olarak ister;  türetme
+        #  kaldırıldı.  Malzeme seçimi artık yalnız kutuyu DOLDURUR — hesap
+        #  her hâlükârda kutudaki sayıyı okur.
+        pg.evaluate("mTumGruplariAc()")
+        r.esit("ray arası serbest kutu",
+               pg.eval_on_selector("#m_agirlik_ray_arasi", "e=>e.tagName"), "INPUT")
+        r.kontrol("karşı ağırlık ölçüleri formda",
+                  pg.eval_on_selector_all("#m_agirlik_genisligi", "e=>e.length") == 1
+                  and pg.eval_on_selector_all("#m_agirlik_derinligi", "e=>e.length") == 1)
+        pg.select_option("#m_agirlik_malzemesi", "Pik Döküm")
+        pg.wait_for_timeout(1800)
+        r.esit("malzeme seçimi derinlik kutusunu dolduruyor",
+               pg.input_value("#m_agirlik_derinligi"), "100")
+        r.esit("hesap kutudaki derinliği kullanıyor",
+               pg.evaluate("SON.m.girdi.agirlik_derinligi"), 100)
+        pg.fill("#m_agirlik_derinligi", "180")
+        pg.wait_for_timeout(1800)
+        r.esit("elle girilen ölçü tabloyu eziyor",
+               pg.evaluate("SON.m.girdi.agirlik_derinligi"), 180)
+        #  Tablo dışı bir ray arası artık hesabı ETKİLEMEZ ve UYARI ÜRETMEZ
+        _once = pg.evaluate("SON.m.bolumler.find(b=>b.kimlik==='agirlik_raylari')"
+                            ".adimlar.map(a=>a.deger)")
+        pg.fill("#m_agirlik_ray_arasi", "1234")
+        pg.wait_for_timeout(1800)
+        _sonra = pg.evaluate("SON.m.bolumler.find(b=>b.kimlik==='agirlik_raylari')"
+                             ".adimlar.map(a=>a.deger)")
+        r.esit("ray arası ray gerilmesini değiştirmiyor",
+               [x for x in _once if x != 1050], [x for x in _sonra if x != 1234])
+        #  TEMİZLİK — sonraki kontrolleri bozmasın
+        pg.select_option("#m_agirlik_malzemesi", "Barit")
+        pg.wait_for_timeout(600)
+        pg.fill("#m_agirlik_ray_arasi", "1050")
+        pg.fill("#m_agirlik_genisligi", "960")
+        pg.wait_for_timeout(1800)
+
         #  ── FORM ALANLARININ TEK GEZİNTİSİ
         #  "Alan nedir, nasıl okunur, nasıl yazılır" bilgisi BİR YERDE
         #  durmalı.  Bir süre aynı gezinti beş ayrı yerde elle yazılıydı ve

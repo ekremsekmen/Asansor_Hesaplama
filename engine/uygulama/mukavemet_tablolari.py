@@ -601,49 +601,49 @@ def kablo_yukseklik(tip):
 #  NOT:  Excel'deki VLOOKUP aralığı U61:W63'tür, ama 63. satır bir tablo
 #  satırı değil — orada duran =( C80-150 )/... formülü yalnızca U64'e
 #  girer, U64'ü de hiçbir hesap okumaz.  Ölü artık; tabloya alınmadı.
+#  KARŞI AĞIRLIK MALZEMESİ.  Kaynak kitap bu tablodan karşı ağırlığın
+#  DERİNLİĞİNİ ( Barit 150 · Pik döküm 100 mm ) ve yüksekliğini türetiyordu.
+#  Derinlik artık GİRDİDİR ( bkz. aşağıdaki "KALDIRILDI" notu ):  ölçü
+#  malzemenin değil, imal edilen çerçevenin özelliğidir ve TS EN 81-50
+#  Ek C.2.2 onu veri olarak ister.  Sayı sütunları BAŞLANGIÇ DEĞERİ olarak
+#  kaldı — form açılırken derinliğe barit çerçevenin alışılmış ölçüsü gelir;
+#  hesap yalnız girilen değeri okur.
 AGIRLIK_MALZEMESI = (
     ('Barit', 150, 101),
     ('Pik Döküm', 100, 100),
 )
 
-
-
 AGIRLIK_MALZEMELERI = tuple(r[0] for r in AGIRLIK_MALZEMESI)
 
 
-def agirlik_derinlik(malzeme):
-    return _ara(AGIRLIK_MALZEMESI, malzeme, 1)
-
-
-def agirlik_yukseklik(malzeme):
-    return _ara(AGIRLIK_MALZEMESI, malzeme, 2)
-
-
 # =====================================================================
-#  AĞIRLIK RAY ARASI → KARŞI AĞIRLIK GENİŞLİĞİ       [ TABLOLAR!X59:Z60 ]
+#  AĞIRLIK RAY ARASI → GENİŞLİK TABLOSU  ·  KALDIRILDI
 # =====================================================================
-#  Excel:  HLOOKUP( 'Veri Girişi'!B119 ; X59:Z60 ; 2 ; 0 )
-#  Üst satır aranan anahtar ( ray arası mm ), alt satır sonuç
-#  ( karşı ağırlık çerçeve genişliği mm ).
+#  Kaynak Excel karşı ağırlık genişliğini ray arasından türetiyordu:
+#      HLOOKUP( 'Veri Girişi'!B119 ; TABLOLAR!X59:Z60 ; 2 ; 0 )
+#      ray arası   700 · 1050 · 1400   →   genişlik   660 · 960 · 1320
+#  TAM EŞLEŞME arandığı için girdi üç değere kilitliydi;  oysa ray arası her
+#  tesiste ÖLÇÜLEN bir mesafedir.
 #
-#  NOT:  X61/X62 satırları ( 30·42·60 ve 84·123·169 ) yalnızca TABLOLAR!U63
-#  ölü formülüne girer; hiçbir hesap okumaz — tabloya alınmadı.
-AGIRLIK_RAY_ARASI = (
-    (700, 1050, 1400),
-    (660, 960, 1320),
-)
-
-RAY_ARALARI = AGIRLIK_RAY_ARASI[0]
-
-
-def agirlik_genisligi(ray_arasi):
-    """Ağırlık ray arası ( mm ) → karşı ağırlık genişliği ( mm )."""
-    anahtar, sonuc = AGIRLIK_RAY_ARASI
-    for i, v in enumerate(anahtar):
-        if v == ray_arasi:
-            return sonuc[i]
-    return None
-
+#  BÖYLE BİR BAĞINTI YOK.  Araştırıldı ( 2026-09-09 ):
+#    · TS EN 81-20 / TS EN 81-50 kapsamındaki ray hesabı kılavuzu karşı
+#      ağırlığın ölçülerini VERİ olarak alır:  "Gx = 130 mm, Gy = 960 mm
+#      Counterweight dimensions",  XG = %10 × Gx,  YG = %5 × Gy.  Ray arası
+#      bu hesaba hiç girmez.
+#    · Referans uygulama projesi ( ELEport ) de karşı ağırlığın Dx ve Dy'sini
+#      DOĞRUDAN sorar;  karşı ağırlık ray arasını hiç sormaz.  Aynı belgede
+#      kabin için Dy = 1350 mm ( kabin genişliği ) iken ray arası DBG =
+#      1550 mm'dir — yani D, bileşenin KENDİ ölçüsüdür, ray arası değil.
+#    · Ofisin öteki mukavemet kitabında ( 690 formül ) karşı ağırlık
+#      genişliği diye bir kavram yoktur;  orada ray arası KİRİŞ AÇIKLIĞI
+#      olarak kullanılır.
+#    · Oran da tutmuyor:  kabin 0,871 · tablo 0,943 / 0,914 / 0,943.
+#  Tablodaki üç değer üç ayrı KATALOG ÇERÇEVESİDİR ( kitabın ölü U63
+#  formülü her birine ayrı dolgu bloğu kütlesi bağlar:  Barit 30/42/60 kg,
+#  Pik döküm 84/123/169 kg ) — bir eğrinin noktaları değil.
+#
+#  Bu yüzden genişlik ve derinlik artık GİRDİDİR;  program kabin tarafında
+#  zaten böyle yapıyordu ( kabin_genisligi · kabin_derinligi ).
 
 # =====================================================================
 #  KILAVUZ RAY ÇELİĞİ  Rm → izin verilen gerilmeler    [ TEKNİK!P2:R4 ]

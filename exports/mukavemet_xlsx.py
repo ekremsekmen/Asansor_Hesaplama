@@ -395,6 +395,11 @@ EK_GIRDI_HUCRELERI = (
     #  asansörlüktür, bu yüzden kitapta karşılığı yoktur;  teslim kopyasına
     #  yine de yazılır ki hangi asansörün kitabı olduğu dosyadan anlaşılsın.
     ("asansor_adi",           255, "Asansör adı",                          "—"),
+    #  Karşı ağırlık çerçeve genişliği.  Kitap bunu ray arasından HLOOKUP
+    #  ile, TAM EŞLEŞME arayarak türetir ( 700 · 1050 · 1400 );  imalatçıdan
+    #  gelen gerçek genişlik varsa tahmine gerek yoktur ( bkz. ㊱ ).
+    ("agirlik_genisligi",     256, "Gy — karşı ağırlık genişliği",   "mm"),
+    ("agirlik_derinligi",     257, "Gx — karşı ağırlık derinliği",   "mm"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -897,6 +902,34 @@ def _standarda_uydur(wb, g):
         ws[jh], ws[mh], ws[ph] = olcu
         ws[rh] = ("m ebatlarında güvenlik boşluğu "
                   f"( TS EN 81-20 m.5.2.5.7.1 / m.5.2.5.8.1 — {tip.lower()} )")
+
+    #  ㊱  KARŞI AĞIRLIĞIN ÖLÇÜLERİ ARTIK TÜRETİLMİYOR, SORULUYOR.
+    #  Kitap ikisini de tablodan buluyordu:
+    #      AH550 = VLOOKUP( B118 ; U61:W63 ; 2 ; 0 )   malzeme → derinlik
+    #      AH551 = HLOOKUP( B119 ; X59:Z60 ; 2 ; 0 )   ray arası → genişlik
+    #  İkincisi TAM EŞLEŞME arar ve tabloda üç ray arası vardır ( 700 · 1050
+    #  · 1400 ), yani girdi üç değere kilitliydi.  Oysa TS EN 81-50 Ek C.2.2
+    #  karşı ağırlığın KENDİ ölçülerini ( Gx · Gy ) VERİ olarak ister;  ölçü
+    #  ne ray arasının ne malzemenin özelliğidir.  ( Ayrıntılı gerekçe:
+    #  mukavemet_tablolari'ndaki "KALDIRILDI" notu. )
+    #
+    #  Teslim edilen kitap da girilen ölçüleri kullanır, yoksa pafta ile
+    #  kitap ayrışır.
+    #  BOŞ HÜCREYE DÜŞMEZ.  duzeltilmis_kaynak() hiçbir proje girdisi
+    #  yazmayan bir USTA kopya üretir;  doğrudan atıf yapılsaydı ölçüler
+    #  orada 0 çıkar ve kitap kendi kendini hesaplayamazdı.  Boşta modülün
+    #  varsayılanına düşülür — motorun boş girdide yaptığının aynısı.
+    _var = {a: MG.ALAN[a][6] for a in ("agirlik_derinligi", "agirlik_genisligi")}
+    for _h, _a, _s in (("AH550", "agirlik_derinligi", "B257"),
+                       ("AH551", "agirlik_genisligi", "B256")):
+        _c = f"'Veri Girişi'!{_s}"
+        ws[_h] = (f'=IF(AND(ISNUMBER({_c}),{_c}>0),{_c},'
+                  f'{float(_var[_a])!r})')
+    #  B119 artık yalnız PAFTA BİLGİSİDİR ve serbest ölçüdür;  kitaptaki üç
+    #  değerlik açılır listesi kaldırılır ki kitabı açan da yazabilsin.
+    for _dv in list(vg.data_validations.dataValidation):
+        if "B119" in str(_dv.sqref):
+            vg.data_validations.dataValidation.remove(_dv)
 
     #  ㉞  KATALOG HALAT VERİSİ tabloyu ezer  ( bkz. mukavemet._halat_verisi ).
     #  TS 12385-5 yalnız lif özlü halatları kapsar;  imalatçı değeri girildiyse

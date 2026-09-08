@@ -18,6 +18,7 @@ import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from engine.uygulama import mukavemet as MK                        # noqa: E402
 from engine.uygulama import mukavemet_girdi as MG                  # noqa: E402
 from engine.uygulama import mukavemet_tablolari as MT              # noqa: E402
 from exports import mukavemet_xlsx as MX                   # noqa: E402
@@ -211,13 +212,18 @@ def calistir():
                   f"→ modül {MT.omega(lam)!r}, Excel {w!r}")
     r.kontrol("ω tablo dışı λ için None", MT.omega(19) is None and MT.omega(251) is None)
 
-    #  Ağırlık ray arası — yatay tablo
-    yat = [[c.value for c in s] for s in wb["TABLOLAR"]["X59:Z60"]]
-    r.esit("AGIRLIK_RAY_ARASI satır", len(MT.AGIRLIK_RAY_ARASI), 2)
-    for i in range(len(yat[0])):
-        r.kontrol(f"ağırlık ray arası {yat[0][i]} → genişlik",
-                  _esit(MT.agirlik_genisligi(yat[0][i]), yat[1][i]),
-                  f"→ {MT.agirlik_genisligi(yat[0][i])!r} / {yat[1][i]!r}")
+    #  AĞIRLIK RAY ARASI → GENİŞLİK TABLOSU KALDIRILDI.  Kitapta duruyor
+    #  ( X59:Z60 ) ama motor artık okumaz:  TS EN 81-50 Ek C.2.2 karşı
+    #  ağırlığın KENDİ ölçülerini ( Gx · Gy ) veri olarak ister, ray
+    #  arasından türetme diye bir bağıntı yoktur.  Türetme işlevlerinin
+    #  GERİ GELMEDİĞİ denetlenir — geri gelirse üç değere kilitli girdi de
+    #  geri gelmiş demektir.
+    for _kalkti in ("AGIRLIK_RAY_ARASI", "RAY_ARALARI", "agirlik_genisligi",
+                    "agirlik_derinlik"):
+        r.kontrol(f"kaldırılan türetme geri gelmedi: {_kalkti}",
+                  not hasattr(MT, _kalkti))
+    r.kontrol("karşı ağırlık ölçüleri GİRDİ",
+              all(a in MG.ALAN for a in ("agirlik_genisligi", "agirlik_derinligi")))
 
     #  Erişim işlevleri gerçekten doğru sütunu okuyor mu
     p = "89 x 62 x 15,88"
@@ -261,6 +267,13 @@ BILINEN_FARK = {
                     750, 800, 825, 900, 975, 1000, 1050, 1125, 1200, 1250, 1275,
                     1350, 1425, 1500, 1600, 2000, 2500]),
 }
+
+
+#  KAYNAK KİTAPTA AÇILIR LİSTESİ OLAN ama modülde SERBEST bırakılan alanlar.
+#  Kaynak kitap tarihî referanstır ve olduğu gibi kalır;  serbestleştirme
+#  EXCEL_FARKLARI'nda belgelenir ve teslim edilen kopyada doğrulama
+#  kaldırılır.  ( değer:  farkın kaydında geçmesi beklenen anahtar sözcük )
+SERBESTLESTIRILEN = {"agirlik_ray_arasi": "Karşı ağırlığın ölçüleri"}
 
 
 def _girdi_sozlesmesi(r, wb):
@@ -316,6 +329,17 @@ def _girdi_sozlesmesi(r, wb):
 
         ar = dv_araligi.get(hucre)
         if secenekler is None:
+            if anahtar in SERBESTLESTIRILEN:
+                #  KAYNAK KİTAPTA LİSTE VAR, MODÜLDE YOK — BİLEREK.
+                #  Gerekçesi mukavemet.EXCEL_FARKLARI'nda yazılıdır ve teslim
+                #  edilen kopyada doğrulama KALDIRILIR ( aşağıda denetleniyor ),
+                #  yoksa pafta serbest, kitap kilitli olurdu.
+                r.kontrol(f"girdi {anahtar}: serbestleştirme belgeli",
+                          any(anahtar in a[0].lower().replace(" ", "_")
+                              or SERBESTLESTIRILEN[anahtar] in a[0]
+                              for a in MK.EXCEL_FARKLARI),
+                          "→ EXCEL_FARKLARI'nda kaydı yok")
+                continue
             r.kontrol(f"girdi {anahtar}: Excel'de de açılır liste yok", ar is None,
                       f"→ Excel'de {ar} listesi var, modülde serbest sayı")
             continue

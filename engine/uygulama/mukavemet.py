@@ -44,6 +44,32 @@ from engine.ortak.steps import metin, tr, trn
 #  Doğrulama testleri bu listeyi okur;  bir sapma sessizce kapanır ya da
 #  yenisi eklenirse test bunu söyler.
 EXCEL_FARKLARI = (
+    ("Karşı ağırlığın ölçüleri tablodan türetiliyordu",
+     "TS EN 81-50 Ek C.2.2",
+     "Karşı ağırlığın iki ölçüsünü de tablodan bulur:  derinliği "
+     "MALZEMEDEN ( VLOOKUP B118 → 150 / 100 mm ), genişliği RAY ARASINDAN "
+     "( HLOOKUP B119 ; X59:Z60 ; 2 ; 0 — TAM EŞLEŞME, yalnız 700 · 1050 · "
+     "1400 ).  Genişlik girdisi bu yüzden üç değere kilitliydi;  1200 mm "
+     "ray arası olan bir kuyuda mühendis 1050 seçmek zorunda kalıyor ve "
+     "genişlik 154 mm yanlış çıkıyordu — hata eksantriklik Dya üzerinden "
+     "ray gerilmesine ve sehimine geçiyordu.",
+     "İKİSİ DE GİRDİDİR ( Gx · Gy ).  Ek C.2.2 karşı ağırlığın KENDİ "
+     "ölçülerini veri olarak ister;  standardı izleyen ray hesabı kılavuzu "
+     "da öyle yapar ( 'Gx = 130 mm, Gy = 960 mm Counterweight dimensions', "
+     "XG = %10 × Gx, YG = %5 × Gy ) ve referans uygulama projesi de ikisini "
+     "doğrudan sorar.  Ölçü ne ray arasının ne malzemenin özelliğidir — "
+     "imal edilen çerçevenin özelliğidir.  Program kabin tarafında zaten "
+     "böyle yapıyordu.  Ray arası pafta bilgisi olarak sorulmaya devam "
+     "eder, hesaba girmez.",
+     #  HÜCRE LİSTESİ BOŞ.  Bu bir formül sapması değil, GİRDİ SÖZLEŞMESİ
+     #  değişikliğidir:  özgün kitapta bu iki girdinin hücresi hiç yoktur,
+     #  ölçüleri kendi tablolarından türetir.  Aynı girdilerle iki tarafı
+     #  karşılaştırıp "şu hücrede ayrışıyoruz" demek mümkün değil;  ayrışma
+     #  ancak kitabın göremediği bir ölçü girildiğinde doğar ve bütün karşı
+     #  ağırlık rayı bölümüne yayılır.  Serbest ölçülerin doğruluğu TESLİM
+     #  EDİLEN kitapta denetlenir ( bkz. test_mukavemet_excel — "serbest
+     #  ölçü" bloğu ).
+     ()),
     ("Tahrik kasnağı / halat oranı",
      "TS EN 81-20 m.5.5.2.1",
      "Başlık '≥ 40' yazar ama kontrolü 30 ile yapar. 30, aynı standardın "
@@ -2261,8 +2287,13 @@ def _agirlik_raylari(g, o):
     #  b) Güv. tertibatsız karşı ağırlık raylarında: 10 mm
     dperm = S["dperm_kabin"] if gt_var else S["dperm_agirlik"]
 
-    derinlik = MT.agirlik_derinlik(g["agirlik_malzemesi"])
-    genislik = MT.agirlik_genisligi(g["agirlik_ray_arasi"])
+    #  KARŞI AĞIRLIĞIN KENDİ ÖLÇÜLERİ  —  Ek C.2.2'nin Gx ( derinlik ) ve
+    #  Gy ( genişlik )'si.  İKİSİ DE GİRDİDİR;  eskiden derinlik malzemeden,
+    #  genişlik ray arasından türetiliyordu ve ikisi de yanlıştı — ölçü imal
+    #  edilen çerçevenin özelliğidir ( bkz. mukavemet_tablolari'ndeki
+    #  "AĞIRLIK RAY ARASI → GENİŞLİK TABLOSU · KALDIRILDI" notu ).
+    derinlik = g["agirlik_derinligi"]
+    genislik = g["agirlik_genisligi"]
     Dxa = S["Dxa_katsayi"] * derinlik
     Dya = S["Dya_katsayi"] * genislik
     xsa = ysa = 0.0
@@ -2337,15 +2368,14 @@ def _agirlik_raylari(g, o):
                 + ("  ( m.5.6.2.1.2.3:  v > 1 m/s ise KAYMALI olmalı )"
                    if gt_var else "  ( tertibat yok )"), gt_tip_uygun),
         veri("", "Karşı ağırlık malzemesi", g["agirlik_malzemesi"]),
-        veri("", "Karşı ağırlık derinliği", derinlik, "mm",
-             f"Ağırlık malzemesi tablosu  ·  {g['agirlik_malzemesi']}", 0),
-        veri("", "Karşı ağırlık genişliği", genislik, "mm",
-             f"Ray arası {trn(g['agirlik_ray_arasi'], 0)} mm karşılığı", 0),
+        veri("Gx", "Karşı ağırlık derinliği", derinlik, "mm", "GİRİŞ", 0),
+        veri("Gy", "Karşı ağırlık genişliği", genislik, "mm", "GİRİŞ", 0),
+        veri("", "Ağırlık ray arası  ( hesaba girmez )",
+             g["agirlik_ray_arasi"], "mm", "GİRİŞ", 0),
         hesap("Dxa = 0,1 × ağırlık derinliği",
               f"0,1 × {trn(derinlik, 0)}", Dxa, "mm"),
         hesap("Dya = 0,05 × ağırlık genişliği",
-              f"0,05 × {trn(genislik, 0)}   ( ray arası {trn(g['agirlik_ray_arasi'], 0)} mm )",
-              Dya, "mm"),
+              f"0,05 × {trn(genislik, 0)}", Dya, "mm"),
         veri("xsa", "Askı noktasının x mesafesi", xsa, "mm"),
         veri("ysa", "Askı noktasının y mesafesi", ysa, "mm"),
         veri("MY", "Raylara bağlı yardımcı donanım", MY, "N", "Ofis kabulü", 0),

@@ -225,8 +225,23 @@ ALANLAR = (
     # ── KARŞI AĞIRLIK ─────────────────────────────────────────────────
     ("agirlik_malzemesi", "B118", "Karşı ağırlık malzemesi",           "—",    "secim",
      MT.AGIRLIK_MALZEMELERI, "Barit"),
-    ("agirlik_ray_arasi", "B119", "Ağırlık ray arası",                 "mm",   "secim",
-     MT.RAY_ARALARI, 1050),
+    #  KARŞI AĞIRLIĞIN KENDİ İKİ ÖLÇÜSÜ  —  TS EN 81-50 Ek C.2.2'nin Gx · Gy
+    #  Eksantriklikler bunlardan çıkar:  Dxa = %10 × derinlik ( Gx ),
+    #  Dya = %5 × genişlik ( Gy ).  Standardı izleyen ray hesabı kılavuzu da
+    #  ikisini VERİ olarak alır ( "Gx = 130 mm, Gy = 960 mm Counterweight
+    #  dimensions" ), referans uygulama projesi de doğrudan sorar.
+    #
+    #  ESKİDEN TÜRETİLİYORLARDI ve ikisi de yanlıştı:  genişlik ray arasından
+    #  ( üç değere kilitli açılır liste ), derinlik malzemeden.  Ölçü ne ray
+    #  arasının ne malzemenin özelliğidir — imal edilen ÇERÇEVENİN özelliğidir.
+    #  Program kabin tarafında zaten böyle yapıyor ( kabin_genisligi ·
+    #  kabin_derinligi ).
+    ("agirlik_genisligi",  "",     "Karşı ağırlık genişliği  ( Gy )", "mm", "sayi", None, 960),
+    ("agirlik_derinligi",  "",     "Karşı ağırlık derinliği  ( Gx )", "mm", "sayi", None, 150),
+    #  Ray arası PAFTA BİLGİSİDİR.  Mukavemet hesabına girmez ( standartta
+    #  ray arası → genişlik diye bir bağıntı yoktur );  kuyu yerleşimine ve
+    #  inşaat projesine ait bir ölçü olduğu için sorulmaya devam eder.
+    ("agirlik_ray_arasi", "B119", "Ağırlık ray arası  ( pafta bilgisi )", "mm", "sayi", None, 1050),
     #  TS EN 81-20 m.5.6.1:  karşı ağırlıkta güvenlik tertibatı, kuyunun
     #  altındaki hacme girilebiliyorsa ZORUNLUDUR.  Varsa ağırlık rayı
     #  TS EN 81-50 Ek C.2.1'e göre de ( k1 darbe katsayısıyla ) hesaplanmalıdır;
@@ -319,8 +334,8 @@ TABLO_GEREKLI = (
     #  ( EN 81-50 Çizelge 2 );  burada yalnız şeklin TANINDIĞI denetlenir.
     ("kanal_sekli", [("kanal türü", MT.kanal_turu)], "kasnak verisi"),
     ("guvenlik_tertibati", [("k1", MT.darbe_k1)], "darbe katsayısı"),
-    ("agirlik_malzemesi", [("derinlik", MT.agirlik_derinlik)], "malzeme verisi"),
-    ("agirlik_ray_arasi", [("genişlik", MT.agirlik_genisligi)], "genişlik karşılığı"),
+
+
     ("ray_celigi_rm", [("σperm normal", MT.sigma_perm_normal),
                        ("σperm güv.tert.", MT.sigma_perm_guvenlik)],
      "izin verilen gerilmeler"),
@@ -368,7 +383,8 @@ GRUPLAR = (
       "ray_celigi_rm", "kabin_paten_arasi", "agirlik_paten_arasi",
       "guvenlik_tertibati", "paten_balata_boyu", "paten_tipi",
       "klips_itme_kuvveti", "yapi_sehim_x", "yapi_sehim_y")),
-    ("Karşı ağırlık", ("agirlik_malzemesi", "agirlik_ray_arasi",
+    ("Karşı ağırlık", ("agirlik_genisligi", "agirlik_derinligi",
+                       "agirlik_malzemesi", "agirlik_ray_arasi",
                        "agirlik_guvenlik_tertibati")),
     ("Tamponlar",
      ("kabin_tampon_baba", "agirlik_tampon_baba", "kabin_tampon_ezilme",
@@ -433,6 +449,14 @@ def arayuz_alanlari():
         gruplar.append({"ad": ad, "alanlar": alanlar})
     return {"gruplar": gruplar,
             "bolum_grubu": {no: list(gr) for no, gr in BOLUM_GRUBU.items()},
+            #  MALZEME → ALIŞILMIŞ DERİNLİK.  Bu bir HESAP tablosu DEĞİL,
+            #  formun başlangıç değeridir:  malzeme seçilince derinlik kutusu
+            #  bu sayıyla dolar, mühendis üzerine yazabilir ve hesap her
+            #  hâlükârda KUTUDAKİ sayıyı okur.  Eskiden motor derinliği
+            #  malzemeden türetiyordu;  o türetme kaldırıldı ( TS EN 81-50
+            #  Ek C.2.2 ölçüyü veri olarak ister ), ama seçim yapınca ekranda
+            #  hiçbir şeyin değişmemesi sessiz bir tuzaktı.
+            "malzeme_derinligi": {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI},
             "durak_azami": DURAK_AZAMI,
             "hesaplanan": list(HESAPLANAN)}
 

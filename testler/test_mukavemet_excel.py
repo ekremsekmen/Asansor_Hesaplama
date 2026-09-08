@@ -80,11 +80,27 @@ def senaryolar():
     for t in MT.DARBE_TIPLERI_ADLARI:
         E(f"güv. tertibatı {t}", guvenlik_tertibati=t)
 
-    #  Karşı ağırlık malzemesi ve ray arası
+    #  Karşı ağırlık malzemesi.  DERİNLİK DE VERİLİR:  motor artık onu
+    #  malzemeden türetmiyor ( ölçü imal edilen çerçevenin özelliğidir,
+    #  bkz. TS EN 81-50 Ek C.2.2 ) ama ÖZGÜN KİTAP türetmeye devam ediyor.
+    #  Karşılaştırmanın anlamlı kalması için ikisi aynı sayıyı kullanmalı;
+    #  yoksa sınanan şey kitap değil, kaldırdığımız türetme olurdu.
+    _KITAP_DERINLIK = {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI}
     for m in MT.AGIRLIK_MALZEMELERI:
-        E(f"ağırlık malzemesi {m}", agirlik_malzemesi=m)
-    for a in MT.RAY_ARALARI:
-        E(f"ağırlık ray arası {a}", agirlik_ray_arasi=a)
+        E(f"ağırlık malzemesi {m}", agirlik_malzemesi=m,
+          agirlik_derinligi=_KITAP_DERINLIK[m])
+    #  RAY ARASI ARTIK SERBEST ÖLÇÜ.  Üç tablo noktası ( 700 · 1050 · 1400 )
+    #  birebir korunmalı;  ARADAKİ ve TABLO DIŞI değerlerde de LibreOffice
+    #  motorla aynı genişliği bulmalı, yoksa kitap #YOK der ve pafta ile
+    #  ayrışır.  İmalatçı genişliği girilen durum da denenir — o zaman tablo
+    #  hiç kullanılmaz.
+    #  KARŞI AĞIRLIĞIN ÖLÇÜLERİ BU DÖNGÜDE DEĞİŞTİRİLMEZ.  Buradaki
+    #  senaryolar ÖZGÜN kitaba yazılır ve özgün kitapta bu iki girdinin
+    #  hücresi YOKTUR — ölçüleri hâlâ kendi tablolarından türetir
+    #  ( VLOOKUP B118 → derinlik, HLOOKUP B119 → genişlik ).  Motor ise
+    #  girilen ölçüyü kullanır;  ikisini farklı değerlerle karşılaştırmak
+    #  özgün kitabı değil, kaldırdığımız türetmeyi sınamak olurdu.
+    #  Serbest ölçüler TESLİM EDİLEN kitapta denetlenir ( aşağıda ).
 
     #  Ray çeliği  →  σperm
     for rm in MT.RAY_CELIKLERI:
@@ -281,6 +297,57 @@ def calistir():
         for _e in hata_hucresi_ara(_uyol):
             if _e.startswith(SAYFA) or _e.startswith("Askı Tipleri"):
                 r.kontrol("[düzeltilmiş kitap] Excel hata hücresi", False, _e)
+
+    #  ---------------------------------------------------------------
+    #  TESLİM EDİLEN KİTAP  —  KARŞI AĞIRLIĞIN SERBEST ÖLÇÜLERİ
+    #  ---------------------------------------------------------------
+    #  Özgün kitap bu iki ölçüyü tablodan türetiyordu ( ray arası → genişlik
+    #  üç değere kilitliydi ).  TS EN 81-50 Ek C.2.2 ikisini de VERİ olarak
+    #  ister;  türetme kaldırıldı.  Teslim edilen kitap girilen ölçüleri
+    #  kullanmalı, yoksa pafta ile kitap ayrışır ve mühendis kitabı açtığında
+    #  başka bir gerilme görür.  Tablo DIŞI değerler seçildi.
+    _sk = os.path.join(GECICI, "serbest")
+    _sg = os.path.join(_sk, "in")
+    os.makedirs(_sg, exist_ok=True)
+    _olcu = {"agirlik_genisligi": 850, "agirlik_derinligi": 130,
+             "agirlik_ray_arasi": 1200}
+    try:
+        _bayt = MX.mukavemet_xlsx(dict(MG.varsayilanlar(), **_olcu), None)
+    except FileNotFoundError:
+        _bayt = None
+    if _bayt is None:
+        r.atla("mukavemet şablonu yok — serbest ölçü denetimi atlandı")
+    else:
+        with open(os.path.join(_sg, "serbest.xlsx"), "wb") as _f:
+            _f.write(_bayt)
+        yeniden_hesapla([os.path.join(_sg, "serbest.xlsx")],
+                        os.path.join(_sk, "out"))
+        _syol = os.path.join(_sk, "out", "serbest.xlsx")
+        if not os.path.isfile(_syol):
+            r.kontrol("[serbest ölçü] kitap LibreOffice ile açıldı", False,
+                      "→ dönüştürme başarısız")
+        else:
+            _sws = openpyxl.load_workbook(_syol, data_only=True)[SAYFA]
+            #  Girilen ölçüler kitabın kendi hücrelerine geçmiş mi
+            r.esit("[serbest ölçü] Gy kitapta", _sws["AH551"].value, 850)
+            r.esit("[serbest ölçü] Gx kitapta", _sws["AH550"].value, 130)
+            #  Ve ASIL KONTROL:  kitabın bütün hesabı motorla aynı mı
+            _ss = MK.hesapla(_olcu)
+            _st = 0
+            for _h, _m in sorted(_ss["_h"].items()):
+                _v = _sws[_h].value
+                if (not isinstance(_v, (int, float))
+                        or not isinstance(_m, (int, float))
+                        or isinstance(_v, bool) or isinstance(_m, bool)):
+                    continue
+                _st += 1
+                r.kontrol(f"[serbest ölçü] {SAYFA}!{_h}", _esit(_m, _v),
+                          f"→ motor {_m!r}, kitap {_v!r}")
+            r.kontrol("[serbest ölçü] karşılaştırılan hücre var", _st > 100,
+                      f"→ yalnız {_st} hücre")
+            for _e in hata_hucresi_ara(_syol):
+                if _e.startswith(SAYFA):
+                    r.kontrol("[serbest ölçü] Excel hata hücresi", False, _e)
 
     shutil.rmtree(GECICI, ignore_errors=True)
     return r

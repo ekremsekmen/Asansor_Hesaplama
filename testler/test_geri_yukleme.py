@@ -388,7 +388,11 @@ def calistir():
            #  Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( m.5.5.2.1 )
            "saptirma_kasnak_min_capi": 320,
            #  Asansör adı — çoklu projede paftaları ayırt eder
-           "asansor_adi": "İnsan 1"}
+           "asansor_adi": "İnsan 1",
+           #  Karşı ağırlığın KENDİ ölçüleri  ( TS EN 81-50 Ek C.2.2 · Gx · Gy )
+           #  Eskiden türetiliyorlardı:  genişlik ray arasından, derinlik
+           #  malzemeden.  İkisi de kaldırıldı, ölçüler artık girdi.
+           "agirlik_genisligi": 850, "agirlik_derinligi": 130}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))
