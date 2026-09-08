@@ -81,7 +81,12 @@
     <button class="sekme" data-sekme="proje" data-mod="avan">3 · Proje Kapağı</button>
     <!--  UYGULAMA PROJESİ ADIMLARI  —  avan sekmeleriyle aynı şeritte durur,
           moda göre biri gizlenir  ( bkz. ortak.js · modAyarla ).            -->
-    <button class="sekme" data-sekme="mukavemet" data-mod="uygulama" hidden>1 · Uygulama Hesapları</button>
+    <button class="sekme" data-sekme="uygproje" data-mod="uygulama" hidden>1 · Proje</button>
+    <!--  ASANSÖR SEKMELERİ.  Adet seçimine göre burada üretilir
+          ( uygulama.js · mAsansorSekmeleriTazele ).  Hepsi AYNI gövdeyi
+          ( #s-mukavemet ) gösterir ve yalnız aktif asansörü değiştirir;
+          dört ayrı sayfa 4 × 86 alanlık DOM demek olurdu.               -->
+    <span id="m_asansor_sekmeleri" class="m-asansor-sekmeler"></span>
     <!--  BAŞVURU SEKMELERİ  —  işlem adımı değil, gerektikçe bakılır;
           bu yüzden şeridin sağ ucuna itilir ( .sekme-ayrac ).            -->
     <span class="sekme-ayrac"></span>
@@ -436,7 +441,8 @@
 </section>
 
 <!-- ═══════════════════ UYGULAMA PROJESİ · MUKAVEMET ═══════════════════ -->
-<section id="s-mukavemet" class="sayfa" hidden>
+<!-- ═══════════════════ UYGULAMA — PROJE ═══════════════════ -->
+<section id="s-uygproje" class="sayfa" hidden>
   <div class="ikili">
     <div class="sol">
       <div class="kart">
@@ -458,6 +464,25 @@
         </div>
       </div>
       <div class="kart">
+        <div class="kart-bas"><span>ASANSÖRLER</span>
+          <span class="kaynak">bir binada 1 - 4 asansör</span></div>
+        <div class="kart-ic">
+          <div class="yardim">Her asansör <b>ayrı kuyudadır</b> ve kendi girdilerini
+            taşır; hesap hepsi için aynıdır. Adedi azaltmak girdileri <b>silmez</b> —
+            yalnız hesaba ve paftaya girmezler, artırınca geri gelirler.
+            Yeni asansör <b>1 nolu asansörün kopyası</b> olarak açılır.</div>
+          <div class="satir i2">
+            <div class="alan"><label>Asansör adedi</label>
+              <select id="m_adet" class="girdi" onchange="mAdetDegisti(this.value)">
+                <option value="1">1 asansör</option>
+                <option value="2">2 asansör</option>
+                <option value="3">3 asansör</option>
+                <option value="4">4 asansör</option>
+              </select></div>
+          </div>
+        </div>
+      </div>
+      <div class="kart">
         <div class="kart-bas"><span>REVİZYON — EXCEL'DEN AÇ</span>
           <span class="kaynak">girdiler dosyanın içindedir</span></div>
         <div class="kart-ic">
@@ -476,10 +501,6 @@
           <div id="m_yukleme_ozeti"></div>
         </div>
       </div>
-      <!--  UYGULAMA PROJESİNİN KENDİ PROJE DOSYASI.
-            Bugüne kadar YOKTU:  proje dosyası düğmeleri Proje Kapağı
-            sekmesindeydi, o sekme de yalnız avan modunda görünüyordu.
-            Uygulamada tek geri dönüş yolu Excel'di.                     -->
       <div class="kart">
         <div class="kart-bas"><span>PROJE DOSYASI</span>
           <span class="kaynak">.uygulama — girdilerin geri dönüş noktası</span></div>
@@ -498,16 +519,14 @@
         </div>
       </div>
       <div class="kart">
-        <div class="kart-bas"><span>UYGULAMA PROJESİ GİRDİLERİ</span>
-          <span class="kaynak">mukavemet · elektrik · topraklama</span></div>
+        <div class="kart-bas"><span>PROJE GENELİ GİRDİLER</span>
+          <span class="kaynak">binaya aittir, asansöre değil</span></div>
         <div class="kart-ic">
-          <div class="uyari mavi" style="margin:0 0 12px">
-            Bu bölüm <b>uygulama projesine</b> aittir, avandan ayrıdır: mukavemet
-            tabloları ve kabulleri kendi kaynağından gelir. Hücre adresi yazılı
-            alanlar <b>MUKAVEMET_HESABI.xlsx</b> "Veri Girişi" sayfasıyla birebir
-            eşleşir. Ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β )
-            <b>Sabitler / Ofis Standardı</b> sekmesinden gelir.</div>
-          <div id="m_form"></div>
+          <div class="yardim">Temel topraklama ve makine dairesi <b>binaya</b> aittir:
+            bir binada dört asansör olsa da topraklama tektir. Bu yüzden burada
+            <b>bir kez</b> girilir, her asansörün hesabına buradan katılır ve paftada
+            yalnız <b>1 nolu asansörün</b> bölümlerinde bir kez basılır.</div>
+          <div id="p_form"></div>
         </div>
       </div>
       <div class="kart">
@@ -527,6 +546,27 @@
             <button class="dg" onclick="indir('uygulama-xlsx')">Uygulama Projesi Excel</button>
             <button class="dg" id="dg_uygulama_dwg" onclick="indir('uygulama-dwg')">Projeyi paketle (ZIP)</button>
           </div>
+        </div>
+      </div>
+    </div>
+    <div><div class="kart"><div id="p_ozet"></div></div></div>
+  </div>
+</section>
+
+<section id="s-mukavemet" class="sayfa" hidden>
+  <div class="ikili">
+    <div class="sol">
+      <div class="kart">
+        <div class="kart-bas"><span>UYGULAMA PROJESİ GİRDİLERİ</span>
+          <span class="kaynak">mukavemet · elektrik · topraklama</span></div>
+        <div class="kart-ic">
+          <div class="uyari mavi" style="margin:0 0 12px">
+            Bu bölüm <b>uygulama projesine</b> aittir, avandan ayrıdır: mukavemet
+            tabloları ve kabulleri kendi kaynağından gelir. Hücre adresi yazılı
+            alanlar <b>MUKAVEMET_HESABI.xlsx</b> "Veri Girişi" sayfasıyla birebir
+            eşleşir. Ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β )
+            <b>Sabitler / Ofis Standardı</b> sekmesinden gelir.</div>
+          <div id="m_form"></div>
         </div>
       </div>
     </div>

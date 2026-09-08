@@ -458,3 +458,65 @@ body:not(.giriste) .giris{display:none}
   content:"";position:absolute;left:0;top:10px;bottom:10px;
   border-left:1px solid rgba(255,255,255,.22);
 }
+
+/* ------------------------------------------------- uygulama girdi akordeonu
+   Girdi sütunu 380-440 px'tir;  yatay sekme şeridi sığmaz.  Akordeon bu
+   genişliğe oturur ve kapalıyken de bütün bölüm adları görünür — kullanıcı
+   haritayı kaybetmez.  Kapalı grup DOM'da kalır, hesabı etkilemez. */
+.m-ara-satir{margin:0 0 10px}
+.m-ara{
+  width:100%;font:400 12px/1 inherit;color:#1F2A36;
+  border:1px solid var(--cizgi,#D5DDE7);border-radius:6px;padding:8px 10px;
+}
+.m-ara:focus{outline:none;border-color:var(--mavi2,#1F3A5F)}
+
+.m-grup{border:1px solid var(--cizgi,#E3E8EF);border-radius:7px;margin-bottom:6px;overflow:hidden}
+.m-grup.acik{border-color:#C2CFDD}
+.m-grup-bas{
+  display:flex;align-items:center;gap:8px;width:100%;
+  font:700 11.5px/1.3 inherit;letter-spacing:.02em;color:var(--gri,#5A6A7A);
+  background:#F4F7FA;border:0;padding:10px 11px;cursor:pointer;text-align:left;
+}
+.m-grup-bas:hover{background:#EAF0F6;color:#1F2A36}
+.m-grup.acik .m-grup-bas{background:var(--mavi2,#1F3A5F);color:#fff}
+.m-grup-ok{font-size:10px;width:10px;flex:0 0 10px}
+.m-grup-ad{flex:1 1 auto}
+.m-grup-adet{
+  font-weight:600;font-size:10px;opacity:.65;
+  background:rgba(0,0,0,.07);border-radius:9px;padding:2px 7px;
+}
+.m-grup.acik .m-grup-adet{background:rgba(255,255,255,.18)}
+.m-grup-ic{padding:11px}
+
+/*  Sonuç tablosunda bölüm satırı → girdilerine kısayol */
+tr.m-gidilir{cursor:pointer}
+tr.m-gidilir:hover td{background:#EEF4FB}
+tr.m-gidilir .etiket{text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:2px}
+
+/* ------------------------------------------------------- asansör şeridi
+   Bir binada 1-4 asansör;  form tek kopyadır, şerit aktif olanı seçer. */
+.m-asansor-serit{
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:0 0 10px;
+  padding-bottom:9px;border-bottom:1px solid var(--cizgi,#E3E8EF);
+}
+.m-asansor-etiket{
+  font:700 10px/1 inherit;letter-spacing:.08em;color:#8A96A3;margin-right:4px;
+}
+.m-asansor{
+  font:600 11.5px/1 inherit;color:var(--gri,#5A6A7A);cursor:pointer;
+  background:#EEF2F7;border:1px solid transparent;border-radius:6px;
+  padding:7px 10px;max-width:150px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.m-asansor:hover{background:#E2E8F0;color:#1F2A36}
+.m-asansor.etkin{background:var(--mavi2,#1F3A5F);color:#fff}
+.m-asansor.ekle{background:#E8F3EA;color:#2F7D45;font-weight:700}
+.m-asansor.ekle:hover{background:#D8ECDD}
+.m-asansor.sil{background:#FBECEC;color:#B3322C;font-weight:700;margin-left:auto}
+.m-asansor.sil:hover{background:#F6DADA}
+tr.m-gidilir.etkin td{background:#EEF4FB;font-weight:600}
+
+/*  Asansör sekmeleri üst şeritte, PROJE sekmesinin sağında dururlar.
+    Adet seçimine göre üretilirler ve hepsi AYNI gövdeyi gösterir. */
+.m-asansor-sekmeler{display:contents}

@@ -25,7 +25,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.avan import hesap as AV                               # noqa: E402
 from engine.avan import trafik as TR                            # noqa: E402
 from testler.altin_uret import (DOSYA, DOSYA_AVAN,          # noqa: E402
-                                avan_senaryolar, senaryolar)
+                                DOSYA_UYGULAMA, avan_senaryolar,
+                                senaryolar, uygulama_motoru,
+                                uygulama_senaryolar)
 from testler.ortak import Rapor                             # noqa: E402
 
 
@@ -45,6 +47,11 @@ def calistir():
     r = Rapor("TEST 7 — ALTIN ÇIKTI (refactor kalkanı)")
     _karsilastir(r, DOSYA, senaryolar, TR.hesapla, "trafik")
     _karsilastir(r, DOSYA_AVAN, avan_senaryolar, AV.hesapla, "avan")
+    #  UYGULAMA PROJESİ.  Senaryolar ÇOKLU yoldan geçer;  hesapla_coklu tek
+    #  asansörde hesapla()'nın tam çıktısını taşıdığı için bu dosya hem tek
+    #  hem çok asansörlü yolu birden dondurur.
+    _karsilastir(r, DOSYA_UYGULAMA, uygulama_senaryolar, uygulama_motoru,
+                 "uygulama")
     return r
 
 

@@ -72,6 +72,9 @@ function sekmeGoster(ad){
   //  Trafik ARTIK TEK GÖVDEDİR ( #s-coklu ) — 1..4 asansör aynı formda
   //  tanımlanır, yöntemi program veriden çıkarır.
   $('s-' + (ad==='trafik' ? 'coklu' : ad)).hidden=false;
+  //  Asansör sekmeleri "mukavemet" gövdesini paylaşır;  hangisinin etkin
+  //  göründüğü açık gövdeye bağlıdır, o yüzden her geçişte tazelenir.
+  if(typeof mAsansorSekmeleriTazele === 'function') mAsansorSekmeleriTazele();
   window.scrollTo({top:0,behavior:'instant'});
 }
 /*  Şeritte yalnız seçili modun adımları durur.  Gizlenen sekmenin sayfası da
@@ -504,6 +507,15 @@ function tumGirdiler(mod){
   });
   if(m === 'uygulama'){
     o.__muk_durak = MUK_DURAK.slice();
+    //  ÇOKLU ASANSÖR.  Form yalnız AKTİF asansörü taşır;  ötekiler dizide
+    //  durur.  Kaydetmeden önce form diziye işlenir, yoksa son düzenlemeler
+    //  kaybolurdu.
+    if(typeof mAsansorKaydet === 'function') mAsansorKaydet();
+    if(typeof MUK_ASANSORLER !== 'undefined'){
+      o.__muk_asansorler = MUK_ASANSORLER;
+      o.__muk_aktif = MUK_AKTIF;
+      o.__muk_adet = MUK_ADET;
+    }
   }else{
     o.__eknufus_c = ekNufusTopla('c');
     o.__trafik_adet = TRAFIK_ADET;
@@ -619,6 +631,23 @@ function uygula(o){
   if(Array.isArray(o.__muk_durak) && o.__muk_durak.length){
     MUK_DURAK = o.__muk_durak.slice(0, (MUK && MUK.durak_azami) || 20).map(mSayi);
     if($('m_durak_kutu')) mDurakCiz();
+  }
+  /*  Çoklu asansör dizisi de bir form alanı DEĞİLDİR.  Proje dosyasından
+      ( .uygulama ) geri yüklenirken buradan kurulur;  form ayaktaysa aktif
+      asansör hemen basılır, değilse mukavemetKur() onu yerine oturtur. */
+  if(Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length
+     && typeof MUK_ASANSORLER !== 'undefined'){
+    MUK_ASANSORLER = o.__muk_asansorler
+      .slice(0, (MUK && MUK.asansor_azami) || 4)
+      .map(x => (x && typeof x === 'object') ? x : {});
+    MUK_ADET = Math.min(Math.max(1, Number(o.__muk_adet) || MUK_ASANSORLER.length),
+                        MUK_ASANSORLER.length);
+    MUK_AKTIF = Math.min(Math.max(0, Number(o.__muk_aktif) || 0), MUK_ADET - 1);
+    if($('m_form') && $('m_form').innerHTML){
+      mAsansorYukle(MUK_AKTIF);
+      if($('m_adet')) $('m_adet').value = String(MUK_ADET);
+      mAsansorSekmeleriTazele();
+    }
   }
   AVAN_OTO = (o.__avan_oto && typeof o.__avan_oto==='object') ? {...o.__avan_oto} : {};
   AVAN_TRF = (o.__avan_trf && typeof o.__avan_trf==='object') ? {...o.__avan_trf} : {};
@@ -828,7 +857,7 @@ function uygulamaAc(hangi){
   document.body.classList.remove('giriste');
   window.scrollTo(0, 0);
   if(MOD === 'uygulama'){
-    sekmeGoster('mukavemet');
+    sekmeGoster('uygproje');
     mukavemetKur();
     durum('Uygulama projesi — mukavemet hesabı.');
   }else{

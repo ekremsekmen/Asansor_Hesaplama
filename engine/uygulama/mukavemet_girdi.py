@@ -32,6 +32,11 @@ def _s(*d):
 #    "hesap" alanları kullanıcıdan alınmaz — tamamla() üretir.
 ALANLAR = (
     # ── ASANSÖR TEKNİK BİLGİLERİ ──────────────────────────────────────
+    #  ASANSÖR ADI.  Bir binada dört asansör olabilir ve hepsi ayrı kuyudadır;
+    #  paftaları birbirinden ayırt edilebilmeli.  Boş bırakılırsa "1 nolu
+    #  asansör" gibi numarayla anılır.  Kaynak Excel'de karşılığı yoktur
+    #  ( tek asansörlük bir kitaptır ), o yüzden hücre adresi boştur.
+    ("asansor_adi",       "",     "Asansör adı  ( paftada görünür )",  "—",    "metin", None, None),
     #  SEÇENEKLER TABLODAN TÜRETİLİR.  Elle yazılan ikinci bir liste, kabin
     #  alanı tablosuyla ayrışabilir — nitekim kaynak kitapta ayrışmıştı:
     #  EN 81-20 Çizelge 6'nın 7 beyan yükü listede yoktu ve o yüklerde hiç
@@ -273,7 +278,8 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 #  kabin_agirligi BURADA DEĞİLDİR:  tamamla() onu ofis tablosundan doldurur
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
-OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet",
+OPSIYONEL_ALANLAR = ("asansor_adi",
+                     "paten_balata_boyu", "guvenlik_devreye_kuvvet",
                      "reg_devreye_hizi", "makine_tst",
                      "halat_birim_kutle", "halat_kopma_kN",
                      "saptirma_kasnak_min_capi")
@@ -331,8 +337,8 @@ TABLO_GEREKLI = (
 #  giren kullanıcı sırayı şaşırmasın.
 GRUPLAR = (
     ("Asansör teknik bilgileri",
-     ("beyan_yuku", "beyan_hizi", "seyir_mesafesi", "kabin_agirligi",
-      "aski_orani")),
+     ("asansor_adi", "beyan_yuku", "beyan_hizi", "seyir_mesafesi",
+      "kabin_agirligi", "aski_orani")),
     ("Kabin ve kapı",
      ("kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
       "uzun_pervaz",
@@ -371,6 +377,41 @@ GRUPLAR = (
 )
 
 
+#  HESAP BÖLÜMÜ  →  onu besleyen GİRDİ GRUPLARI.
+#  Revizyonda mühendis "4. bölüm halat kaldı, neyi değiştireceğim" diye
+#  düşünür — girdi grubunun adıyla değil, HESAP BÖLÜMÜYLE.  Arayüz, sonuç
+#  tablosundaki bir bölüme tıklandığında doğrudan onun girdilerini açar.
+#  Eşleme burada durur çünkü hangi girdinin hangi hesaba girdiği MOTORUN
+#  bilgisidir;  arayüzde tutulursa motor değişince sessizce bayatlar.
+#  Anahtar, bölüm başlığının başındaki numaradır ( "4 -  ASKI HALATLARI…" ).
+#
+#  NİÇİN BİRDEN ÇOK GRUP:  önce her bölüm için TEK bir "asıl" grup yazılıydı
+#  ve çoğu bölümde bu yanlış yere götürüyordu.  Örnek:  4. bölüm "tahrik
+#  kasnağı çapını büyütün" der, ama Dt alanı MAKİNE VE MOTOR grubundadır —
+#  tıklayan mühendis ASKI HALATLARI grubunda kasnak çapı arıyordu.  Aynı
+#  şey 10. bölümde de vardı:  kuyu dibi sığınma yüksekliği DURAK VE KUYU'dan
+#  değil, TAMPONLAR'daki baba yüksekliğinden gelir.
+#
+#  Sıra ÖNEM SIRASIDIR:  ilk grup bölümün ana girdilerini taşır, ikincisi o
+#  bölümün kontrollerinden en az birini tek başına belirleyen ikinci gruptur.
+#  İkiyle sınırlıdır — üç grup açmak akordeonu listeye çevirir ve aranan alan
+#  yine kaybolur.  Listeler, motor kodundaki g[...] okumaları taranarak
+#  çıkarılmıştır.
+BOLUM_GRUBU = {
+    #  bölüm                    asıl grup            ikinci grup
+    "1":  ("Makine ve motor", "Askı halatları"),   # Nsç ↔ halat ağırlığı gh · nh
+    "2":  ("Makine ve motor",),                    # kaide  ← kiriş kesitleri
+    "3":  ("Kabin ve kapı",),                      # kabin alanı ← ölçüler · pervaz
+    "4":  ("Askı halatları", "Makine ve motor"),   # S ↔ Dt · Ds kasnak çapları
+    "5":  ("Hız regülatörü",),                     # regülatör halatı
+    "6":  ("Askı halatları", "Makine ve motor"),   # tahrik ↔ kanal · kasnak
+    "7":  ("Kılavuz raylar", "Kabin ve kapı"),     # kabin rayı ↔ kaçıklık · kapı
+    "8":  ("Kılavuz raylar", "Karşı ağırlık"),     # ağırlık rayı ↔ ağırlık verisi
+    "9":  ("Tamponlar", "Kılavuz raylar"),         # kuyu tabanı yükleri
+    "10": ("Durak ve kuyu", "Tamponlar"),          # sığınma ↔ tampon babası
+}
+
+
 def arayuz_alanlari():
     """Formun kendini üretmesi için alan tanımları  ( JSON'a hazır )."""
     gruplar = []
@@ -385,7 +426,9 @@ def arayuz_alanlari():
                 "varsayilan": list(varsayilan) if tur == "liste" else varsayilan,
             })
         gruplar.append({"ad": ad, "alanlar": alanlar})
-    return {"gruplar": gruplar, "durak_azami": DURAK_AZAMI,
+    return {"gruplar": gruplar,
+            "bolum_grubu": {no: list(gr) for no, gr in BOLUM_GRUBU.items()},
+            "durak_azami": DURAK_AZAMI,
             "hesaplanan": list(HESAPLANAN)}
 
 

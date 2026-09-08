@@ -113,13 +113,197 @@ def calistir():
         #  topraklama hesapları oradaki değerleri kullanır.
         r.kontrol("uygulama modunda Sabitler sekmesi görünür",
                   pg.is_visible('.sekme[data-sekme="sabitler"]'))
+
+        #  ── PROJE SEKMESİ / ASANSÖR SEKMELERİ
+        #  Uygulama modu artık doğrudan girdi formuna düşmez.  Bir PROJE'de
+        #  dörde kadar asansör olabilir;  PROJE sekmesinde binaya ait olan
+        #  şeyler ( kapak · asansör adedi · proje geneli girdiler · çıktılar )
+        #  BİR KEZ durur, her asansörün kendi hesabı KENDİ SEKMESİNDEDİR.
+        r.kontrol("uygulama modu PROJE sekmesiyle açılıyor",
+                  pg.is_visible("#s-uygproje") and not pg.is_visible("#s-mukavemet"))
+        r.esit("proje geneli girdiler PROJE sekmesinde",
+               pg.eval_on_selector_all("#p_form .alan", "e=>e.length"),
+               pg.evaluate("MUK.proje_geneli.length"))
+        r.kontrol("proje geneli alan asansör formunda TEKRARLANMIYOR",
+                  pg.evaluate("MUK.proje_geneli.every(a=>"
+                              "!document.querySelector('#m_form #'+M_ID(a)))"),
+                  "→ aynı topraklama iki yerde soruluyor")
+        r.esit("asansör adedi seçmeli  ( 1 - 4 )",
+               pg.eval_on_selector_all("#m_adet option", "e=>e.map(x=>x.value)"),
+               ["1", "2", "3", "4"])
+        r.esit("açılışta tek asansör sekmesi",
+               pg.eval_on_selector_all("#m_asansor_sekmeleri .sekme", "e=>e.length"), 1)
+        #  Girdi formu asansör sekmesindedir — sonraki kontroller oradan okur.
+        pg.evaluate("mAsansorSekmesi(0)")
+        pg.wait_for_timeout(1200)
+        r.kontrol("asansör sekmesi hesap formunu açıyor",
+                  pg.is_visible("#s-mukavemet") and not pg.is_visible("#s-uygproje"))
         r.kontrol("ortak girdi köprüsü formda yazılı",
                   "Ortak girdiler bir kez girilir" in pg.inner_text("#m_form"))
         r.kontrol("başlık uygulama projesini gösteriyor",
                   "UYGULAMA" in pg.inner_text("#ust_ad"),
                   f"→ {pg.inner_text('#ust_ad')!r}")
         r.esit("uygulama formu 10 grup üretti",
-               pg.eval_on_selector_all("#m_form .bolum-bas", "e=>e.length"), 10)
+               pg.eval_on_selector_all("#m_form .m-grup", "e=>e.length"), 10)
+
+        #  ── GİRDİ AKORDEONU  ( 86 girdi tek sütunda bulunamıyordu )
+        #  Kapalı grup DOM'da KALIR;  yalnız görünmez.  Hesabın okuduğu alan
+        #  kümesi açık/kapalı durumdan ETKİLENMEMELİ — asıl kontrol budur.
+        r.esit("akordeon: tek grup açık başlıyor",
+               pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length"), 1)
+        _ga = pg.evaluate("Object.keys(mukavemetGirdi()).length")
+        pg.evaluate("mGrupAc(6)")
+        _gb = pg.evaluate("Object.keys(mukavemetGirdi()).length")
+        pg.evaluate("document.getElementById('m_ara').value='halat';mAramaUygula()")
+        _gc = pg.evaluate("Object.keys(mukavemetGirdi()).length")
+        _bulunan = pg.eval_on_selector_all(
+            "#m_form .alan", "e=>e.filter(x=>!x.hidden).length")
+        pg.evaluate("document.getElementById('m_ara').value='';mAramaUygula()")
+        _gd = pg.evaluate("Object.keys(mukavemetGirdi()).length")
+        r.kontrol("akordeon: okunan girdi kümesi HİÇ değişmiyor",
+                  len({_ga, _gb, _gc, _gd}) == 1,
+                  f"→ {_ga} · {_gb} · {_gc} · {_gd}")
+        r.kontrol("akordeon: arama alanları süzüyor",
+                  0 < _bulunan < _ga, f"→ {_bulunan} alan kaldı")
+        r.kontrol("akordeon: arama temizlenince sayaçlar geri geliyor",
+                  pg.eval_on_selector_all(
+                      "#m_form .m-grup-adet",
+                      "e=>e.every(x=>x.textContent.trim()===x.dataset.toplam)"),
+                  "→ arama sayaçları başlıkta kaldı")
+        #  SONUÇTAN GİRDİYE ATLAMA — eşleme motordan gelir ( BOLUM_GRUBU ).
+        #  Bir hesap bölümü İKİ girdi grubundan beslenebilir ve kalan
+        #  kontrolün alanı ikincisinde olabilir:  4. bölüm "tahrik kasnağı
+        #  çapını büyütün" der ama Dt alanı MAKİNE VE MOTOR grubundadır,
+        #  10. bölümün kuyu dibi sığınma yüksekliği ise TAMPONLAR'daki baba
+        #  yüksekliğinden gelir.  Eskiden tek grup açılıyordu ve mühendis
+        #  aradığı alanı açılan grupta bulamıyordu.
+        for _no in ("1", "2", "4", "7", "10"):
+            pg.evaluate(f"mGirdiyeGit('{_no}')")
+            r.esit(f"bölüm {_no} → girdi grupları",
+                   sorted(pg.eval_on_selector_all(
+                       "#m_form .m-grup.acik", "e=>e.map(x=>x.dataset.ad)")),
+                   sorted(pg.evaluate(f"mBolumGruplari('{_no}')")))
+        pg.evaluate("mGirdiyeGit('4')")
+        r.kontrol("bölüm 4 hem halatı hem tahrik kasnağını açıyor",
+                  pg.is_visible("#m_halat_capi")
+                  and pg.is_visible("#m_tahrik_kasnak_capi"))
+        pg.evaluate("mGirdiyeGit('10')")
+        r.kontrol("bölüm 10 hem kuyuyu hem tampon babasını açıyor",
+                  pg.is_visible("#m_son_kat_yuksekligi")
+                  and pg.is_visible("#m_kabin_tampon_baba"))
+        #  ÜÇ GRUP AÇILMAZ — akordeon listeye dönerse aranan alan yine kaybolur
+        r.esit("atlama en çok iki grup açıyor",
+               max(pg.evaluate(f"mBolumGruplari('{_n}').length")
+                   for _n in range(1, 11)), 2)
+        #  Öteki gruplar KAPANIR:  atlama akordeonu açık bırakmaz
+        r.esit("atlamadan sonra yalnız eşlemedeki gruplar açık",
+               pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length"),
+               len(pg.evaluate("mBolumGruplari('10')")))
+        r.kontrol("sonuç tablosunda bölüm satırları tıklanabilir",
+                  pg.eval_on_selector_all("#m_sonuc tr.m-gidilir", "e=>e.length") >= 10)
+
+        #  ── ÇOKLU ASANSÖR  ( 1 - 4 asansör, tek proje )
+        #  Asansör adedi SEÇİLİR ( ekle/sil değil ):  bir binada kaç asansör
+        #  olduğu baştan bellidir, mühendis onu sayar — sırayla ekleyip
+        #  silmez.  Form TEK KOPYADIR;  aktif asansörün değerleri onda durur.
+        #  Asansör değişince değerler kaybolmamalı — asıl kontrol budur.
+        #  Denemede BAĞIMSIZ bir alan kullanılır:  seyir mesafesi ve son kat
+        #  yüksekliği durak listesinden TÜRETİLİR ( mTuretilenleriDoldur ),
+        #  asansör değişince yeniden hesaplanırlar — taşınmadıkları için
+        #  değil, türetildikleri için.
+        r.esit("çoklu: açılışta tek asansör", pg.evaluate("MUK_ADET"), 1)
+        pg.evaluate("mTumGruplariAc()")
+        pg.fill("#m_asansor_adi", "İnsan 1")
+        pg.fill("#m_motor_gucu", "7.5")
+        pg.evaluate("mAdetDegisti(2)")
+        pg.wait_for_timeout(1400)
+        r.esit("çoklu: adet 2 seçildi", pg.evaluate("MUK_ADET"), 2)
+        r.esit("çoklu: şeritte iki asansör sekmesi",
+               pg.eval_on_selector_all("#m_asansor_sekmeleri .sekme", "e=>e.length"), 2)
+        #  Adet seçmek AKTİF ASANSÖRÜ DEĞİŞTİRMEZ — mühendis 1'i doldururken
+        #  adedi 3 yapınca formu altından çekilmiş olmaz.
+        r.esit("çoklu: adet seçimi aktif asansörü değiştirmiyor",
+               pg.evaluate("MUK_AKTIF"), 0)
+        r.kontrol("çoklu: 1. asansörün değerleri yerinde",
+                  pg.input_value("#m_asansor_adi") == "İnsan 1")
+        pg.evaluate("mAsansorSekmesi(1)")
+        pg.wait_for_timeout(1400)
+        r.esit("çoklu: sekmeyle 2. asansöre geçiliyor", pg.evaluate("MUK_AKTIF"), 1)
+        r.kontrol("çoklu: yeni asansör 1 nolunun kopyası olarak açılıyor",
+                  pg.input_value("#m_motor_gucu") == "7.5",
+                  f"→ {pg.input_value('#m_motor_gucu')!r}")
+        r.esit("çoklu: kopyanın adı boş", pg.input_value("#m_asansor_adi"), "")
+        pg.evaluate("mTumGruplariAc()")
+        pg.fill("#m_asansor_adi", "Yük")
+        pg.fill("#m_motor_gucu", "15")
+        pg.evaluate("mAsansorSec(0)")
+        pg.wait_for_timeout(1400)
+        r.kontrol("çoklu: 1. asansöre dönünce KENDİ değerleri geliyor",
+                  pg.input_value("#m_asansor_adi") == "İnsan 1"
+                  and pg.input_value("#m_motor_gucu") == "7.5",
+                  f"→ {pg.input_value('#m_asansor_adi')!r} · "
+                  f"{pg.input_value('#m_motor_gucu')!r}")
+        pg.evaluate("mAsansorSec(1)")
+        pg.wait_for_timeout(1400)
+        r.kontrol("çoklu: 2. asansörün değerleri korunmuş",
+                  pg.input_value("#m_asansor_adi") == "Yük"
+                  and pg.input_value("#m_motor_gucu") == "15")
+        #  Hesap İKİ asansörü birden döner ve özet tablosu çizilir
+        pg.evaluate("hesapMukavemet()")
+        pg.wait_for_timeout(2200)
+        r.esit("çoklu: sunucu iki asansör hesapladı",
+               pg.evaluate("SON.mc && SON.mc.adet"), 2)
+        r.kontrol("çoklu: SON.m aktif asansörün sonucu  ( geriye dönük )",
+                  pg.evaluate("!!(SON.m && SON.m.bolumler && SON.m.bolumler.length)"))
+        r.esit("çoklu: özet iki asansörü listeliyor",
+               pg.evaluate("SON.mc.ozet.asansorler.length"), 2)
+        r.esit("çoklu: özetteki adlar",
+               pg.evaluate("SON.mc.ozet.asansorler.map(a=>a.tanim)"),
+               ["İnsan 1", "Yük"])
+        #  HER ASANSÖR KENDİ GİRDİSİYLE hesaplanır:  sonuçta girdi de dönüyor,
+        #  aktif asansörün girdisi ikisine birden gönderilmiş olsa iki motor
+        #  gücü aynı görünürdü.
+        r.esit("çoklu: her asansör KENDİ girdisiyle hesaplandı",
+               pg.evaluate("SON.mc.asansorler.map(a=>a.girdi.motor_gucu)"),
+               [7.5, 15.0])
+        #  Sekme rozeti ASANSÖRE ÖZELDİR — dördünde aynı rozet çıkmamalı
+        r.esit("çoklu: her sekme kendi rozetini taşıyor",
+               pg.eval_on_selector_all(
+                   "#m_asansor_sekmeleri .sekme",
+                   "e=>e.map(x=>x.textContent.trim().slice(0,9))"),
+               ["ASANSÖR 1", "ASANSÖR 2"])
+        #  PROJE GENELİ alanlar asansörden asansöre TAŞINMAZ
+        r.kontrol("çoklu: proje geneli alanlar asansör haritasında yok",
+                  pg.evaluate("MUK.proje_geneli.every(a=>"
+                              "MUK_ASANSORLER.every(d=>!(a in d)))"),
+                  "→ topraklama/makine dairesi asansöre kopyalanmış")
+        #  ADEDİ AZALTMAK VERİYİ SİLMEZ:  3→2→3 yapan mühendis girdilerini
+        #  geri bulmalı.  Harita dizide kalır, yalnız hesaba girmez.
+        pg.evaluate("mAdetDegisti(1)")
+        pg.wait_for_timeout(1400)
+        r.esit("çoklu: adet 1'e indi", pg.evaluate("MUK_ADET"), 1)
+        r.esit("çoklu: tek asansör sekmesi kaldı",
+               pg.eval_on_selector_all("#m_asansor_sekmeleri .sekme", "e=>e.length"), 1)
+        r.esit("çoklu: azaltmak 2. asansörün verisini SİLMİYOR",
+               pg.evaluate("(MUK_ASANSORLER[1]||{}).asansor_adi"), "Yük")
+        r.esit("çoklu: hesap yalnız seçilen adedi kapsıyor",
+               pg.evaluate("SON.mc && SON.mc.adet"), 1)
+        pg.evaluate("mAdetDegisti(2)")
+        pg.wait_for_timeout(1400)
+        r.esit("çoklu: geri artırınca eski girdi geliyor",
+               pg.evaluate("SON.mc.ozet.asansorler.map(a=>a.tanim)"), ["İnsan 1", "Yük"])
+        #  TEMİZLİK.  Girdiler tarayıcıda saklanıyor ve testler arasında
+        #  silinmiyor;  bu blok motor gücünü değiştirdiği için bırakıldığı
+        #  gibi kalırsa BİR SONRAKİ KOŞUDA daha erken bir kontrolü
+        #  ( "varsayılanda üç bölüm kalıyor" ) bozar.  Dokunulan alanlar
+        #  varsayılanına döndürülür ve ikinci asansör atılır.
+        pg.evaluate("mAdetDegisti(1); MUK_ASANSORLER = [{}]; MUK_AKTIF = 0;")
+        pg.wait_for_timeout(1200)
+        pg.evaluate("mTumGruplariAc()")
+        pg.fill("#m_motor_gucu", "4,9")
+        pg.fill("#m_asansor_adi", "")
+        pg.evaluate("mAsansorKaydet(); yaz()")
+        pg.wait_for_timeout(700)
         r.esit("varsayılan durak sayısı", pg.evaluate("MUK_DURAK.length"), 8)
 
         #  DURAK DÜĞMELERİ ALTTAKİ ALANIN ÜSTÜNE TAŞMAMALI.
@@ -168,6 +352,11 @@ def calistir():
         r.esit("varsayılanda üç bölüm kalıyor", len(_kalan), 3)
         r.kontrol("kalanlar motor gücü, askı halatları ve regülatör",
                   sorted(x[:1] for x in _kalan) == ["1", "4", "5"], f"→ {_kalan}")
+        #  GİRDİ AKORDEONU.  Alanlar artık gruplara ayrıldı ve kapalı gruptaki
+        #  alan "görünür değil" sayılır — Playwright dolduramaz.  Test alanları
+        #  id ile doldurduğu için bütün grupları açıyoruz;  akordeonun kendi
+        #  davranışı aşağıda ayrıca denetleniyor.
+        pg.evaluate("mTumGruplariAc()")
         #  Üçü de giderilince hepsi geçmeli
         pg.fill("#m_tahrik_kasnak_capi", "280")
         pg.fill("#m_saptirma_kasnak_capi", "280")
@@ -277,13 +466,13 @@ def calistir():
         r.kontrol("kasnak 280 mm hâlâ yerinde",
                   pg.input_value("#m_tahrik_kasnak_capi") == "280")
 
-        #  Çıktı düğmeleri:  varlıkları YETMEZ, gerçekten dosya dönmeli
-        #  Girdi formundaki durak düğmeleri de ".dugmeler .dg" — çıktı
-        #  düğmeleri form DIŞINDA olanlardır.
+        #  Çıktı düğmeleri:  varlıkları YETMEZ, gerçekten dosya dönmeli.
+        #  PROJE sekmesindedirler — çıktı bütün asansörleri kapsar, tek bir
+        #  asansörün sekmesine ait değildir.
         r.esit("uygulama çıktı ve proje dosyası düğmeleri",
                pg.eval_on_selector_all(
-                   "#s-mukavemet .dugmeler .dg",
-                   "e=>e.filter(x=>!x.closest('#m_form')).map(x=>x.textContent.trim())"),
+                   "#s-uygproje .dugmeler .dg",
+                   "e=>e.map(x=>x.textContent.trim())"),
                ["Projeyi kaydet", "Proje aç (.uygulama)", "Tümünü temizle",
                 "Uygulama Projesi PDF", "Uygulama Projesi Excel",
                 "Projeyi paketle (ZIP)"])
@@ -308,7 +497,13 @@ def calistir():
                   f"→ {_ind['xlsx']['boyut']} bayt")
 
         #  Proje kimliği dosya adına giriyor mu  ( avan kapağı BASILMAMALI )
+        #  Kimlik PROJE sekmesindedir:  bir kapak dört asansörü birden
+        #  taşır, tek asansörün sekmesine ait değildir.
+        pg.click('.sekme[data-sekme="uygproje"]')
+        pg.wait_for_timeout(400)
         pg.fill("#mk_proje_adi", "Güneş Apartmanı")
+        pg.evaluate("mAsansorSekmesi(0)")
+        pg.wait_for_timeout(900)
         _ad = pg.evaluate("""async () => {
             const r = await fetch('/api/indir/uygulama-pdf', {method:'POST',
               headers:{'Content-Type':'application/json'},
@@ -466,7 +661,7 @@ def calistir():
         r.kontrol("halat tablosunda TS 12385-5 yazılı", "12385" in _tm)
 
         #  ─────────── PROJE DOSYASI  (.uygulama) ───────────
-        pg.click(".sekme[data-sekme='mukavemet']")
+        pg.click('.sekme[data-sekme="uygproje"]')
         pg.wait_for_timeout(400)
         _pd = pg.evaluate("projeGovdesi('uygulama')")
         r.esit("proje dosyası modunu yazıyor", _pd.get("__mod"), "uygulama")
@@ -545,7 +740,7 @@ def calistir():
         # --- her sekme açılıyor ve içerik üretiyor
         r.esit("avan modunda görünen sekme sayısı 5",
                pg.eval_on_selector_all(".sekme", "e=>e.filter(x=>!x.hidden).length"), 5)
-        r.esit("şeritteki toplam sekme 6  ( + mukavemet )",
+        r.esit("şeritteki toplam sekme 6  ( + uygulama projesi )",
                pg.eval_on_selector_all(".sekme", "e=>e.length"), 6)
         r.kontrol("ayrı 'çoklu' sekmesi kalmadı",
                   pg.query_selector('.sekme[data-sekme="coklu"]') is None)

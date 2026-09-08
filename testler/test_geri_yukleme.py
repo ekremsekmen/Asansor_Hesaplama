@@ -386,7 +386,9 @@ def calistir():
            #  λ — denge ( kompanzasyon ) zinciri
            "denge_zinciri": "Var",
            #  Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( m.5.5.2.1 )
-           "saptirma_kasnak_min_capi": 320}
+           "saptirma_kasnak_min_capi": 320,
+           #  Asansör adı — çoklu projede paftaları ayırt eder
+           "asansor_adi": "İnsan 1"}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

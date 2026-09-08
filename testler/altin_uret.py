@@ -28,10 +28,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.avan import hesap as AV                               # noqa: E402
 from engine.avan import tablolar as T                              # noqa: E402
 from engine.avan import trafik as TR                            # noqa: E402
+from engine.uygulama import hesap as UY                        # noqa: E402
 
 _KLASOR = os.path.dirname(os.path.abspath(__file__))
 DOSYA = os.path.join(_KLASOR, "altin_trafik.json.gz")
 DOSYA_AVAN = os.path.join(_KLASOR, "altin_avan.json.gz")
+DOSYA_UYGULAMA = os.path.join(_KLASOR, "altin_uygulama.json.gz")
 
 
 def senaryolar():
@@ -195,6 +197,85 @@ def avan_senaryolar():
                     "makine_tipi": "Dişlisiz"}]}
 
 
+def uygulama_senaryolar():
+    """Uygulama projesi  ( mukavemet + elektrik + topraklama )  senaryoları.
+
+    HEPSİ ÇOKLU YOLDAN GEÇER.  hesapla_coklu tek asansörde hesapla()'nın TAM
+    çıktısını asansorler[0]'da taşır;  böylece tek dosya hem tek hem çoklu
+    yolu dondurur ve ikinci bir altın dosyaya gerek kalmaz.
+
+    Kapsam:  taban proje · yük/hız/askı çeşitleri · denge zinciri · katalog
+    halat verisi · sığınma duruşları · Tst kontrolü · Ds ayrımı · proje
+    geneli hesaplar ( topraklama + makine dairesi ) · çok asansörlü proje ·
+    hesabı durduran girdi.
+    """
+    PG = {"temel_a": 26.55, "temel_b": 16.4, "serit_L": 58.5,
+          "mk_yok": False, "mk_uzunluk": 4.0, "mk_genislik": 3.0}
+
+    #  1) Taban — varsayılan proje, proje geneli hesaplar YOK
+    yield {"asansorler": [{}], "ortak": {}}
+    #  2) Taban + topraklama ve makine dairesi
+    yield {"asansorler": [{}], "ortak": dict(PG)}
+    #  3) MRL — makine dairesi yok
+    yield {"asansorler": [{}], "ortak": dict(PG, mk_yok=True)}
+
+    #  4-7) Yük · hız · askı oranı çeşitleri
+    for yuk, hiz, aski in ((630, 1.0, 1), (800, 1.6, 2),
+                           (1275, 2.5, 2), (1600, 1.0, 1)):
+        yield {"asansorler": [{"beyan_yuku": yuk, "beyan_hizi": hiz,
+                               "aski_orani": aski}],
+               "ortak": dict(PG)}
+
+    #  8-9) Denge zinciri — var / yok  ( Gmax ve Tst ters yönde değişir )
+    for z in ("Yok", "Var"):
+        yield {"asansorler": [{"denge_zinciri": z, "aski_orani": 2}],
+               "ortak": dict(PG)}
+
+    #  10) Katalog halat verisi tabloyu ezer
+    yield {"asansorler": [{"halat_capi": 6.5, "halat_adedi": 7,
+                           "halat_birim_kutle": 0.179, "halat_kopma_kN": 31.5}],
+           "ortak": dict(PG)}
+
+    #  11-13) Sığınma duruşları  ( kuyu dibi )
+    for tip in ("Çömelme", "Yatarak", "Dik duruş"):
+        yield {"asansorler": [{"siginma_tipi_dip": tip}], "ortak": dict(PG)}
+
+    #  14-15) Tst kontrolü — geçen ve kalan
+    for tst in (3400, 800):
+        yield {"asansorler": [{"makine_tst": tst, "motor_gucu": 11}],
+               "ortak": dict(PG)}
+
+    #  16) Ds ( en küçük kasnak ) ayrımı
+    yield {"asansorler": [{"tahrik_kasnak_capi": 320, "halat_capi": 8,
+                           "saptirma_kasnak_capi": 295, "kasnak_tek_yon": 2,
+                           "saptirma_kasnak_min_capi": 320}],
+           "ortak": dict(PG)}
+
+    #  17) ÇOK ASANSÖRLÜ — proje geneli bölümler yalnız ilkinde kalmalı
+    yield {"asansorler": [{"asansor_adi": "İnsan 1"},
+                          {"beyan_yuku": 630, "asansor_adi": "İnsan 2"},
+                          {"beyan_yuku": 1275, "asansor_adi": "Yük",
+                           "denge_zinciri": "Var"}],
+           "ortak": dict(PG)}
+    #  18) Dört asansör — azami
+    yield {"asansorler": [{"beyan_yuku": y} for y in (630, 800, 1000, 1275)],
+           "ortak": dict(PG)}
+
+    #  19-20) Hesabı DURDURAN girdiler — hata metinleri de dondurulur
+    yield {"asansorler": [{"halat_adedi": 1}], "ortak": {}}
+    yield {"asansorler": [{"kabin_paten_arasi": 30000}], "ortak": {}}
+
+    #  21) Ofis sabiti ezmesi  ( verim + zincir oranı )
+    yield {"asansorler": [{"denge_zinciri": "Var"}],
+           "ortak": dict(PG, _ofis={"verim_dislisiz": 0.80,
+                                    "denge_zinciri_orani": 80})}
+
+
+def uygulama_motoru(g):
+    """Altın karşılaştırmasının çağırdığı sarmalayıcı."""
+    return UY.hesapla_coklu(g.get("asansorler"), g.get("ortak"))
+
+
 def uret():
     kayit = []
     for i, g in enumerate(senaryolar()):
@@ -217,9 +298,18 @@ def _yaz_bir(kayit, dosya, ad):
           f"{os.path.getsize(dosya)/1024:5.0f} KB sıkıştırılmış  →  {os.path.basename(dosya)}")
 
 
+def uret_uygulama():
+    kayit = []
+    for i, g in enumerate(uygulama_senaryolar()):
+        kayit.append({"no": i, "girdi": g,
+                      "cikti": uygulama_motoru(json.loads(json.dumps(g)))})
+    return kayit
+
+
 def yaz():
     _yaz_bir(uret(), DOSYA, "TRAFİK")
     _yaz_bir(uret_avan(), DOSYA_AVAN, "AVAN")
+    _yaz_bir(uret_uygulama(), DOSYA_UYGULAMA, "UYGULAMA")
 
 
 if __name__ == "__main__":

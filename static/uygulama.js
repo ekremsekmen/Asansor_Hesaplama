@@ -14,6 +14,24 @@
    ═══════════════════════════════════════════════════════════════════════ */
 const M_ID = a => 'm_' + a;
 
+/*  ÇOKLU ASANSÖR.  Bir binada farklı kuyularda 1-4 asansör olabilir;  hesap
+    her biri için AYNIDIR, değişen yalnız girdilerdir.
+
+    FORM TEK KOPYADIR.  Dört kopya DOM ( 4 × 86 alan ) hem ağır olurdu hem de
+    akordeonu dörde katlardı.  Bunun yerine aktif asansörün değerleri formda
+    durur;  asansör değişince form kaydedilip ötekinin değerleri yüklenir.
+    MUK_ASANSORLER[i] = { alan anahtarı: değer , __durak: [ … ] } */
+//  MUK_ASANSORLER her zaman 4 haritaya kadar tutar;  MUK_ADET kaçının
+//  KULLANILDIĞINI söyler.  Adedi azaltmak veri SİLMEZ — 3→2→3 yapan mühendis
+//  girdilerini geri bulur.
+let MUK_ASANSORLER = [{}];
+let MUK_AKTIF = 0;
+let MUK_ADET = 1;
+
+/*  Proje geneli alanlar asansörden asansöre TAŞINMAZ:  topraklama ve makine
+    dairesi binaya aittir.  Liste sunucudan gelir ( MUK.proje_geneli ). */
+const mProjeGeneliMi = a => !!(MUK && (MUK.proje_geneli||[]).includes(a));
+
 /*  Sayı biçimi:  sözleşme 0,63 gibi ondalıkları nokta ile taşır, kullanıcı
     virgül görür.  Seçenek listesinde DEĞER değişmez, yalnız etiket çevrilir. */
 const mSayi = x => (typeof x === 'number')
@@ -40,20 +58,53 @@ async function mukavemetKur(){
           `${kacis(k.mukavemet)} <b>→</b> ${kacis(k.avan)}`).join(' &nbsp;·&nbsp; ')
       + '</div></div>';
   }
-  for(const g of MUK.gruplar){
-    h += `<div class="bolum-bas">${kacis(g.ad)}</div>`;
-    let acik = [];
+  //  AKORDEON.  86 girdi tek sütunda alt alta durunca aranan alanı bulmak
+  //  zorlaşıyordu.  Girdi sütunu 440 px'tir — yatay sekme şeridi sığmaz;
+  //  akordeon bu genişliğe oturur ve KAPALIYKEN DE bütün bölüm adları
+  //  görünür, yani harita hep ortadadır.
+  //  Alanlar DOM'dan SİLİNMEZ, yalnız gizlenir:  mukavemetGirdi() bütün
+  //  grupları dolaşıp okur ve kapalı gruptaki alan da okunur.  Görünüm
+  //  değişikliği hesabın hiçbir noktasına dokunmaz.
+  h += `<div class="m-ara-satir">
+          <input id="m_ara" class="m-ara" type="search" placeholder="alan ara…"
+                 oninput="mAramaUygula()" autocomplete="off">
+        </div>`;
+  //  PROJE GENELİ alanlar akordeona GİRMEZ:  binaya aittirler ve PROJE
+  //  sekmesinde bir kez sorulurlar.  Asansör formunda görünselerdi "bu
+  //  topraklama hangi asansörün?" sorusu doğardı.
+  let pgIc = '', pgAcik = [];
+  for(const g of MUK.gruplar) for(const f of g.alanlar){
+    if(!mProjeGeneliMi(f.anahtar)) continue;
+    pgAcik.push(mAlan(f));
+    if(pgAcik.length === 2){ pgIc += mSatir(pgAcik); pgAcik = []; }
+  }
+  if(pgAcik.length) pgIc += mSatir(pgAcik);
+  if($('p_form')) $('p_form').innerHTML = pgIc;
+
+  for(const [i, g] of MUK.gruplar.entries()){
+    let ic = '', acik = [];
     for(const f of g.alanlar){
+      if(mProjeGeneliMi(f.anahtar)) continue;
       if(f.tur === 'liste'){
-        //  Durak yükseklikleri kendi düzenleyicisini ister
-        if(acik.length){ h += mSatir(acik); acik = []; }
-        h += mDurakKutusu(f);
+        if(acik.length){ ic += mSatir(acik); acik = []; }
+        ic += mDurakKutusu(f);
         continue;
       }
       acik.push(mAlan(f));
-      if(acik.length === 2){ h += mSatir(acik); acik = []; }
+      if(acik.length === 2){ ic += mSatir(acik); acik = []; }
     }
-    if(acik.length) h += mSatir(acik);
+    if(acik.length) ic += mSatir(acik);
+    if(!ic) continue;                       // bütün alanları proje geneli olan grup
+    h += `<div class="m-grup" data-grup="${i}" data-ad="${kacis(g.ad)}">
+            <button type="button" class="m-grup-bas" onclick="mGrupAc(${i})">
+              <span class="m-grup-ok">▸</span>
+              <span class="m-grup-ad">${kacis(g.ad)}</span>
+              <span class="m-grup-adet" data-toplam="${g.alanlar.filter(
+                       f=>!mProjeGeneliMi(f.anahtar)).length}"
+                    >${g.alanlar.filter(f=>!mProjeGeneliMi(f.anahtar)).length}</span>
+            </button>
+            <div class="m-grup-ic" hidden>${ic}</div>
+          </div>`;
   }
   $('m_form').innerHTML = h;
   //  Varsayılan durak listesi
@@ -64,6 +115,16 @@ async function mukavemetKur(){
   uygulamaTablolariKur();
   mukavemetGeriYukle();
   mDurakCiz();
+  //  Son bakılan grup açık gelsin — sayfa yenilenince baştan başlamasın.
+  let _g0 = 0; try{ _g0 = Number(localStorage.getItem('m_grup')) || 0; }catch(e){}
+  mGrupAc(_g0 < MUK.gruplar.length ? _g0 : 0, true);
+  //  Asansör durumu:  geri yükleme diziyi doldurmuşsa aktif olanı forma bas.
+  if(!Array.isArray(MUK_ASANSORLER) || !MUK_ASANSORLER.length) MUK_ASANSORLER = [{}];
+  if(MUK_AKTIF >= MUK_ASANSORLER.length) MUK_AKTIF = 0;
+  if(MUK_ASANSORLER.length > 1 || Object.keys(MUK_ASANSORLER[0]||{}).length)
+    mAsansorYukle(MUK_AKTIF);
+  if($('m_adet')) $('m_adet').value = String(MUK_ADET);
+  mAsansorSekmeleriTazele();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
   //  sorun yok, orada form açılışta kuruluyor ).
@@ -97,6 +158,16 @@ function mukavemetGeriYukle(){
   });
   if(Array.isArray(o.__muk_durak) && o.__muk_durak.length)
     MUK_DURAK = o.__muk_durak.slice(0, MUK.durak_azami).map(mSayi);
+  //  Çoklu asansör dizisi.  Form kurulduktan SONRA aktif olan basılır
+  //  ( bkz. mukavemetKur ) — burada yalnız durum geri alınır.
+  if(Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length){
+    MUK_ASANSORLER = o.__muk_asansorler
+      .slice(0, (MUK && MUK.asansor_azami) || 4)
+      .map(x => (x && typeof x === 'object') ? x : {});
+    MUK_ADET = Math.min(Math.max(1, Number(o.__muk_adet) || MUK_ASANSORLER.length),
+                        MUK_ASANSORLER.length);
+    MUK_AKTIF = Math.min(Math.max(0, Number(o.__muk_aktif) || 0), MUK_ADET - 1);
+  }
 }
 
 const mSatir = alanlar => `<div class="satir i${alanlar.length}">${alanlar.join('')}</div>`;
@@ -293,21 +364,29 @@ async function hesapMukavemet(){
   if(!MUK) return;
   const sira = ++ISTEK.mukavemet;
   try{
-    const r = await (await fetch('/api/uygulama', {method:'POST',
+    const c = await (await fetch('/api/uygulama/coklu', {method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({girdiler: mukavemetGirdi(),
-                            sabitler: ofisSabitleri()})})).json();
+      body: JSON.stringify(mukavemetIstek())})).json();
     if(sira !== ISTEK.mukavemet) return;      // daha yeni istek var
-    SON.m = r;
+    SON.mc = c;
+    //  SON.m AKTİF ASANSÖRÜN sonucudur.  Tek asansörlük kodun ( ve testlerin )
+    //  baktığı yer burasıdır;  çoklu sonuç SON.mc'de durur.
+    const aktif = (c.asansorler || [])[MUK_AKTIF] || (c.asansorler || [])[0] || c;
+    SON.m = aktif;
     if(MUK_GK_TAZELE){
       MUK_GK_TAZELE = false;
       const gk = $('m_kabin_agirligi');
-      const yeni = r.girdi && r.girdi.kabin_agirligi;
+      const yeni = aktif.girdi && aktif.girdi.kabin_agirligi;
       if(gk && yeni !== null && yeni !== undefined){ gk.value = mSayi(yeni); yaz(); }
     }
-    cizMukavemet(r);
-    const hatali = !r.aktif;
-    sekmeRozeti('mukavemet', hatali, hatali ? 0 : (r.uyarilar||[]).length);
+    cizMukavemet(aktif);
+    if((c.asansorler || []).length > 1) mAsansorOzetiEkle(c);
+    mProjeOzetiCiz(c);
+    //  Genel rozet PROJE sekmesindedir:  asansör sekmelerininki kendilerine
+    //  aittir ( bkz. mAsansorSekmeleriTazele ).
+    const hatali = !c.aktif;
+    sekmeRozeti('uygproje', hatali, hatali ? 0 : (aktif.uyarilar||[]).length);
+    mAsansorSekmeleriTazele();
   }catch(e){
     $('m_sonuc').innerHTML =
       `<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`;
@@ -344,7 +423,13 @@ function cizMukavemet(r){
   (r.bolumler||[]).forEach(b=>{
     const sn = b.sonuc || {};
     const sinif = sn.uygun === true ? 'ok' : (sn.uygun === false ? 'hata' : '');
-    h += `<tr><td class="etiket">${kacis(b.baslik)}</td>
+    //  Bölüm satırı GİRDİLERİNE bir kısayoldur:  revizyonda insan "4. bölüm
+    //  kaldı" diye düşünür ve doğrudan onun girdilerini arar.
+    const no = String(b.baslik||'').trim().split(/[^0-9]/)[0];
+    const gidilir = mBolumGruplari(no).join('  ·  ');
+    h += `<tr${gidilir ? ` class="m-gidilir" onclick="mGirdiyeGit('${no}')"
+              title="Girdilerine git — ${kacis(gidilir)}"` : ''}>
+            <td class="etiket">${kacis(b.baslik)}</td>
             <td>${kacis(b.kaynak||'')}</td>
             <td class="${sinif}">${kacis(sn.metin||'—')}</td></tr>`;
   });
@@ -371,3 +456,268 @@ function cizMukavemet(r){
    BAŞLATMA  —  en sonda, üç dosya da yüklendikten sonra
    ═══════════════════════════════════════════════════════════════════ */
 kur();
+
+
+/* ==========================================================================
+   GİRDİ AKORDEONU
+   Kapalı grup DOM'da durur, yalnız görünmez.  mukavemetGirdi() alanları
+   id ile okur;  açık/kapalı olması okunan değeri DEĞİŞTİRMEZ.
+   ========================================================================== */
+/*  i  tek bir grup numarası ya da NUMARA DİZİSİ olabilir.  Dizi verilince
+    hepsi birden açılır ve İLKİNE kaydırılır:  bir hesap bölümü iki gruptan
+    besleniyorsa ( ör. 4. bölüm — halat + kasnak ) ikisini de görmek gerekir.
+    Öteki bütün gruplar yine kapanır;  akordeon listeye dönüşmez. */
+function mGrupAc(i, sessiz){
+  const ac = (Array.isArray(i) ? i : [i]).map(Number).filter(x=>x >= 0);
+  if(!ac.length) return;
+  i = ac[0];
+  const ara = $('m_ara');
+  if(ara && ara.value){ ara.value = ''; }        // arama açıkken gruba geçilirse temizle
+  document.querySelectorAll('#m_form .m-grup').forEach(gr=>{
+    const bu = ac.includes(Number(gr.dataset.grup));
+    gr.classList.toggle('acik', bu);
+    gr.querySelector('.m-grup-ic').hidden = !bu;
+    gr.querySelector('.m-grup-ok').textContent = bu ? '▾' : '▸';
+    //  Arama tek tek alanları gizlemiş olabilir — gruba dönerken geri aç.
+    gr.querySelectorAll('.alan[hidden]').forEach(a=>{ a.hidden = false; });
+    //  ve sayaç aramanın bıraktığı değerde kalmasın
+    const sy = gr.querySelector('.m-grup-adet');
+    if(sy) sy.textContent = sy.dataset.toplam;
+  });
+  try{ localStorage.setItem('m_grup', String(i)); }catch(e){}
+  if(!sessiz){
+    const gr = document.querySelector(`#m_form .m-grup[data-grup="${i}"]`);
+    if(gr) gr.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+}
+
+/*  BÜTÜN grupları açar.  Otomatik testler alanları id ile doldurur;
+    kapalı gruptaki alan "görünür değil" sayılıp doldurulamaz. */
+function mTumGruplariAc(){
+  document.querySelectorAll('#m_form .m-grup').forEach(gr=>{
+    gr.classList.add('acik');
+    gr.querySelector('.m-grup-ic').hidden = false;
+    gr.querySelector('.m-grup-ok').textContent = '▾';
+    gr.querySelectorAll('.alan[hidden]').forEach(a=>{ a.hidden = false; });
+    const sy = gr.querySelector('.m-grup-adet');
+    if(sy) sy.textContent = sy.dataset.toplam;
+  });
+}
+
+/*  Alan etiketinde geçen metne göre süzer;  eşleşme olan gruplar açılır.
+    Boşaltılınca son seçili gruba dönülür. */
+function mAramaUygula(){
+  const q = ($('m_ara').value || '').trim().toLocaleLowerCase('tr');
+  if(!q){
+    let i = 0; try{ i = Number(localStorage.getItem('m_grup')) || 0; }catch(e){}
+    mGrupAc(i, true);
+    return;
+  }
+  document.querySelectorAll('#m_form .m-grup').forEach(gr=>{
+    let bulunan = 0;
+    gr.querySelectorAll('.alan').forEach(a=>{
+      const es = (a.textContent || '').toLocaleLowerCase('tr').includes(q);
+      a.hidden = !es;
+      if(es) bulunan++;
+    });
+    gr.classList.toggle('acik', bulunan > 0);
+    gr.querySelector('.m-grup-ic').hidden = bulunan === 0;
+    gr.querySelector('.m-grup-ok').textContent = bulunan ? '▾' : '▸';
+    gr.querySelector('.m-grup-adet').textContent = bulunan || gr.querySelectorAll('.alan').length;
+  });
+}
+
+/*  SONUÇTAN GİRDİYE ATLAMA.  Sonuç tablosundaki bölüme tıklanınca o bölümü
+    besleyen girdi grubu açılır.  Eşleme motordan gelir
+    ( mukavemet_girdi.BOLUM_GRUBU ) — arayüzde tutulsaydı motor değişince
+    sessizce bayatlardı. */
+function mGirdiyeGit(bolumNo){
+  if(!MUK || !MUK.bolum_grubu) return;
+  const no = mBolumGruplari(bolumNo).map(ad=>MUK.gruplar.findIndex(g=>g.ad === ad))
+                                    .filter(i=>i >= 0);
+  if(!no.length) return;
+  mGrupAc(no);
+}
+
+/*  Bir bölümü besleyen grup adları.  Motor eskiden tek ad döndürüyordu;
+    dizi gelmeyen ( eski ) sunucuya karşı ikisi de kabul edilir. */
+function mBolumGruplari(bolumNo){
+  const g = (MUK && MUK.bolum_grubu || {})[String(bolumNo)];
+  return !g ? [] : (Array.isArray(g) ? g : [g]);
+}
+
+
+/* ==========================================================================
+   ÇOKLU ASANSÖR
+   Form tek kopyadır;  aktif asansörün değerleri onda durur.  Asansör
+   değişince form MUK_ASANSORLER'e kaydedilir ve ötekinin değerleri yüklenir.
+   Proje geneli alanlar ( topraklama · makine dairesi ) TAŞINMAZ — binaya
+   aittir, dört asansörde de aynıdır.
+   ========================================================================== */
+function mAsansorSekmeleriTazele(){
+  const k = $('m_asansor_sekmeleri'); if(!k) return;
+  if(MOD !== 'uygulama'){ k.innerHTML = ''; return; }
+  let h = '';
+  for(let i = 0; i < MUK_ADET; i++){
+    const ad = ((MUK_ASANSORLER[i] || {}).asansor_adi || '').trim();
+    const etkin = i === MUK_AKTIF && !$('s-mukavemet').hidden;
+    //  ROZET ASANSÖRE ÖZELDİR.  sekmeRozeti() querySelector ile İLK eşleşeni
+    //  bulur;  dört sekmede hepsine aynı rozeti basardı ve hangi asansörün
+    //  kaldığı görünmezdi.  Her sekme kendi sonucundan okur.
+    const d = ((SON.mc && SON.mc.ozet && SON.mc.ozet.asansorler) || [])[i];
+    let rozet = '';
+    if(d && d.aktif === false)
+      rozet = `<span class="sekme-rozet kirmizi" title="Hesap yapılamadı">!</span>`;
+    else if(d && d.tumu_uygun === false)
+      rozet = `<span class="sekme-rozet kirmizi" title="Bir ya da daha çok bölüm uygun değil">✕</span>`;
+    h += `<button class="sekme${etkin ? ' etkin' : ''}" data-sekme="mukavemet"
+                  data-asansor="${i}" onclick="mAsansorSekmesi(${i})"
+                  title="${kacis(ad || (i + 1) + ' nolu asansör')}"
+          >ASANSÖR ${i + 1}${ad ? ' · ' + kacis(ad.slice(0, 12)) : ''}${rozet}</button>`;
+  }
+  k.innerHTML = h;
+}
+
+/*  Sekmeye tıklamak hem gövdeyi açar hem aktif asansörü değiştirir.
+    Dört ayrı sayfa yerine TEK gövde kullanılır ( 4 × 86 alanlık DOM olmasın );
+    sekmeler yalnız hangi asansörün formda olduğunu belirler. */
+function mAsansorSekmesi(i){
+  if(i >= MUK_ADET) i = 0;
+  const gecis = i !== MUK_AKTIF;
+  if(gecis){ mAsansorKaydet(); MUK_AKTIF = i; mAsansorYukle(i); }
+  sekmeGoster('mukavemet');
+  mAsansorSekmeleriTazele();
+  if(gecis){ yaz(); hesapMukavemet(); }
+}
+
+/*  ADET SEÇİMİ.  Azaltmak veriyi SİLMEZ:  haritalar dizide kalır, yalnız
+    hesaba ve paftaya girmezler.  3→2→3 yapan mühendis girdilerini geri bulur.
+    Artırırken eksik haritalar 1 NOLU ASANSÖRÜN kopyası olarak açılır — bir
+    binanın asansörleri çoğunlukla benzerdir, sıfırdan 86 alan doldurtmak
+    işkence olurdu. */
+function mAdetDegisti(n){
+  const azami = (MUK && MUK.asansor_azami) || 4;
+  n = Math.max(1, Math.min(azami, parseInt(n, 10) || 1));
+  mAsansorKaydet();
+  while(MUK_ASANSORLER.length < n){
+    const kopya = JSON.parse(JSON.stringify(MUK_ASANSORLER[0] || {}));
+    kopya.asansor_adi = '';               // ad kopyalanmaz, karışmasın
+    MUK_ASANSORLER.push(kopya);
+  }
+  MUK_ADET = n;
+  if(MUK_AKTIF >= MUK_ADET){ MUK_AKTIF = MUK_ADET - 1; mAsansorYukle(MUK_AKTIF); }
+  if($('m_adet')) $('m_adet').value = String(n);
+  mAsansorSekmeleriTazele();
+  yaz();
+  hesapMukavemet();
+}
+
+function mAsansorKaydet(){
+  if(!MUK || !Array.isArray(MUK_ASANSORLER) || !MUK_ASANSORLER[MUK_AKTIF]) return;
+  const d = {};
+  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
+    if(f.tur === 'liste' || mProjeGeneliMi(f.anahtar)) continue;
+    const e = $(M_ID(f.anahtar));
+    if(e) d[f.anahtar] = (e.type === 'checkbox') ? e.checked : e.value;
+  }
+  d.__durak = (typeof MUK_DURAK !== 'undefined' ? MUK_DURAK : []).slice();
+  MUK_ASANSORLER[MUK_AKTIF] = d;
+}
+
+/*  Haritadaki değerleri forma basar.  Haritada olmayan alan OLDUĞU GİBİ
+    kalır — yeni eklenen asansör, kopyalandığı asansörün değerleriyle açılır. */
+function mAsansorYukle(i){
+  const d = MUK_ASANSORLER[i]; if(!d) return;
+  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
+    if(f.tur === 'liste' || mProjeGeneliMi(f.anahtar)) continue;
+    if(d[f.anahtar] === undefined) continue;
+    const e = $(M_ID(f.anahtar)); if(!e) continue;
+    if(e.type === 'checkbox') e.checked = !!d[f.anahtar];
+    else e.value = d[f.anahtar];
+  }
+  if(Array.isArray(d.__durak) && d.__durak.length){
+    MUK_DURAK = d.__durak.slice();
+    if($('m_durak_kutu')) mDurakCiz();
+  }
+}
+
+function mAsansorSec(i){
+  if(i < 0 || i >= MUK_ADET) return;
+  mAsansorSekmesi(i);
+}
+
+
+
+/*  Sunucuya gidecek istek:  bütün asansörler + proje geneli.
+    Aktif asansör formdan TAZE okunur;  ötekiler haritadan gelir. */
+function mukavemetIstek(){
+  mAsansorKaydet();
+  const pg = {};
+  for(const a of (MUK.proje_geneli || [])){
+    const e = $(M_ID(a));
+    if(e) pg[a] = (e.type === 'checkbox') ? e.checked : e.value;
+  }
+  //  Adedin ÜSTÜNDEKİ haritalar dizide durur ama hesaba GİRMEZ.
+  const asansorler = MUK_ASANSORLER.slice(0, MUK_ADET).map(d=>{
+    const g = {...d};
+    delete g.__durak;
+    g.durak_yukseklikleri = (d.__durak || []).slice();
+    return g;
+  });
+  //  Boş kabin kütlesi sunucudan tazelenecekse aktif asansörde boşaltılır.
+  if(MUK_GK_TAZELE && asansorler[MUK_AKTIF]) asansorler[MUK_AKTIF].kabin_agirligi = '';
+  return {asansorler, proje_geneli: pg, sabitler: ofisSabitleri()};
+}
+
+
+/*  ÇOKLU SONUÇ ÖZETİ.  Sonuç panelinin başına bütün asansörlerin durumunu
+    koyar;  satıra tıklayınca o asansöre geçilir.  Ayrıntı hep AKTİF
+    asansörün — dört asansörün bütün bölümlerini alt alta basmak paneli
+    okunamaz hâle getirirdi, o iş paftanın. */
+function mAsansorOzetiEkle(c){
+  const kutu = $('m_sonuc'); if(!kutu) return;
+  const liste = (c.ozet && c.ozet.asansorler) || [];
+  let h = `<div class="serit"><span>ASANSÖRLER</span>
+             <span class="kaynak">${liste.length} asansör · ayrıntı aktif olanın</span></div>
+           <div class="kaydir"><table class="veri">
+             <tr><th>No</th><th>Asansör</th><th>N ( kW )</th><th>Sonuç</th></tr>`;
+  liste.forEach(a=>{
+    const sinif = a.aktif === false ? 'hata'
+                : (a.tumu_uygun === true ? 'ok' : (a.tumu_uygun === false ? 'hata' : ''));
+    const metin = a.aktif === false ? 'HESAP YAPILAMADI'
+                : (a.tumu_uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR');
+    h += `<tr class="m-gidilir${a.no - 1 === MUK_AKTIF ? ' etkin' : ''}"
+              onclick="mAsansorSec(${a.no - 1})">
+            <td class="etiket">${a.no}</td>
+            <td>${kacis(a.tanim || '')}</td>
+            <td>${a.N_hesap == null ? '—' : tr(a.N_hesap)}</td>
+            <td class="${sinif}">${metin}</td></tr>`;
+  });
+  h += '</table></div>';
+  const ic = kutu.querySelector('.kart-ic') || kutu.firstElementChild || kutu;
+  ic.insertAdjacentHTML('afterbegin', h);
+}
+
+/*  PROJE sekmesinin sağ sütunu:  bütün asansörlerin durumu bir arada.
+    Ayrıntı asansör sekmelerinde;  burada yalnız "hangisi kaldı" görünür. */
+function mProjeOzetiCiz(c){
+  const kutu = $('p_ozet'); if(!kutu) return;
+  if(!c || !c.asansorler){ kutu.innerHTML = ''; return; }
+  const liste = (c.ozet && c.ozet.asansorler) || [];
+  let h = `<div class="kart-ic"><div class="serit"><span>PROJE ÖZETİ</span>
+             <span class="kaynak">${liste.length} asansör</span></div>
+           <div class="kaydir"><table class="veri">
+             <tr><th>No</th><th>Asansör</th><th>N ( kW )</th><th>Sonuç</th></tr>`;
+  liste.forEach(a=>{
+    const sinif = a.aktif === false ? 'hata'
+                : (a.tumu_uygun === true ? 'ok' : (a.tumu_uygun === false ? 'hata' : ''));
+    const metin = a.aktif === false ? 'HESAP YAPILAMADI'
+                : (a.tumu_uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR');
+    h += `<tr class="m-gidilir" onclick="mAsansorSec(${a.no - 1})"
+              title="${kacis(a.tanim || '')} sekmesine git">
+            <td class="etiket">${a.no}</td><td>${kacis(a.tanim || '')}</td>
+            <td>${a.N_hesap == null ? '—' : tr(a.N_hesap)}</td>
+            <td class="${sinif}">${metin}</td></tr>`;
+  });
+  kutu.innerHTML = h + '</table></div></div>';
+}

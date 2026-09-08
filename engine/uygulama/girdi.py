@@ -39,6 +39,15 @@ MK_VERIM = US.OFIS.VARSAYILAN_VERIM
 
 #  ( anahtar , etiket , birim , tür , seçenekler , varsayılan )
 #  Mukavemette KARŞILIĞI OLMAYAN girdiler.  Hepsi elektrik hesaplarına girer.
+#  PROJE GENELİ GİRDİLER.  Temel topraklama ve makine dairesi BİNAYA aittir,
+#  asansöre değil:  bir binada dört asansör varsa topraklama tektir ve makine
+#  dairesi ortaktır.  Çoklu projede bunlar asansör formunun DIŞINDA bir kez
+#  girilir ve her asansörün girdi setine karıştırılır — elektrik köprüsü
+#  onları orada bekler.  Liste burada durur ki API ve arayüz aynı yerden
+#  okusun;  iki yerde tutulsaydı ayrışırlardı.
+PROJE_GENELI_ALANLAR = ("temel_a", "temel_b", "serit_L",
+                        "mk_yok", "mk_uzunluk", "mk_genislik")
+
 EK_ALANLAR = (
     ("kuyu_genisligi",  "Kuyu genişliği  ( KG )",            "mm",   "sayi", None, 2400),
     ("kolon_kesit",     "S1 — Kolon hattı kesiti",           "mm²",  "sayi", None, 16),

@@ -615,6 +615,61 @@ def calistir():
     _b = MK._aski_halatlari(_g, _o)
     r.kontrol("tek halat bölümde de reddedilir", _b["sonuc"]["uygun"] is False)
 
+    #  ══════════════════════════════════════════════════════════════
+    #  ÇOKLU ASANSÖR  ( 1 - 4 asansör, tek proje )
+    #  ══════════════════════════════════════════════════════════════
+    #  Motor TEK ASANSÖRLÜK kalır;  çoklu yalnız onu birden çok kez koşturur.
+    #  İkinci bir hesap yolu açılmadığı burada kilitlenir:  tek asansörlük
+    #  çağrı ile çoklunun ilk asansörü BİREBİR aynı çıkmalıdır.
+    _C_ORTAK = {"temel_a": 26.55, "temel_b": 16.4, "serit_L": 58.5,
+                "mk_yok": False, "mk_uzunluk": 4.0, "mk_genislik": 3.0}
+    _c = UY.hesapla_coklu([{"asansor_adi": "İnsan 1"},
+                           {"beyan_yuku": 630},
+                           {"beyan_yuku": 1000, "asansor_adi": "Yük"}], _C_ORTAK)
+    r.kontrol("çoklu: hesap aktif", _c["aktif"] is True, f"→ {_c.get('hata')}")
+    r.esit("çoklu: asansör sayısı", _c["adet"], 3)
+    r.esit("çoklu: azami asansör", UY.ASANSOR_AZAMI, 4)
+    r.esit("çoklu: girilen ad korunuyor", _c["asansorler"][0]["tanim"], "İnsan 1")
+    r.esit("çoklu: adsız asansör numarayla anılıyor",
+           _c["asansorler"][1]["tanim"], "2 nolu asansör")
+
+    #  PROJE GENELİ HESAPLAR BİR KEZ.  Topraklama ve makine dairesi binaya
+    #  aittir;  dört paftada dört kez basılması hem yer kaplar hem de
+    #  "hangisi geçerli" sorusunu doğurur.
+    _pg = [len([b for b in a["bolumler"] if b.get("proje_geneli")])
+           for a in _c["asansorler"]]
+    r.esit("çoklu: proje geneli bölümler YALNIZ ilk asansörde", _pg, [4, 0, 0])
+    r.kontrol("çoklu: sonraki asansörlerin bölüm numaraları boşluksuz",
+              all([b["baslik"].split("-")[0].strip()
+                   for b in _c["asansorler"][1]["bolumler"]]
+                  == [str(i) for i in range(1, 15)] for _x in (0,)),
+              f"→ {[b['baslik'].split('-')[0].strip() for b in _c['asansorler'][1]['bolumler']]}")
+
+    #  TEK ASANSÖRLE BİREBİR AYNI:  ikinci bir hesap yolu yok
+    _tekil = UY.hesapla(dict(_C_ORTAK, beyan_yuku=630))
+    _ikinci = _c["asansorler"][1]
+    r.esit("çoklu: 2. asansörün motor gücü tekille aynı",
+           (_ikinci["ozet"] or {}).get("N_hesap"),
+           (_tekil["ozet"] or {}).get("N_hesap"))
+    r.esit("çoklu: 2. asansörün halat katsayısı tekille aynı",
+           (_ikinci["ozet"] or {}).get("Sf"), (_tekil["ozet"] or {}).get("Sf"))
+
+    #  SINIRLAR
+    r.esit("çoklu: azamiden fazlası kırpılıyor",
+           UY.hesapla_coklu([{}] * 9)["adet"], UY.ASANSOR_AZAMI)
+    r.esit("çoklu: boş liste tek asansöre düşer",
+           UY.hesapla_coklu([])["adet"], 1)
+    r.kontrol("çoklu: özet asansör listesi dolu",
+              len(_c["ozet"]["asansorler"]) == 3
+              and _c["ozet"]["asansorler"][2]["tanim"] == "Yük")
+
+    #  PROJE GENELİ ALANLAR TEK KAYNAKTA
+    r.kontrol("proje geneli alan listesi motorda",
+              set(UG.PROJE_GENELI_ALANLAR)
+              == {"temel_a", "temel_b", "serit_L",
+                  "mk_yok", "mk_uzunluk", "mk_genislik"},
+              f"→ {UG.PROJE_GENELI_ALANLAR}")
+
     return r
 
 

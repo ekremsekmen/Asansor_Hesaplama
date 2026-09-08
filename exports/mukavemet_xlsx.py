@@ -391,6 +391,10 @@ EK_GIRDI_HUCRELERI = (
     ("denge_zinciri",         253, "Denge ( kompanzasyon ) zinciri",       "—"),
     ("saptirma_kasnak_min_capi", 254,
      "Ds — saptırma kasnaklarının EN KÜÇÜK çapı", "mm"),
+    #  Asansör adı — çoklu projede paftaları ayırt eder.  Kaynak kitap tek
+    #  asansörlüktür, bu yüzden kitapta karşılığı yoktur;  teslim kopyasına
+    #  yine de yazılır ki hangi asansörün kitabı olduğu dosyadan anlaşılsın.
+    ("asansor_adi",           255, "Asansör adı",                          "—"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -400,8 +404,8 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
 #  Blok, yukarıdaki ek girdi listesi büyüdükçe aşağı kayar;  konum yalnız
 #  YAZMA içindir, okuma başlığı arayarak bulur ( _ofis_basligi ).
-OFIS_BASLIK = 259
-OFIS_BAS = 261
+OFIS_BASLIK = 261
+OFIS_BAS = 263
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -412,7 +416,8 @@ OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
 EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
-                     "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri")
+                     "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri",
+                     "asansor_adi")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 

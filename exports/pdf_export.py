@@ -17,8 +17,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageTemplate,
-                                Paragraph, Spacer, Table, TableStyle)
+from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageBreak,
+                                PageTemplate, Paragraph, Spacer, Table, TableStyle)
 
 from engine.ortak.steps import tr, trn
 
@@ -915,26 +915,81 @@ def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:    # noqa: ARG001
         buf.seek(0)
         return buf.read()
 
+    ic += _uygulama_govdesi(sonuc)
+    doc.build(ic)
+    buf.seek(0)
+    return buf.read()
+
+
+def _uygulama_govdesi(sonuc, ust_ek=""):
+    """Bir asansörün bütün bölümleri + sonuç özeti  ( akış öğeleri ).
+
+    Tek ve çoklu pafta AYNI gövdeyi basar;  ikisi ayrı yazılsaydı biçim
+    zamanla ayrışırdı.  ``ust_ek`` çoklu paftada şerit sağına asansörün
+    adını yazar.
+    """
+    ic = []
     if sonuc.get("uyarilar"):
         ic += _uyari_kutusu(sonuc["uyarilar"])
 
+    kaynak = ust_ek or "UYGULAMA PROJESİ"
     #  Mukavemet ve elektrik bölümleri ayrı şeritlerle açılır ki paftada
     #  hangi ailenin nerede bittiği görünsün.
     muk_sayi = int(sonuc.get("mukavemet_bolum_sayisi") or 0)
     for i, b in enumerate(sonuc.get("bolumler") or []):
         ust = None
         if i == 0:
-            ust = _baslik_seridi("MUKAVEMET HESAPLARI", "UYGULAMA PROJESİ")
+            ust = _baslik_seridi("MUKAVEMET HESAPLARI", kaynak)
         elif i == muk_sayi:
-            ust = _baslik_seridi("ELEKTRİK VE TOPRAKLAMA HESAPLARI",
-                                 "UYGULAMA PROJESİ")
+            ust = _baslik_seridi("ELEKTRİK VE TOPRAKLAMA HESAPLARI", kaynak)
             ust.spaceBefore = 6 * mm
         ic += _bolum(b, ust=ust, sayfa=SAYFA_ALANI)
 
-    ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", f"{len(sonuc.get('bolumler') or [])} hesap bölümü")
+    ozet_bas = _baslik_seridi(
+        "SONUÇ ÖZETİ", f"{len(sonuc.get('bolumler') or [])} hesap bölümü")
     ozet_bas.spaceBefore = 6 * mm
     ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc),
                          Spacer(1, 5 * mm), _imza_kutusu()])]
+    return ic
+
+
+def uygulama_coklu_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
+    """1 - 4 asansörlük uygulama projesi — hepsi TEK paftada, arka arkaya.
+
+    Her asansör yeni sayfada başlar ve kendi adıyla açılır;  bölümler ve
+    sonuç özeti tek asansörlük paftayla AYNI gövdeden gelir.
+
+    PROJE GENELİ HESAPLAR ( topraklama · makine dairesi aydınlatması ) motor
+    tarafında yalnız İLK asansöre bırakılmıştır — pafta bunları dört kez
+    basmaz ( bkz. engine/uygulama/hesap.hesapla_coklu ).
+    """
+    buf = io.BytesIO()
+    doc = _Belge(buf, "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
+                 "TS EN 81-20   ·   TS EN 81-50   ·   TS 12385-5   ·   ISO 7465"
+                 "   ·   MMO 208/4   ·   MMO 208/7   ·   IEEE Std 80"
+                 "   ·   IEC 60364-5-52")
+    asansorler = sonuc.get("asansorler") or []
+    ic = []
+    if not sonuc.get("aktif") or not asansorler:
+        ic += _uyari_kutusu(list(sonuc.get("hata") or ["Hesap yapılamadı."]),
+                            hata=True)
+        doc.build(ic)
+        buf.seek(0)
+        return buf.read()
+
+    for i, a in enumerate(asansorler):
+        if i:
+            ic.append(PageBreak())
+        etiket = f"{a.get('no', i + 1)} · {a.get('tanim') or ''}".strip(" ·")
+        bas = _baslik_seridi(f"ASANSÖR {etiket}",
+                             f"{len(asansorler)} asansörden {i + 1}.")
+        ic.append(bas)
+        ic.append(Spacer(1, 1.5 * mm))
+        if not a.get("aktif"):
+            ic += _uyari_kutusu(list(a.get("hata") or ["Hesap yapılamadı."]),
+                                hata=True)
+            continue
+        ic += _uygulama_govdesi(a, ust_ek=f"ASANSÖR {etiket}")
     doc.build(ic)
     buf.seek(0)
     return buf.read()

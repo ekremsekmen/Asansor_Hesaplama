@@ -104,11 +104,17 @@ def hesapla(veriler=None):
         b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
         bolumler.append(b)
 
+    #  PROJE GENELİ BÖLÜMLER.  Makine dairesi aydınlatması ve temel
+    #  topraklama BİNAYA aittir, asansöre değil:  bir binada dört asansör
+    #  varsa topraklama tektir.  İşaretlenirler ki çoklu projede yalnız BİR
+    #  KEZ paftaya girsinler ( bkz. hesapla_coklu ) — avan projesi de bu iki
+    #  hesabı proje seviyesinde tutar.
     mk = av.get("makine_dairesi") or {}
     if mk.get("aktif"):
         sira += 1
         b = _notlari_uyarla(mk["bolum"])
         b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
+        b["proje_geneli"] = True
         bolumler.append(b)
     elif mk.get("mk_yok") is False:
         #  Makine dairesi VAR denmiş ama aydınlatması hesaplanamamış:  zorunlu
@@ -122,6 +128,7 @@ def hesapla(veriler=None):
             sira += 1
             b = _notlari_uyarla(b)
             b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
+            b["proje_geneli"] = True
             bolumler.append(b)
     elif g.get("temel_a") or g.get("temel_b"):
         #  Temel ölçüsü girilmiş ama topraklama hesaplanamamış — eksik hesap.
@@ -175,3 +182,74 @@ def _basliktan_ad(baslik):
     if " - " in metin:
         return metin.split(" - ", 1)[1].strip()
     return metin.strip()
+
+
+# =====================================================================
+#  ÇOKLU ASANSÖR        ( 1 - 4 asansör, tek proje )
+# =====================================================================
+#  Bir binada farklı kuyularda dört asansör olabilir;  hesap her biri için
+#  AYNIDIR, değişen yalnız girdilerdir.  Motor tek asansörlük kalır ve
+#  burada birden çok kez koşturulur — ikinci bir hesap yolu açılmaz, yoksa
+#  zamanla ayrışırlar.
+#
+#  PROJE GENELİ HESAPLAR BİR KEZ GİRER.  Temel topraklama ve makine dairesi
+#  aydınlatması binaya aittir;  dört paftada dört kez aynı topraklama
+#  hesabını basmak hem yer kaplar hem de "hangisi geçerli" sorusunu doğurur.
+#  İlk asansörün sonucundan alınır, ötekilerden düşülür.
+ASANSOR_AZAMI = 4
+
+
+def hesapla_coklu(asansorler=None, ortak=None):
+    """1 - ASANSOR_AZAMI arası asansörü aynı motorla koşturur.
+
+    asansorler   her biri hesapla()'nın beklediği girdi sözlüğü
+    ortak        bütün asansörlerde geçerli değerler ( ofis sabitleri … );
+                 asansörün kendi girdisi bunu EZER.
+
+    Döner:  { aktif , asansorler:[ … ] , ozet , … }
+    Tek asansörlü çağrıda da aynı yapı döner;  arayüz tek koda bakar.
+    """
+    ham = [a for a in (asansorler or []) if isinstance(a, dict)]
+    if not ham:
+        ham = [{}]
+    ham = ham[:ASANSOR_AZAMI]
+    ortak = ortak if isinstance(ortak, dict) else {}
+
+    sonuclar, proje_geneli_alindi = [], False
+    for i, g in enumerate(ham, 1):
+        s = hesapla(dict(ortak, **g))
+        s["no"] = i
+        s["tanim"] = str(g.get("asansor_adi") or "").strip() or f"{i} nolu asansör"
+        if s.get("aktif"):
+            if proje_geneli_alindi:
+                #  Proje geneli bölümleri YALNIZ ilk asansörde kalır.
+                #  Numaralar bölüm listesindeki sırayla yeniden verilir ki
+                #  paftada 11-12-13 diye boşluksuz gitsin.
+                kalan = [b for b in s["bolumler"] if not b.get("proje_geneli")]
+                for n, b in enumerate(kalan, 1):
+                    b["baslik"] = f"{n} - " + _basliktan_ad(b.get("baslik", ""))
+                s["bolumler"] = kalan
+            else:
+                proje_geneli_alindi = True
+        sonuclar.append(s)
+
+    aktifler = [s for s in sonuclar if s.get("aktif")]
+    return {
+        "aktif": bool(aktifler),
+        "baslik": "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
+        "asansorler": sonuclar,
+        "adet": len(sonuclar),
+        "hata": [h for s in sonuclar if not s.get("aktif")
+                 for h in (s.get("hata") or [])],
+        "ozet": {
+            "adet": len(sonuclar),
+            "tumu_uygun": bool(aktifler) and all(
+                (s.get("ozet") or {}).get("tumu_uygun") for s in aktifler)
+            and len(aktifler) == len(sonuclar),
+            "asansorler": [{"no": s["no"], "tanim": s["tanim"],
+                            "aktif": bool(s.get("aktif")),
+                            "tumu_uygun": (s.get("ozet") or {}).get("tumu_uygun"),
+                            "N_hesap": (s.get("ozet") or {}).get("N_hesap")}
+                           for s in sonuclar],
+        },
+    }
