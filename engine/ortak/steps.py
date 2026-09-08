@@ -3,7 +3,7 @@
 Hesap adımı (Step) yapısı ve Türkçe sayı biçimlendirme yardımcıları.
 
 Excel'deki "işlem satırı" mantığı burada birebir korunur:
-    formul   ->  C sütunundaki sembolik denklem      (örn. "N = (1−q)·Q·V / (102·η′)")
+    formul   ->  C sütunundaki sembolik denklem      (örn. "N = (1−q)·Q·V / (102·η)")
     islem    ->  C sütunundaki sayıların yerine konmuş hâli
     deger    ->  E sütunundaki sonuç
     birim    ->  F sütunu

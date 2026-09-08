@@ -1161,8 +1161,11 @@ def calistir():
     for _ara in (_ngucu, _sf, _fkr, "58.860"):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
                   f"→ paftada yok")
-    r.kontrol("mukavemet PDF'inde makine tipi ve η′ görünüyor",
-              "Makine tipi" in _mm and "η′" in _mm, "→ verim satırları basılmamış")
+    r.kontrol("mukavemet PDF'inde makine tipi ve η görünüyor",
+              "Makine tipi" in _mm and "Toplam sistem verimi" in _mm,
+              "→ verim satırları basılmamış")
+    r.kontrol("mukavemet PDF'inde η′ satırı KALMADI  ( Δη kaldırıldı )",
+              "η′" not in _mm, "→ eski palanga düşüşü satırı hâlâ basılıyor")
 
     #  Hesap durduran girdide de GEÇERLİ belge çıkmalı, sebebi yazmalı
     #  ( kabin ağırlığı ARTIK boş bırakılabilir — ofis tablosundan dolar;
@@ -1228,8 +1231,9 @@ def calistir():
         r.esit("teslim kopyasında ray dibi açıklığı 100 mm",
                _duz["AD647"].value, 100)
         r.kontrol("teslim kopyasında η makine tipine bağlı formül",
-                  "B130" in str(_duz["AQ22"].value)
-                  and "B100" in str(_duz["AQ22"].value),
+                  "B130" in str(_duz["AQ22"].value), f"→ {_duz['AQ22'].value!r}")
+        r.kontrol("teslim kopyasında η askı oranından BAĞIMSIZ  ( Δη kaldırıldı )",
+                  "B100" not in str(_duz["AQ22"].value),
                   f"→ {_duz['AQ22'].value!r}")
         _sb = _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]
         r.esit("kaynak kitapta η sabit 0,92 idi", _sb["AQ22"].value, 0.92)

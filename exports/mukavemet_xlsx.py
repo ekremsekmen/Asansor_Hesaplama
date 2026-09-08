@@ -367,9 +367,9 @@ EK_GIRDI_HUCRELERI = (
     ("mk_yok",                237, "Makine dairesiz  ( MRL )",       "EVET / HAYIR"),
     ("mk_uzunluk",            238, "Makine dairesi uzunluğu",        "m"),
     ("mk_genislik",           239, "Makine dairesi genişliği",       "m"),
-    #  Kaynak kitapta karşılığı olmayan üç yeni girdi
-    ("toplam_verim",          240, "Ofis verimi η toplam sistem verimidir",
-     "EVET / HAYIR"),
+    #  Kaynak kitapta karşılığı olmayan iki yeni girdi
+    #  ( 240 "toplam_verim" idi;  Δη kalkınca anahtar da kalktı — satır
+    #    numarası yeniden kullanılmıyor ki eski kitaplar karışmasın. )
     ("agirlik_guvenlik_tertibati", 241, "Karşı ağırlıkta güvenlik tertibatı", "—"),
     ("guvenlik_devreye_kuvvet", 242,
      "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )", "N"),
@@ -380,6 +380,15 @@ EK_GIRDI_HUCRELERI = (
     ("yapi_sehim_x",          245, "δstr-x — bina yapısının x sehimi", "mm"),
     ("yapi_sehim_y",          246, "δstr-y — bina yapısının y sehimi", "mm"),
     ("reg_devreye_hizi",      247, "Regülatör devreye girme hızı  ( imalatçı )", "m/s"),
+    #  Sığınma hacmi duruşu  ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 ) —
+    #  beyandır, kitapta karşılığı yoktur.
+    ("siginma_tipi_ust",      248, "Kabin üstü sığınma hacmi tipi",   "—"),
+    ("siginma_tipi_dip",      249, "Kuyu dibi sığınma hacmi tipi",    "—"),
+    ("makine_tst",            250, "Tst — makinenin azami kasnak statik yükü", "kg"),
+    #  Katalog halat verisi ( boşsa TS 12385-5 tablosu kullanılır )
+    ("halat_birim_kutle",     251, "Askı halatı 1 m ağırlığı  ( imalatçı )", "kg/m"),
+    ("halat_kopma_kN",        252, "Askı halatı kopma yükü  ( imalatçı )",  "kN"),
+    ("kompanzasyon_orani",    253, "λ — denge zinciri oranı",              "%"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -387,8 +396,10 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  dosyasının bir parçasıdır:  σem = 100 ile "UYGUN DEĞİL" çıkan bir proje,
 #  Excel'e aktarılıp geri okunduğunda varsayılan 130'a dönüyor ve "UYGUN"
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
-OFIS_BASLIK = 249
-OFIS_BAS = 251
+#  Blok, yukarıdaki ek girdi listesi büyüdükçe aşağı kayar;  konum yalnız
+#  YAZMA içindir, okuma başlığı arayarak bulur ( _ofis_basligi ).
+OFIS_BASLIK = 257
+OFIS_BAS = 259
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -398,8 +409,8 @@ OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 #  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
 EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
-EK_METIN_ALANLARI = ("toplam_verim", "agirlik_guvenlik_tertibati",
-                     "paten_tipi")
+EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
+                     "siginma_tipi_ust", "siginma_tipi_dip")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -633,19 +644,33 @@ def _liste_tamamla(wb):
 
 
 def _verim_formulu(O):
-    """η′  =  makine tipi tablosu  −  palangalı sistemde düşüş.
+    """η  =  makine tipi tablosundan TOPLAM SİSTEM VERİMİ.
 
-    Tablo ve düşüş PROJENİN ofis sabitlerinden okunur ( uygulama projesinin
-    kendi Sabitler sekmesi ) — böylece ekranda değiştirilen verim teslim
-    edilen kitapta da geçerli olur, pafta ile kitap ayrışmaz.
+    Tablo PROJENİN ofis sabitlerinden okunur ( uygulama projesinin kendi
+    Sabitler sekmesi ) — böylece ekranda değiştirilen verim teslim edilen
+    kitapta da geçerli olur, pafta ile kitap ayrışmaz.  Askı oranına bağlı
+    Δη düşüşü KALDIRILDI ( bkz. engine/ortak/ofis.py ), bu yüzden formülde
+    B100 ( askı oranı ) artık yer almaz.
     """
-    tip, askı = "'Veri Girişi'!B130", "'Veri Girişi'!B100"
+    tip = "'Veri Girişi'!B130"
     #  Tablo iki satırlık olduğu için iç içe IF yeterli;  tanınmayan tipte
     #  ortak fabrika ayarına düşülür.
     ic = repr(float(OFIS.VARSAYILAN_VERIM))
     for ad, anahtar in (("Dişli", "verim_disli"), ("Dişlisiz", "verim_dislisiz")):
         ic = f'IF({tip}="{ad}",{float(O[anahtar])!r},{ic})'
-    return f"=({ic})-IF({askı}>1,{float(O['palanga_verim_dususu'])!r},0)"
+    return f"={ic}"
+
+
+def _ek_satir(anahtar):
+    """Ek girdi anahtarının 'Veri Girişi' satır numarası."""
+    for ad, satir, *_x in EK_GIRDI_HUCRELERI:
+        if ad == anahtar:
+            return satir
+    raise KeyError(anahtar)
+
+
+def _pozitif_sayi(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
 
 
 def _standarda_uydur(wb, g):
@@ -837,6 +862,28 @@ def _standarda_uydur(wb, g):
     #  2:1 palangada tahrik kasnağının gördüğü kuvvet Gmax değil Gmax/i'dir.
     ws["AQ7"] = "=(AQ11-AQ13)/'Veri Girişi'!B100"
     ws["AQ21"] = "=(AQ9/'Veri Girişi'!B100)*(AQ10/2000)"
+
+    #  ㉝  DENGESİZ ( ARTAN ) YÜK  Gmax  —  bkz. mukavemet._motor
+    #  Kitap Gmax = F1 + Gs − Ga yazar, yani ( 1−q )·Q + Gh.  Gh KABİN
+    #  TARAFINDAKİ toplam halat kütlesidir ve dengesizlik DEĞİLDİR;  ayrıca
+    #  denge zinciri ve gezici kablo hiç girmez.  Teslim kopyası motorla aynı
+    #  bağıntıyı kurar:
+    #      Gmax = ( Q + P − Ga ) + Gs + i·H·gh·ns·( 1 − λ ) + 0,5·H·mt
+    _lam = f"IF(ISNUMBER('Veri Girişi'!B{_ek_satir('kompanzasyon_orani')})," \
+           f"'Veri Girişi'!B{_ek_satir('kompanzasyon_orani')}/100,0)"
+    _mt = ("(IFERROR(VLOOKUP('Veri Girişi'!B107,TABLOLAR!$D$61:$G$64,4,0),0)"
+           "+IFERROR(VLOOKUP('Veri Girişi'!B108,TABLOLAR!$D$61:$G$64,4,0),0))")
+    ws["AQ9"] = (f"=(AQ14+AQ15)-AQ13+AQ8"
+                 f"+AQ18*AQ20*'Veri Girişi'!B100*'Veri Girişi'!C63*(1-{_lam})"
+                 f"+0.5*'Veri Girişi'!C63*{_mt}")
+
+    #  ㉞  KATALOG HALAT VERİSİ tabloyu ezer  ( bkz. mukavemet._halat_verisi ).
+    #  TS 12385-5 yalnız lif özlü halatları kapsar;  imalatçı değeri girildiyse
+    #  teslim kopyası da onu kullanmalı, yoksa pafta ile kitap ayrışır.
+    if _pozitif_sayi(g.get("halat_birim_kutle")):
+        ws["AQ18"] = float(g["halat_birim_kutle"])
+    if _pozitif_sayi(g.get("halat_kopma_kN")):
+        ws["AH109"] = float(g["halat_kopma_kN"]) * 1000.0
 
     #  ⑳  REGÜLATÖR:  ÇEKME KUVVETİ VE İKİNCİ SINIR
     #      m.5.6.2.2.1.1 d)  regülatörün ÜRETTİĞİ kuvveti sınırlar — kasnağın

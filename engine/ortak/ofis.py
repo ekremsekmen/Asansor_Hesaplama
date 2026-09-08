@@ -18,18 +18,43 @@ NİÇİN AYRI DOSYA:
 import math
 
 
-#  Makine tipine göre verim  ( ofis kabulü ).  Anahtarlar, mukavemet çalışma
-#  kitabının 'Veri Girişi'!B130 açılır listesindeki metinlerle AYNI olmalıdır
-#  ( "Dişli,Dişlisiz" ) — yoksa Excel'den gelen değer tabloda bulunamaz.
+#  Makine tipine göre TOPLAM SİSTEM VERİMİ  ( ofis kabulü ).  Anahtarlar,
+#  mukavemet çalışma kitabının 'Veri Girişi'!B130 açılır listesindeki
+#  metinlerle AYNI olmalıdır ( "Dişli,Dişlisiz" ) — yoksa Excel'den gelen
+#  değer tabloda bulunamaz.
 MAKINE_VERIMLERI = {
     "Dişlisiz": 0.85,
     "Dişli":    0.50,
 }
 
-#  Palangalı ( i > 1 ) sistemde verim düşüşü  —  MMO/697 §2.4.
-#  Avan tarafında SABİTLER A'dan değiştirilebilir;  uygulama projesi de aynı
-#  ofis sabitini okur ( bkz. mukavemet._motor ).
-PALANGA_VERIM_DUSUSU = 0.10
+#  ---------------------------------------------------------------------
+#  PALANGA VERİM DÜŞÜŞÜ ( Δη = 0,10 ) KALDIRILDI
+#  ---------------------------------------------------------------------
+#  MMO/697 §2.4 "palangalı sistemlerde verim %10 az alınacaktır" der ve
+#  program bunu  η′ = η − 0,10  diye uyguluyordu.  Kural üç yönden yanlıştı:
+#
+#  1) TOPLAMSAL.  Makara kayıpları ( halatın bükülüp açılmasındaki tel içi
+#     sürtünme + yatak sürtünmesi ) fiziksel olarak ÇARPIMSALDIR:  her
+#     geçiş η_makara ≈ 0,98 ( burçlu makarada ≈ 0,95 ) ile çarpar.  Sabit
+#     bir sayı çıkarmak, aynı fiziksel kaybı dişlisizde %11,8, dişlide %20
+#     göreli ceza yapıyordu — oysa makaralar üstlerinde redüktör olup
+#     olmadığını bilmez.
+#  2) MAKARA SAYISINA GÖRE ÖLÇEKLENMİYORDU.  i > 1 olan her sistem aynı
+#     0,10'u alıyordu;  4:1 ile 2:1 eşitti.
+#  3) NEGATİFE DÜŞEBİLİYORDU.  η = 0,08 → η′ = −0,02.  İki projede de bunun
+#     için ayrı kalkanlar yazılmıştı;  o kalkanlara ihtiyaç duyulması
+#     girdinin değil MODELİN bozuk olduğunun belirtisiydi.
+#
+#  Yerine geçen kural:  buradaki değerler ve GİRİŞ'ten girilen η artık
+#  TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı zaten içindedir, ikinci
+#  kez uygulanmaz.  İmalatçı kataloğu da bu büyüklüğü verir ( ör. EN 81-20/50
+#  şablonlarındaki η_ins ), yani girilen sayı ile hesaplanan sayı aynı şeydir.
+#
+#  DİKKAT — 0,85 / 0,50 değerleri eskiden MAKİNE verimi olarak tanımlıydı.
+#  Toplam sistem verimi olarak okunduklarında 2:1 askıda İYİMSERDİRLER
+#  ( gerçekçi: dişlisiz 2:1 ≈ 0,80 · dişli 2:1 ≈ 0,48 ).  Ofis bu iki
+#  varsayılanı katalog verisiyle güncellemelidir;  asansör bazında girilen
+#  η zaten bunları ezer.
 
 #  Tanınmayan makine tipinde kullanılacak verim.  Kaynak mukavemet kitabının
 #  11!AQ22 hücresindeki eski sabittir;  yalnız GERİYE DÖNÜK uyum içindir,
@@ -95,19 +120,13 @@ def makine_verimi(makine_tipi):
     return MAKINE_VERIMLERI.get(makine_tipi)
 
 
-def sistem_verimi(makine_tipi, aski_orani=1, palanga_dususu=None):
-    """η′  —  makine tipi ve askı oranına göre sistem verimi.
+def sistem_verimi(makine_tipi):
+    """η  —  makine tipine göre TOPLAM SİSTEM VERİMİ.
 
-    Palangalı sistemde ( i > 1 ) ek makara ve halat sürtünmesi yüzünden
-    verim düşer;  MMO/697 §2.4 bunu sabit bir düşüşle karşılar.
-    Tanınmayan makine tipinde VARSAYILAN_VERIM'e dönülür.
+    Askı ( palanga ) kaybı bu değerin İÇİNDEDİR;  askı oranına bağlı ayrı
+    bir düzeltme uygulanmaz ( bkz. yukarıdaki "PALANGA VERİM DÜŞÜŞÜ
+    KALDIRILDI" notu ).  Tanınmayan makine tipinde VARSAYILAN_VERIM'e
+    dönülür.
     """
     eta = makine_verimi(makine_tipi)
-    if eta is None:
-        eta = VARSAYILAN_VERIM
-    dusus = PALANGA_VERIM_DUSUSU if palanga_dususu is None else palanga_dususu
-    try:
-        palangali = float(aski_orani) > 1
-    except (TypeError, ValueError):
-        palangali = False
-    return (eta - dusus) if palangali else eta
+    return VARSAYILAN_VERIM if eta is None else eta

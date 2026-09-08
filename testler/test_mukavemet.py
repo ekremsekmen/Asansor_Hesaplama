@@ -247,14 +247,20 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 32)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 33)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
-        #  Her sapmanın DAYANAĞI yazılı olmalı:  ya TS EN 81-20/50 maddesi,
-        #  ya da açıkça ofis standardı  ( ⑨ — verim tablosu;  standart makine
-        #  verimi için sayı vermez, ofisin kendi avan tablosu verir ).
+        #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
+        #    · TS EN 81-20 / 81-50 maddesi
+        #    · açıkça "ofis standardı"  ( ⑨ — verim tablosu;  standart makine
+        #      verimi için sayı vermez, ofisin kendi avan tablosu verir )
+        #    · açıkça "fiziksel"  —  kitabın bağıntısı standarda değil FİZİĞE
+        #      aykırı olduğunda ( ㉝ — Gmax'ta halatın tamamını dengesizlik
+        #      sayması ).  Bu üçüncü kapı bilerek DARDIR:  gerekçe metninde
+        #      "fiziksel" sözcüğü geçmeli ki keyfî sapma buradan sızmasın.
         r.kontrol(f"sapma '{ad[:34]}' dayanağı yazılı",
                   bool(madde) and ("81-20" in madde or "81-50" in madde
-                                   or "ofis standardı" in madde),
+                                   or "ofis standardı" in madde
+                                   or "fiziksel" in madde),
                   f"→ {madde!r}")
 
     #  ① Dt/dh eşiği
@@ -487,18 +493,21 @@ def _sapmalar(r):
               "→ tablo ikiye ayrılmış;  yeniden ayrışabilir")
     r.esit("⑨ ofis verim tablosu", dict(_OF.MAKINE_VERIMLERI),
            {"Dişlisiz": 0.85, "Dişli": 0.50})
-    r.esit("⑨ palanga verim düşüşü  ( MMO/697 §2.4 )", _OF.PALANGA_VERIM_DUSUSU, 0.10)
+    r.kontrol("⑨ palanga verim düşüşü Δη KALDIRILDI  ( toplamsal model )",
+              not hasattr(_OF, "PALANGA_VERIM_DUSUSU"),
+              "→ Δη geri gelmiş;  makara kaybı çarpımsaldır, sabit sayı çıkarılamaz")
     r.kontrol("⑨ makine tipi artık girdi ve Excel'de B130'a bağlı",
               ("makine_tipi", "B130") in [(a[0], a[1]) for a in _MG.ALANLAR],
               f"→ {[a[:2] for a in _MG.ALANLAR if a[0] == 'makine_tipi']}")
-    _bek9 = {("Dişlisiz", 1): 0.85, ("Dişlisiz", 2): 0.75,
-             ("Dişli", 1): 0.50, ("Dişli", 2): 0.40}
+    #  η TOPLAM SİSTEM VERİMİDİR:  askı oranı onu DEĞİŞTİRMEZ.
+    _bek9 = {("Dişlisiz", 1): 0.85, ("Dişlisiz", 2): 0.85,
+             ("Dişli", 1): 0.50, ("Dişli", 2): 0.50}
     for (_t, _r2), _e in sorted(_bek9.items()):
         _v = MK.hesapla({"makine_tipi": _t, "aski_orani": _r2})["_h"]["AQ22"]
-        r.kontrol(f"⑨ η′  {_t} {_r2}:1  = {_e}", _yakin(_v, _e), f"→ {_v!r}")
+        r.kontrol(f"⑨ η  {_t} {_r2}:1  = {_e}", _yakin(_v, _e), f"→ {_v!r}")
     _s9 = MK.hesapla({"makine_tipi": "Dişli", "aski_orani": 1})
     _bekN = _s9["_h"]["AQ9"] * _s9["girdi"]["beyan_hizi"] / (0.50 * 102)
-    r.kontrol("⑨ N = Gmax·v/(η′·102)", _yakin(_s9["_h"]["AQ23"], _bekN),
+    r.kontrol("⑨ N = Gmax·v/(η·102)", _yakin(_s9["_h"]["AQ23"], _bekN),
               f"→ {_s9['_h']['AQ23']!r} ≠ {_bekN!r}")
     r.kontrol("⑨ dişli makine dişlisizden BÜYÜK güç istiyor",
               MK.hesapla({"makine_tipi": "Dişli"})["_h"]["AQ23"]
@@ -525,9 +534,21 @@ def _sapmalar(r):
     r.esit("⑧ kuyuya sabit parça  ( m.5.2.5.8.2 b) )", _S["min_regulator"], 300)
     r.esit("⑧ kabin üstü donanım  ( m.5.2.5.7.2 a) )", _S["min_revizyon"], 500)
     r.esit("⑧ ilave kılavuzlu yol  ( m.5.2.5.6.2 )", _S["min_ust_paten"], 100)
-    r.esit("⑧ sığınma hacimleri  ( Çiz.3 / Çiz.4 tip 2 )",
-           [sorted(_S["ust_hacim"]), sorted(_S["dip_hacim"])],
-           [[0.5, 0.7, 1.0], [0.5, 0.7, 1.0]])
+    #  Sığınma hacimleri SIGINMA sözlüğünden çıkarıldı:  duruş tipi artık
+    #  tesise özel bir BEYAN ( girdi ), ölçüler MT.SIGINMA_HACMI tablosundan.
+    r.kontrol("⑧ sığınma hacimleri artık ofis sabiti DEĞİL",
+              "ust_hacim" not in _S and "dip_hacim" not in _S, f"→ {sorted(_S)}")
+    r.esit("⑧ sığınma duruşları  ( EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 )",
+           {ad: (a, b, c) for ad, a, b, c in _MT.SIGINMA_HACMI},
+           {"Dik duruş": (0.40, 0.50, 2.00), "Çömelme": (0.50, 0.70, 1.00),
+            "Yatarak": (0.70, 1.00, 0.50)})
+    r.kontrol("⑧ yatarak duruş YALNIZ kuyu dibinde",
+              "Yatarak" in _MT.SIGINMA_TIPLERI_DIP
+              and "Yatarak" not in _MT.SIGINMA_TIPLERI_UST,
+              f"→ üst {_MT.SIGINMA_TIPLERI_UST} · dip {_MT.SIGINMA_TIPLERI_DIP}")
+    r.esit("⑧ varsayılan duruş çömelme  ( eski davranış korunuyor )",
+           [_MT.siginma_hacmi("Çömelme", "ust"), _MT.siginma_hacmi("Çömelme", "dip")],
+           [(0.7, 0.5, 1.0), (0.5, 0.7, 1.0)])
     r.kontrol("⑧ artık ayrı bir min_kabin_ustu sabiti yok",
               "min_kabin_ustu" not in _S, f"→ {sorted(_S)}")
 
@@ -540,7 +561,7 @@ def _sapmalar(r):
                 _ac.split("en az")[1].split("mm")[0].strip().replace(".", ""))
     r.esit("⑧ kabin üstü sınırı sığınma yüksekliğinden okunuyor",
            _sinir.get("c.2 - Kabin üstü / kuyu tavanının en alt kısmı arası"),
-           _S["ust_hacim"][2] * 1000)
+           _MT.siginma_hacmi("Çömelme", "ust")[2] * 1000)
     r.esit("⑧ ray dibi sınırı pafta metnine de yansıyor",
            _sinir.get("a.2 - Kılavuz raylar / kabinin en alt kısmı arası"), 100.0)
     r.kontrol("⑧ sınıra eşit ölçü UYGUN sayılıyor  ( 'en az' )",
@@ -712,16 +733,16 @@ def _denetim_bulgulari(r):
     r.kontrol("B8  askı oranı momenti değiştiriyor", _m1 != _m2 and _p1 != _p2,
               f"→ M {_m1!r}/{_m2!r} · Pm {_p1!r}/{_p2!r}")
 
-    #  ── B9  "Ofis verimi toplam sistem verimidir" kutusu
+    #  ── B9  η TOPLAM SİSTEM VERİMİDİR:  askı oranı verimi değiştirmez
     _v0 = MK.hesapla({"aski_orani": 2})["_h"]["AQ22"]
-    _v1 = MK.hesapla({"aski_orani": 2, "toplam_verim": "Evet"})["_h"]["AQ22"]
-    r.kontrol("B9  toplam verim seçilince palanga düşüşü ikinci kez inmiyor",
-              _yakin(_v1, _v0 + _USd.VARSAYILAN["palanga_verim_dususu"]),
-              f"→ {_v0!r} → {_v1!r}")
-    r.kontrol("B9  1:1 askıda kutunun etkisi yok",
-              _yakin(MK.hesapla({"aski_orani": 1})["_h"]["AQ22"],
-                     MK.hesapla({"aski_orani": 1,
-                                 "toplam_verim": "Evet"})["_h"]["AQ22"]))
+    _v1 = MK.hesapla({"aski_orani": 1})["_h"]["AQ22"]
+    r.kontrol("B9  askı oranı η'yı DEĞİŞTİRMİYOR  ( Δη kaldırıldı )",
+              _yakin(_v0, _v1), f"→ 2:1 {_v0!r} · 1:1 {_v1!r}")
+    r.kontrol("B9  η ofis tablosundan birebir geliyor",
+              _yakin(_v0, _USd.VARSAYILAN["verim_dislisiz"]),
+              f"→ {_v0!r} ≠ {_USd.VARSAYILAN['verim_dislisiz']!r}")
+    r.kontrol("B9  'toplam_verim' anahtarı artık girdi listesinde yok",
+              "toplam_verim" not in [a[0] for a in MK.MG.ALANLAR])
 
     #  ── B10  Kabin önü girintisi  ( EN 81-20 m.5.4.2.1.3 )
     _a90 = MK.hesapla({"uzun_pervaz": 90})["ozet"]["kabin_alani"]
@@ -952,34 +973,27 @@ def _denetim_bulgulari(r):
     #  ══════════════════════════════════════════════════════════════
     #  DÖRDÜNCÜ TUR  —  SINIR DURUMLARI
     #  ══════════════════════════════════════════════════════════════
-    #  ── D1  Sistem verimi η′ fiziksel olmalı  ( 0 < η′ ≤ 1 )
-    #  Verim ile palanga kaybı ayrı ayrı geçerli, ama İLİŞKİLERİ
-    #  denetlenmiyordu:  η = 0,10 · Δη = 0,10 → sıfıra bölme;
-    #  Δη = 0,20 → η′ = −0,10 ve N = −44,26 kW, her motor "uygun".
-    for _dus, _ne in ((0.10, "η′ = 0  ( sıfıra bölme )"),
-                      (0.20, "η′ = −0,10  ( negatif güç )")):
-        _d1 = MK.hesapla({"_ofis": {"verim_dislisiz": 0.10,
-                                    "palanga_verim_dususu": _dus}})
-        r.kontrol(f"D1  {_ne} reddediliyor", _d1["aktif"] is False,
-                  f"→ {_d1.get('ozet', {}).get('tumu_uygun')}")
-        r.kontrol(f"D1  hata iki sabiti de adıyla söylüyor  ( Δη = {_dus} )",
-                  any("η′" in x and "palanga" in x for x in (_d1.get("hata") or [])),
-                  f"→ {_d1.get('hata')}")
-    #  Toplam sistem verimi seçilince palanga düşüşü inmez — geçerli olmalı
-    _d1t = MK.hesapla({"toplam_verim": "Evet",
-                       "_ofis": {"verim_dislisiz": 0.10,
-                                 "palanga_verim_dususu": 0.20}})
-    r.kontrol("D1  toplam verim seçiliyken aynı sabitler geçerli",
-              _d1t["aktif"] is True, f"→ {_d1t.get('hata')}")
-    r.kontrol("D1  η′ = 1 sınırı kabul ediliyor",
-              MK.hesapla({"toplam_verim": "Evet",
-                          "_ofis": {"verim_dislisiz": 1.0}})["aktif"] is True)
-    #  İKİNCİ KALKAN:  doğrulama atlansa bile sıfıra bölünmemeli
-    _dog1 = MK.MG.dogrula
+    #  ── D1  Sistem verimi η fiziksel olmalı  ( 0 < η ≤ 1 )
+    #  Δη KALDIRILDIĞI için η artık kendi başına negatife düşemez;  eski
+    #  senaryolar ( η = 0,10 · Δη = 0,10 → sıfıra bölme;  Δη = 0,20 →
+    #  η′ = −0,10 ve N = −44,26 kW ) yapısal olarak imkânsızdır.  Kalan risk
+    #  ofis sabitinin kendisidir:  aralık dışı değer REDDEDİLİP varsayılana
+    #  dönmeli, sessizce kullanılmamalı.
+    for _kotu in (0, -0.5, 1.5):
+        _d1 = MK.hesapla({"_ofis": {"verim_dislisiz": _kotu}})
+        r.kontrol(f"D1  η = {_kotu} reddedilip varsayılana dönüyor",
+                  _d1["aktif"] is True
+                  and _yakin(_d1["_h"]["AQ22"], _USd.VARSAYILAN["verim_dislisiz"]),
+                  f"→ aktif {_d1['aktif']} · η {_d1.get('_h', {}).get('AQ22')!r}")
+    r.kontrol("D1  η = 1 sınırı kabul ediliyor",
+              MK.hesapla({"_ofis": {"verim_dislisiz": 1.0}})["aktif"] is True)
+    #  İKİNCİ KALKAN:  doğrulama ATLANSA ve η yine de sıfır gelse bile
+    #  N sıfıra bölünmemeli  ( motor doğrudan çağrıldığında ).
+    _dog1, _ver1 = MK.MG.dogrula, MK.US.verim
     try:
         MK.MG.dogrula = lambda g: []
-        _d1x = MK.hesapla({"_ofis": {"verim_dislisiz": 0.10,
-                                     "palanga_verim_dususu": 0.10}})
+        MK.US.verim = lambda *a, **k: 0.0
+        _d1x = MK.hesapla({})
         r.kontrol("D1  doğrulama atlansa bile sıfıra bölünmüyor",
                   _d1x["aktif"] is True
                   and _d1x["ozet"]["tumu_uygun"] is False)
@@ -990,7 +1004,7 @@ def _denetim_bulgulari(r):
         r.kontrol("D1  doğrulama atlansa bile sıfıra bölünmüyor", False,
                   f"→ {_e!r}")
     finally:
-        MK.MG.dogrula = _dog1
+        MK.MG.dogrula, MK.US.verim = _dog1, _ver1
 
     #  ── D2  Tampon / paten yığını kuyuya sığmalı  ( halat boyu > 0 )
     #  30 m paten arasında lh = −4,82 m, Gh = −5,13 kg;  negatif ağırlık

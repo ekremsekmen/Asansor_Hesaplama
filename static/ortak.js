@@ -570,7 +570,6 @@ function bolumuTemizle(tur){
       ['tanim','kapasite','Q_elle','V','eta','Hk','kuyu_genisligi','kabin_boyu',
        'kabin_genisligi','Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2',
        'kablo_tipi','i_palanga','q_denge'].forEach(k=>bosalt('a_'+k+i));
-      const tv=$('a_toplam_verim'+i); if(tv) tv.checked=false;
     }
     ['temel_a','temel_b','serit_L','mk_uzunluk','mk_genislik'].forEach(k=>bosalt('a_'+k));
     //  Yüklenen avan değerleri trafikle EZİLMESİN:  bu asansörler artık
@@ -806,10 +805,10 @@ function ornekYukle(){
     a_temel_a:'26,55', a_temel_b:'16,4', a_serit_L:'',
     a_mk_yok:true, a_mk_uzunluk:'0', a_mk_genislik:'0',
     a_aktif1:true, a_tanim1:'İnsan', a_kapasite1:'10', a_V1:'1.6', a_eta1:'0,85', a_Hk1:'38,50',
-    a_makine_tipi1:'Dişlisiz', a_i_palanga1:'2', a_toplam_verim1:false,
+    a_makine_tipi1:'Dişlisiz', a_i_palanga1:'2',
     a_kuyu_genisligi1:'1800', a_kabin_boyu1:'1450', a_kabin_genisligi1:'1300',
     a_aktif2:true, a_tanim2:'Sedye + Yük', a_kapasite2:'16', a_V2:'1.6', a_eta2:'0,85', a_Hk2:'38,50',
-    a_makine_tipi2:'Dişlisiz', a_i_palanga2:'2', a_toplam_verim2:false,
+    a_makine_tipi2:'Dişlisiz', a_i_palanga2:'2',
     a_kuyu_genisligi2:'2650', a_kabin_boyu2:'1350', a_kabin_genisligi2:'2100',
     a_aktif3:false, a_aktif4:false, __eknufus_c:[],
     /* Ofisin Excel örneği 10 + 16 kişilik İKİ asansörlük bir gruptur —

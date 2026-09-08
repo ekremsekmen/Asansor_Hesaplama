@@ -123,8 +123,8 @@ def calistir():
     r.esit("köprü · Nsç = motor gücü", a["Nsc"], g["motor_gucu"])
     r.esit("köprü · askı oranı", a["i_palanga"], g["aski_orani"])
     r.esit("köprü · ray metre ağırlığı ray profilinden", a["gr"], 12.38)
-    #  Verim artık sabit değil, MAKİNE TİPİNDEN gelir;  köprü avana TABAN η
-    #  geçirir ( palanga düşüşünü avan kendisi uygular, yoksa iki kez düşerdi ).
+    #  Verim artık sabit değil, MAKİNE TİPİNDEN gelir ve TOPLAM SİSTEM
+    #  VERİMİDİR ( askı kaybı içinde ) — iki taraf aynı sayıyı kullanır.
     from engine.ortak import ofis as _OF
     r.esit("köprü · makine tipi taşınıyor", a["makine_tipi"], g["makine_tipi"])
     r.esit("köprü · η makine tipinden", a["eta"],

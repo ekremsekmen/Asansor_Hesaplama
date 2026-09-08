@@ -237,15 +237,13 @@ def avan_senaryolar():
         A(tanim="dişli 2:1",    makine_tipi="Dişli",    eta=0.50, i_palanga=2),
         A(tanim="dişlisiz 1:1", makine_tipi="Dişlisiz", eta=0.85, i_palanga=1),
         A(tanim="dişlisiz 2:1", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2)]}))
-    # b-4) TOPLAM SİSTEM VERİMİ — palanga düşüşü İKİNCİ KEZ uygulanmamalı
+    # b-4) TOPLAM SİSTEM VERİMİ — askı oranı η'yı değiştirmemeli ( Δη yok )
     s.append(("toplam sistem verimi", {"ortak": ORT, "asansorler": [
-        A(tanim="ofis dişli 1:1", makine_tipi="Dişli", eta=0.60,
-          i_palanga=1, toplam_verim=True),
-        A(tanim="ofis dişlisiz 2:1", makine_tipi="Dişlisiz", eta=0.82,
-          i_palanga=2, toplam_verim=True),
-        A(tanim="karışık — MMO", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2),
-        A(tanim="karışık — toplam", makine_tipi="Dişlisiz", eta=0.78,
-          i_palanga=2, toplam_verim=True)]}))
+        A(tanim="dişli 1:1", makine_tipi="Dişli", eta=0.60, i_palanga=1),
+        A(tanim="dişlisiz 2:1", makine_tipi="Dişlisiz", eta=0.82, i_palanga=2),
+        A(tanim="dişlisiz 2:1 ofis", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2),
+        A(tanim="dişlisiz 2:1 katalog", makine_tipi="Dişlisiz", eta=0.78,
+          i_palanga=2)]}))
     # b-5) OFİS VARSAYILANLARI — alanlar BOŞ bırakılır.  Program bunları
     #      dosyaya yazmalı ki Excel kendi başına aynı sonucu versin.
     BOS_ORT = dict(temel_a=26.55, temel_b=16.4, serit_L=58.5,
@@ -344,7 +342,7 @@ COKLU_ASANSOR_SATIR = {27: "p", 28: "H", 29: "S", 30: "ta", 31: "tk", 32: "tg",
                        33: "tp", 34: "tv", 35: "ts", 36: "TR", 37: "R",
                        38: "yuk_kg", 57: "V", 60: "N", 101: "bodrum"}
 AVAN_HUCRE = {
-    "E6": "Q", "E7": "V", "E8": "q_denge", "E9": "i_palanga", "E10": "eta", "E11": "eta_p", "E14": "N_hes", "E15": "Nsc",
+    "E6": "Q", "E7": "V", "E8": "q_denge", "E9": "i_palanga", "E10": "eta", "E14": "N_hes", "E15": "Nsc",
     "E21": "Gk", "E24": "Gf", "E26": "P", "E30": "Ga", "E31": "k1", "E34": "Lr",
     "E36": "Mg", "E40": "P1", "E44": "P2", "E48": "PR", "E52": "PK", "E56": "Fs",
     "E63": "kabin_a", "E64": "kabin_b", "E67": "k_kabin", "E68": "eta_kabin",

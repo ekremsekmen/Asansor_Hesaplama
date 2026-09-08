@@ -272,8 +272,10 @@ def calistir():
         r.kontrol("düzeltilmiş kitapta karşılaştırılan hücre var", _tut > 100,
                   f"→ yalnız {_tut} hücre")
         #  Kitabın kendi hesabı, düzeltilmiş eşikleri de göstermeli
+        #  AQ22:  Δη KALDIRILDIĞI için 2:1 askıda da ofis tablosunun kendisi
+        #  ( dişlisiz 0,85 ) geçerlidir — eskiden 0,85 − 0,10 = 0,75 idi.
         for _h, _bek in (("Q97", 40), ("AD636", 1000), ("AD647", 100),
-                         ("AQ22", 0.75)):
+                         ("AQ22", 0.85)):
             r.kontrol(f"[düzeltilmiş kitap] {_h} = {_bek}",
                       _esit(_uws[_h].value, _bek), f"→ {_uws[_h].value!r}")
         for _e in hata_hucresi_ara(_uyol):

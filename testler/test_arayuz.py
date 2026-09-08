@@ -412,7 +412,7 @@ def calistir():
         _uof = pg.eval_on_selector_all("[id^='uof_']", "e=>e.length")
         r.kontrol("uygulama ofis sabitleri çizildi", _uof >= 40, f"→ {_uof} alan")
         for _a in ("uof_sigma_em", "uof_k1_kaymali", "uof_verim_dislisiz",
-                   "uof_palanga_verim_dususu", "uof_tavan_payi"):
+                   "uof_verim_disli", "uof_tavan_payi"):
             r.kontrol(f"ofis sabiti ekranda: {_a}", pg.is_visible(f"#{_a}"))
 
         #  Ekrandan değiştirilen sabit HESABI değiştirmeli
@@ -846,18 +846,19 @@ def calistir():
         pg.select_option("#a_i_palanga1", "1")
         pg.wait_for_timeout(1300)
         _m = pg.inner_text("#a_sonuc")
-        r.kontrol("1:1 seçilince palanga düşüşü uygulanmıyor", "0,85" in _m)
+        r.kontrol("1:1 askıda η aynen kullanılıyor", "0,85" in _m)
         pg.select_option("#a_i_palanga1", "2")
         pg.wait_for_timeout(1300)
-        r.kontrol("2:1 seçilince η′ = 0,75", "0,75" in pg.inner_text("#a_sonuc"))
-        #  toplam sistem verimi: palanga düşüşü İKİNCİ KEZ uygulanmamalı
-        pg.check("#a_toplam_verim1")
+        _m = pg.inner_text("#a_sonuc")
+        r.kontrol("2:1 askıda da η = 0,85  ( Δη kaldırıldı )", "0,85" in _m)
+        r.kontrol("ekranda artık η′ = 0,75 yok", "0,75" not in _m)
+        r.kontrol("toplam sistem verimi kutusu ekrandan kalktı",
+                  not pg.is_visible("#a_toplam_verim1"))
         pg.fill("#a_eta1", "0,82")
         pg.wait_for_timeout(1400)
         _m = pg.inner_text("#a_sonuc")
-        r.kontrol("toplam verim: η′ = η ( 0,82 )", "0,82" in _m)
-        r.kontrol("toplam verim uyarısı çıkıyor", "TOPLAM SİSTEM VERİMİ" in _m)
-        pg.uncheck("#a_toplam_verim1")
+        r.kontrol("girilen η aynen kullanılıyor ( 0,82 )", "0,82" in _m)
+        r.kontrol("toplam sistem verimi notu paftada", "TOPLAM SİSTEM VERİMİ" in _m)
         pg.fill("#a_eta1", "0,85")
         pg.wait_for_timeout(1300)
 

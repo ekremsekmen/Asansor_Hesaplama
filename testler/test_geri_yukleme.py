@@ -368,14 +368,23 @@ def calistir():
            "kolon_uzunluk": 33, "makine_kesit": 10, "makine_uzunluk": 44,
            "temel_a": 12.5, "temel_b": 8.5, "serit_L": 40, "mk_yok": False,
            "mk_uzunluk": 3.5, "mk_genislik": 2.5,
-           #  Bağımsız denetimden sonra eklenen üç girdi
-           "toplam_verim": "Evet", "agirlik_guvenlik_tertibati": "Kaymalı",
+           #  Bağımsız denetimden sonra eklenen iki girdi
+           #  ( "toplam_verim" Δη ile birlikte kaldırıldı )
+           "agirlik_guvenlik_tertibati": "Kaymalı",
            "guvenlik_devreye_kuvvet": 850,
            #  Standardın metnine karşı denetimden sonra eklenen dört girdi
            #  ( TS EN 81-50 m.5.10.5 · Ek C.2.1.2 · Ek C.2.1.5 )
            "paten_tipi": "Makaralı", "klips_itme_kuvveti": 275,
            "yapi_sehim_x": 1.5, "yapi_sehim_y": 0.8,
-           "reg_devreye_hizi": 1.25}
+           "reg_devreye_hizi": 1.25,
+           #  Sığınma hacmi duruşu  ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 )
+           "siginma_tipi_ust": "Dik duruş", "siginma_tipi_dip": "Yatarak",
+           #  Tst — makinenin azami kasnak statik yükü ( imalatçı )
+           "makine_tst": 3400,
+           #  Katalog halat verisi  ( TS 12385-5 tablosunu ezer )
+           "halat_birim_kutle": 0.179, "halat_kopma_kN": 31.5,
+           #  λ — denge ( kompanzasyon ) zinciri oranı
+           "kompanzasyon_orani": 100}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

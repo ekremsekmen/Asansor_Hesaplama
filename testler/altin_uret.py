@@ -150,7 +150,7 @@ def avan_senaryolar():
                            "kabin_genisligi": 1100, "makine_tipi": "Dişlisiz"}]}
     yield {"ortak": dict(ortak), "sabitler": {"kuyu_armatur_lm": 2600, "q_denge": 0.45},
            "asansorler": [{"tanim": "özel", "kapasite": 16, "V": 2, "eta": 0.72,
-                           "toplam_verim": "Evet", "Hk": 40, "kuyu_genisligi": 2000,
+                           "Hk": 40, "kuyu_genisligi": 2000,
                            "kabin_boyu": 1700, "kabin_genisligi": 1300, "Nsc": 15,
                            "Gk_elle": 1150, "makine_tipi": "Dişlisiz"}]}
     yield {"ortak": dict(ortak), "sabitler": {},

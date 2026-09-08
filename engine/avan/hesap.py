@@ -26,7 +26,6 @@ SABIT_A = {
     "k1_orta": 3,                  # 0,63 < V ≤ 1,00 m/s
     "k1_yavas": 5,                 # 0,15 < V ≤ 0,63 m/s
     "motor_sabiti": 102,           # N = (1/η)·[(Q/2·V)/102]   MMO/697 §2.4
-    "palanga_verim_dususu": 0.10,  # Palangalı sistemde verim %10 az       MMO/697 §2.4
     "kirlenme_faktoru": 1.25,      # Aydınlatmada bakım faktörü d
     "E_makine_dairesi": 200,       # lüx     TS EN 81-20
     "E_kabin": 100,                # lüx     TS EN 81-20
@@ -213,7 +212,7 @@ def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
 FIZIKSEL_SINIR = (
     ("Q elle — anma yükü",          "Q_elle",  50,   20000, "kg"),
     ("Gk elle — boş kabin kütlesi", "Gk_elle", 50,   20000, "kg"),
-    ("η — makine verimi",           "eta",     0.05, 1.0,   "—"),
+    ("η — toplam sistem verimi",    "eta",     0.05, 1.0,   "—"),
 )
 
 #  HESABA GİRMESİ ZORUNLU ALANLAR.  Üçüncü sütun: sıfır ya da negatif OLAMAZ mı?
@@ -221,7 +220,7 @@ FIZIKSEL_SINIR = (
 #    eşlenmek zorundaydı;  tek tabloya alındı, ayrışamazlar. )
 ZORUNLU_ALANLAR = (
     ("V",               "Kabin hızı",                   True),
-    ("eta",             "Makine verimi",                True),
+    ("eta",             "Toplam sistem verimi",         True),
     ("Hk",              "Kuyu yüksekliği",              True),
     ("kuyu_genisligi",  "Kuyu genişliği",               True),
     ("kabin_boyu",      "Kabin boyu",                   True),
@@ -420,10 +419,6 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         L1, L1_kaynak = None, "GİRİŞ"
     Gk_elle = a.get("Gk_elle")
     makine_tipi = a.get("makine_tipi") or ""
-    #  "Girilen verim TOPLAM sistem verimidir" işaretliyse MMO/697 §2.4'teki
-    #  palanga verim düşüşü İKİNCİ KEZ uygulanmaz — askı kaybı zaten o
-    #  değerin içindedir (aksi hâlde çift sayılır).
-    toplam_verim = _evet_mi(a.get("toplam_verim"))
 
     #  Şebeke gerilimi, iletkenlik ve izin verilen gerilim düşümü ofis
     #  varsayılanıdır; ortak panelde boş bırakılırsa oradan gelir.
@@ -480,30 +475,21 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  standardındadır, gerekirse asansör bazında ezilir.
     i_pal, i_kaynak = _asansor_sabiti(a, S, "i_palanga", red)
     q, q_kaynak = _asansor_sabiti(a, S, "q_denge", red)
-    if toplam_verim:
-        eta_p = eta
-        eta_p_aciklama = "Girilen değer TOPLAM sistem verimidir — palanga düşüşü uygulanmaz"
-        eta_p_kaynak = "GİRİŞ — toplam sistem verimi"
-    else:
-        eta_p = (eta - S["palanga_verim_dususu"]) if i_pal > 1 else eta    # η′
-        eta_p_aciklama = "Palangalı sistemde verim ( i > 1 ise η − 0,10 )"
-        eta_p_kaynak = "SABİTLER A  /  MMO/697 §2.4"
-    #  η′ ≤ 0 FİZİKSEL DEĞİLDİR.  Palangalı ( i > 1 ) sistemde MMO/697 §2.4
-    #  gereği η′ = η − 0,10;  η bunun altında girilirse η′ sıfır ya da negatif
-    #  çıkar.  Eskiden hesap durmuyordu:  paftaya η′ = −0,02 basılıyor, N boş
-    #  kalıyor ve sonuç "UYGUN DEĞİL — motoru büyütün" diyordu — YANLIŞ TEŞHİS,
-    #  motor değil verim değeri hatalıydı.  ( Nsç boşsa mesaj "Nsç alanını
-    #  doldurun" diyordu; doldurmak da negatif verimli bir pafta üretirdi. )
+    #  ASKI ORANINA BAĞLI Δη = 0,10 DÜŞÜŞÜ KALDIRILDI ( bkz. ortak/ofis.py ).
+    #  Girilen η HER ZAMAN toplam sistem verimidir — askı ( palanga ) kaybı
+    #  içindedir ve ikinci kez uygulanmaz.  Askı oranı motor gücüne artık
+    #  hiçbir yoldan girmez;  güç zaten askı oranından bağımsızdır.
+    eta_p = eta
+    #  η ≤ 0 FİZİKSEL DEĞİLDİR.  Δη kalktığı için verim artık kendi başına
+    #  negatife düşemez ( eskiden η = 0,08 + 2:1 → η′ = −0,02 oluyor, paftaya
+    #  negatif verim basılıyor ve sonuç "UYGUN DEĞİL — motoru büyütün" diyerek
+    #  YANLIŞ TEŞHİS koyuyordu ).  Kalkan yine de durur:  η bir GİRDİdir ve
+    #  aralık denetimi atlanırsa N = …/(102·η) sıfıra bölünür.
     if not (sayi_mi(eta_p) and eta_p > 0):
         return {"no": no, "aktif": False,
-                "uyari": f"!!!   {no} NOLU ASANSÖR — hesaba giren verim η′ = {tr(eta_p)}   ·   "
-                         f"girilen η = {tr(eta)}"
-                         + (f" ve {T.aski_orani_metni(i_pal)} askıda MMO/697 §2.4 gereği "
-                            f"η′ = η − {tr(S['palanga_verim_dususu'])} uygulanır"
-                            if i_pal > 1 else "")
-                         + ".  Verim sıfır ya da negatif olamaz: η değerini düzeltin ya da "
-                           "imalatçının TOPLAM sistem verimini giriyorsanız "
-                           "'Girilen η toplam sistem verimidir' kutusunu işaretleyin.   !!!"}
+                "uyari": f"!!!   {no} NOLU ASANSÖR — toplam sistem verimi η = {tr(eta)}   ·   "
+                         "verim sıfır ya da negatif olamaz.  İmalatçının verdiği "
+                         "toplam sistem verimini girin ( askı kaybı dâhil ).   !!!"}
     #  AĞIR ÇALIŞMA YÖNÜ.  Karşı ağırlık q·Q kadarını dengeler:
     #      dolu kabin YUKARI  →  dengesiz yük = ( 1 − q )·Q
     #      boş  kabin AŞAĞI   →  dengesiz yük =        q ·Q   ( karşı ağırlık ağır )
@@ -547,12 +533,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
              "GİRİŞ" if makine_tipi else "belirtilmedi"),
         veri("i", f"Askı ( palanga ) oranı   —   {T.aski_orani_metni(i_pal)}",
              i_pal, "—", i_kaynak, 0),
-        veri("η", "Makine verimi", eta, "—",
-             "GİRİŞ — toplam sistem verimi" if toplam_verim
-             else (f"GİRİŞ  ( {makine_tipi} — ofis kabulü )" if makine_tipi else "GİRİŞ")),
-        veri("η′", eta_p_aciklama, eta_p, "—", eta_p_kaynak),
-        hesap(("N   =   ( 1 − q ) · Q · V   /   ( 102 · η′ )" if (1 - q) >= q
-               else "N   =   q · Q · V   /   ( 102 · η′ )        ( boş kabin aşağı — ağır yön )"),
+        veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "—",
+             f"GİRİŞ  ( {makine_tipi} — ofis kabulü )" if makine_tipi else "GİRİŞ"),
+        hesap(("N   =   ( 1 − q ) · Q · V   /   ( 102 · η )" if (1 - q) >= q
+               else "N   =   q · Q · V   /   ( 102 · η )        ( boş kabin aşağı — ağır yön )"),
               (f"=   ( 1 − {tr(q)} ) · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"
                if (1 - q) >= q else
                f"=   {tr(q)} · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"),
@@ -567,15 +551,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                    f"{tr(Q_BANT_ALT)} - {tr(Q_BANT_UST)} bandındadır. "
                    "Karşı ağırlık dengelemesi bu değerde ise gerekçesi paftaya yazılmalıdır")
     b1["aciklamalar"] = [T.VERIM_NOTU]
-    if toplam_verim:
-        b1["notlar"] = [T.TOPLAM_VERIM_NOTU]
-    else:
-        mmo_eta = T.makine_verimi(makine_tipi)
-        if mmo_eta is not None and sayi_mi(eta) and abs(eta - mmo_eta) > 1e-9:
-            b1["notlar"] = [
-                f"η, {makine_tipi} makine için ofis kabulü olan {tr(mmo_eta)} "
-                f"değerinden farklı girilmiştir ( {tr(eta)} ). Kaynağı paftada "
-                "belirtilmelidir."]
+    b1["notlar"] = [T.TOPLAM_VERIM_NOTU]
+    mmo_eta = T.makine_verimi(makine_tipi)
+    if mmo_eta is not None and sayi_mi(eta) and abs(eta - mmo_eta) > 1e-9:
+        b1["notlar"] = b1["notlar"] + [
+            f"η, {makine_tipi} makine için ofis kabulü olan {tr(mmo_eta)} "
+            f"değerinden farklı girilmiştir ( {tr(eta)} ). Kaynağı paftada "
+            "belirtilmelidir."]
     b1["sonuc"] = {"baslik": "KONTROL      Nsç  ≥  N",
                    "metin": "UYGUN" if motor_uygun else "UYGUN DEĞİL — motoru büyütün",
                    "uygun": bool(motor_uygun)}
@@ -984,10 +966,12 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         "bolumler": bolumler,
         "ozet": {
             "tanim": tanim, "kapasite": P_kap, "Q": Q, "Q0": Q0, "V": V, "eta": eta,
+            #  eta_p, Δη kalktıktan sonra η ile AYNIDIR;  anahtar yalnız
+            #  geriye dönük uyum için durur.
             "eta_p": eta_p, "Gk": Gk, "Gk0": Gk0, "Gf": Gf, "P": P_kut, "Ga": Ga,
             "i_palanga": i_pal, "q_denge": q,
             "i_kaynak": i_kaynak, "q_kaynak": q_kaynak,
-            "makine_tipi": makine_tipi, "toplam_verim": toplam_verim,
+            "makine_tipi": makine_tipi,
             "aski": T.aski_orani_metni(i_pal),
             "k1": k1, "Lr": Lr, "Mg": Mg,
             "N_hes": N_hes, "Nsc": Nsc, "motor_uygun": motor_uygun,

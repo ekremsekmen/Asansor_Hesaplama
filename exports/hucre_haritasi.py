@@ -111,7 +111,6 @@ AVAN_ASANSOR = {           # satır : alan adı
     53: "i_palanga",
     54: "q_denge",
     55: "makine_tipi",
-    56: "toplam_verim",
 }
 AVAN_SABIT_SAYFA = "SABİTLER"
 AVAN_SABIT = {
@@ -173,7 +172,7 @@ IMZALAR = (IMZA, "Asansör Avan Hesaplama Programı")
 #  metni mantıksal değere çevirmek gerekir; "Hayır" metni doğrudan bir
 #  kutuya yazılsaydı doğru sayılıp kutuyu İŞARETLERDİ.
 # =====================================================================
-EVET_HAYIR_ALANLARI = ("mk_yok", "toplam_verim")
+EVET_HAYIR_ALANLARI = ("mk_yok",)
 
 
 def evet_hayir_mi(anahtar):

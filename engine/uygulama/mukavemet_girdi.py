@@ -95,6 +95,25 @@ ALANLAR = (
 
     # ── ASKI HALATLARI ────────────────────────────────────────────────
     ("halat_adedi",       "B98",  "Askı halatı adedi",                 "adet", "sayi", None, 7),
+    #  KATALOG HALAT VERİSİ.  Birim kütle ve kopma yükü TS 12385-5 tablosundan
+    #  ( 6x19 / 8x19 LİF ÖZLÜ ) çapa göre okunuyordu ve elle girme yolu yoktu.
+    #  Küçük kasnaklı dişlisiz makinelerde kullanılan çelik özlü / özel halatlar
+    #  o tabloda HİÇ YOKTUR:  6,5 mm için tablo 0,152 kg/m · 24,7 kN derken
+    #  katalog 0,179 kg/m · 31,5 kN verir.  Fark iki ayrı yöne çalışıyordu —
+    #  hafif halat motoru KÜÇÜK gösteriyor ( emniyetsiz ), düşük kopma yükü ise
+    #  güvenlik katsayısını olduğundan KÖTÜ gösterip standarda uyan tasarımlara
+    #  "UYGUN DEĞİL" dedirtiyordu.  Boş bırakılırsa tablo kullanılır.
+    #  λ — DENGE ( KOMPANZASYON ) ZİNCİRİ ORANI.  Zincir, kabin ile karşı
+    #  ağırlık arasında asılıdır ve halatın kabin en alttayken yarattığı
+    #  dengesizliği karşılar.  Program bunu HİÇ bilmiyordu:  zincirli bir
+    #  tesiste motoru gereğinden büyük hesaplıyordu ( 120 m seyirde 20,7 kW
+    #  yerine 39,3 kW ).  %0 = zincir yok  ·  %100 = tam dengeleme.
+    ("kompanzasyon_orani", "",     "λ — denge zinciri oranı  ( %0 = zincir yok )",
+     "%", "sayi", None, 0),
+    ("halat_birim_kutle", "",     "Askı halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+     "kg/m", "sayi", None, None),
+    ("halat_kopma_kN",    "",     "Askı halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
+     "kN", "sayi", None, None),
     ("halat_capi",        "B99",  "Askı halatı çapı",                  "mm",   "secim",
      MT.HALAT_CAPLARI, 6.5),
     ("kanal_sekli",       "F105", "Kasnak kanal şekli",                "—",    "secim",
@@ -128,6 +147,12 @@ ALANLAR = (
     #  denetlenir ve pafta eksiği açıkça yazar.
     ("guvenlik_devreye_kuvvet", "", "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )",
      "N", "sayi", None, None),
+    #  Tst — SEÇİLEN makinenin tahrik kasnağına izin verdiği azami STATİK yük
+    #  ( imalatçı kataloğu ).  Motor gücü "UYGUN" çıkıp kasnak yükü aşılmış bir
+    #  makine seçilebiliyordu:  hiçbir şey bakmıyordu.  Boş bırakılırsa kontrol
+    #  yapılmaz ve pafta bunu açıkça yazar.
+    ("makine_tst",        "",     "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
+     "kg", "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 a):  devreye girme hızı beyan hızının en az
     #  %115'i ve tertibat tipine göre belirlenen üst sınırın ALTINDA olmalı.
     #  Değer regülatörün TİP İNCELEME belgesinden gelir.
@@ -150,18 +175,23 @@ ALANLAR = (
     #  kendi tablosu ( engine/ortak/ofis.py ) dişli makinede 0,50 der.
     ("makine_tipi",       "B130", "Makine tipi",                       "—",    "secim",
      tuple(OFIS.MAKINE_VERIMLERI), "Dişlisiz"),
-    #  AVAN TARAFIYLA SİMETRİ.  Avan motorunda "Girilen η toplam sistem
-    #  verimidir" kutusu vardır;  işaretliyken MMO/697 §2.4'ün palanga verim
-    #  düşüşü İKİNCİ KEZ uygulanmaz.  Uygulama projesinde karşılığı yoktu:
-    #  imalatçının toplam sistem verimini kullanmak isteyen mühendis bunu
-    #  ancak ofis sabitini değiştirerek yapabiliyordu — ve o değişiklik
-    #  projedeki BÜTÜN asansörleri etkiliyordu.
-    ("toplam_verim",      "",     "Ofis verimi η toplam sistem verimidir", "—", "secim",
-     _s("Hayır", "Evet"), "Hayır"),
+    #  "Ofis verimi η toplam sistem verimidir" ANAHTARI KALDIRILDI.
+    #  η artık HER ZAMAN toplam sistem verimidir ( askı kaybı içinde ) —
+    #  seçilecek bir şey kalmadı.  Bkz. engine/ortak/ofis.py, "PALANGA VERİM
+    #  DÜŞÜŞÜ KALDIRILDI".  Eski projelerin JSON'unda kalan toplam_verim
+    #  anahtarı yok sayılır, geri yükleme bozulmaz.
     ("kabin_paten_arasi", "B127", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
     ("agirlik_paten_arasi", "B128", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
     ("guvenlik_tertibati", "G36", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
      MT.DARBE_TIPLERI_ADLARI, "Kaymalı"),
+    #  SIĞINMA HACMİ TİPİ  ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 ).
+    #  Standart üç duruştan BİRİNİ ister;  program bunu bilmiyor, ÇÖMELME
+    #  tipini koda çivilemişti ve yatarak tipiyle uygun olan tesislere
+    #  "UYGUN DEĞİL" diyordu.  Beyan edilen tip paftaya yazılır.
+    ("siginma_tipi_ust",  "",     "Kabin üstü sığınma hacmi tipi",     "—",    "secim",
+     MT.SIGINMA_TIPLERI_UST, "Çömelme"),
+    ("siginma_tipi_dip",  "",     "Kuyu dibi sığınma hacmi tipi",      "—",    "secim",
+     MT.SIGINMA_TIPLERI_DIP, "Çömelme"),
     #  TS EN 81-50 m.5.10.5 flanş eğilmesindeki ℓ.  Kaynak Excel'de karşılığı
     #  YOKTUR ( oraya 1 yazılıdır ), bu yüzden hücre alanı boştur.  Boş
     #  bırakılırsa ray tablosundaki balata yarı genişliğinden türetilir.
@@ -237,7 +267,8 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
 OPSIYONEL_ALANLAR = ("paten_balata_boyu", "guvenlik_devreye_kuvvet",
-                     "reg_devreye_hizi")
+                     "reg_devreye_hizi", "makine_tst",
+                     "halat_birim_kutle", "halat_kopma_kN")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
 #  hesaba katılacak azami sürtünme katsayısı.
@@ -300,14 +331,16 @@ GRUPLAR = (
       "kabin_kaciklik", "agirlik_yeri", "kapi_agirligi", "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
      ("durak_yukseklikleri", "son_kat_yuksekligi", "kaide_yuksekligi",
-      "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar")),
+      "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar",
+      "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
      ("motor_gucu", "makine_agirligi", "sap_kasnak_yuk", "makine_yatak_yuk",
       "tahrik_kasnak_capi", "saptirma_kasnak_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
-      "yan_yatak_boyu", "makine_tipi", "toplam_verim")),
+      "yan_yatak_boyu", "makine_tipi", "makine_tst")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
+      "halat_birim_kutle", "halat_kopma_kN", "kompanzasyon_orani",
       "halat_arasi_yan", "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
@@ -535,6 +568,21 @@ def dogrula(g):
         if not _sayi(gdk) or gdk <= 0:
             hata.append(f"{ALAN['guvenlik_devreye_kuvvet'][2]}: sıfırdan büyük olmalıdır ( {gdk!r} girildi ).")
 
+    #  KATALOG HALAT VERİSİ ve Tst — hepsi opsiyoneldir, girilirse MAKUL olmalı.
+    #  Kopma yükü alanı kN'dir:  katalog "31,5 kN" der, projeci 31500 yazarsa
+    #  güvenlik katsayısı 1000 kat büyür ve HER tasarım "UYGUN" görünürdü.
+    #  Üst sınır o hatayı yakalar.
+    for _ad, _alt, _ust in (("halat_birim_kutle", 0.02, 5.0),
+                            ("halat_kopma_kN", 5.0, 2000.0),
+                            ("makine_tst", 100.0, 100000.0),
+                            ("kompanzasyon_orani", 0.0, 100.0)):
+        _v = g.get(_ad)
+        if _v is None or _v == "":
+            continue
+        if not _sayi(_v) or not (_alt <= _v <= _ust):
+            hata.append(f"{ALAN[_ad][2]}: {_alt} - {_ust} aralığında olmalıdır "
+                        f"( {_v!r} girildi ).")
+
     #  MAKİNE KAİDESİ GEOMETRİSİ.  Bölüm 2 basit kiriş modelidir:  açıklığı L
     #  olan kirişte tekil yük, A mesnedinden X = L − mesnet payı uzaklıktadır.
     #  Model 0 < X < L gerektirir.  L mesnet payından küçükse X NEGATİF çıkar;
@@ -608,32 +656,19 @@ def dogrula(g):
                "hesaplanır. )" if g.get("agirlik_yeri") == "Arka" else ""))
 
     #  ------------------------------------------------------------------
-    #  SİSTEM VERİMİ  η′  FİZİKSEL OLMALI            0 < η′ ≤ 1
+    #  SİSTEM VERİMİ  η  FİZİKSEL OLMALI             0 < η ≤ 1
     #  ------------------------------------------------------------------
-    #  Verim ile palanga kaybı AYRI AYRI kabul ediliyor ( ARALIK ikisini de
-    #  geçerli sayar ) ama ARALARINDAKİ İLİŞKİ denetlenmiyordu.  Palangalı
-    #  sistemde η′ = η − Δη;  η = 0,10 ve Δη = 0,10 seçilirse η′ = 0 çıkıp
-    #  N = Gmax·v/(η′·102) SIFIRA BÖLÜNÜYOR;  Δη = 0,20'de η′ = −0,10 olup
-    #  gereken güç −44,26 kW çıkıyor ve "Nsç ≥ N" her motoru geçiriyordu —
-    #  temiz bir projede genel sonuç "UYGUN" görünüyordu.
-    #  ( Avan motoru bu kalkanı zaten taşıyor;  uygulama tarafında yoktu. )
+    #  Δη kalktığı için η artık kendi başına negatife düşemez;  bu kalkan
+    #  yine de durur, çünkü ofis sabiti ekrandan elle girilir ve ARALIK
+    #  ( 0,1 - 1 ) atlanırsa N = Gmax·v/(η·102) sıfıra bölünür.
     from engine.uygulama import sabitler as _USv
     _O = _USv.sabitler(g.get("_ofis"))
     _tip = g.get("makine_tipi")
-    _toplam = str(g.get("toplam_verim") or "").strip().lower() == "evet"
-    _etap = _USv.verim(_O, _tip, g.get("aski_orani"), toplam=_toplam)
+    _etap = _USv.verim(_O, _tip)
     if not (_sayi(_etap) and 0 < _etap <= 1):
-        _eta0 = _USv.verim(_O, _tip, 1)
         hata.append(
-            f"Sistem verimi η′ = {_etap} fiziksel değil — 0 < η′ ≤ 1 olmalı. "
-            f"'{_tip}' makine verimi {_eta0}"
-            + ("" if _toplam else
-               f", palanga verim düşüşü {_O.get('palanga_verim_dususu')}")
-            + ". Sabitler sekmesinden düzeltin"
-            + ("" if _toplam else
-               "  ( ya da 'Ofis verimi η toplam sistem verimidir' kutusunu "
-               "işaretleyin — o zaman palanga düşüşü ikinci kez inmez )")
-            + ".")
+            f"Toplam sistem verimi η = {_etap} fiziksel değil — 0 < η ≤ 1 "
+            f"olmalı ( '{_tip}' makine ). Sabitler sekmesinden düzeltin.")
 
     #  ------------------------------------------------------------------
     #  HALAT BOYU POZİTİF OLMALI  —  tampon / paten yığını kuyuya sığmalı

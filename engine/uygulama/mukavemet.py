@@ -482,6 +482,26 @@ EXCEL_FARKLARI = (
      "        Ayrıca karşılaştırma '>' idi;  standart 'en az' dediği için "
      "sınıra eşit ölçü de uygundur — '≥' yapıldı.",
      ()),
+    ("Dengesiz yük Gmax halatın TAMAMINI sayıyordu",
+     "MMO 208/7 - 2.4  ( fiziksel dengesizlik )",
+     "Gmax = F1 + Gs − Ga yazar, yani ( 1−q )·Q + Gh.  Buradaki Gh kabin "
+     "tarafındaki TOPLAM halat kütlesidir ( kuyu boyu + 5 m pay ) ve "
+     "dengesizlik DEĞİLDİR:  kabin en alttayken karşı ağırlık tarafında da "
+     "halat vardır.  Denge zinciri ve gezici kablo hiç girmez.",
+     "Motoru zorlayan, iki taraf arasındaki FARKTIR:\n"
+     "        Gmax = ( Q + P − Ga ) + Gs + i·H·gh·ns·( 1 − λ ) + 0,5·H·mt\n"
+     "        MSR = i·H·gh·ns  —  seyahat mesafesi üzerinden;  askı oranı "
+     "çarpandır çünkü 2:1'de kabin 1 m indiğinde kabin tarafındaki halat "
+     "2 m uzar.  λ denge zincirinin karşıladığı oran, MTrav gezici kablonun "
+     "yarısıdır.\n"
+     "        Kuyu boyu yerine seyahat mesafesi kullanmak kısa kuyuda gücü "
+     "küçültür;  denge zinciri olmayan UZUN kuyuda ise eski hesap — hafif "
+     "tablo halatıyla birleşince — gücü OLDUĞUNDAN KÜÇÜK gösteriyordu.  "
+     "Zincirli tesiste eski hesap motoru iki katına kadar büyütüyordu "
+     "( 120 m seyirde 20,7 kW yerine 39,3 kW ).\n"
+     "        Gh ve F1 DEĞİŞMEDİ:  onlar kabin tarafındaki gerçek yüktür ve "
+     "kaide, halat güvenlik katsayısı, tahrik ve Tst onlara dayanır.",
+     ("AQ9",)),
 )
 
 #  Testlerin okuduğu düz küme
@@ -567,9 +587,11 @@ SIGINMA = {
     "etek_kotu":             950,
     "ray_alt_payi":          270,
     "regulator_payi":        300,
-    #  EN 81-20 Çizelge 3 / Çizelge 4  —  çömelmiş duruş sığınma hacmi  [m]
-    "ust_hacim":            (0.7, 0.5, 1.0),
-    "dip_hacim":            (0.5, 0.7, 1.0),
+    #  SIĞINMA HACİMLERİ ARTIK BURADA DEĞİL.  Duruş tipi ( dik / çömelme /
+    #  yatarak ) tesise özel bir BEYANDIR, ofis sabiti değil:  girdiden gelir
+    #  ve ölçüler mukavemet_tablolari.SIGINMA_HACMI tablosundan okunur.
+    #  Eskiden çömelme tipi buraya çivilenmişti ve yatarak tipiyle uygun olan
+    #  kuyu diplerine "UYGUN DEĞİL" deniyordu ( bkz. MT.SIGINMA_HACMI notu ).
     #  ---------------------------------------------------------------
     #  TS EN 81-20 asgari açıklıklar  [mm].  Her satırın karşısındaki
     #  madde numarası standardın kendi metnindendir.
@@ -589,6 +611,36 @@ SIGINMA = {
     "min_ray_alt":           100,
     "min_regulator":         300,   # m.5.2.5.8.2 b) kuyuya sabit parça  0,30 m
 }
+
+
+def _pozitif(x):
+    """Pozitif bir sayı mı  ( bool tuzağı dâhil )."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
+
+
+def _halat_verisi(g):
+    """Askı halatı birim kütlesi ve kopma yükü  —  KATALOG GİRDİSİ TABLOYU EZER.
+
+    Döner:  ( gh kg/m , Tmin N , gh_kaynak , Tmin_kaynak )
+
+    TS 12385-5 tablosu yalnız 6x19 / 8x19 LİF ÖZLÜ halatları kapsar;  küçük
+    kasnaklı dişlisiz makinelerin çelik özlü / özel halatları orada yoktur.
+    Elle girilen değer tabloyu ezer ve paftaya kaynağı 'imalatçı kataloğu'
+    olarak yazılır — hangi verinin kullanıldığı GÖRÜNÜR olmalıdır.
+    """
+    dh = g.get("halat_capi")
+    gh_t, Tmin_t = MT.halat_agirlik(dh), MT.halat_kopma(dh)
+    gh_e, Tmin_e = g.get("halat_birim_kutle"), g.get("halat_kopma_kN")
+    tablo = f"TS 12385-5  ·  {MT.halat_tipi(dh)}"
+    if _pozitif(gh_e):
+        gh, gh_k = float(gh_e), "GİRİŞ — imalatçı kataloğu"
+    else:
+        gh, gh_k = gh_t, tablo
+    if _pozitif(Tmin_e):
+        Tmin, Tmin_k = float(Tmin_e) * 1000.0, "GİRİŞ — imalatçı kataloğu"
+    else:
+        Tmin, Tmin_k = Tmin_t, tablo
+    return gh, Tmin, gh_k, Tmin_k
 
 
 def _bosluk(v):
@@ -624,7 +676,7 @@ def _motor(g, o):
     Q, P, v = g["beyan_yuku"], g["kabin_agirligi"], g["beyan_hizi"]
     Dt, dh, nh, r = (g["tahrik_kasnak_capi"], g["halat_capi"],
                      g["halat_adedi"], g["aski_orani"])
-    gh = MT.halat_agirlik(dh)
+    gh, _Tmin_h, gh_kaynak, _Tmin_kaynak = _halat_verisi(g)
 
     #  Halat boyu:  kuyu boyundan tampon/paten yığını düşülür, 5 m pay eklenir;
     #  2:1 askıda halat iki kat gider.
@@ -640,7 +692,36 @@ def _motor(g, o):
     #  Burada ikinci kez  P + q·Q  hesaplansaydı, q değiştiğinde bu bölüm ile
     #  tahrik / ray / tampon bölümleri ayrışırdı — nitekim ayrışıyordu.
     Ga = g["karsi_agirlik"]               # karşı ağırlık yükü
-    Gmax = F1 + O["Gs"] - Ga              # maksimum artan yük
+
+    #  ------------------------------------------------------------------
+    #  DENGESİZ ( ARTAN ) YÜK  Gmax  —  motor gücünü belirleyen büyüklük
+    #  ------------------------------------------------------------------
+    #  ESKİDEN:  Gmax = F1 + Gs − Ga,  yani ( 1−q )·Q + Gh.  Buradaki Gh
+    #  KABİN TARAFINDAKİ TOPLAM halat kütlesidir ve dengesizlik DEĞİLDİR:
+    #  kabin en alttayken karşı ağırlık tarafında da halat vardır, motoru
+    #  zorlayan iki tarafın FARKIDIR.  Üç eksik vardı:
+    #
+    #    1) Halat dengesizliği kuyu boyu + 5 m payla hesaplanıyordu;  doğrusu
+    #       SEYAHAT MESAFESİDİR ( MSR = i·H·gh·ns ).  Kısa kuyuda fazla, uzun
+    #       kuyuda — hafif tablo halatıyla birleşince — EKSİK çıkıyordu.
+    #    2) DENGE ZİNCİRİ hiç yoktu.  Zincir halat dengesizliğini karşılar;
+    #       zincirli bir tesiste program motoru gereğinden büyük seçiyordu.
+    #    3) GEZİCİ KABLO ( flexbil ) hiç girmiyordu.  Küçük ama her zaman
+    #       eksi yönde:  kablo kuyu ortasından asılıdır, kabin en alttayken
+    #       yarısı kabin tarafındadır.
+    #
+    #  Gh ve F1 OLDUĞU GİBİ KALIR:  onlar kabin tarafındaki GERÇEK yüktür ve
+    #  kaide ( bölüm 2 ), halat güvenlik katsayısı ( bölüm 4 ), tahrik
+    #  ( bölüm 6 ) ve Tst bunlara dayanır — dengesizlikle karıştırılmamalıdır.
+    H = g["seyir_mesafesi"]                          # seyahat mesafesi, m
+    MSR = r * H * gh * nh                            # dengesiz halat kütlesi
+    lam = (g.get("kompanzasyon_orani") or 0) / 100.0  # denge zinciri oranı
+    MCR = lam * MSR                                  # zincirin dengelediği
+    mt = sum(MT.kablo_agirligi(g.get(k)) or 0.0
+             for k in ("kablo_tipi_1", "kablo_tipi_2"))
+    MTrav = 0.5 * H * mt                             # gezici kablo dengesizliği
+    Gden = (Q + P) - Ga                              # dengelenmeyen beyan yükü
+    Gmax = Gden + O["Gs"] + MSR - MCR + MTrav
     #  MİL KUVVETİ VE MOMENT ASKI ORANINA GÖRE İNDİRGENİR.
     #  Kitap bu iki satırı kabin tarafındaki yükle yazıyordu.  2:1 palangalı
     #  bir sistemde tahrik kasnağının gördüğü kuvvet Gmax değil Gmax/i'dir —
@@ -650,27 +731,40 @@ def _motor(g, o):
     #  okuyucuya iki katı bir sayı yazılıyordu. )
     Pm = (F1 - Ga) / r                    # tahrik kasnağına gelen döndürme kuvveti
     M = (Gmax / r) * (Dt / 2000.0)        # tahrik kasnağı momenti
-    #  VERİM — makine tipine ve askı oranına bağlıdır  ( ofis standardı ).
+    #  TAHRİK KASNAĞINA GELEN STATİK YÜK.  Kasnak iki halat kolunu birden
+    #  taşır;  Pm bunların FARKI ( döndüren kuvvet ), Tst ise TOPLAMIDIR.
+    #  Palangalı sistemde her kol yükün yarısını çeker, bu yüzden askı
+    #  oranına bölünür:  1:1'de F1 + Ga,  2:1'de ( F1 + Ga ) / 2.
+    #  İmalatçının kasnak için verdiği azami statik yük aşılmamalıdır;
+    #  program bunu HİÇ denetlemiyordu — motor gücü "UYGUN" çıkan bir seçim
+    #  kasnak yükünü aşmış olabilirdi.
+    Tst_h = (F1 + Ga) / r
+    Tst = g.get("makine_tst")
+    Tst_verildi = isinstance(Tst, (int, float)) and not isinstance(Tst, bool) and Tst > 0
+    tst_uygun = (Tst >= Tst_h) if Tst_verildi else None
+    #  VERİM — makine tipine bağlı TOPLAM SİSTEM VERİMİ  ( ofis standardı ).
     #  Kaynak kitap burada makine tipinden bağımsız sabit 0,92 kullanıyordu;
     #  ofisin kendi avan tablosu ise dişli makinede 0,50 der.  Dişli makinede
     #  0,92 gerekli gücü YARIYA yakın gösteriyordu — emniyetsiz taraf.
-    dusus = O["palanga_verim_dususu"]
-    #  "Ofis verimi η toplam sistem verimidir" seçiliyse palanga düşüşü
-    #  İKİNCİ KEZ uygulanmaz — askı kaybı zaten o değerin içindedir.
-    toplam_verim = str(g.get("toplam_verim") or "").strip().lower() == "evet"
-    eta_taban = US.verim(O, g.get("makine_tipi"), 1)
-    eta = US.verim(O, g.get("makine_tipi"), r, toplam=toplam_verim)
-    #  İKİNCİ KALKAN.  Girdi doğrulaması η′ ≤ 0'ı ve negatif halat boyunu
+    #  ASKI ORANINA BAĞLI Δη = 0,10 DÜŞÜŞÜ KALDIRILDI ( bkz. ortak/ofis.py ):
+    #  askı ( palanga ) kaybı artık η'nın İÇİNDEDİR, ikinci kez inmez.  Bu
+    #  yüzden "Ofis verimi η toplam sistem verimidir" anahtarı da kalktı —
+    #  η her zaman toplam sistem verimidir.
+    eta = US.verim(O, g.get("makine_tipi"))
+    #  İKİNCİ KALKAN.  Girdi doğrulaması η ≤ 0'ı ve negatif halat boyunu
     #  zaten reddediyor;  motor doğrudan çağrılırsa ( testler ) sıfıra
     #  bölünmesin ve fiziksel olmayan bir güç "uygun" sayılmasın.
     hesaplanabilir = eta > 0 and lh > 0
     N = (Gmax * v / (eta * S["motor_sabiti"])) if hesaplanabilir else None
     HP = N * S["hp_carpani"] if N is not None else None
-    uygun = bool(N is not None and N > 0 and g["motor_gucu"] >= N)
+    uygun = bool(N is not None and N > 0 and g["motor_gucu"] >= N
+                 and tst_uygun is not False)
 
     o.update(Q=Q, P=P, v=v, gh=gh, lh=lh, Gh=Gh, F1=F1, Ga=Ga, Gmax=Gmax,
-             N_hesap=N, motor_uygun=uygun, r=r, nh=nh, dh=dh, Dt=Dt)
-    o.update(eta=eta, eta_taban=eta_taban)
+             N_hesap=N, motor_uygun=uygun, r=r, nh=nh, dh=dh, Dt=Dt,
+             Tst_hesap=Tst_h, Tst=Tst if Tst_verildi else None,
+             tst_uygun=tst_uygun)
+    o.update(eta=eta)
     _kay(o, AQ18=gh, AQ19=lh, AQ16=Gh, AQ11=F1, AQ13=Ga, AQ9=Gmax, AQ7=Pm,
          AQ21=M, AQ22=eta, AQ23=N, X25=HP)
 
@@ -682,8 +776,7 @@ def _motor(g, o):
              g.get("kabin_agirligi_kaynak") or "GİRİŞ"),
         veri("dh", "Halat çapı", dh, "mm", "GİRİŞ"),
         veri("nh", "Halat sayısı", nh, "adet", "GİRİŞ"),
-        veri("gh", "Halatın 1 m'deki ağırlığı", gh, "kg/m",
-             f"TS 12385-5  ·  {MT.halat_tipi(dh)}", 4),
+        veri("gh", "Halatın 1 m'deki ağırlığı", gh, "kg/m", gh_kaynak, 4),
         hesap("lh = ( Kuyu boyu − tampon/paten yığını ) / 1000 + 5"
               + ("  ( × 2 :  2:1 askı )" if r != 1 else ""),
               f"( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
@@ -695,7 +788,22 @@ def _motor(g, o):
         hesap(f"Ga = P + {tr(O['q_denge'])} × Q",
               f"{trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)}", Ga, "kg"),
         veri("Gs", "Sürtünme yükü", O["Gs"], "kg", "OFİS STANDARDI"),
-        hesap("Gmax = F1 + Gs − Ga", f"{tr(F1)} + {tr(O['Gs'])} − {tr(Ga)}",
+        metin("Dengesiz  ( artan )  yükün bileşenleri :"),
+        hesap("Gden = ( Q + P ) − Ga        ( dengelenmeyen beyan yükü )",
+              f"( {trn(Q, 0)} + {trn(P, 0)} ) − {tr(Ga)}", Gden, "kg"),
+        veri("H", "Seyir mesafesi", H, "m", "GİRİŞ"),
+        hesap("MSR = i × H × gh × ns" if r != 1 else "MSR = H × gh × ns",
+              (f"{trn(r, 0)} × {tr(H)} × {tr(gh)} × {trn(nh, 0)}" if r != 1
+               else f"{tr(H)} × {tr(gh)} × {trn(nh, 0)}"), MSR, "kg",
+              "dengesiz halat kütlesi  ( kabin en altta )"),
+        veri("λ", "Denge ( kompanzasyon ) zinciri oranı", lam * 100, "%", "GİRİŞ", 0),
+        hesap("MCR = λ × MSR", f"{tr(lam)} × {tr(MSR)}", MCR, "kg",
+              "zincirin dengelediği kütle"),
+        hesap("MTrav = 0,5 × H × mt",
+              f"0,5 × {tr(H)} × {tr(mt)}", MTrav, "kg",
+              "gezici kablo dengesizliği"),
+        hesap("Gmax = Gden + Gs + MSR − MCR + MTrav",
+              f"{tr(Gden)} + {tr(O['Gs'])} + {tr(MSR)} − {tr(MCR)} + {tr(MTrav)}",
               Gmax, "kg"),
         hesap("Pm = ( F1 − Ga ) / i" if r != 1 else "Pm = F1 − Ga",
               (f"( {tr(F1)} − {tr(Ga)} ) / {trn(r, 0)}" if r != 1
@@ -707,32 +815,46 @@ def _motor(g, o):
                else f"{tr(Gmax)} × {tr(Dt / 2000.0)}"), M, "kg·m",
               "tahrik kasnağı momenti"),
         veri("", "Makine tipi", g.get("makine_tipi") or "—", "", "GİRİŞ"),
-        veri("η", "Makine verimi", eta_taban if eta_taban is not None else eta,
-             "", f"OFİS STANDARDI  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
-        veri("η′", ("Verim  ( ofis değeri ZATEN toplam sistem verimi — "
-                    "palanga düşüşü ikinci kez uygulanmaz )") if toplam_verim else
-                   (("Palangalı sistemde verim  ( i > 1 ise η − "
-                     + tr(dusus) + " )") if r != 1 else
-                    "Sistem verimi  ( 1:1 askıda η′ = η )"), eta, "",
-             "GİRİŞ — toplam sistem verimi" if toplam_verim
-             else ("MMO/697 §2.4" if r != 1 else "Ofis kabulü")),
-        hesap("N = Gmax × v / ( η′ × 102 )",
+        veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "",
+             f"OFİS STANDARDI  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
+        hesap("N = Gmax × v / ( η × 102 )",
               f"{tr(Gmax)} × {tr(v)} / ( {tr(eta)} × 102 )",
               N, "kW", "MMO 208/7 - 2.4"),
         hesap("HP = N × 1,34", f"{tr(N)} × 1,34", HP, "HP"),
         veri("Nsç", "Kullanılan motor gücü", g["motor_gucu"], "kW", "GİRİŞ"),
-    ]
+        metin("Tahrik kasnağına gelen statik yük :"),
+        hesap("Tst-h = ( F1 + Ga ) / i" if r != 1 else "Tst-h = F1 + Ga",
+              (f"( {tr(F1)} + {tr(Ga)} ) / {trn(r, 0)}" if r != 1
+               else f"{tr(F1)} + {tr(Ga)}"), Tst_h, "kg",
+              "kasnağın taşıdığı toplam halat yükü"),
+    ] + ([
+        veri("Tst", "Makinenin azami kasnak statik yükü", Tst, "kg",
+             "GİRİŞ — imalatçı kataloğu", 0),
+        kontrol(f"Tst-h = {trn(Tst_h, 0)} kg  ≤  Tst = {trn(Tst, 0)} kg", bool(tst_uygun)),
+    ] if Tst_verildi else [
+        metin("Tst girilmediği için kasnak statik yükü DENETLENMEDİ — "
+              "imalatçı kataloğundaki sınırla karşılaştırın."),
+    ])
     b["aciklamalar"] = [
         "N bir GÜÇ bağıntısıdır ve güç askı oranından bağımsızdır — 2:1'de "
         "kuvvet yarıya iner, halat hızı iki katına çıkar. Askı oranı buraya "
-        "yalnız İKİ yoldan girer:  halat boyu ( dolayısıyla Gh ) iki katına "
-        "çıkar ve palangalı sistemde verim düşer.",
-        "Gmax = F1 − Ga cebirsel olarak Q/2 + Gh'dir:  karşı ağırlık "
-        "Ga = P + Q/2 kabulüyle dengesiz yük beyan yükünün yarısıdır, "
-        "üstüne halatın tamamı eklenir ( kabin en altta iken halat ağırlığının "
-        "tamamı kabin tarafındadır — en olumsuz durum )."]
+        "yalnız TEK yoldan girer:  halat boyu ( dolayısıyla Gh ) iki katına "
+        "çıkar. Verime AYRICA girmez — askı ( palanga ) kaybı η'nın "
+        "içindedir ve eski Δη = 0,10 düşüşü kaldırılmıştır.",
+        "Gmax, kabin EN ALTTA ve TAM YÜKLÜ iken yukarı çıkarken motorun "
+        "yenmesi gereken dengesiz kütledir. Ga = P + q·Q kabulüyle "
+        "dengelenmeyen beyan yükü Gden = ( 1 − q )·Q'dur;  üstüne halatın iki "
+        "taraf arasındaki FARKI ( MSR ) ve gezici kablonun yarısı eklenir, "
+        "denge zincirinin karşıladığı kısım ( MCR ) düşülür.",
+        "MSR = i·H·gh·ns:  askı oranı çarpan olarak girer çünkü 2:1'de kabin "
+        "1 m indiğinde kabin tarafındaki halat 2 m uzar. Denge zinciri 1:1 "
+        "asıldığı için tam dengeleme ( λ = %100 ) tam bu kütleyi ister."]
     b["notlar"] = [f"Binada en az {tr(N)} kW ( {tr(HP)} HP ) gücünde makine "
                    "motor kullanılacaktır.",
+                   "Tst, kasnağın taşıdığı TOPLAM halat yüküdür ( iki kol "
+                   "birden ) ve makinenin katalog sınırıyla karşılaştırılır. "
+                   "Makinenin kendi ağırlığı buna girmez — o, kaide "
+                   "hesabındadır ( bölüm 2 ).",
                    "Bu güç KARARLI REJİM gücüdür:  beyan hızındaki dengesiz "
                    "yükü karşılar. Kalkış ( ivmelenme ) momenti — kabin, karşı "
                    "ağırlık, halat, kasnak ve rotor ataletleri — hesaba "
@@ -742,11 +864,17 @@ def _motor(g, o):
                    "Ga = P + Q/2 ). Kaynak çalışma kitabının tamamı bu kabul "
                    "üzerine kuruludur — karşı ağırlık kütlesi tahrik, ray ve "
                    "tampon hesaplarına da aynı yerden girer."]
-    b["sonuc"] = {"baslik": "KONTROL      Nsç  ≥  N",
+    _ne = []
+    if hesaplanabilir and not (N is not None and N > 0 and g["motor_gucu"] >= N):
+        _ne.append("motoru büyütün")
+    if tst_uygun is False:
+        _ne.append("kasnak statik yükü aşıldı — makineyi büyütün")
+    b["sonuc"] = {"baslik": "KONTROL      Nsç ≥ N"
+                            + ("   ·   Tst-h ≤ Tst" if Tst_verildi else ""),
                   "metin": "UYGUNDUR." if uygun else
                            ("HESAP YAPILAMADI — sistem verimi ya da halat boyu "
                             "fiziksel değil" if not hesaplanabilir
-                            else "UYGUN DEĞİLDİR — motoru büyütün"),
+                            else "UYGUN DEĞİLDİR — " + " ve ".join(_ne)),
                   "uygun": bool(uygun)}
     if not hesaplanabilir:
         b["eksik_hesap"] = b["sonuc"]["metin"]
@@ -941,7 +1069,7 @@ def _aski_halatlari(g, o):
     gama = MT.kanal_acisi(sekil, O["kanal_gama_v"], O["kanal_gama_yd"])
     beta = MT.kanal_beta(sekil, O["kanal_beta"])
     Nequiv_t = MT.kanal_nequiv_t(sekil, O["kanal_gama_v"], O["kanal_beta"])
-    Tmin = MT.halat_kopma(dh)
+    _gh4, Tmin, _gh4_kaynak, Tmin_kaynak = _halat_verisi(g)
     nh_uygun = nh >= 2 and float(nh).is_integer()
     Smin = 16 if nh == 2 else 12
     Kp = (Dt / Dp) ** 4
@@ -999,7 +1127,7 @@ def _aski_halatlari(g, o):
         veri("Npr", "Ters yönde bükülmeli kasnak sayısı", Npr, "adet", "GİRİŞ", 0),
         veri("Dp", "Tahrik kasnağı hariç kasnakların ortalama çapı", Dp, "mm", "GİRİŞ"),
         veri("r", "Halat askı oranı", r, "", "GİRİŞ", 0),
-        veri("Tmin", "Halatın en küçük kopma değeri", Tmin, "N", "TS 12385-5", 0),
+        veri("Tmin", "Halatın en küçük kopma değeri", Tmin, "N", Tmin_kaynak, 0),
         veri("Smin", "Asgari halat güvenlik katsayısı", Smin, "",
              "EN 81-20 m.5.5.2.2  ( nh = 2 ise 16 )", 0),
         hesap("Kp = ( Dt / Dp )⁴", f"( {trn(Dt, 0)} / {trn(Dp, 0)} )⁴", Kp, "", ondalik=4),
@@ -2398,6 +2526,14 @@ def _siginma(g, o):
     #  kabin imalatına bağlı bir kabuldür ve ekrandan değiştirilir, ikincisi
     #  TS EN 81-20'nin sayısıdır ve değiştirilemez.
     K, v = dict(SIGINMA, **{k: o["ofis"][k] for k in SIGINMA_PAYLARI}), o["v"]
+    #  Beyan edilen sığınma duruşları.  Tanınmayan bir değer gelirse ( eski
+    #  proje dosyası, elle düzenlenmiş Excel ) çömelmeye dönülür — eski
+    #  davranış budur ve emniyetli taraftır.
+    tip_ust = g.get("siginma_tipi_ust") or "Çömelme"
+    tip_dip = g.get("siginma_tipi_dip") or "Çömelme"
+    ust_hacim = MT.siginma_hacmi(tip_ust, "ust") or MT.siginma_hacmi("Çömelme", "ust")
+    dip_hacim = MT.siginma_hacmi(tip_dip, "dip") or MT.siginma_hacmi("Çömelme", "dip")
+    K["ust_hacim"], K["dip_hacim"] = ust_hacim, dip_hacim
     SK = g["son_kat_yuksekligi"]
     W, D = g["kabin_genisligi"], g["kabin_derinligi"]
     bosluk = _bosluk(v)
@@ -2462,16 +2598,17 @@ def _siginma(g, o):
 
     #  Sığınma hacimleri  ( EN 81-20 Çizelge 3 — çömelmiş duruş )
     ust_h = (SK - K["kabin_ust_donanim"] - K["tavan_payi"]) / 1000.0
-    for etiket, (a, bb, c), olcu in (
-            ("Ç.3 - Kabin üstünde sığınma hacmi",
+    for etiket, tip, (a, bb, c), olcu in (
+            ("Ç.3 - Kabin üstünde sığınma hacmi", tip_ust,
              K["ust_hacim"], ((W + 40) / 1000.0, (D + 20) / 1000.0, ust_h)),
-            ("Ç.4 - Kuyu dibinde sığınma hacmi",
+            ("Ç.4 - Kuyu dibinde sığınma hacmi", tip_dip,
              K["dip_hacim"], (W / 1000.0, D / 1000.0, a_dip / 1000.0))):
         uygun = a <= olcu[0] and bb <= olcu[1] and c <= olcu[2]
         uygunlar.append(uygun)
-        ad.append(veri("", f"{etiket}  ( en az {tr(a)} × {tr(bb)} × {tr(c)} m )",
+        ad.append(veri("", f"{etiket}   —   beyan edilen duruş :  {tip}"
+                           f"  ( en az {tr(a)} × {tr(bb)} × {tr(c)} m )",
                        f"{tr(olcu[0])} × {tr(olcu[1])} × {tr(olcu[2])} m"))
-        ad.append(kontrol(etiket, uygun))
+        ad.append(kontrol(f"{etiket}  ( {tip} )", uygun))
 
     b = Bolum("10 -  SIĞINMA ALANLARI VE AÇIKLIKLARIN UYGUNLUĞU",
               "TS EN 81-20 m.5.2.5.7  /  m.5.2.5.8")
@@ -2493,7 +2630,16 @@ def _siginma(g, o):
         "Serbest boşluğa eklenen 0,035 × v² terimi TS EN 81-20'de açıklığın "
         "değil, kabinin EN ÜST KONUMUNUN tanımındadır ( Çizelge 2 ). Burada "
         "kuyu ölçüleri anma konumundan alındığı için aynı eşitsizlik, terim "
-        "sınıra eklenerek yazılmıştır — cebirsel olarak birebir aynıdır."]
+        "sınıra eklenerek yazılmıştır — cebirsel olarak birebir aynıdır.",
+        "SIĞINMA HACMİ TİPİ BİR BEYANDIR. TS EN 81-20 m.5.2.5.7.1 ve "
+        "m.5.2.5.8.1 üç duruştan BİRİNİ ister: dik ( 0,40 × 0,50 × 2,00 m ), "
+        "çömelme ( 0,50 × 0,70 × 1,00 m ) ve — yalnız kuyu dibinde — yatarak "
+        "( 0,70 × 1,00 × 0,50 m ). Kontrol, GİRİŞ'te beyan edilen duruşa göre "
+        "yapılır; seçilen duruş kuyu dibinde işaretlenmeli ve projede "
+        "belgelenmelidir."]
+    b["notlar"] = [
+        f"Beyan edilen sığınma duruşu — kabin üstü : {tip_ust}   ·   "
+        f"kuyu dibi : {tip_dip}."]
     return b
 
 
@@ -2533,6 +2679,8 @@ def hesapla(veriler=None):
         "sabitler": dict(SABIT),
         "ozet": {
             "N_hesap": o.get("N_hesap"), "motor_uygun": o.get("motor_uygun"),
+            "Tst_hesap": o.get("Tst_hesap"), "Tst": o.get("Tst"),
+            "tst_uygun": o.get("tst_uygun"),
             "kabin_alani": o.get("kabin_alani"), "kabin_kisi": o.get("kabin_kisi"),
             "Sf": o.get("Sf"), "S_gercek": o.get("S_gercek"),
             "ray_boyu": o.get("ray_boyu"), "Mg_kabin": o.get("Mg_kabin"),

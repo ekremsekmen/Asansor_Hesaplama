@@ -257,7 +257,6 @@ function avanGirdi(){
      'Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2','kablo_tipi',
      'i_palanga','q_denge','makine_tipi']
       .forEach(k=>o[k]=v('a_'+k+i));
-    o.toplam_verim = !!($('a_toplam_verim'+i) && $('a_toplam_verim'+i).checked);
     return o;
   });
   const sabitler={}; Object.keys(SEC.sabit_b).forEach(k=>{const x=v('sb_'+k); if(x!=='')sabitler[k]=x;});
@@ -589,18 +588,15 @@ function avanAsansorleriKur(){
         </div>
         <div class="satir i2">
           <div class="alan"><label>i — Askı ( palanga ) oranı
-            ${bilgiSimgesi(['Doğrudan askı 1:1 / palangalı 2:1. Asansörün kendi özelliğidir — kapasite ve hız gibi burada girilir.','Motor GÜCÜ askı oranından bağımsızdır: 2:1 askıda halat hızı yarıya iner, kuvvet iki katına çıkar, çarpımları değişmez. Askı oranı hesaba yalnız VERİM üzerinden girer (MMO/697 §2.4: palangalı sistemde η − 0,10).'])}</label>
+            ${bilgiSimgesi(['Doğrudan askı 1:1 / palangalı 2:1. Asansörün kendi özelliğidir — kapasite ve hız gibi burada girilir.','Motor GÜCÜ askı oranından bağımsızdır: 2:1 askıda halat hızı iki katına çıkar, kuvvet yarıya iner, çarpımları değişmez. Askı oranı verime de girmez — MMO/697 §2.4\'ün Δη = 0,10 palanga düşüşü kaldırılmıştır ( makara kaybı çarpımsaldır ve η zaten toplam sistem verimidir ).'])}</label>
             <select id="a_i_palanga${i}" class="girdi" onchange="verimTazele(${i});planla()">
               ${Object.keys(SEC.aski_oranlari||{}).map(k=>
                 `<option value="${SEC.aski_oranlari[k]}"${SEC.aski_oranlari[k]===2?' selected':''}>${k}</option>`).join('')}
             </select></div>
-          <div class="alan"><label>η — Makine verimi
-            ${bilgiSimgesi(['MMO/697 s.21: dişlisiz 0,85 · dişli 0,50. Makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','İmalatçı katalogları genellikle TOPLAM SİSTEM verimi verir (makine × dişli × askı × motor) ve bu değerler daha yüksektir. Öyle bir değer giriyorsanız alttaki kutuyu işaretleyin — yoksa palanga kaybı ikinci kez düşülür.'])}</label>
+          <div class="alan"><label>η — Toplam sistem verimi
+            ${bilgiSimgesi(['Askı ( palanga ), kasnak ve makine kayıpları DÂHİL tek verim. Ofis kabulü: dişlisiz 0,85 · dişli 0,50 — makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','İmalatçı kataloğundaki toplam sistem verimini ( EN 81-20/50 şablonlarında η_ins ) doğrudan buraya girin. Paftada marka-model referansı belirtilmelidir.','Askı oranına bağlı Δη = 0,10 düşüşü KALDIRILDI: makara kaybı çarpımsaldır ( geçiş başına ≈ 0,98 ) ve sabit bir sayı çıkarmak dişli ile dişlisiz makineyi farklı oranda cezalandırıyordu. Güç zaten askı oranından bağımsızdır.'])}</label>
             <input id="a_eta${i}" class="girdi" value="0,85"></div>
         </div>
-        <label class="kutu-satir"><input type="checkbox" id="a_toplam_verim${i}" onchange="planla()">
-          <span>Girilen η <b>toplam sistem verimidir</b> ( askı kaybı dâhil )</span>
-          ${bilgiSimgesi(['İşaretliyken MMO/697 §2.4 uyarınca uygulanan palanga verim düşüşü (Δη = 0,10) AYRICA uygulanmaz — askı kaybı zaten girilen değerin içindedir.','Uygulamada toplam sistem verimi dişli sistemlerde ≈ 0,52 – 0,78, dişlisizlerde daha üsttedir. MMO değerleri (dişli 1:1 = 0,50 · dişlisiz 2:1 = 0,75) daha muhafazakârdır ve motoru büyütür.','İşaretlerseniz paftada imalatçı / marka-model referansı belirtilmelidir — program bunu not olarak yazar.'])}</label>
         <div class="bolum-bas">Boyutlar</div>
         <div class="satir i2">
           <div class="alan"><label>Hk — Kuyu yüksekliği (m)</label><input id="a_Hk${i}" class="girdi"></div>
@@ -638,7 +634,7 @@ function avanAsansorleriKur(){
           <div class="satir i2">
             <div class="alan"><label>Fsh — Sehpa ağırlığı (kg)</label><input id="a_Fsh${i}" class="girdi ofis-alan" data-ofis="Fsh"></div>
             <div class="alan"><label>q — Denge faktörü <span class="ipucu">0 – 1</span>
-              ${bilgiSimgesi(['Karşı ağırlığın dengelediği anma yükü oranı; uygulamada 0,50 alınır.','Motor gücü N = (1−q)·Q·V / (102·η′) ve karşı ağırlık Ga = P + q·Q bağıntılarına girer.','Boş bırakırsanız Sabitler / Ofis Standardı sekmesindeki değer kullanılır.'])}</label>
+              ${bilgiSimgesi(['Karşı ağırlığın dengelediği anma yükü oranı; uygulamada 0,50 alınır.','Motor gücü N = (1−q)·Q·V / (102·η) ve karşı ağırlık Ga = P + q·Q bağıntılarına girer.','Boş bırakırsanız Sabitler / Ofis Standardı sekmesindeki değer kullanılır.'])}</label>
               <input id="a_q_denge${i}" class="girdi" placeholder="Sabitler B"></div>
           </div>
           <div class="satir i2">
@@ -934,7 +930,6 @@ function sabitATablosu(){
     k1_orta:['k1','Darbe faktörü — 0,63 < V ≤ 1,00 m/s','—','MMO/697 Çizelge-1'],
     k1_yavas:['k1','Darbe faktörü — 0,15 < V ≤ 0,63 m/s','—','MMO/697 Çizelge-1'],
     motor_sabiti:['—','Motor gücü denklem sabiti','kg·m/s','MMO/697 §2.4'],
-    palanga_verim_dususu:['Δη','Palangalı sistemde verim düşüşü','—','MMO/697 §2.4'],
     kirlenme_faktoru:['d','Aydınlatmada kirlenme (bakım) faktörü','—','Aydınlatma tekniği teamülü'],
     E_makine_dairesi:['E','Aydınlatma şiddeti — makine dairesi','lüx','TS EN 81-20'],
     E_kabin:['E','Aydınlatma şiddeti — kabin','lüx','TS EN 81-20'],

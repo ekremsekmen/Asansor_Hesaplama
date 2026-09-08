@@ -496,21 +496,21 @@ BODRUM_NOTU = (
 # ================================================================
 #  MAKİNE TİPİ  ve  ASKI ( PALANGA ) ORANI
 # ================================================================
-#  MAKİNE VERİMİ  ( η )  —  OFİS KABULÜ, MMO/697'DE TABLO YOKTUR.
+#  TOPLAM SİSTEM VERİMİ  ( η )  —  OFİS KABULÜ, MMO/697'DE TABLO YOKTUR.
 #        Dişlisiz  η = 0,85          Dişli  η = 0,50
 #  Kitabın §2.4 (s.21) motor gücü bölümü YALNIZ formülü ve şu cümleyi verir:
 #  "Palangalı sistemlerde verim %10 az alınacaktır."  Verim DEĞERLERİ kitapta
 #  bulunmaz;  yukarıdaki iki sayı ofisin imalatçı deneyiminden gelir.
-#  Δη = 0,10 kuralı ise kitaptandır; yani
-#  askı oranı verime Δη = 0,10 olarak girer:
-#        dişli   1:1 → 0,50      dişli   2:1 → 0,40
-#        dişlisiz 1:1 → 0,85     dişlisiz 2:1 → 0,75
 #
-#  Bu değerler MAKİNE verimidir ve emniyetli taraftadır.  İmalatçı katalogları
-#  genellikle TOPLAM SİSTEM verimi (makine × dişli × askı × motor) verir ve bu
-#  değerler daha yüksektir — uygulamada dişli sistemlerde ≈ 0,52 – 0,78,
-#  dişlisizlerde daha üstü.  Toplam verim girilecekse palanga cezası TEKRAR
-#  UYGULANMAMALIDIR (çift sayılır); program bunun için ayrı bir seçenek sunar.
+#  Δη = 0,10 KURALI KALDIRILDI.  Gerekçesi engine/ortak/ofis.py'de ayrıntılı
+#  yazılıdır:  makara kayıpları çarpımsaldır, toplamsal bir düşüş aynı fiziksel
+#  kaybı dişlisizde %11,8 · dişlide %20 göreli ceza yapıyor, makara sayısına
+#  göre ölçeklenmiyor ve η küçükken η′'yü negatife düşürüyordu.
+#
+#  Yukarıdaki değerler artık TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı
+#  içlerindedir.  İmalatçı kataloğu da bu büyüklüğü verir;  EN 81-20/50
+#  şablonları buna η_ins ( installation efficiency ) der ve askı oranını ayrıca
+#  cezalandırmaz.  Askı oranı motor gücüne HİÇBİR yoldan girmez.
 #  Makine verimi tablosu artık ORTAK ofis standardındadır:  uygulama projesi
 #  ( mukavemet ) de aynı sayıları okur.  Bir süre iki yerde ayrı durdu ve
 #  ayrıştı — bkz. engine/ortak/ofis.py.
@@ -531,16 +531,18 @@ def aski_orani_metni(i):
 
 
 VERIM_NOTU = (
-    "Motor gücü denkleminde askı oranı yalnız VERİM üzerinden etkilidir: "
-    "N = (1−q)·Q·V / (102·η′) bir GÜÇ bağıntısıdır ve güç, askı oranından "
-    "bağımsızdır — 2:1 askıda halat hızı yarıya iner, kuvvet iki katına çıkar, "
-    "çarpımları değişmez. Askı oranının etkisi MMO/697 §2.4'teki Δη = 0,10 "
-    "verim düşüşüdür."
+    "N = (1−q)·Q·V / (102·η) bir GÜÇ bağıntısıdır ve güç askı oranından "
+    "BAĞIMSIZDIR — 2:1 askıda halat hızı iki katına çıkar, kuvvet yarıya iner, "
+    "çarpımları değişmez. Askı oranı bu denkleme hiçbir yoldan girmez."
 )
 TOPLAM_VERIM_NOTU = (
-    "Girilen değer TOPLAM SİSTEM VERİMİ olarak işaretlendiği için MMO/697 §2.4'teki "
-    "palanga verim düşüşü (Δη = 0,10) AYRICA uygulanmamıştır — askı kaybı zaten bu "
-    "değerin içindedir. Paftada imalatçı / marka-model referansı belirtilmelidir."
+    "η TOPLAM SİSTEM VERİMİDİR — askı ( palanga ), kasnak ve makine kayıpları "
+    "bu değerin içindedir. MMO/697 §2.4'ün Δη = 0,10 palanga düşüşü artık "
+    "uygulanmaz: makara kaybı fiziksel olarak çarpımsaldır ( geçiş başına "
+    "η ≈ 0,98; burçlu makarada ≈ 0,95 ), sabit bir sayı çıkarmak aynı kaybı "
+    "dişli ve dişlisiz makinede farklı oranda cezalandırıyordu. Değer "
+    "imalatçı kataloğundan alınmalı ve paftada marka-model referansı "
+    "belirtilmelidir."
 )
 
 # =====================================================================
@@ -553,8 +555,8 @@ MOTOR_KADEMELERI = (2.2, 3.0, 4.0, 5.5, 7.5, 11.0, 15.0, 18.5, 22.0,
                     30.0, 37.0, 45.0, 55.0, 75.0, 90.0, 110.0, 132.0, 160.0)
 
 #  KADEME SEÇİMİ ile "Nsç ≥ N" KONTROLÜ AYNI TOLERANSI KULLANMALIDIR.
-#  N = ( 1 − q )·Q·V / ( 102 · η′ ) kayan noktada tam kademenin bir kıl payı
-#  üstüne düşebilir ( ör. 1275 kg · 1,6 m/s · η′ 0,60 · q 0,55  →
+#  N = ( 1 − q )·Q·V / ( 102 · η ) kayan noktada tam kademenin bir kıl payı
+#  üstüne düşebilir ( ör. 1275 kg · 1,6 m/s · η 0,60 · q 0,55  →
 #  N = 15,000000000000002 ).  motor_sec toleranslı seçtiği hâlde kontrol katı
 #  olursa program KENDİ seçtiği motoru reddeder ve pafta
 #  "Nsç = 15,00  ≥  N = 15,00   →   UYGUN DEĞİL" gibi kendi kendisiyle çelişen

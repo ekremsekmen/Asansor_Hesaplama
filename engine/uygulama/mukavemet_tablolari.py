@@ -699,3 +699,52 @@ def surtunme(isleme_sekli, durum):
     test için durur.
     """
     return _ara(KANAL_ISLEME, isleme_sekli, _SURTUNME_SUTUN[durum])
+
+
+# =====================================================================
+#  SIĞINMA HACMİ TİPLERİ   ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 )
+# =====================================================================
+#  Standart, kabin üstünde ve kuyu dibinde bir sığınma hacmi ARAR ama TİPİNİ
+#  tasarımcıya bırakır:  aşağıdaki duruşlardan BİRİ sağlanmalıdır.  Kuyu
+#  dibinde üç, kabin üstünde iki seçenek vardır — YATARAK duruş yalnız kuyu
+#  dibi içindir.
+#
+#      duruş        yatay a × b      yükseklik c
+#      dik           0,40 × 0,50        2,00 m
+#      çömelme       0,50 × 0,70        1,00 m
+#      yatarak       0,70 × 1,00        0,50 m      ( yalnız kuyu dibi )
+#
+#  NİÇİN SEÇİM:  program bu tabloyu bilmiyor, ÇÖMELME tipini koda çivilemişti
+#  ( eski SIGINMA["dip_hacim"] = (0,50 · 0,70 · 1,00) ).  Kuyu dibinde 0,88 m
+#  serbest yüksekliği olan bir tesis çömelmeyi geçmez ama YATARAK tipini
+#  rahatça geçer;  program buna bakmadığı için "UYGUN DEĞİL" diyor ve
+#  projeciyi kuyu dibini derinleştirmeye ya da tamponu revize etmeye
+#  yönlendiriyordu — çoğu zaman gereksiz, mevcut binada çoğu zaman imkânsız.
+#
+#  Seçilen tip PAFTAYA YAZILIR:  hangi duruşun beyan edildiği belgelenmeli ve
+#  standardın istediği biçimde kuyu dibinde işaretlenmelidir.
+SIGINMA_HACMI = (
+    #  ad,         a (m),  b (m),  c (m) — yükseklik
+    ("Dik duruş",   0.40,   0.50,   2.00),
+    ("Çömelme",     0.50,   0.70,   1.00),
+    ("Yatarak",     0.70,   1.00,   0.50),
+)
+
+#  Kabin üstünde YATARAK duruş yoktur  ( m.5.2.5.7.1 ).
+SIGINMA_TIPLERI_UST = ("Dik duruş", "Çömelme")
+SIGINMA_TIPLERI_DIP = ("Dik duruş", "Çömelme", "Yatarak")
+
+
+def siginma_hacmi(tip, konum="dip"):
+    """Sığınma hacmi ölçüleri  ( a , b , c )  —  metre.
+
+    konum "dip" ise ( a , b ) = ( kısa , uzun ) ,  "ust" ise ( uzun , kısa ).
+    Bu SIRALAMA standardın bir kuralı değildir;  kaynak çalışma kitabının
+    kabin üstü ve kuyu dibi kontrollerinde dikdörtgeni hangi eksene
+    oturttuğunu birebir korur ( bkz. mukavemet._siginma ).
+    Tanınmayan tip için None döner.
+    """
+    for ad, a, b, c in SIGINMA_HACMI:
+        if ad == tip:
+            return (b, a, c) if konum == "ust" else (a, b, c)
+    return None

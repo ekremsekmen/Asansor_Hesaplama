@@ -130,12 +130,14 @@ def kopru(g):
         "i_palanga": g.get("aski_orani"),
         "gr": ray,                                # ray metre ağırlığı  [kg/m]
         #  Motor verimi:  MAKİNE TİPİNDEN gelir ( ofis standardı, tek kaynak
-        #  engine/ortak/ofis.py ).  Avan tarafına TABAN η geçilir — palanga
-        #  düşüşünü avan kendisi uygular, yoksa iki kez düşerdi.  Eskiden
-        #  buradan sabit 0,92 geçiyordu:  aynı asansör için avan paftası ile
-        #  uygulama paftası farklı motor gücü veriyordu.
+        #  engine/ortak/ofis.py ) ve TOPLAM SİSTEM VERİMİDİR — askı kaybı
+        #  içindedir.  İki taraf aynı sayıyı kullanır;  eskiden avan bunun
+        #  üstüne Δη = 0,10 uyguluyordu ve köprü "taban η" geçirmek zorundaydı.
+        #  Δη kalktığı için o ayrım da kalktı.  ( Daha eskiden buradan sabit
+        #  0,92 geçiyordu:  aynı asansör için avan ve uygulama paftaları
+        #  farklı motor gücü veriyordu. )
         "makine_tipi": g.get("makine_tipi"),
-        "eta": US.verim(US.sabitler(g.get("_ofis")), g.get("makine_tipi"), 1),
+        "eta": US.verim(US.sabitler(g.get("_ofis")), g.get("makine_tipi")),
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
         "S1": g.get("kolon_kesit"), "L1": g.get("kolon_uzunluk"),

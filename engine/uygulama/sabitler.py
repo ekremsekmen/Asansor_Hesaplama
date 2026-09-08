@@ -28,7 +28,6 @@ VARSAYILAN = {
     # ── ① MAKİNE VE MOTOR ────────────────────────────────────────────
     "verim_dislisiz":   OFIS.MAKINE_VERIMLERI["Dişlisiz"],
     "verim_disli":      OFIS.MAKINE_VERIMLERI["Dişli"],
-    "palanga_verim_dususu": OFIS.PALANGA_VERIM_DUSUSU,
     "Gs":               0,      # Sürtünme yükü, kg          ( 11!AQ8 )
     "q_denge":          0.50,   # Karşı ağırlık denge oranı  ( 11!AA627 )
     "halat_pay_m":      5,      # Halat boyu payı, m         ( 11!AQ19 )
@@ -109,7 +108,7 @@ METIN = ("kablo_tipi",)
 
 ARALIK = {
     "verim_dislisiz": (0.1, 1), "verim_disli": (0.1, 1),
-    "palanga_verim_dususu": (0, 0.5), "Gs": (0, 5000), "q_denge": (0.2, 0.8),
+    "Gs": (0, 5000), "q_denge": (0.2, 0.8),
     "halat_pay_m": (0, 100),
     #  Sınırlar tek yerde durur ( mukavemet_tablolari ):  standardın kendi
     #  m.5.11.2.3.1 sınırlarıdır ve iki dosyada ayrı ayrı yazılırsa ayrışır.
@@ -139,7 +138,7 @@ ARALIK = {
 GRUPLAR = (
     ("① MAKİNE VE MOTOR",
      "TS EN 81-50 · MMO 208/7 — motor gücü ve verim",
-     ("verim_dislisiz", "verim_disli", "palanga_verim_dususu",
+     ("verim_dislisiz", "verim_disli",
       "Gs", "q_denge", "halat_pay_m",
       "kanal_gama_v", "kanal_gama_yd", "kanal_beta")),
     ("② MUKAVEMET KABULLERİ",
@@ -170,9 +169,10 @@ ETIKET = {
     "k3_yardimci": ("Yardımcı donanım darbe katsayısı k3",
                     "TS EN 81-20 Çizelge 14 k3'e SAYI VERMEZ — "
                     "'imalatçı tarafından, gerçek tesise göre belirlenir'"),
-    "verim_dislisiz": ("Dişlisiz makine verimi η", "MMO 208/7 §2.4 — motor gücü bağıntısındaki η"),
-    "verim_disli": ("Dişli makine verimi η", "redüktör kaybı dâhil"),
-    "palanga_verim_dususu": ("Palangalı sistemde verim düşüşü Δη", "i > 1 ise η′ = η − Δη  ( MMO/697 §2.4 )"),
+    "verim_dislisiz": ("Dişlisiz makine TOPLAM sistem verimi η",
+                       "askı ( palanga ) kaybı DÂHİL — N = Gmax·v/(η·102)"),
+    "verim_disli": ("Dişli makine TOPLAM sistem verimi η",
+                    "redüktör ve askı ( palanga ) kaybı DÂHİL"),
     "Gs": ("Sürtünme yükü Gs (kg)", "Gmax = F1 + Gs − Ga"),
     "q_denge": ("Denge faktörü q", "karşı ağırlık = P + q·Q;  kitabın tamamı q = 0,50 üzerine kuruludur"),
     "halat_pay_m": ("Halat boyu payı (m)", "kuyu boyuna eklenen pay"),
@@ -251,25 +251,17 @@ def sabitler(ozel=None):
     return s
 
 
-def verim(S, makine_tipi, aski_orani=1, toplam=False):
-    """η′  —  ofis sabitlerinden okunan makine verimi + palanga düşüşü.
+def verim(S, makine_tipi):
+    """η  —  ofis sabitlerinden okunan TOPLAM SİSTEM VERİMİ.
 
-    toplam=True ise ofis verimi ZATEN toplam sistem verimidir:  MMO/697
-    §2.4'ün palanga düşüşü ikinci kez uygulanmaz ( askı kaybı o değerin
-    içindedir ).  Avan motorundaki "Girilen η toplam sistem verimidir"
-    kutusunun uygulama projesindeki karşılığıdır.
+    Askı ( palanga ) kaybı bu değerin İÇİNDEDİR;  askı oranına bağlı ayrı
+    bir düzeltme YOKTUR ( bkz. engine/ortak/ofis.py — "PALANGA VERİM
+    DÜŞÜŞÜ KALDIRILDI" ).  Tanınmayan makine tipinde ortak fabrika ayarına
+    dönülür.
     """
     eta = {"Dişlisiz": S.get("verim_dislisiz"),
            "Dişli": S.get("verim_disli")}.get(makine_tipi)
-    if eta is None:
-        eta = OFIS.VARSAYILAN_VERIM
-    if toplam:
-        return eta
-    try:
-        palangali = float(aski_orani) > 1
-    except (TypeError, ValueError):
-        palangali = False
-    return (eta - S.get("palanga_verim_dususu", 0)) if palangali else eta
+    return OFIS.VARSAYILAN_VERIM if eta is None else eta
 
 
 def darbe_k1(S, tertibat):
