@@ -10,7 +10,8 @@ import os
 import sys
 import urllib.request
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, KOK)
 
 from exports import xlsx_export as XE           # noqa: E402
 from testler.ortak import Rapor      # noqa: E402
@@ -323,6 +324,59 @@ def calistir():
                   f"→ {pg.inner_text('#p_ozet')[:60]!r}")
         r.esit("proje özeti iki asansörü listeliyor",
                pg.eval_on_selector_all("#p_ozet table tr", "e=>e.length"), 3)
+        #  ── FORM ALANLARININ TEK GEZİNTİSİ
+        #  "Alan nedir, nasıl okunur, nasıl yazılır" bilgisi BİR YERDE
+        #  durmalı.  Bir süre aynı gezinti beş ayrı yerde elle yazılıydı ve
+        #  hepsi "checkbox ise checked, değilse value" kuralının kendi
+        #  kopyasını taşıyordu:  yeni bir alan türü eklendiğinde birinde
+        #  unutulur ve asansör değiştirince o alan SESSİZCE kaybolurdu.
+        #  Ayrıca ikisi ayrışmıştı — kovadan geri yükleme alanaYaz()
+        #  kullanıyor ( seçim kutusunda "6.5" ile "6,5"i eşleştirir ),
+        #  asansör yükleme ise ham `e.value =` yapıyordu.
+        _js = open(os.path.join(KOK, "static", "uygulama.js"),
+                   encoding="utf-8").read()
+        for _fn in ("mukavemetGirdi", "mAsansorKaydet", "mAsansorYukle",
+                    "mukavemetIstek"):
+            _bas = _js.index(f"function {_fn}(")
+            _govde = _js[_bas:_js.index("\n}\n", _bas)]
+            r.kontrol(f"{_fn} okuma/yazma kuralını KENDİ kopyasında taşımıyor",
+                      "checkbox" not in _govde, f"→ {_fn} hâlâ elle okuyor")
+        for _yardimci in ("mAlanlar", "mAlanOku", "mAlanYaz",
+                          "mFormOku", "mFormaYaz"):
+            r.kontrol(f"ortak yardımcı var: {_yardimci}",
+                      pg.evaluate(f"typeof {_yardimci} === 'function'"))
+        #  KAYDEDİLEN küme = OKUNAN küme − durak listesi − proje geneli.
+        #  İkisi ayrışırsa asansör değiştirince alan sessizce kaybolur.
+        r.esit("kaydedilen ve okunan alan kümeleri tutarlı",
+               pg.evaluate("""() => {
+                   mAsansorKaydet();
+                   const tum = Object.keys(mukavemetGirdi());
+                   const kayit = Object.keys(MUK_ASANSORLER[MUK_AKTIF])
+                                       .filter(k => k[0] !== '_');
+                   const liste = mAlanlar(f => f.tur === 'liste')
+                                       .map(f => f.anahtar);
+                   const bek = tum.filter(k => !liste.includes(k)
+                                               && !mProjeGeneliMi(k));
+                   return {eksik: bek.filter(k => !kayit.includes(k)),
+                           fazla: kayit.filter(k => !bek.includes(k))};
+               }"""), {"eksik": [], "fazla": []})
+        #  SEÇİM KUTUSU asansörler arasında korunuyor mu — ham `e.value =`
+        #  ile yazılırken seçenekle birebir eşleşmeyen değer sessizce düşerdi.
+        pg.evaluate("mTumGruplariAc()")
+        pg.select_option("#m_halat_capi", "8")
+        pg.select_option("#m_makine_tipi", "Dişli")
+        pg.evaluate("mAsansorSec(0)")
+        pg.wait_for_timeout(1400)
+        pg.evaluate("mAsansorSec(1)")
+        pg.wait_for_timeout(1400)
+        r.esit("seçim kutuları asansör değişince korunuyor",
+               [pg.input_value("#m_halat_capi"), pg.input_value("#m_makine_tipi")],
+               ["8", "Dişli"])
+        pg.evaluate("mTumGruplariAc()")
+        pg.select_option("#m_halat_capi", "6,5")
+        pg.select_option("#m_makine_tipi", "Dişlisiz")
+        pg.wait_for_timeout(1200)
+
         #  PROJE GENELİ HESAPLAR:  girdi asansör formunda, SONUÇ PROJE
         #  sekmesinde ve paftanın en sonunda — asansör sekmelerinde
         #  tekrarlanmaz.  Makine dairesi ve temel girilince bölümler doğar.

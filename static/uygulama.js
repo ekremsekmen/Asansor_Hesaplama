@@ -125,12 +125,17 @@ function mukavemetGeriYukle(){
   //  Uygulamanın KENDİ kovası okunur — avanınki ayrı dosyadadır.
   let o; try{ o = JSON.parse(localStorage.getItem(KOVA.uygulama)||'null'); }catch(e){ o = null; }
   if(!o) return;
-  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
-    if(f.tur === 'liste') continue;
+  //  KOVA ALAN KİMLİĞİYLE ( "m_beyan_yuku" ) anahtarlanır, sözleşme
+  //  anahtarıyla değil;  o yüzden burada mFormaYaz kullanılamaz.  Gezinti
+  //  yine ortak, yalnız kaynağı ve boş-değer kuralı farklı:  kovada boş
+  //  duran alan formdakini EZMEZ.
+  for(const f of mAlanlar(f => f.tur !== 'liste')){
     const e = $(M_ID(f.anahtar));
     if(!e || o[e.id] === undefined) continue;
-    if(e.type === 'checkbox') e.checked = !!o[e.id];
-    else if(o[e.id] !== '') alanaYaz(e, o[e.id]);
+    //  Kovada BOŞ duran alan formdakini ezmez ( onay kutusu hariç:  orada
+    //  "false" geçerli bir değerdir ).
+    if(e.type !== 'checkbox' && o[e.id] === '') continue;
+    mAlanYaz(f, o[e.id]);
   }
   //  UYGULAMAYA AİT HER ALAN geri yazılır — yalnız sözleşmedekiler değil.
   //  Proje kimliği ( mk_… ) ve ofis sabitleri ( uof_… ) de buradadır;
@@ -338,13 +343,75 @@ function mTuretilenleriDoldur(){
     JS'de durur ve motorunkiyle ayrışırdı. */
 let MUK_GK_TAZELE = false;
 
-function mukavemetGirdi(){
-  const g = {};
-  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
-    if(f.tur === 'liste'){ g[f.anahtar] = MUK_DURAK.slice(); continue; }
-    const e = $(M_ID(f.anahtar));
-    if(e) g[f.anahtar] = (e.type === 'checkbox') ? e.checked : e.value;
+/* ==========================================================================
+   FORM ALANLARININ TEK GEZİNTİSİ
+
+   "Alan nedir, nasıl okunur, nasıl yazılır" bilgisi BİR YERDE durur.  Bir
+   süre aynı gezinti dört ayrı yerde elle yazılıydı — hesaba gönderilecek
+   girdiyi toplarken, asansör değiştirirken kaydederken, yüklerken ve
+   tarayıcı kovasından geri yüklerken.  Dördü de "checkbox ise checked,
+   değilse value" kuralını kendi kopyasında taşıyordu:  yeni bir alan türü
+   ( radyo · çoklu seçim ) eklendiğinde birinde unutulur ve asansör
+   değiştirince o alan SESSİZCE kaybolurdu.
+
+   Ayrıca ikisi ayrışmıştı:  kovadan geri yükleme alanaYaz() kullanıyor —
+   seçim kutusunda "6.5" ile "6,5"i eşleştiren ortak yardımcı — asansör
+   yükleme ise ham `e.value =` yapıyordu, yani o eşleştirmeyi atlıyordu.
+   ========================================================================== */
+
+/*  Sözleşmedeki alanlar, isteğe bağlı süzgeçle.  Sıra GRUP SIRASIDIR. */
+function mAlanlar(sec){
+  const c = [];
+  for(const gr of ((MUK && MUK.gruplar) || [])) for(const f of gr.alanlar)
+    if(!sec || sec(f)) c.push(f);
+  return c;
+}
+
+/*  ASANSÖRE AİT alan:  durak listesi ayrı taşınır ( __durak ), proje geneli
+    alanlar binaya aittir ve asansörden asansöre kopyalanmaz. */
+const M_ASANSOR_ALANI = f => f.tur !== 'liste' && !mProjeGeneliMi(f.anahtar);
+
+/*  Tek alanın değeri.  Alan formda yoksa undefined döner — çağıran o
+    anahtarı hiç yazmaz, "boş string" ile karıştırmasın. */
+function mAlanOku(f){
+  if(f.tur === 'liste') return MUK_DURAK.slice();
+  const e = $(M_ID(f.anahtar));
+  if(!e) return undefined;
+  return (e.type === 'checkbox') ? e.checked : e.value;
+}
+
+/*  Tek alana değer basar.  Yazma her yerde alanaYaz() üzerinden gider. */
+function mAlanYaz(f, deger){
+  if(f.tur === 'liste'){
+    if(!Array.isArray(deger) || !deger.length) return;
+    MUK_DURAK = deger.slice();
+    if($('m_durak_kutu')) mDurakCiz();
+    return;
   }
+  const e = $(M_ID(f.anahtar));
+  if(e) alanaYaz(e, deger);
+}
+
+function mFormOku(sec){
+  const g = {};
+  for(const f of mAlanlar(sec)){
+    const deger = mAlanOku(f);
+    if(deger !== undefined) g[f.anahtar] = deger;
+  }
+  return g;
+}
+
+/*  Haritadaki değerleri forma basar.  Haritada OLMAYAN alana dokunulmaz —
+    yeni açılan asansör, kopyalandığı asansörün değerleriyle kalır. */
+function mFormaYaz(harita, sec){
+  for(const f of mAlanlar(sec)){
+    if(harita[f.anahtar] === undefined) continue;
+    mAlanYaz(f, harita[f.anahtar]);
+  }
+}
+
+function mukavemetGirdi(){
+  const g = mFormOku();
   if(MUK_GK_TAZELE) g.kabin_agirligi = '';      // sunucu tablodan doldursun
   return g;
 }
@@ -642,27 +709,14 @@ function mAdetDegisti(n){
 
 function mAsansorKaydet(){
   if(!MUK || !Array.isArray(MUK_ASANSORLER) || !MUK_ASANSORLER[MUK_AKTIF]) return;
-  const d = {};
-  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
-    if(f.tur === 'liste' || mProjeGeneliMi(f.anahtar)) continue;
-    const e = $(M_ID(f.anahtar));
-    if(e) d[f.anahtar] = (e.type === 'checkbox') ? e.checked : e.value;
-  }
+  const d = mFormOku(M_ASANSOR_ALANI);
   d.__durak = (typeof MUK_DURAK !== 'undefined' ? MUK_DURAK : []).slice();
   MUK_ASANSORLER[MUK_AKTIF] = d;
 }
 
-/*  Haritadaki değerleri forma basar.  Haritada olmayan alan OLDUĞU GİBİ
-    kalır — yeni eklenen asansör, kopyalandığı asansörün değerleriyle açılır. */
 function mAsansorYukle(i){
   const d = MUK_ASANSORLER[i]; if(!d) return;
-  for(const gr of MUK.gruplar) for(const f of gr.alanlar){
-    if(f.tur === 'liste' || mProjeGeneliMi(f.anahtar)) continue;
-    if(d[f.anahtar] === undefined) continue;
-    const e = $(M_ID(f.anahtar)); if(!e) continue;
-    if(e.type === 'checkbox') e.checked = !!d[f.anahtar];
-    else e.value = d[f.anahtar];
-  }
+  mFormaYaz(d, M_ASANSOR_ALANI);
   if(Array.isArray(d.__durak) && d.__durak.length){
     MUK_DURAK = d.__durak.slice();
     if($('m_durak_kutu')) mDurakCiz();
@@ -680,11 +734,7 @@ function mAsansorSec(i){
     Aktif asansör formdan TAZE okunur;  ötekiler haritadan gelir. */
 function mukavemetIstek(){
   mAsansorKaydet();
-  const pg = {};
-  for(const a of (MUK.proje_geneli || [])){
-    const e = $(M_ID(a));
-    if(e) pg[a] = (e.type === 'checkbox') ? e.checked : e.value;
-  }
+  const pg = mFormOku(f => mProjeGeneliMi(f.anahtar));
   //  Adedin ÜSTÜNDEKİ haritalar dizide durur ama hesaba GİRMEZ.
   const asansorler = MUK_ASANSORLER.slice(0, MUK_ADET).map(d=>{
     const g = {...d};
