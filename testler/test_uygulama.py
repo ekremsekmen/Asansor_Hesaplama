@@ -633,16 +633,39 @@ def calistir():
     r.esit("çoklu: adsız asansör numarayla anılıyor",
            _c["asansorler"][1]["tanim"], "2 nolu asansör")
 
-    #  PROJE GENELİ HESAPLAR BİR KEZ.  Topraklama ve makine dairesi binaya
-    #  aittir;  dört paftada dört kez basılması hem yer kaplar hem de
-    #  "hangisi geçerli" sorusunu doğurur.
+    #  PROJE GENELİ HESAPLAR HİÇBİR ASANSÖRDE DEĞİL, EN SONDA BİR KEZ.
+    #  Topraklama ve makine dairesi binaya aittir;  dört kez basılması hem yer
+    #  kaplar hem "hangisi geçerli" sorusunu doğurur.  Bir süre YALNIZ İLK
+    #  asansörde bırakılıyorlardı — o zaman da binaya ait hesap 1 nolu
+    #  asansörün arkasına, yani belgenin ORTASINA düşüyordu.
     _pg = [len([b for b in a["bolumler"] if b.get("proje_geneli")])
            for a in _c["asansorler"]]
-    r.esit("çoklu: proje geneli bölümler YALNIZ ilk asansörde", _pg, [4, 0, 0])
-    r.kontrol("çoklu: sonraki asansörlerin bölüm numaraları boşluksuz",
+    r.esit("çoklu: proje geneli bölüm hiçbir asansörde kalmıyor", _pg, [0, 0, 0])
+    r.esit("çoklu: proje geneli bölümler üst seviyede",
+           [b["baslik"] for b in _c["proje_geneli"]],
+           ["1 - MAKİNE DAİRESİ AYDINLATMA HESABI",
+            "2 - YATAY ( TEMEL ) TOPRAKLAYICI",
+            "3 - DİKEY ( ÇUBUK ) TOPRAKLAYICI",
+            "4 - TOPLAM TOPRAKLAMA DİRENCİ VE KONTROL"])
+    r.esit("çoklu: özet proje geneli bölümleri sayıyor",
+           _c["ozet"]["proje_geneli_adet"], 4)
+    r.kontrol("çoklu: proje geneli uygunluğu özette",
+              _c["ozet"]["proje_geneli_uygun"] is True)
+    #  PROJE GENELİ HESAP "HEPSİ UYGUN"A GİRER.  Bölümler asansörlerden
+    #  çıkınca onların bayrağı bunları saymaz;  ayrıca katılmasaydı
+    #  topraklaması yetersiz bir proje "UYGUNDUR" görünürdü.
+    _kotu = UY.hesapla_coklu([{}], dict(_C_ORTAK, temel_a=0.4, temel_b=0.4,
+                                        serit_L=1.0))
+    if _kotu["ozet"]["proje_geneli_uygun"] is False:
+        r.kontrol("çoklu: proje geneli kalınca proje UYGUN görünmüyor",
+                  _kotu["ozet"]["tumu_uygun"] is False)
+    else:
+        r.kontrol("çoklu: proje geneli kalınca proje UYGUN görünmüyor", True,
+                  "→ küçük temelde de topraklama uygun çıktı, kontrol atlandı")
+    r.kontrol("çoklu: asansörlerin bölüm numaraları boşluksuz",
               all([b["baslik"].split("-")[0].strip()
-                   for b in _c["asansorler"][1]["bolumler"]]
-                  == [str(i) for i in range(1, 15)] for _x in (0,)),
+                   for b in a["bolumler"]] == [str(i) for i in range(1, 15)]
+                  for a in _c["asansorler"]),
               f"→ {[b['baslik'].split('-')[0].strip() for b in _c['asansorler'][1]['bolumler']]}")
 
     #  TEK ASANSÖRLE BİREBİR AYNI:  ikinci bir hesap yolu yok
@@ -662,6 +685,35 @@ def calistir():
     r.kontrol("çoklu: özet asansör listesi dolu",
               len(_c["ozet"]["asansorler"]) == 3
               and _c["ozet"]["asansorler"][2]["tanim"] == "Yük")
+
+    #  PAFTADA EN SONDA.  Motor bölümleri ayırıyor;  asıl mesele onların
+    #  BELGEDE nereye düştüğü — bunu ancak basılmış PDF gösterir.
+    try:
+        import io as _io
+        import re as _re
+
+        import pypdfium2 as _pdfium
+
+        from exports import pdf_export as _PDF
+        _b = _PDF.uygulama_coklu_pdf(_c, {"project_title": "Deneme"})
+        _d = _pdfium.PdfDocument(_io.BytesIO(_b))
+        _m = "\n".join(_d[i].get_textpage().get_text_range() for i in range(len(_d)))
+        _d.close()                     # pdfium tutamakları açık kalmasın
+        _sira, _onceki = [], None
+        for _x in _re.findall(r"(ASANSÖR \d · [^\n]*?|PROJE GENELİ HESAPLAR)", _m):
+            _x = _x.split(" 3 asansörden")[0].strip()
+            if _x != _onceki:
+                _sira.append(_x)
+                _onceki = _x
+        r.kontrol("pafta: proje geneli hesaplar EN SONDA",
+                  _sira and _sira[-1] == "PROJE GENELİ HESAPLAR",
+                  f"→ {_sira}")
+        r.esit("pafta: topraklama bir kez basılıyor",
+               _m.count("YATAY ( TEMEL ) TOPRAKLAYICI"), 1)
+        r.kontrol("pafta: proje geneli şeridi açıklamasıyla geliyor",
+                  "bütün asansörler için bir kez" in _m)
+    except ImportError:
+        r.kontrol("pafta sırası denetlenemedi ( pypdfium2 yok )", True)
 
     #  PROJE GENELİ ALANLAR TEK KAYNAKTA
     r.kontrol("proje geneli alan listesi motorda",

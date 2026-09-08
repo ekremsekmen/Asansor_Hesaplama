@@ -960,8 +960,10 @@ def uygulama_coklu_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG0
     sonuç özeti tek asansörlük paftayla AYNI gövdeden gelir.
 
     PROJE GENELİ HESAPLAR ( topraklama · makine dairesi aydınlatması ) motor
-    tarafında yalnız İLK asansöre bırakılmıştır — pafta bunları dört kez
-    basmaz ( bkz. engine/uygulama/hesap.hesapla_coklu ).
+    tarafında HER asansörden ayrılmıştır ve burada EN SONA, kendi sayfasına
+    bir kez basılır ( bkz. engine/uygulama/hesap.hesapla_coklu ).  Bir süre
+    ilk asansöre bırakılıyorlardı;  o zaman binaya ait hesap 1 nolu asansörün
+    arkasına, yani belgenin ORTASINA düşüyordu.
     """
     buf = io.BytesIO()
     doc = _Belge(buf, "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
@@ -990,9 +992,29 @@ def uygulama_coklu_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG0
                                 hata=True)
             continue
         ic += _uygulama_govdesi(a, ust_ek=f"ASANSÖR {etiket}")
+
+    #  PROJE GENELİ HESAPLAR — bütün asansörlerin ARKASINDA, bir kez.
+    pg = sonuc.get("proje_geneli") or []
+    if pg:
+        ic.append(PageBreak())
+        bas = _baslik_seridi("PROJE GENELİ HESAPLAR",
+                             "bütün asansörler için bir kez")
+        ic.append(bas)
+        ic.append(Spacer(1, 1.5 * mm))
+        ic += _pg_aciklamasi(len(asansorler))
+        for b in pg:
+            ic += _bolum(b, sayfa=SAYFA_ALANI)
     doc.build(ic)
     buf.seek(0)
     return buf.read()
+
+
+def _pg_aciklamasi(adet):
+    """Proje geneli bölümlerin niçin bir kez basıldığını yazar."""
+    return _uyari_kutusu(
+        ["Temel topraklama ve makine dairesi aydınlatması BİNAYA aittir, "
+         f"asansöre değil: projedeki {adet} asansör için bu hesaplar bir kez "
+         "yapılır ve paftada bir kez basılır."])
 
 
 def _uygulama_ozet(sonuc):

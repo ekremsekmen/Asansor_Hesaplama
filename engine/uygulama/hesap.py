@@ -215,37 +215,56 @@ def hesapla_coklu(asansorler=None, ortak=None):
     ham = ham[:ASANSOR_AZAMI]
     ortak = ortak if isinstance(ortak, dict) else {}
 
-    sonuclar, proje_geneli_alindi = [], False
+    #  PROJE GENELİ BÖLÜMLER HİÇBİR ASANSÖRDE KALMAZ.
+    #  Önce yalnız İLK asansörde bırakılıyorlardı;  dört asansörlük paftada
+    #  bu, topraklamayı 1 nolu asansörün sonuna, yani BELGENİN ORTASINA
+    #  koyuyordu — 2, 3 ve 4 nolu asansörler ondan sonra geliyordu.  Binaya
+    #  ait hesap, asansörlerin arasında değil HEPSİNİN ARKASINDA durmalıdır.
+    #  Burada ayrılıp üst seviyeye alınırlar;  paftayı basan taraf onları en
+    #  sona, kendi şeridiyle bir kez koyar ( bkz. pdf_export.uygulama_coklu_pdf ).
+    sonuclar, proje_geneli = [], []
     for i, g in enumerate(ham, 1):
         s = hesapla(dict(ortak, **g))
         s["no"] = i
         s["tanim"] = str(g.get("asansor_adi") or "").strip() or f"{i} nolu asansör"
         if s.get("aktif"):
-            if proje_geneli_alindi:
-                #  Proje geneli bölümleri YALNIZ ilk asansörde kalır.
-                #  Numaralar bölüm listesindeki sırayla yeniden verilir ki
-                #  paftada 11-12-13 diye boşluksuz gitsin.
+            ayrilan = [b for b in s["bolumler"] if b.get("proje_geneli")]
+            if ayrilan:
+                if not proje_geneli:
+                    #  KENDİ NUMARALARINI ALIRLAR:  artık bir asansörün
+                    #  bölümleri değiller, ayrı bir başlığın altındalar.
+                    proje_geneli = ayrilan
+                    for n, b in enumerate(proje_geneli, 1):
+                        b["baslik"] = f"{n} - " + _basliktan_ad(b.get("baslik", ""))
+                #  Asansörün kalan bölümleri boşluksuz 1..N diye yeniden
+                #  numaralanır — paftada 11-12-13 diye gitsin.
                 kalan = [b for b in s["bolumler"] if not b.get("proje_geneli")]
                 for n, b in enumerate(kalan, 1):
                     b["baslik"] = f"{n} - " + _basliktan_ad(b.get("baslik", ""))
                 s["bolumler"] = kalan
-            else:
-                proje_geneli_alindi = True
         sonuclar.append(s)
 
     aktifler = [s for s in sonuclar if s.get("aktif")]
+    #  PROJE GENELİ HESAP DA "HEPSİ UYGUN"A GİRER.  Bölümler asansörlerden
+    #  çıkınca onların ozet.tumu_uygun bayrağı bunları artık saymaz;  ayrıca
+    #  katılmasaydı topraklaması yetersiz bir proje "UYGUNDUR" görünürdü.
+    pg_uygun = all((b.get("sonuc") or {}).get("uygun") is not False
+                   for b in proje_geneli)
     return {
         "aktif": bool(aktifler),
         "baslik": "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
         "asansorler": sonuclar,
+        "proje_geneli": proje_geneli,
         "adet": len(sonuclar),
         "hata": [h for s in sonuclar if not s.get("aktif")
                  for h in (s.get("hata") or [])],
         "ozet": {
             "adet": len(sonuclar),
-            "tumu_uygun": bool(aktifler) and all(
+            "tumu_uygun": bool(aktifler) and pg_uygun and all(
                 (s.get("ozet") or {}).get("tumu_uygun") for s in aktifler)
             and len(aktifler) == len(sonuclar),
+            "proje_geneli_uygun": pg_uygun,
+            "proje_geneli_adet": len(proje_geneli),
             "asansorler": [{"no": s["no"], "tanim": s["tanim"],
                             "aktif": bool(s.get("aktif")),
                             "tumu_uygun": (s.get("ozet") or {}).get("tumu_uygun"),

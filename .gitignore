@@ -7,3 +7,12 @@ __pycache__/
 #  araclar/kaynak_excel_duzelt.py çıktısı — üretilen dosya, kaynak değil.
 #  Depoya konursa koddaki düzeltmelerden sessizce geri kalır.
 MUKAVEMET_HESABI_DUZELTILMIS.xlsx
+
+#  ÜRETİLEN VE GEÇİCİ KLASÖRLER — depoya girmezler.
+#  tmp/ bir keresinde 273 MB'lık bir pymupdf kurulumuyla ( .so · .dylib )
+#  birlikte commit'lendi;  output/ ise programın kendi ürettiği teslim
+#  dosyalarıdır ( PDF · DXF · ZIP ) — kaynak değil, çıktıdırlar.
+tmp/
+output/*
+#  ...  ama elle yazılmış betikler görünür kalsın, unutulmasınlar.
+!output/*.py

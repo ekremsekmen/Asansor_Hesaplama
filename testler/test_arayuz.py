@@ -121,13 +121,18 @@ def calistir():
         #  BİR KEZ durur, her asansörün kendi hesabı KENDİ SEKMESİNDEDİR.
         r.kontrol("uygulama modu PROJE sekmesiyle açılıyor",
                   pg.is_visible("#s-uygproje") and not pg.is_visible("#s-mukavemet"))
-        r.esit("proje geneli girdiler PROJE sekmesinde",
-               pg.eval_on_selector_all("#p_form .alan", "e=>e.length"),
-               pg.evaluate("MUK.proje_geneli.length"))
-        r.kontrol("proje geneli alan asansör formunda TEKRARLANMIYOR",
+        #  PROJE GENELİ ALANLAR ASANSÖR FORMUNDA, kendi grubunun içinde ve
+        #  HER sekmede.  Bir süre ayrı bir karta çekilmişlerdi;  topraklamayı
+        #  girmek için sekme değiştirmek gerekiyordu.  Değer TEKTİR — rozet
+        #  bunu söyler, mAsansorKaydet de onları asansöre kopyalamaz.
+        r.kontrol("proje geneli alanlar asansör formunda",
                   pg.evaluate("MUK.proje_geneli.every(a=>"
-                              "!document.querySelector('#m_form #'+M_ID(a)))"),
-                  "→ aynı topraklama iki yerde soruluyor")
+                              "!!document.querySelector('#m_form #'+M_ID(a)))"))
+        r.esit("proje geneli alanların hepsi rozetli",
+               pg.eval_on_selector_all("#m_form .pg-rozet", "e=>e.length"),
+               pg.evaluate("MUK.proje_geneli.length"))
+        r.kontrol("ayrı proje geneli kartı kalmadı",
+                  pg.query_selector("#p_form") is None)
         r.esit("asansör adedi seçmeli  ( 1 - 4 )",
                pg.eval_on_selector_all("#m_adet option", "e=>e.map(x=>x.value)"),
                ["1", "2", "3", "4"])
@@ -138,8 +143,19 @@ def calistir():
         pg.wait_for_timeout(1200)
         r.kontrol("asansör sekmesi hesap formunu açıyor",
                   pg.is_visible("#s-mukavemet") and not pg.is_visible("#s-uygproje"))
-        r.kontrol("ortak girdi köprüsü formda yazılı",
-                  "Ortak girdiler bir kez girilir" in pg.inner_text("#m_form"))
+        #  FORMUN BAŞINDAKİ AÇIKLAMA KUTULARI KALDIRILDI.  Ortak girdi
+        #  köprüsü ve "bu bölüm uygulama projesine aittir" metni her açılışta
+        #  girdilerin önünü kapatıyordu;  köprü zaten görünmez çalışıyor.
+        #  Excel hücre adresleri de ( "· B132" ) etiketten çıkarıldı — Excel
+        #  eşleşmesi SÖZLEŞMEDE duruyor, TEST 6 onu ayrıca doğruluyor.
+        r.kontrol("form açıklama kutusuyla başlamıyor",
+                  "Ortak girdiler bir kez girilir" not in pg.inner_text("#m_form")
+                  and "uygulama projesine" not in pg.inner_text("#m_form"))
+        r.esit("etiketlerde Excel hücre adresi yok",
+               pg.eval_on_selector_all(
+                   "#m_form label",
+                   "e=>e.filter(x=>/·\\s*[A-Z]{1,2}[0-9]{1,4}\\b/.test(x.textContent))"
+                   ".map(x=>x.textContent.trim())"), [])
         r.kontrol("başlık uygulama projesini gösteriyor",
                   "UYGULAMA" in pg.inner_text("#ust_ad"),
                   f"→ {pg.inner_text('#ust_ad')!r}")
@@ -295,6 +311,40 @@ def calistir():
                   f"→ {pg.inner_text('#p_ozet')[:60]!r}")
         r.esit("proje özeti iki asansörü listeliyor",
                pg.eval_on_selector_all("#p_ozet table tr", "e=>e.length"), 3)
+        #  PROJE GENELİ HESAPLAR:  girdi asansör formunda, SONUÇ PROJE
+        #  sekmesinde ve paftanın en sonunda — asansör sekmelerinde
+        #  tekrarlanmaz.  Makine dairesi ve temel girilince bölümler doğar.
+        pg.evaluate("mTumGruplariAc()")
+        pg.uncheck("#m_mk_yok")
+        for _a, _d in (("m_mk_uzunluk", "4"), ("m_mk_genislik", "3"),
+                       ("m_temel_a", "20"), ("m_temel_b", "12"),
+                       ("m_serit_L", "64")):
+            pg.fill(f"#{_a}", _d)
+        pg.wait_for_timeout(2500)
+        r.esit("proje geneli bölümler üst seviyede",
+               pg.evaluate("(SON.mc.proje_geneli||[]).length"), 4)
+        r.esit("proje geneli bölüm hiçbir asansörde kalmıyor",
+               pg.evaluate("SON.mc.asansorler.map(a=>a.bolumler.filter("
+                           "b=>b.proje_geneli).length)"), [0, 0])
+        r.kontrol("proje geneli hesaplar asansör panelinde YOK",
+                  "TOPRAKLAYICI" not in pg.inner_text("#m_sonuc"))
+        r.kontrol("proje geneli hesaplar PROJE sekmesinde",
+                  "TOPRAKLAYICI" in pg.inner_text("#p_geneli")
+                  and "PROJE GENELİ HESAPLAR" in pg.inner_text("#p_geneli"))
+        #  Girdi hangi asansör sekmesinde yazılırsa yazılsın TEK değerdir
+        pg.evaluate("mAsansorSec(0)")
+        pg.wait_for_timeout(1600)
+        r.esit("proje geneli girdi asansör değişince duruyor",
+               pg.input_value("#m_temel_a"), "20")
+        pg.evaluate("mAsansorSec(1)")
+        pg.wait_for_timeout(1600)
+        #  Temizlik — sonraki koşuyu bozmasın
+        pg.evaluate("mTumGruplariAc()")
+        pg.check("#m_mk_yok")
+        for _a in ("m_mk_uzunluk", "m_mk_genislik", "m_temel_a",
+                   "m_temel_b", "m_serit_L"):
+            pg.fill(f"#{_a}", "")
+        pg.wait_for_timeout(2000)
         #  HER ASANSÖR KENDİ GİRDİSİYLE hesaplanır:  sonuçta girdi de dönüyor,
         #  aktif asansörün girdisi ikisine birden gönderilmiş olsa iki motor
         #  gücü aynı görünürdü.

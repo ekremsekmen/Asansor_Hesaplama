@@ -520,3 +520,14 @@ tr.m-gidilir.etkin td{background:#EEF4FB;font-weight:600}
 /*  Asansör sekmeleri üst şeritte, PROJE sekmesinin sağında dururlar.
     Adet seçimine göre üretilirler ve hepsi AYNI gövdeyi gösterir. */
 .m-asansor-sekmeler{display:contents}
+
+/*  PROJE GENELİ ROZETİ.  Alan asansöre değil binaya aittir:  dört asansörün
+    sekmesinde de aynı kutu görünür ve aynı değeri taşır.  Etiketin yanında
+    küçük durur — kutuyu büyütmez, yalnız "bu ortak" der.  */
+.pg-rozet{
+  display:inline-block; margin-left:6px; padding:1px 6px;
+  border:1px solid var(--cizgi); border-radius:9px;
+  font-size:10px; font-weight:600; letter-spacing:.02em;
+  color:var(--mavi); background:var(--mavi-ac);
+  vertical-align:middle; white-space:nowrap;
+}

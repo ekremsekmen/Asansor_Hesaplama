@@ -46,18 +46,11 @@ async function mukavemetKur(){
     return;
   }
   let h = '';
-  //  ORTAK GİRDİ UYARISI.  Kullanıcı "elektrik hesabının kabin ölçüsünü
-  //  nereye gireceğim" diye aramasın:  bu değerlerin mukavemet alanlarından
-  //  geldiği açıkça yazılır.
-  if((MUK.ortak_kopru||[]).length){
-    h += `<div class="uyari mavi" style="margin:0 0 12px">
-      <b>Ortak girdiler bir kez girilir.</b> Elektrik ve topraklama hesapları
-      aşağıdaki değerleri mukavemet alanlarından alır — ikinci kez sorulmaz:
-      <div class="satir2" style="margin-top:6px">`
-      + MUK.ortak_kopru.map(k=>
-          `${kacis(k.mukavemet)} <b>→</b> ${kacis(k.avan)}`).join(' &nbsp;·&nbsp; ')
-      + '</div></div>';
-  }
+  //  ORTAK GİRDİ KÖPRÜSÜ ( MUK.ortak_kopru ) BURADA YAZILMAZ.  Bir süre
+  //  formun başında "beyan yükü → Q · beyan hızı → V …" diye duruyordu;
+  //  köprü zaten görünmez çalışıyor ( alan zaten formda, ikinci kez
+  //  sorulmuyor ) ve o kutu her açılışta okunacak bir şey değil, girdilerin
+  //  önünü kapatan sabit bir metindi.  Sözleşme API'de duruyor.
   //  AKORDEON.  86 girdi tek sütunda alt alta durunca aranan alanı bulmak
   //  zorlaşıyordu.  Girdi sütunu 440 px'tir — yatay sekme şeridi sığmaz;
   //  akordeon bu genişliğe oturur ve KAPALIYKEN DE bütün bölüm adları
@@ -69,22 +62,16 @@ async function mukavemetKur(){
           <input id="m_ara" class="m-ara" type="search" placeholder="alan ara…"
                  oninput="mAramaUygula()" autocomplete="off">
         </div>`;
-  //  PROJE GENELİ alanlar akordeona GİRMEZ:  binaya aittirler ve PROJE
-  //  sekmesinde bir kez sorulurlar.  Asansör formunda görünselerdi "bu
-  //  topraklama hangi asansörün?" sorusu doğardı.
-  let pgIc = '', pgAcik = [];
-  for(const g of MUK.gruplar) for(const f of g.alanlar){
-    if(!mProjeGeneliMi(f.anahtar)) continue;
-    pgAcik.push(mAlan(f));
-    if(pgAcik.length === 2){ pgIc += mSatir(pgAcik); pgAcik = []; }
-  }
-  if(pgAcik.length) pgIc += mSatir(pgAcik);
-  if($('p_form')) $('p_form').innerHTML = pgIc;
-
+  //  PROJE GENELİ ALANLAR AKORDEONDA, kendi grubunun ( Elektrik ve
+  //  topraklama ) içinde durur ve HER asansör sekmesinde görünür.  Bir süre
+  //  ayrı bir PROJE sekmesine çekilmişlerdi;  topraklamayı girmek için sekme
+  //  değiştirmek gerekiyordu ve alanlar zaten ait oldukları grubun dışına
+  //  düşüyordu.  Karışmasınlar diye üzerlerinde "proje geneli" etiketi var:
+  //  değer TEKTİR, hangi sekmede yazılırsa yazılsın aynı yere gider ve
+  //  asansörden asansöre kopyalanmaz ( mAsansorKaydet onları atlar ).
   for(const [i, g] of MUK.gruplar.entries()){
     let ic = '', acik = [];
     for(const f of g.alanlar){
-      if(mProjeGeneliMi(f.anahtar)) continue;
       if(f.tur === 'liste'){
         if(acik.length){ ic += mSatir(acik); acik = []; }
         ic += mDurakKutusu(f);
@@ -99,9 +86,8 @@ async function mukavemetKur(){
             <button type="button" class="m-grup-bas" onclick="mGrupDegistir(${i})">
               <span class="m-grup-ok">▸</span>
               <span class="m-grup-ad">${kacis(g.ad)}</span>
-              <span class="m-grup-adet" data-toplam="${g.alanlar.filter(
-                       f=>!mProjeGeneliMi(f.anahtar)).length}"
-                    >${g.alanlar.filter(f=>!mProjeGeneliMi(f.anahtar)).length}</span>
+              <span class="m-grup-adet" data-toplam="${g.alanlar.length}"
+                    >${g.alanlar.length}</span>
             </button>
             <div class="m-grup-ic" hidden>${ic}</div>
           </div>`;
@@ -247,14 +233,25 @@ function mukavemetKimlik(){
           sheet_no: al('mk_pafta_no')};
 }
 
+/*  EXCEL HÜCRE ADRESİ ETİKETTE YAZILMAZ.  Bir süre her alanın yanında
+    "· B132" gibi duruyordu;  hesabı yapan mühendisin işine yaramıyor, yalnız
+    etiketi uzatıp okumayı zorlaştırıyordu.  Adres SÖZLEŞMEDE duruyor
+    ( mukavemet_girdi.ALANLAR ) ve Excel'e yazma / Excel'den geri okuma onu
+    oradan kullanmaya devam ediyor — görünümden kalkması o eşleşmeye
+    dokunmaz. */
 function mAlan(f){
+  //  PROJE GENELİ ROZETİ.  Alan asansöre değil BİNAYA aitse söylenir:  dört
+  //  asansörün sekmesinde de aynı kutu görünür ve aynı değeri taşır.
+  const pg = mProjeGeneliMi(f.anahtar)
+    ? ` <span class="pg-rozet" title="Binaya aittir: bütün asansörlerde tek`
+      + ` değer, hesaba bir kez girer">proje geneli</span>` : '';
   const et = kacis(f.etiket)
     + (f.birim && f.birim !== '—' ? ` <span class="ipucu">(${kacis(f.birim)})</span>` : '')
-    + (f.hucre ? `<span class="ipucu" style="opacity:.55"> · ${kacis(f.hucre)}</span>` : '');
+    + pg;
   if(f.tur === 'onay'){
     return `<div class="alan"><label class="kutu-satir">`
       + `<input type="checkbox" id="${M_ID(f.anahtar)}"${f.varsayilan?' checked':''}>`
-      + `<span>${kacis(f.etiket)}</span></label></div>`;
+      + `<span>${kacis(f.etiket)}${pg}</span></label></div>`;
   }
   let giris;
   if(f.secenekler){
@@ -385,6 +382,7 @@ async function hesapMukavemet(){
     //  listesi görmek, o sekmenin zaten 1 nolu asansöre ait olduğunu bile
     //  bile tekrar söylemektir — hangi sekmede olduğun üstteki şeritte yazılı.
     mProjeOzetiCiz(c);
+    mProjeGeneliCiz(c);
     //  Genel rozet PROJE sekmesindedir:  asansör sekmelerininki kendilerine
     //  aittir ( bkz. mAsansorSekmeleriTazele ).
     const hatali = !c.aktif;
@@ -695,6 +693,27 @@ function mukavemetIstek(){
   return {asansorler, proje_geneli: pg, sabitler: ofisSabitleri()};
 }
 
+
+/*  PROJE GENELİ HESAPLAR.  Temel topraklama ve makine dairesi aydınlatması
+    binaya aittir;  motor bunları her asansörden ayırıp tek listede döndürür
+    ( hesap.hesapla_coklu ) ve pafta en sona basar.  Ekranda da asansör
+    sekmelerinde değil, PROJE sekmesinde bir kez görünürler. */
+function mProjeGeneliCiz(c){
+  const kutu = $('p_geneli'); if(!kutu) return;
+  const bolumler = (c && c.proje_geneli) || [];
+  if(!bolumler.length){ kutu.innerHTML = ''; kutu.parentElement.hidden = true; return; }
+  kutu.parentElement.hidden = false;
+  const o = (c.ozet || {});
+  let h = `<div class="kart-ic"><div class="serit"><span>PROJE GENELİ HESAPLAR</span>
+             <span class="kaynak">${bolumler.length} bölüm · bütün asansörler için bir kez</span></div>
+           <div class="uyari ${o.proje_geneli_uygun === false ? 'kirmizi' : 'mavi'}"
+                style="margin:0 0 12px">Temel topraklama ve makine dairesi
+             aydınlatması <b>binaya</b> aittir, asansöre değil: projedeki
+             ${o.adet || 1} asansör için bir kez hesaplanır ve paftanın
+             <b>en sonunda</b> bir kez basılır.</div>`;
+  bolumler.forEach(b=>{ h += bolumCiz(b); });
+  kutu.innerHTML = h + '</div>';
+}
 
 /*  PROJE sekmesinin sağ sütunu:  bütün asansörlerin durumu bir arada.
     Ayrıntı asansör sekmelerinde;  burada yalnız "hangisi kaldı" görünür. */
