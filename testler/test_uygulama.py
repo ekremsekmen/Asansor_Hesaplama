@@ -13,10 +13,13 @@ hesap testi bunu göremez — iki motor da kendi içinde tutarlı çalışmaya d
 eder.  Bu yüzden burada her ortak alan TEK TEK oynatılır ve elektrik
 sonucunun gerçekten değiştiği doğrulanır.
 """
+import io
+import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, KOK)
 
 from engine.avan import hesap as AV                          # noqa: E402
 from engine.avan import tablolar as AVT                      # noqa: E402
@@ -543,7 +546,7 @@ def calistir():
     else:
         #  `s` bu noktada bozuk girdilerle yeniden hesaplanmış durumda;
         #  pafta TAM girdiden üretilmeli.
-        _pdf = PE.uygulama_pdf(birlikte)
+        _pdf = PE.uygulama_pdf(UY.hesapla_coklu([TAM]))
         _dxf = DXE.proje_dxf([("Uygulama Projesi", _pdf)])
         import io as _io
         _d = ezdxf.read(_io.StringIO(_dxf.decode("utf-8")))
@@ -695,7 +698,7 @@ def calistir():
         import pypdfium2 as _pdfium
 
         from exports import pdf_export as _PDF
-        _b = _PDF.uygulama_coklu_pdf(_c, {"project_title": "Deneme"})
+        _b = _PDF.uygulama_pdf(_c, {"project_title": "Deneme"})
         _d = _pdfium.PdfDocument(_io.BytesIO(_b))
         _m = "\n".join(_d[i].get_textpage().get_text_range() for i in range(len(_d)))
         _d.close()                     # pdfium tutamakları açık kalmasın
@@ -714,6 +717,186 @@ def calistir():
                   "bütün asansörler için bir kez" in _m)
     except ImportError:
         r.kontrol("pafta sırası denetlenemedi ( pypdfium2 yok )", True)
+
+    #  ─────────────────────────────────────────────────────────────
+    #  TEK YOL  —  tek asansör ile çoklu asansör aynı yerden geçer
+    #  ─────────────────────────────────────────────────────────────
+    #  Bir süre iki motor girişi ( hesapla / hesapla_coklu ), iki pafta
+    #  fonksiyonu ( uygulama_pdf / uygulama_coklu_pdf ) ve API'de ÜÇ ayrı
+    #  dallanma vardı;  hangisinin çağrılacağına API karar veriyordu.  İkisi
+    #  ayrıştı:  proje geneli hesaplar çoklu paftada en sona alınmış, tek
+    #  asansörlükte bölümlerin arasında kalmıştı — aynı program aynı projeyi
+    #  asansör sayısına göre iki türlü basıyordu.  Avan trafik motoru bu işi
+    #  baştan doğru yapar:  tek giriş, kullanılan yol SONUCUN İÇİNDE yazar.
+    _t1 = UY.hesapla_coklu([{}], _C_ORTAK)
+    _t2 = UY.hesapla_coklu([{}, {"beyan_yuku": 630}], _C_ORTAK)
+    r.esit("tek asansörde yol 'tek' yazıyor", _t1["yol"], "tek")
+    r.esit("çok asansörde yol 'coklu' yazıyor", _t2["yol"], "coklu")
+    r.esit("iki durumda da SONUÇ ŞEKLİ aynı",
+           sorted(_t1.keys()), sorted(_t2.keys()))
+    #  Proje geneli hesaplar TEK asansörde de ayrılır — asıl ayrışma buydu
+    r.esit("tek asansörde de proje geneli ayrılmış",
+           [b["kimlik"] for b in _t1["proje_geneli"]],
+           [b["kimlik"] for b in _t2["proje_geneli"]])
+    r.esit("tek asansörde de bölümler asansörde kalmıyor",
+           [b for b in _t1["asansorler"][0]["bolumler"] if b.get("proje_geneli")], [])
+    #  API artık asansör sayısına göre BAŞKA MOTOR çağırmıyor:  modülde
+    #  dallanmayı kuran isimler kalmamalı.
+    _api = io.open(os.path.join(KOK, "api", "uygulama.py"), encoding="utf-8").read()
+    for _ad in ("_coklu_mu", "_uygulama_sonucu", "uygulama_coklu_pdf"):
+        r.kontrol(f"API'de '{_ad}' kalmadı", _ad not in _api)
+    r.esit("API tek motor girişi çağırıyor", _api.count("E_UYG.hesapla("), 0)
+    _pe = io.open(os.path.join(KOK, "exports", "pdf_export.py"), encoding="utf-8").read()
+    r.esit("tek uygulama paftası fonksiyonu", _pe.count("\ndef uygulama_"), 1)
+
+    #  ─────────────────────────────────────────────────────────────
+    #  BÖLÜM KİMLİĞİ  —  numara biçimdir, kimlik değildir
+    #  ─────────────────────────────────────────────────────────────
+    #  Bir süre bölümü tanıyan her şey BAŞLIKTAKİ NUMARAYA bakıyordu.  Numara
+    #  projeye göre kayar:  proje geneli bölümler ayrılınca kalanlar yeniden
+    #  numaralanır, makine dairesi yoksa topraklama bir sıra öne gelir.  Bu
+    #  yüzden proje geneli bölümler hiç eşlenemiyordu ve elektrik bölümlerini
+    #  eşlemek için "mukavemet 10 bölümdür" varsayımını gömmek gerekiyordu.
+    _tekil = UY.hesapla(_C_ORTAK)
+    _tum = list(_tekil["bolumler"])
+    r.kontrol("her bölüm kimlik taşıyor",
+              all(b.get("kimlik") for b in _tum),
+              f"→ kimliksiz: {[b['baslik'] for b in _tum if not b.get('kimlik')]}")
+    r.esit("kimlikler tekil", len({b["kimlik"] for b in _tum}), len(_tum))
+    r.kontrol("her bölüm sıra numarası da taşıyor",
+              [b.get("sira") for b in _tum] == list(range(1, len(_tum) + 1)),
+              f"→ {[b.get('sira') for b in _tum]}")
+    r.kontrol("başlık = sıra + ad",
+              all(b["baslik"] == f"{b['sira']} - {b['ad']}" for b in _tum),
+              f"→ {[b['baslik'] for b in _tum[:2]]}")
+
+    #  ASIL KONTROL:  NUMARA KAYARKEN KİMLİK DURUYOR.
+    #  Aynı hesap üç ayrı kurulumda üç ayrı numara alır ama kimliği aynıdır.
+    def _numara(sonuc, kim):
+        for b in (sonuc.get("bolumler") or []) + (sonuc.get("proje_geneli") or []):
+            if b.get("kimlik") == kim:
+                return b["sira"]
+        return None
+    _mk_var = UY.hesapla_coklu([{}], _C_ORTAK)                 # makine dairesi VAR
+    _mk_yok = UY.hesapla_coklu([{}], dict(_C_ORTAK, mk_yok=True,
+                                          mk_uzunluk=None, mk_genislik=None))
+    _numaralar = (_numara(_tekil, "topraklama_toplam"),
+                  _numara(_mk_var["asansorler"][0], "topraklama_toplam")
+                  or _numara(_mk_var, "topraklama_toplam"),
+                  _numara(_mk_yok, "topraklama_toplam"))
+    r.kontrol("aynı hesap kurulumdan kuruluma FARKLI numara alıyor",
+              len(set(_numaralar)) > 1, f"→ {_numaralar}")
+    r.kontrol("kimlik ise hiç değişmiyor",
+              all(n is not None for n in _numaralar), f"→ {_numaralar}")
+
+    #  EŞLEME SÖZLEŞMESİ:  eşlemedeki her kimlik gerçek bir bölümdür ve
+    #  gerçek her bölüm eşlemededir.  Numara kullanılırken bu denetlenemezdi.
+    _bg = UG.arayuz_alanlari()["bolum_grubu"]
+    _gercek = {b["kimlik"] for b in _tum}
+    r.esit("eşlemede olup motorda olmayan bölüm", sorted(set(_bg) - _gercek), [])
+    r.esit("motorda olup eşlemede olmayan bölüm", sorted(_gercek - set(_bg)), [])
+    _gruplar = {g["ad"] for g in UG.arayuz_alanlari()["gruplar"]}
+    r.esit("eşlemenin gösterdiği her grup gerçekten var",
+           sorted({ad for v in _bg.values() for ad in v} - _gruplar), [])
+    r.kontrol("eşleme en çok iki grup gösteriyor",
+              all(1 <= len(v) <= 2 for v in _bg.values()),
+              f"→ {[k for k, v in _bg.items() if len(v) > 2]}")
+    r.kontrol("proje geneli bölümler de eşlenmiş",
+              all(k in _bg for k in ("makine_dairesi_aydinlatma",
+                                     "topraklama_yatay", "topraklama_toplam")),
+              "→ numara kayarken eşlenemiyorlardı")
+
+    #  ─────────────────────────────────────────────────────────────
+    #  EŞLEMENİN İÇERİĞİ  —  gösterdiği grup gerçekten o bölümü besliyor mu
+    #  ─────────────────────────────────────────────────────────────
+    #  Yukarıdaki kontroller eşlemenin TAM olduğunu gösteriyor:  her bölüm
+    #  eşlemede, her kimlik gerçek.  Ama İÇERİĞİNİ ( "aski_halatlari →
+    #  Makine ve motor" doğru mu ) hiçbir şey denetlemiyordu;  liste elle
+    #  yazılmıştı ve bir alan grup değiştirdiğinde sessizce bayatlardı.
+    #
+    #  YÖNTEM PERTÜRBASYON, KOD TARAMASI DEĞİL:  her girdi tek tek oynatılıp
+    #  hangi bölümün sonucunun değiştiğine bakılır.  Kaynak koddaki g[...]
+    #  okumalarını taramak dolaylı bağları ( köprüden geçen elektrik
+    #  girdileri gibi ) kaçırırdı;  bu yöntem motorun İKİSİNİ birden ve
+    #  gerçekte ne olduğunu ölçer.
+    #
+    #  KURAL:  eşlemede yazılı her grup, o bölümü GERÇEKTEN etkileyen bir
+    #  grup olmalıdır.  Tersi aranmaz — bir bölüm çoğu grubu okur ( motor
+    #  gücü yedi gruptan besleniyor ), eşleme ise en çok ikisini gösterir.
+    #
+    #  Bu tarama iki gerçek hata yakaladı:  "kuyu_tabani → Tamponlar"
+    #  ( tampon KUVVETİ kütle × g'dir, tampon geometrisi kuvvete girmez ) ve
+    #  "kurulu_guc → Elektrik ve topraklama" ( kuyu armatür adedi kuyu
+    #  YÜKSEKLİĞİNDEN gelir, genişlik yalnız lux kontrolüne girer ).
+    _ORTAK_T = {"mk_yok": False, "mk_uzunluk": 4.0, "mk_genislik": 3.0,
+                "temel_a": 20.0, "temel_b": 12.0, "serit_L": 64.0}
+
+    def _bolum_icerigi(sonuc):
+        """kimlik → karşılaştırılabilir içerik  ( sıra ve başlık hariç )."""
+        ic = {}
+        for b in ((sonuc.get("asansorler") or [{}])[0].get("bolumler") or []) \
+                + (sonuc.get("proje_geneli") or []):
+            ic[b.get("kimlik")] = json.dumps(
+                {k: v for k, v in b.items() if k not in ("sira", "baslik")},
+                ensure_ascii=False, sort_keys=True, default=str)
+        return ic
+
+    def _oynat(f, simdiki):
+        """Alanı GEÇERLİ kalacak şekilde değiştir;  değiştirilemiyorsa None."""
+        t = f["tur"]
+        if t == "onay":
+            return not simdiki
+        if t == "secim":
+            baska = [x for x in (f["secenekler"] or []) if str(x) != str(simdiki)]
+            return baska[0] if baska else None
+        if t == "sayi":
+            v = simdiki if isinstance(simdiki, (int, float)) else 0
+            return round(v * 1.15 + 1, 3)
+        return None                       # metin ve liste: sonuca girmez / ayrı denenir
+
+    _taban = UY.hesapla_coklu([{}], _ORTAK_T)
+    _taban_ic = _bolum_icerigi(_taban)
+    _tg = _taban["asansorler"][0]["girdi"]
+    _arayuz = UG.arayuz_alanlari()
+    _grubu = {f["anahtar"]: gr["ad"] for gr in _arayuz["gruplar"] for f in gr["alanlar"]}
+    _etki, _denenemeyen = {k: set() for k in _taban_ic}, []
+    for _gr in _arayuz["gruplar"]:
+        for _f in _gr["alanlar"]:
+            _a = _f["anahtar"]
+            _yeni = _oynat(_f, _tg.get(_a))
+            if _yeni is None:
+                _denenemeyen.append(_a)
+                continue
+            _s = (UY.hesapla_coklu([{}], dict(_ORTAK_T, **{_a: _yeni}))
+                  if _a in UG.PROJE_GENELI_ALANLAR
+                  else UY.hesapla_coklu([{_a: _yeni}], _ORTAK_T))
+            if not _s.get("aktif"):
+                _denenemeyen.append(_a)      # bu değerle girdi geçersiz oluyor
+                continue
+            _yeni_ic = _bolum_icerigi(_s)
+            for _kim in set(_taban_ic) | set(_yeni_ic):
+                if _taban_ic.get(_kim) != _yeni_ic.get(_kim):
+                    _etki.setdefault(_kim, set()).add(_grubu[_a])
+
+    r.kontrol("pertürbasyon taraması çalıştı",
+              sum(len(v) for v in _etki.values()) > 40,
+              f"→ yalnız {sum(len(v) for v in _etki.values())} bağ bulundu")
+    _yanlis = {kim: [g for g in gruplar if g not in _etki.get(kim, set())]
+               for kim, gruplar in _bg.items()
+               #  Girdisi HİÇ olmayan bölüm muaf:  topraklama çubuğu yalnız
+               #  ofis sabitlerinden ( çubuk sayısı · boyu · toprak özdirenci )
+               #  hesaplanır, hiçbir proje girdisi onu değiştirmez.
+               if _etki.get(kim)}
+    _yanlis = {k: v for k, v in _yanlis.items() if v}
+    r.esit("eşlemedeki her grup o bölümü GERÇEKTEN etkiliyor", _yanlis, {})
+    #  Girdisiz bölümlerin listesi SABİTLENİR — yenisi çıkarsa fark edilsin
+    r.esit("hiçbir proje girdisinden etkilenmeyen bölümler",
+           sorted(k for k in _bg if not _etki.get(k)), ["topraklama_dikey"])
+    #  Denenemeyen alanlar körlük yaratır;  sayısı sabitlenir ki sessizce
+    #  büyümesin ( büyürse tarama gitgide daha az şey görüyor demektir ).
+    r.kontrol("taramanın körlüğü sınırlı",
+              len(_denenemeyen) <= 16,
+              f"→ {len(_denenemeyen)} alan denenemedi: {sorted(_denenemeyen)}")
 
     #  PROJE GENELİ ALANLAR TEK KAYNAKTA
     r.kontrol("proje geneli alan listesi motorda",

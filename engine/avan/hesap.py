@@ -524,7 +524,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     motor_uygun = (sayi_mi(N_hes) and sayi_mi(Nsc)
                    and Nsc >= N_hes - T.MOTOR_TOLERANS)
 
-    b1 = Bolum("1 -  MOTOR GÜCÜ HESABI", "MMO / 697  —  s.21")
+    b1 = Bolum("1 -  MOTOR GÜCÜ HESABI", "MMO / 697  —  s.21",
+               kimlik="avan_motor_gucu")
     b1["adimlar"] = [
         veri("Q", "Anma yükü", Q, "kg", "GİRİŞ", 0),
         veri("V", "Kabin hızı", V, "m/s", "GİRİŞ"),
@@ -581,7 +582,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     PK = tavana_yuvarla(k1 * gn * Ga / n_ray + Mg * gn, 10)
     Fs = tavana_yuvarla(gn * (Fmk + Fsh + S["Fmt"] + P_kut + Q + Ga), 10)
 
-    b2 = Bolum("2 -  KUVVET HESAPLARI", "MMO / 697  s.18-20   /   TS EN 81-20")
+    b2 = Bolum("2 -  KUVVET HESAPLARI", "MMO / 697  s.18-20   /   TS EN 81-20",
+               kimlik="avan_kuvvetler")
     b2["adimlar"] = [
         metin("ORTAK BÜYÜKLÜKLER"),
         veri("gn", "Yerçekimi ivmesi", gn, "m/s²", "SABİTLER A"),
@@ -663,7 +665,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     k_kabin, eta_kabin, T_kabin, Z_kabin = _aydinlatma(ka, kb, E_kabin, OL_kabin, S)
     n_kabin = int(yukari_yuvarla(Z_kabin, 0)) if sayi_mi(Z_kabin) else None
 
-    b3 = Bolum("3 -  KABİN AYDINLATMA HESABI", "TS EN 81-20")
+    b3 = Bolum("3 -  KABİN AYDINLATMA HESABI", "TS EN 81-20",
+               kimlik="kabin_aydinlatma")
     b3["adimlar"] = [
         veri("a", "Kabin boyu", ka, "m", "GİRİŞ"),
         veri("b", "Kabin genişliği", kb, "m", "GİRİŞ"),
@@ -699,7 +702,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     n2 = int(yukari_yuvarla((Hk - 1) / Dmax, 0)) + 1 if (sayi_mi(Dmax) and Dmax > 0) else 0
     n_kuyu = int(max(n1 or 0, n2 or 0)) if sayi_mi(n1) else None
 
-    b4 = Bolum("4 -  KUYU AYDINLATMA HESABI", "TS EN 81-20")
+    b4 = Bolum("4 -  KUYU AYDINLATMA HESABI", "TS EN 81-20",
+               kimlik="kuyu_aydinlatma")
     b4["adimlar"] = [
         veri("a", "Kuyu yüksekliği ( kuyu boyu )", qa, "m", "GİRİŞ"),
         veri("b", "Kuyu genişliği", qb, "m", "GİRİŞ"),
@@ -767,7 +771,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     sigorta_A = T.sigorta_sec(I_motor, S["sigorta_katsayisi"])
     motor_sigorta = f"4 x {trn(sigorta_A, 0)}" if sigorta_A else "uygulama projesinde"
 
-    b5 = Bolum(f"5 -  KURULU GÜÇ CETVELİ", f"tablo adı :  TAS{no}")
+    b5 = Bolum(f"5 -  KURULU GÜÇ CETVELİ", f"tablo adı :  TAS{no}",
+               kimlik="kurulu_guc")
     b5["aciklamalar"] = [T.SIGORTA_NOTU]
     b5["cetvel"] = [
         {"lin": 1, "sorti": ("MOTOR" + (f"          ( {tr(Nsc)} kW / ηm = {tr(_eta_m)} "
@@ -823,7 +828,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     I2 = I_motor
     akim2_uygun = sayi_mi(I2) and sayi_mi(Iz2) and I2 <= Iz2
 
-    b6 = Bolum("6 -  GERİLİM DÜŞÜMÜ VE KESİT KONTROLÜ", "Elektrik İç Tesisleri Yönetmeliği")
+    b6 = Bolum("6 -  GERİLİM DÜŞÜMÜ VE KESİT KONTROLÜ", "Elektrik İç Tesisleri Yönetmeliği",
+               kimlik="gerilim_dusumu")
     b6["aciklamalar"] = [
         "ε %  =  100 · P · L  /  ( κ · S · U² )          I  =  P  /  ( √3 · U · cosφ )",
         "Kolon hattı asansörün TOPLAM kurulu gücünü ( motor + aydınlatma + priz ) taşır; "
@@ -1023,7 +1029,8 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
     k, eta, Tt, Z = _aydinlatma(a, b, E, OL, S)
     n = int(yukari_yuvarla(Z, 0)) if sayi_mi(Z) else None
 
-    bl = Bolum("MAKİNE DAİRESİ AYDINLATMA HESABI", "TS EN 81-20")
+    bl = Bolum("MAKİNE DAİRESİ AYDINLATMA HESABI", "TS EN 81-20",
+               kimlik="makine_dairesi_aydinlatma")
     bl["adimlar"] = [
         veri("a", "Makine dairesi uzunluğu", a, "m", "GİRİŞ"),
         veri("b", "Makine dairesi genişliği", b, "m", "GİRİŞ"),
@@ -1108,7 +1115,8 @@ def hesapla_topraklama(ortak: dict, S: dict) -> dict:
     Re_max = UL / IDn if IDn > 0 else None
     uygun = sayi_mi(Re) and sayi_mi(Re_max) and Re <= Re_max
 
-    b1 = Bolum("1 -  YATAY ( TEMEL ) TOPRAKLAYICI", "IEEE Std 80")
+    b1 = Bolum("1 -  YATAY ( TEMEL ) TOPRAKLAYICI", "IEEE Std 80",
+               kimlik="topraklama_yatay")
     b1["adimlar"] = [
         hesap("A   =   a · b", f"=   {tr(a)}  ·  {tr(b)}", A, "m²", "temel alanı"),
         hesap("r   =   √ ( A / π )", f"=   √ ( {tr(A)} / 3,1416 )", r, "m", "eşdeğer yarıçap"),
@@ -1124,7 +1132,8 @@ def hesapla_topraklama(ortak: dict, S: dict) -> dict:
               Ry, "Ω", "IEEE Std 80", 3),
     ]
 
-    b2 = Bolum("2 -  DİKEY ( ÇUBUK ) TOPRAKLAYICI")
+    b2 = Bolum("2 -  DİKEY ( ÇUBUK ) TOPRAKLAYICI",
+               kimlik="topraklama_dikey")
     b2["adimlar"] = [
         veri("lç", "Bir çubuğun boyu", lc, "m", "SABİTLER B"),
         veri("Is", "Paralel bağlı çubuk sayısı", Is, "adet", "GİRİŞ", 0),
@@ -1134,7 +1143,8 @@ def hesapla_topraklama(ortak: dict, S: dict) -> dict:
               Rc, "Ω", "tek çubuk β/lç — Is adet paralel", 3),
     ]
 
-    b3 = Bolum("3 -  TOPLAM TOPRAKLAMA DİRENCİ VE KONTROL")
+    b3 = Bolum("3 -  TOPLAM TOPRAKLAMA DİRENCİ VE KONTROL",
+               kimlik="topraklama_toplam")
     b3["adimlar"] = [
         hesap("Re  =   ( Ry · Rç )  /  ( Ry  +  Rç )",
               (f"=   ( {tr(Ry)} · {tr(Rc)} )  /  ( {tr(Ry)} + {tr(Rc)} )" if sayi_mi(Rc)

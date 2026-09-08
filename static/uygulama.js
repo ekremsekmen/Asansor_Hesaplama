@@ -426,9 +426,12 @@ function cizMukavemet(r){
     const sinif = sn.uygun === true ? 'ok' : (sn.uygun === false ? 'hata' : '');
     //  Bölüm satırı GİRDİLERİNE bir kısayoldur:  revizyonda insan "4. bölüm
     //  kaldı" diye düşünür ve doğrudan onun girdilerini arar.
-    const no = String(b.baslik||'').trim().split(/[^0-9]/)[0];
-    const gidilir = mBolumGruplari(no).join('  ·  ');
-    h += `<tr${gidilir ? ` class="m-gidilir" onclick="mGirdiyeGit('${no}')"
+    //  BÖLÜMÜ KİMLİĞİYLE TANIYORUZ.  Eskiden başlıktan numara ayıklanıyordu
+    //  ( "4 - ASKI…" → "4" );  numara projeye göre kaydığı için proje geneli
+    //  bölümler hiç eşlenemiyordu.  Kimlik bölümün doğduğu yerde verilir.
+    const kim = b.kimlik || '';
+    const gidilir = mBolumGruplari(kim).join('  ·  ');
+    h += `<tr${gidilir ? ` class="m-gidilir" onclick="mGirdiyeGit('${kacis(kim)}')"
               title="Girdilerine git — ${kacis(gidilir)}"` : ''}>
             <td class="etiket">${kacis(b.baslik)}</td>
             <td>${kacis(b.kaynak||'')}</td>
@@ -555,18 +558,19 @@ function mAramaUygula(){
     besleyen girdi grubu açılır.  Eşleme motordan gelir
     ( mukavemet_girdi.BOLUM_GRUBU ) — arayüzde tutulsaydı motor değişince
     sessizce bayatlardı. */
-function mGirdiyeGit(bolumNo){
+function mGirdiyeGit(kimlik){
   if(!MUK || !MUK.bolum_grubu) return;
-  const no = mBolumGruplari(bolumNo).map(ad=>MUK.gruplar.findIndex(g=>g.ad === ad))
-                                    .filter(i=>i >= 0);
+  const no = mBolumGruplari(kimlik).map(ad=>MUK.gruplar.findIndex(g=>g.ad === ad))
+                                   .filter(i=>i >= 0);
   if(!no.length) return;
   mGrupAc(no);
 }
 
-/*  Bir bölümü besleyen grup adları.  Motor eskiden tek ad döndürüyordu;
-    dizi gelmeyen ( eski ) sunucuya karşı ikisi de kabul edilir. */
-function mBolumGruplari(bolumNo){
-  const g = (MUK && MUK.bolum_grubu || {})[String(bolumNo)];
+/*  Bir bölümü besleyen grup adları.  Anahtar bölümün KİMLİĞİDİR
+    ( "aski_halatlari" ) — başlıktaki numara değil.  Motor eskiden tek ad
+    döndürüyordu;  dizi gelmeyen ( eski ) sunucuya karşı ikisi de kabul edilir. */
+function mBolumGruplari(kimlik){
+  const g = (MUK && MUK.bolum_grubu || {})[String(kimlik || '')];
   return !g ? [] : (Array.isArray(g) ? g : [g]);
 }
 

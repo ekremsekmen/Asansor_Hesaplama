@@ -1388,9 +1388,16 @@ def calistir():
         r.esit(f"uygulama-{_ad} ucu dosya döndürüyor", _y.media_type, _tur)
 
     #  UYGULAMA PROJESİ PAFTASI  —  mukavemet + elektrik + topraklama
+    #  PAFTA ARTIK PROJE SONUCU ALIYOR ( hesapla_coklu ), tek asansörün
+    #  sonucunu değil:  tek ve çoklu iki ayrı pafta fonksiyonu vardı ve
+    #  zamanla ayrışmışlardı ( proje geneli hesaplar birinde sonda, ötekinde
+    #  bölümlerin arasında ).  Tek asansörde asansör şeridi basılmaz.
     from engine.uygulama import hesap as _UY
-    _uy = _UY.hesapla({"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45})
-    _upd = PE.uygulama_pdf(_uy, PROJE)
+    _uyp = _UY.hesapla_coklu(
+        [{}], {"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45})
+    _uy = _uyp["asansorler"][0]
+    _upd = PE.uygulama_pdf(_uyp, PROJE)
+    r.esit("tek asansörlü proje 'tek' yolundan geçiyor", _uyp["yol"], "tek")
     r.kontrol("uygulama PDF üretildi", len(_upd) > 30_000, f"→ {len(_upd)} bayt")
     _um = _metin(_upd)
     for _ara in ("ASANSÖR UYGULAMA PROJESİ HESAPLARI", "MUKAVEMET HESAPLARI",
@@ -1404,7 +1411,7 @@ def calistir():
     _pk = _trn(_uy["ozet"]["P_kurulu"], 0)
     r.kontrol("uygulama PDF elektrik sayılarını taşıyor",
               _pk in _um, f"→ kurulu güç ({_pk} W) paftada yok")
-    _ubos = PE.uygulama_pdf(_UY.hesapla({"makine_agirligi": None}), PROJE)
+    _ubos = PE.uygulama_pdf(_UY.hesapla_coklu([{"makine_agirligi": None}]), PROJE)
     r.kontrol("hatalı girdide uygulama PDF'i sebebini yazıyor",
               "boş bırakılamaz" in _metin(_ubos))
 

@@ -193,28 +193,40 @@ def calistir():
         #  10. bölümün kuyu dibi sığınma yüksekliği ise TAMPONLAR'daki baba
         #  yüksekliğinden gelir.  Eskiden tek grup açılıyordu ve mühendis
         #  aradığı alanı açılan grupta bulamıyordu.
-        for _no in ("1", "2", "4", "7", "10", "11", "12", "14"):
-            pg.evaluate(f"mGirdiyeGit('{_no}')")
-            r.esit(f"bölüm {_no} → girdi grupları",
+        #  ANAHTAR BÖLÜMÜN KİMLİĞİDİR, NUMARASI DEĞİL:  numara projeye göre
+        #  kayıyor ve proje geneli bölümler hiç eşlenemiyordu.
+        for _k in ("motor_gucu", "makine_konstruksiyonu", "aski_halatlari",
+                   "kabin_raylari", "siginma_alanlari", "kabin_aydinlatma",
+                   "kuyu_aydinlatma", "gerilim_dusumu"):
+            pg.evaluate(f"mGirdiyeGit('{_k}')")
+            r.esit(f"bölüm {_k} → girdi grupları",
                    sorted(pg.eval_on_selector_all(
                        "#m_form .m-grup.acik", "e=>e.map(x=>x.dataset.ad)")),
-                   sorted(pg.evaluate(f"mBolumGruplari('{_no}')")))
-        pg.evaluate("mGirdiyeGit('4')")
-        r.kontrol("bölüm 4 hem halatı hem tahrik kasnağını açıyor",
+                   sorted(pg.evaluate(f"mBolumGruplari('{_k}')")))
+        #  Sonuç satırı kimliği taşımalı — numaradan ayıklamıyoruz artık
+        r.kontrol("sonuç bölümleri kimlik taşıyor",
+                  pg.evaluate("SON.m.bolumler.every(b=>!!b.kimlik)"),
+                  f"→ {pg.evaluate('SON.m.bolumler.map(b=>b.kimlik)')}")
+        r.esit("aynı bölüm numarası kaysa da kimliği duruyor",
+               pg.evaluate("SON.m.bolumler.map(b=>b.kimlik)")[:4],
+               ["motor_gucu", "makine_konstruksiyonu", "kabin_alani",
+                "aski_halatlari"])
+        pg.evaluate("mGirdiyeGit('aski_halatlari')")
+        r.kontrol("halat bölümü hem halatı hem tahrik kasnağını açıyor",
                   pg.is_visible("#m_halat_capi")
                   and pg.is_visible("#m_tahrik_kasnak_capi"))
-        pg.evaluate("mGirdiyeGit('10')")
-        r.kontrol("bölüm 10 hem kuyuyu hem tampon babasını açıyor",
+        pg.evaluate("mGirdiyeGit('siginma_alanlari')")
+        r.kontrol("sığınma bölümü hem kuyuyu hem tampon babasını açıyor",
                   pg.is_visible("#m_son_kat_yuksekligi")
                   and pg.is_visible("#m_kabin_tampon_baba"))
         #  ÜÇ GRUP AÇILMAZ — akordeon listeye dönerse aranan alan yine kaybolur
         r.esit("atlama en çok iki grup açıyor",
-               max(pg.evaluate(f"mBolumGruplari('{_n}').length")
-                   for _n in range(1, 11)), 2)
+               pg.evaluate("Math.max(...Object.values(MUK.bolum_grubu)"
+                           ".map(v=>v.length))"), 2)
         #  Öteki gruplar KAPANIR:  atlama akordeonu açık bırakmaz
         r.esit("atlamadan sonra yalnız eşlemedeki gruplar açık",
                pg.eval_on_selector_all("#m_form .m-grup.acik", "e=>e.length"),
-               len(pg.evaluate("mBolumGruplari('10')")))
+               len(pg.evaluate("mBolumGruplari('siginma_alanlari')")))
         #  BAŞLIK AÇ/KAPADIR.  Açık gruba yeniden tıklamak eskiden hiçbir şey
         #  yapmıyordu — grup bir açıldı mı kapanmıyordu.
         pg.evaluate("mGrupAc(5)")

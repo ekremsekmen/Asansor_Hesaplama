@@ -378,38 +378,43 @@ GRUPLAR = (
 
 
 #  HESAP BÖLÜMÜ  →  onu besleyen GİRDİ GRUPLARI.
-#  Revizyonda mühendis "4. bölüm halat kaldı, neyi değiştireceğim" diye
+#  Revizyonda mühendis "halat bölümü kaldı, neyi değiştireceğim" diye
 #  düşünür — girdi grubunun adıyla değil, HESAP BÖLÜMÜYLE.  Arayüz, sonuç
 #  tablosundaki bir bölüme tıklandığında doğrudan onun girdilerini açar.
 #  Eşleme burada durur çünkü hangi girdinin hangi hesaba girdiği MOTORUN
 #  bilgisidir;  arayüzde tutulursa motor değişince sessizce bayatlar.
-#  Anahtar, bölüm başlığının başındaki numaradır ( "4 -  ASKI HALATLARI…" ).
 #
-#  NİÇİN BİRDEN ÇOK GRUP:  önce her bölüm için TEK bir "asıl" grup yazılıydı
-#  ve çoğu bölümde bu yanlış yere götürüyordu.  Örnek:  4. bölüm "tahrik
-#  kasnağı çapını büyütün" der, ama Dt alanı MAKİNE VE MOTOR grubundadır —
-#  tıklayan mühendis ASKI HALATLARI grubunda kasnak çapı arıyordu.  Aynı
-#  şey 10. bölümde de vardı:  kuyu dibi sığınma yüksekliği DURAK VE KUYU'dan
-#  değil, TAMPONLAR'daki baba yüksekliğinden gelir.
+#  ANAHTAR BÖLÜMÜN KİMLİĞİDİR, NUMARASI DEĞİL.  Bir süre numara ( "4" )
+#  kullanılıyordu ve bu iki yerden birden bozuktu:  numara projeye göre
+#  kayıyor ( makine dairesi yoksa topraklama bir sıra öne geliyor ), bu
+#  yüzden proje geneli bölümler hiç eşlenemiyordu;  ayrıca elektrik
+#  bölümlerini eşlemek için "mukavemet 10 bölümdür, elektrik 11'den başlar"
+#  varsayımını ikinci bir dosyaya gömmek gerekiyordu.  Kimlik bölümün
+#  doğduğu yerde verilir ve hiç değişmez ( bkz. ortak/steps.Bolum ).
 #
 #  Sıra ÖNEM SIRASIDIR:  ilk grup bölümün ana girdilerini taşır, ikincisi o
 #  bölümün kontrollerinden en az birini tek başına belirleyen ikinci gruptur.
 #  İkiyle sınırlıdır — üç grup açmak akordeonu listeye çevirir ve aranan alan
 #  yine kaybolur.  Listeler, motor kodundaki g[...] okumaları taranarak
-#  çıkarılmıştır.
+#  çıkarılmıştır ve test_uygulama bunu her koşuda yeniden denetler.
 BOLUM_GRUBU = {
-    #  bölüm                    asıl grup            ikinci grup
-    "1":  ("Makine ve motor", "Askı halatları"),   # Nsç ↔ halat ağırlığı gh · nh
-    "2":  ("Makine ve motor",),                    # kaide  ← kiriş kesitleri
-    "3":  ("Kabin ve kapı",),                      # kabin alanı ← ölçüler · pervaz
-    "4":  ("Askı halatları", "Makine ve motor"),   # S ↔ Dt · Ds kasnak çapları
-    "5":  ("Hız regülatörü",),                     # regülatör halatı
-    "6":  ("Askı halatları", "Makine ve motor"),   # tahrik ↔ kanal · kasnak
-    "7":  ("Kılavuz raylar", "Kabin ve kapı"),     # kabin rayı ↔ kaçıklık · kapı
-    "8":  ("Kılavuz raylar", "Karşı ağırlık"),     # ağırlık rayı ↔ ağırlık verisi
-    "9":  ("Tamponlar", "Kılavuz raylar"),         # kuyu tabanı yükleri
-    "10": ("Durak ve kuyu", "Tamponlar"),          # sığınma ↔ tampon babası
+    #  bölüm kimliği             asıl grup            ikinci grup
+    "motor_gucu":            ("Makine ve motor", "Askı halatları"),
+    "makine_konstruksiyonu": ("Makine ve motor",),
+    "kabin_alani":           ("Kabin ve kapı",),
+    "aski_halatlari":        ("Askı halatları", "Makine ve motor"),
+    "regulator_halati":      ("Hız regülatörü",),
+    "tahrik_yetenegi":       ("Askı halatları", "Makine ve motor"),
+    "kabin_raylari":         ("Kılavuz raylar", "Kabin ve kapı"),
+    "agirlik_raylari":       ("Kılavuz raylar", "Karşı ağırlık"),
+    #  TAMPONLAR DEĞİL.  Bölüm tampon KUVVETLERİNİ ( Fkt · Fat ) verir ama
+    #  bunlar kütle × g'dir;  tampon geometrisi ( baba yüksekliği · ezilme ·
+    #  uzunluk ) kuvvete girmez.  Pertürbasyon taraması Tamponlar grubundaki
+    #  yedi alanın da bu bölümü hiç değiştirmediğini gösterdi.
+    "kuyu_tabani":           ("Kılavuz raylar", "Karşı ağırlık"),
+    "siginma_alanlari":      ("Durak ve kuyu", "Tamponlar"),
 }
+
 
 
 def arayuz_alanlari():

@@ -29,7 +29,7 @@ import math
 from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
-from engine.ortak.steps import Bolum, hesap, kontrol, veri
+from engine.ortak.steps import Bolum, hesap, kontrol, numarala, veri
 from engine.ortak.steps import metin, tr, trn
 
 # =====================================================================
@@ -787,7 +787,7 @@ def _motor(g, o):
     _kay(o, AQ18=gh, AQ19=lh, AQ16=Gh, AQ11=F1, AQ13=Ga, AQ9=Gmax, AQ7=Pm,
          AQ21=M, AQ22=eta, AQ23=N, X25=HP)
 
-    b = Bolum("1 -  ASANSÖR MOTOR GÜCÜNÜN HESAPLANMASI", "MMO 208/7 - 2.4")
+    b = Bolum("ASANSÖR MOTOR GÜCÜNÜN HESAPLANMASI", kimlik="motor_gucu", kaynak="MMO 208/7 - 2.4")
     b["adimlar"] = [
         veri("v", "Kabin hızı", v, "m/s", "GİRİŞ"),
         veri("Q", "Beyan yükü", Q, "kg", "GİRİŞ"),
@@ -946,7 +946,7 @@ def _makine(g, o):
          K58=X, O53=FB, AK53=FA, M63=Mmax, J65=sigma_e, O71=lam_ham, Z71=lam,
          K73=sigma_b)
 
-    b = Bolum("2 -  MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", "MMO 208/4 - m.3.4.6")
+    b = Bolum("MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", kimlik="makine_konstruksiyonu", kaynak="MMO 208/4 - m.3.4.6")
     b["adimlar"] = [
         veri("k1", "Darbe katsayısı", k1, "",
              f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
@@ -1039,7 +1039,7 @@ def _kabin_alani(g, o):
     o.update(kabin_alani=alan, kabin_kisi=kisi)
     _kay(o, X84=alan, AC82=azami, L86=kisi, AK88=asgari)
 
-    b = Bolum("3 -  KULLANILABİLİR KABİN ALANI", "TS EN 81-20 m.5.4.2")
+    b = Bolum("KULLANILABİLİR KABİN ALANI", kimlik="kabin_alani", kaynak="TS EN 81-20 m.5.4.2")
     b["adimlar"] = [
         veri("Q", "Beyan yükü", Q, "kg", "GİRİŞ"),
         veri("", "Kabin genişliği × derinliği", f"{trn(W, 0)} × {trn(D, 0)} mm"),
@@ -1122,7 +1122,7 @@ def _aski_halatlari(g, o):
     _kay(o, N97=oran, AH104=Nequiv_t, AH109=Tmin, AH110=Smin, T112=Kp,
          P114=Nequiv_p, V116=Nequiv, T125=Sf, T126=Sger)
 
-    b = Bolum("4 -  ASKI HALATLARININ HESAPLANMASI", "TS EN 81-50 m.5.12")
+    b = Bolum("ASKI HALATLARININ HESAPLANMASI", kimlik="aski_halatlari", kaynak="TS EN 81-50 m.5.12")
     b["adimlar"] = [
         #  PAFTADA KONTROL SATIRI YALNIZ KARARINI BASAR ( "UYGUN" ).  Neyin
         #  kontrolü olduğunu ÖNÜNDEKİ değer satırı söyler;  o olmadan pafta
@@ -1309,8 +1309,8 @@ def _regulator(g, o):
     _kay(o, AI134=gh, AI136=Tmin, J142=oran, W146=f, AF146=efa, W151=Freg,
          J156=Freg2, U156=Fcekme, AA156=sinir, G161=kat)
 
-    b = Bolum("5 -  HIZ REGÜLATÖRÜ HALATININ HESAPLANMASI",
-              "TS EN 81-20 m.5.6.2.2.1  /  TS EN 81-50 m.5.11.2.3")
+    b = Bolum("HIZ REGÜLATÖRÜ HALATININ HESAPLANMASI", kimlik="regulator_halati",
+              kaynak="TS EN 81-20 m.5.6.2.2.1  /  TS EN 81-50 m.5.11.2.3")
     b["adimlar"] = [
         veri("Dreg", "Regülatör kasnak çapı", Dreg, "mm", "GİRİŞ"),
         veri("dreg", "Regülatör halat çapı", dreg, "mm", "GİRİŞ"),
@@ -1621,8 +1621,8 @@ def _tahrik(g, o):
     _kay(o, **{("AJ198" if sert else "AU206"): f_yuk,
                ("AL202" if sert else "AV211"): f_fren})
 
-    b = Bolum("6 -  TAHRİK YETENEĞİNİN HESAPLANMASI",
-              "TS EN 81-50 m.5.11.2  /  m.5.11.3")
+    b = Bolum("TAHRİK YETENEĞİNİN HESAPLANMASI", kimlik="tahrik_yetenegi",
+              kaynak="TS EN 81-50 m.5.11.2  /  m.5.11.3")
     #  m.5.11.2.3.1.2:  "Where the groove has not been submitted to an
     #  additional hardening process, in order to limit the deterioration of
     #  traction due to wear, an undercut is necessary."  Yani sertleştirilmemiş
@@ -1952,8 +1952,8 @@ def _kabin_raylari(g, o):
     xQ1, yQ1 = _yuk_merkezi(xc, D / S["Dx_bolen"], Q, P, xp, xs), yc
     xQ2, yQ2 = xc, _yuk_merkezi(yc, W / S["Dy_bolen"], Q, P, yp, ys)
 
-    b = Bolum("7 -  KABİN KILAVUZ RAYLARININ HESAPLANMASI",
-              "TS EN 81-50 m.C.2.1 / C.2.2 / C.2.3")
+    b = Bolum("KABİN KILAVUZ RAYLARININ HESAPLANMASI", kimlik="kabin_raylari",
+              kaynak="TS EN 81-50 m.C.2.1 / C.2.2 / C.2.3")
     ad = [
         veri("h", "Patenler arası düşey mesafe", h, "mm", "GİRİŞ"),
         veri("l", "Ray konsolları arasındaki en uzun mesafe", l, "mm", "GİRİŞ"),
@@ -2324,8 +2324,8 @@ def _agirlik_raylari(g, o):
             scg is not None and scg <= sperm_g,
             sfg <= sperm_g, dxg <= dperm, dyg <= dperm]
 
-    b = Bolum("8 -  KARŞI AĞIRLIK KILAVUZ RAYLARININ HESAPLANMASI",
-              "TS EN 81-50 m.5.10  /  m.C.2.2" + ("  /  m.C.2.1" if gt_var else ""))
+    b = Bolum("KARŞI AĞIRLIK KILAVUZ RAYLARININ HESAPLANMASI", kimlik="agirlik_raylari",
+              kaynak="TS EN 81-50 m.5.10  /  m.C.2.2" + ("  /  m.C.2.1" if gt_var else ""))
     b["adimlar"] = [
         veri("", "Ray profili", prof, "", "ISO 7465"),
         veri("n", "Ağırlık rayı sayısı", n, "adet", "GİRİŞ", 0),
@@ -2529,8 +2529,8 @@ def _kuyu_tabani(g, o):
     Fkt = S["tampon_katsayi"] * gn * (P + Q)
     Fat = S["tampon_katsayi"] * gn * (P + o["ofis"]["q_denge"] * Q)
 
-    b = Bolum("9 -  KUYU TABANINA GELEN YÜKLERİN HESAPLANMASI",
-              "TS EN 81-20 m.5.2.1.8")
+    b = Bolum("KUYU TABANINA GELEN YÜKLERİN HESAPLANMASI", kimlik="kuyu_tabani",
+              kaynak="TS EN 81-20 m.5.2.1.8")
     b["adimlar"] = [
         veri("LR", "Kılavuz ray boyu", LR, "mm", "Σ durak + kaide − 200 + kuyu dibi − 300", 0),
         metin("Kabin raylarına gelen kuvvetler :"),
@@ -2665,8 +2665,8 @@ def _siginma(g, o):
                        f"{tr(olcu[0])} × {tr(olcu[1])} × {tr(olcu[2])} m"))
         ad.append(kontrol(f"{etiket}  ( {tip} )", uygun))
 
-    b = Bolum("10 -  SIĞINMA ALANLARI VE AÇIKLIKLARIN UYGUNLUĞU",
-              "TS EN 81-20 m.5.2.5.7  /  m.5.2.5.8")
+    b = Bolum("SIĞINMA ALANLARI VE AÇIKLIKLARIN UYGUNLUĞU", kimlik="siginma_alanlari",
+              kaynak="TS EN 81-20 m.5.2.5.7  /  m.5.2.5.8")
     b["adimlar"] = ad
     b["sonuc"] = {"baslik": "KONTROL      bütün sığınma ölçüleri",
                   "metin": "UYGUNDUR." if all(uygunlar)
@@ -2723,7 +2723,12 @@ def hesapla(veriler=None):
     #  bkz. engine/uygulama/sabitler.py ).  Bölümler bunu o["ofis"]'ten okur;
     #  ekrandaki Sabitler sekmesinde değiştirilen her değer buradan geçer.
     o = {"ofis": US.sabitler(g.get("_ofis"))}
-    bolumler = [uret(g, o) for uret in BOLUM_URETICILERI]
+    #  NUMARA BURADA VERİLİR, BÖLÜMÜN İÇİNDE DEĞİL.  Bölüm kendi adını ve
+    #  değişmez kimliğini taşır;  kaçıncı sırada basılacağı onu kullanan
+    #  projeye aittir — uygulama projesi bu on bölümün arkasına elektrik ve
+    #  topraklama hesaplarını ekleyip hepsini yeniden numaralar.
+    bolumler = [numarala(uret(g, o), i)
+                for i, uret in enumerate(BOLUM_URETICILERI, 1)]
     uygunlar = [b["sonuc"]["uygun"] for b in bolumler
                 if b.get("sonuc") and b["sonuc"].get("uygun") is not None]
     return {

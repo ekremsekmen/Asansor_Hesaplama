@@ -897,30 +897,6 @@ def _mukavemet_ozet(sonuc):
 # =====================================================================
 #  UYGULAMA PROJESİ PDF        ( mukavemet + elektrik + topraklama )
 # =====================================================================
-def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:    # noqa: ARG001
-    """Uygulama projesinin tüm hesap bölümleri tek paftada.
-
-    Bölümler engine/uygulama.py'den numaralanmış olarak gelir;  mukavemet ve
-    elektrik hesapları aynı çizim yardımcılarını kullanır, biçim ayrışmaz.
-    """
-    buf = io.BytesIO()
-    doc = _Belge(buf, "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
-                 "TS EN 81-20   ·   TS EN 81-50   ·   TS 12385-5   ·   ISO 7465"
-                 "   ·   MMO 208/4   ·   MMO 208/7   ·   IEEE Std 80"
-                 "   ·   IEC 60364-5-52")
-    ic = []
-    if not sonuc.get("aktif"):
-        ic += _uyari_kutusu(list(sonuc.get("hata") or ["Hesap yapılamadı."]), hata=True)
-        doc.build(ic)
-        buf.seek(0)
-        return buf.read()
-
-    ic += _uygulama_govdesi(sonuc)
-    doc.build(ic)
-    buf.seek(0)
-    return buf.read()
-
-
 def _uygulama_govdesi(sonuc, ust_ek=""):
     """Bir asansörün bütün bölümleri + sonuç özeti  ( akış öğeleri ).
 
@@ -953,17 +929,23 @@ def _uygulama_govdesi(sonuc, ust_ek=""):
     return ic
 
 
-def uygulama_coklu_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
-    """1 - 4 asansörlük uygulama projesi — hepsi TEK paftada, arka arkaya.
+def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
+    """Uygulama projesi paftası — 1 - 4 asansör, hepsi TEK belgede.
 
-    Her asansör yeni sayfada başlar ve kendi adıyla açılır;  bölümler ve
-    sonuç özeti tek asansörlük paftayla AYNI gövdeden gelir.
+    GİRDİSİ PROJE SONUCUDUR ( engine/uygulama/hesap.hesapla_coklu ), tek bir
+    asansörün sonucu değil.  Bir süre iki ayrı fonksiyon vardı — tek asansöre
+    ``uygulama_pdf``, çoğuna ``uygulama_coklu_pdf`` — ve hangisinin
+    çağrılacağına API karar veriyordu.  İkisi zamanla ayrıştı:  proje geneli
+    hesaplar çoklu paftada en sona alınmış, tek asansörlükte asansörün
+    bölümlerinin arasında kalmıştı.  Aynı program aynı projeyi asansör
+    sayısına göre iki türlü basıyordu.  Artık tek yol var.
+
+    TEK ASANSÖRDE ASANSÖR ŞERİDİ BASILMAZ:  "ASANSÖR 1 · —" başlığı tek
+    asansörlük bir paftada bilgi taşımaz, yalnız yer kaplar.
 
     PROJE GENELİ HESAPLAR ( topraklama · makine dairesi aydınlatması ) motor
-    tarafında HER asansörden ayrılmıştır ve burada EN SONA, kendi sayfasına
-    bir kez basılır ( bkz. engine/uygulama/hesap.hesapla_coklu ).  Bir süre
-    ilk asansöre bırakılıyorlardı;  o zaman binaya ait hesap 1 nolu asansörün
-    arkasına, yani belgenin ORTASINA düşüyordu.
+    tarafında HER asansörden ayrılır ve burada EN SONA, kendi sayfasına bir
+    kez basılır — asansör sayısından bağımsız olarak.
     """
     buf = io.BytesIO()
     doc = _Belge(buf, "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
@@ -979,19 +961,20 @@ def uygulama_coklu_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG0
         buf.seek(0)
         return buf.read()
 
+    tek = len(asansorler) == 1
     for i, a in enumerate(asansorler):
-        if i:
-            ic.append(PageBreak())
         etiket = f"{a.get('no', i + 1)} · {a.get('tanim') or ''}".strip(" ·")
-        bas = _baslik_seridi(f"ASANSÖR {etiket}",
-                             f"{len(asansorler)} asansörden {i + 1}.")
-        ic.append(bas)
-        ic.append(Spacer(1, 1.5 * mm))
+        if not tek:
+            if i:
+                ic.append(PageBreak())
+            ic.append(_baslik_seridi(f"ASANSÖR {etiket}",
+                                     f"{len(asansorler)} asansörden {i + 1}."))
+            ic.append(Spacer(1, 1.5 * mm))
         if not a.get("aktif"):
             ic += _uyari_kutusu(list(a.get("hata") or ["Hesap yapılamadı."]),
                                 hata=True)
             continue
-        ic += _uygulama_govdesi(a, ust_ek=f"ASANSÖR {etiket}")
+        ic += _uygulama_govdesi(a, ust_ek="" if tek else f"ASANSÖR {etiket}")
 
     #  PROJE GENELİ HESAPLAR — bütün asansörlerin ARKASINDA, bir kez.
     pg = sonuc.get("proje_geneli") or []

@@ -107,9 +107,48 @@ def metin(icerik, vurgu=False):
     return Step(deger=icerik, tip="metin", vurgu=vurgu)
 
 
+#  Bölüm başlığının biçimi:  "4 - ASKI HALATLARININ HESAPLANMASI".
+#  Tek yerde durur ki numaralayan taraf ile okuyan taraf ayrışmasın.
+BASLIK_BICIMI = "{sira} - {ad}"
+
+
+def basliktan_ad(baslik):
+    """'3 -  KABİN AYDINLATMA HESABI'  →  'KABİN AYDINLATMA HESABI'."""
+    metin = str(baslik or "")
+    bas, ayrac, son = metin.partition(" - ")
+    return son.strip() if ayrac and bas.strip().isdigit() else metin.strip()
+
+
+def numarala(b, sira):
+    """Bölüme sıra numarasını verir ve başlığını yeniden yazar.
+
+    Başlıktaki numara BİÇİMDİR, KİMLİK DEĞİLDİR:  aynı hesap projeden
+    projeye başka numara alır ( makine dairesi olmayan binada topraklama bir
+    sıra öne kayar ).  Bu yüzden numarayı yalnız burası koyar ve bölüme
+    ayrıca ``sira`` diye yazar;  kimliğe ihtiyacı olan ``kimlik`` alanını
+    okur ( bkz. Bolum ).
+    """
+    ad = b.get("ad") or basliktan_ad(b.get("baslik"))
+    b["ad"] = ad
+    b["sira"] = sira
+    b["baslik"] = BASLIK_BICIMI.format(sira=sira, ad=ad)
+    return b
+
+
 class Bolum(dict):
     """
     Numaralı hesap bölümü — Excel'deki '1 -  MOTOR GÜCÜ HESABI' başlığı.
+
+    KİMLİK ve NUMARA AYRI ŞEYLERDİR.  ``kimlik`` bölümün değişmez adıdır
+    ( "aski_halatlari" ) ve doğduğu yerde verilir;  başlıktaki numara ise
+    yalnız BASIM SIRASIDIR ve projeye göre değişir — proje geneli bölümler
+    ayrıldığında kalanlar yeniden numaralanır, makine dairesi yoksa
+    topraklama bir sıra öne gelir.  Bölümü dışarıdan tanıyan her şey
+    ( sonuçtan girdiye atlama gibi ) numaraya değil KİMLİĞE bakmalıdır;
+    numaraya bakan eşlemeler sessizce yanlış bölümü gösterir.
+
+    ``kimlik`` verilmezse ``kimlik`` / ``ad`` alanları hiç yazılmaz —
+    kimliğe ihtiyacı olmayan bölümlerin çıktısı olduğu gibi kalır.
 
     İki ayrı not listesi vardır:
 
@@ -125,7 +164,10 @@ class Bolum(dict):
     """
 
     def __init__(self, baslik, kaynak="", adimlar=None, sonuc=None, notlar=None,
-                 aciklamalar=None):
+                 aciklamalar=None, kimlik=None):
         super().__init__(baslik=baslik, kaynak=kaynak,
                          adimlar=adimlar or [], sonuc=sonuc, notlar=notlar or [],
                          aciklamalar=aciklamalar or [])
+        if kimlik:
+            self["kimlik"] = kimlik
+            self["ad"] = basliktan_ad(baslik)

@@ -23,6 +23,7 @@ AVANIN 1. VE 2. BÖLÜMÜ ALINMAZ:
     m.5.2.1.8'e göre, ray kuvvetlerini de bölüm 7-8'de ayrıntılı verir.
 """
 from engine.avan import hesap as E_AVAN
+from engine.ortak.steps import numarala
 from engine.uygulama import mukavemet as E_MUK
 from engine.avan import tablolar as T
 from engine.uygulama import girdi as UG
@@ -64,7 +65,14 @@ def _notlari_uyarla(b):
 
 
 def hesapla(veriler=None):
-    """Uygulama projesinin tamamı  —  mukavemet + elektrik + topraklama."""
+    """TEK ASANSÖRÜN hesabı  —  mukavemet + elektrik + topraklama.
+
+    Bu bir PARÇADIR, proje girişi değildir:  projeyi ``hesapla_coklu``
+    koşturur ve tek asansörlük projede de o çağrılır.  Doğrudan çağırmak
+    yalnız birim denemeleri içindir — proje geneli bölümler ( topraklama ·
+    makine dairesi ) burada asansörün bölüm listesinin İÇİNDE kalır, oysa
+    projede ayrılıp en sona alınırlar.
+    """
     eksik = []          # yapılamayan ZORUNLU hesaplar
     g = UG.varsayilanlar()
     g.update(veriler or {})
@@ -94,15 +102,16 @@ def hesapla(veriler=None):
         uyarilar.append("⚠ ELEKTRİK HESAPLARI YAPILAMADI: "
                         + str(asansor.get("uyari") or "girdiler eksik"))
 
-    #  Bölüm numaraları uygulama projesinin kendi sırasına göre yeniden yazılır;
-    #  avandan gelen "3 - ..." başlığı burada 11. sıradadır.
+    #  Bölüm numaraları uygulama projesinin kendi sırasına göre yeniden
+    #  yazılır;  avandan gelen "3 - ..." başlığı burada 11. sıradadır.
+    #  Numarayı yalnız steps.numarala koyar ve bölümün KİMLİĞİNE dokunmaz —
+    #  sonuçtan girdiye atlama gibi bölümü tanıması gereken her şey kimliğe
+    #  bakar, numaraya değil.
     bolumler = list(muk.get("bolumler") or [])
     sira = len(bolumler)
     for b in elektrik:
         sira += 1
-        b = _notlari_uyarla(b)
-        b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
-        bolumler.append(b)
+        bolumler.append(numarala(_notlari_uyarla(b), sira))
 
     #  PROJE GENELİ BÖLÜMLER.  Makine dairesi aydınlatması ve temel
     #  topraklama BİNAYA aittir, asansöre değil:  bir binada dört asansör
@@ -112,8 +121,7 @@ def hesapla(veriler=None):
     mk = av.get("makine_dairesi") or {}
     if mk.get("aktif"):
         sira += 1
-        b = _notlari_uyarla(mk["bolum"])
-        b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
+        b = numarala(_notlari_uyarla(mk["bolum"]), sira)
         b["proje_geneli"] = True
         bolumler.append(b)
     elif mk.get("mk_yok") is False:
@@ -126,8 +134,7 @@ def hesapla(veriler=None):
     if tp.get("aktif"):
         for b in (tp.get("bolumler") or []):
             sira += 1
-            b = _notlari_uyarla(b)
-            b["baslik"] = f"{sira} - " + _basliktan_ad(b.get("baslik", ""))
+            b = numarala(_notlari_uyarla(b), sira)
             b["proje_geneli"] = True
             bolumler.append(b)
     elif g.get("temel_a") or g.get("temel_b"):
@@ -174,14 +181,6 @@ def hesapla(veriler=None):
         "uyarilar": uyarilar,
         "_h": muk.get("_h", {}),
     }
-
-
-def _basliktan_ad(baslik):
-    """'3 -  KABİN AYDINLATMA HESABI'  →  'KABİN AYDINLATMA HESABI'."""
-    metin = str(baslik)
-    if " - " in metin:
-        return metin.split(" - ", 1)[1].strip()
-    return metin.strip()
 
 
 # =====================================================================
@@ -233,15 +232,14 @@ def hesapla_coklu(asansorler=None, ortak=None):
                 if not proje_geneli:
                     #  KENDİ NUMARALARINI ALIRLAR:  artık bir asansörün
                     #  bölümleri değiller, ayrı bir başlığın altındalar.
-                    proje_geneli = ayrilan
-                    for n, b in enumerate(proje_geneli, 1):
-                        b["baslik"] = f"{n} - " + _basliktan_ad(b.get("baslik", ""))
+                    proje_geneli = [numarala(b, n)
+                                    for n, b in enumerate(ayrilan, 1)]
                 #  Asansörün kalan bölümleri boşluksuz 1..N diye yeniden
                 #  numaralanır — paftada 11-12-13 diye gitsin.
-                kalan = [b for b in s["bolumler"] if not b.get("proje_geneli")]
-                for n, b in enumerate(kalan, 1):
-                    b["baslik"] = f"{n} - " + _basliktan_ad(b.get("baslik", ""))
-                s["bolumler"] = kalan
+                s["bolumler"] = [
+                    numarala(b, n) for n, b in
+                    enumerate([x for x in s["bolumler"]
+                               if not x.get("proje_geneli")], 1)]
         sonuclar.append(s)
 
     aktifler = [s for s in sonuclar if s.get("aktif")]
@@ -256,6 +254,12 @@ def hesapla_coklu(asansorler=None, ortak=None):
         "asansorler": sonuclar,
         "proje_geneli": proje_geneli,
         "adet": len(sonuclar),
+        #  KULLANILAN YOL SONUCUN İÇİNDE YAZAR.  Çağıran taraf "bu proje tek
+        #  mi çoklu mu" diye karar VERMEZ, sonuca bakar — avan trafik motoru
+        #  da böyle yapar ( engine/avan/trafik.hesapla ).  Bir süre kararı API
+        #  veriyordu ve aynı dallanma PDF · Excel · ZIP uçlarında üç kez
+        #  tekrarlanıyordu;  iki yol zamanla ayrıştı.
+        "yol": "tek" if len(sonuclar) == 1 else "coklu",
         "hata": [h for s in sonuclar if not s.get("aktif")
                  for h in (s.get("hata") or [])],
         "ozet": {

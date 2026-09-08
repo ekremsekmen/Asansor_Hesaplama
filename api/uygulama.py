@@ -187,16 +187,6 @@ def _asansor_girdileri(veri):
     return [_girdi_coz(x, veri) for x in ham], ortak
 
 
-def _coklu_mu(veri):
-    """İstek birden çok asansör mü taşıyor?
-
-    TEK ASANSÖRDE ESKİ YOL KULLANILIR:  çıktı bugünküyle bayt bayt aynı
-    kalsın diye — çoklu pafta asansör şeridi ekler, tek asansörde gereksizdir.
-    """
-    a = (veri or {}).get("asansorler")
-    return isinstance(a, list) and len([x for x in a if isinstance(x, dict)]) > 1
-
-
 def _coklu_sonuc(veri):
     """Çoklu uygulama hesabı.  ( sonuc , hata_yaniti )"""
     asansorler, ortak = _asansor_girdileri(veri)
@@ -227,50 +217,11 @@ def api_uygulama_coklu(veri: dict = Body(...)):
                             status_code=200)
 
 
-@router.post("/api/uygulama")
-def api_uygulama(veri: dict = Body(...)):
-    """Uygulama projesinin tamamı — mukavemet + elektrik + topraklama."""
-    try:
-        g = _mukavemet_girdi(veri)
-        belirsiz = _belirsiz_hata()
-        if belirsiz:
-            return JSONResponse({"aktif": False, "hata": [belirsiz]}, status_code=200)
-        s = E_UYG.hesapla(g)
-        #  "_h" motorun Excel hücre haritasıdır — doğrulama testleri içindir,
-        #  arayüzün işine yaramaz ve yanıtı gereksiz büyütür.
-        s.pop("_h", None)
-        return JSONResponse(json.loads(json.dumps(s, default=str)))
-    except Exception as e:                                    # noqa: BLE001
-        return JSONResponse({"aktif": False, "hata": [f"HESAP HATASI: {e}"]},
-                            status_code=200)
-
-
-def _uygulama_sonucu(veri):
-    """Girdileri okuyup uygulama hesabını koşturur.  ( sonuc , hata_yaniti )"""
-    g = _mukavemet_girdi(veri)
-    belirsiz = _belirsiz_hata()
-    if belirsiz:
-        return None, JSONResponse({"hata": belirsiz}, status_code=200)
-    s = E_UYG.hesapla(g)
-    if not s.get("aktif"):
-        return None, JSONResponse(
-            {"hata": "HESAP HATASI: " + "  ·  ".join(s.get("hata") or [])},
-            status_code=200)
-    return s, None
-
-
 @router.post("/api/indir/uygulama-pdf")
 def indir_uygulama_pdf(veri: dict = Body(...)):
     try:
         _p = _proje_kimligi(veri)
-        if _coklu_mu(veri):
-            s, yanit = _coklu_sonuc(veri)
-            if yanit is not None:
-                return yanit
-            return _indir(X_PDF.uygulama_coklu_pdf(s, _p),
-                          _dosya_adi(_p, "Uygulama Projesi Hesaplari", "pdf"),
-                          "application/pdf")
-        s, yanit = _uygulama_sonucu(veri)
+        s, yanit = _coklu_sonuc(veri)
         if yanit is not None:
             return yanit
         return _indir(X_PDF.uygulama_pdf(s, _p),
@@ -292,20 +243,18 @@ def indir_uygulama_xlsx(veri: dict = Body(...)):
         #  sayfa adlarına bağlıdır;  sayfa çoğaltmak her çapraz atfı yeniden
         #  yazmayı gerektirirdi.  Çoklu projede bu yüzden ASANSÖR BAŞINA AYRI
         #  KİTAP üretilir ve hepsi tek ZIP'te verilir.
-        if _coklu_mu(veri):
-            s, yanit = _coklu_sonuc(veri)
-            if yanit is not None:
-                return yanit
+        s, yanit = _coklu_sonuc(veri)
+        if yanit is not None:
+            return yanit
+        #  HESAP TEK YOLDAN GEÇTİ;  adede göre değişen yalnız PAKETLEMEDİR.
+        if s["adet"] > 1:
             ad = _dosya_adi(_p, "Mukavemet Hesaplari", "zip")
             paket = io.BytesIO()
             with zipfile.ZipFile(paket, "w", zipfile.ZIP_DEFLATED) as z:
                 for k in _asansor_kitaplari(s, _p):
                     z.writestr(k[0], k[1])
             return _indir(paket.getvalue(), ad, "application/zip")
-        s, yanit = _uygulama_sonucu(veri)
-        if yanit is not None:
-            return yanit
-        return _indir(X_MXLS.mukavemet_xlsx(s["girdi"], _p),
+        return _indir(X_MXLS.mukavemet_xlsx(s["asansorler"][0]["girdi"], _p),
                       _dosya_adi(_p, "Mukavemet Hesaplari", "xlsx"),
                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except FileNotFoundError as e:
@@ -350,11 +299,7 @@ def indir_uygulama_dwg(veri: dict = Body(...)):
             status_code=200)
     try:
         _p = _proje_kimligi(veri)
-        coklu = _coklu_mu(veri)
-        if coklu:
-            s, yanit = _coklu_sonuc(veri)
-        else:
-            s, yanit = _uygulama_sonucu(veri)
+        s, yanit = _coklu_sonuc(veri)
         if yanit is not None:
             return yanit
         paftalar = []
@@ -364,20 +309,18 @@ def indir_uygulama_dwg(veri: dict = Body(...)):
         kapak = veri.get("kapak_sayfasi")
         if isinstance(kapak, dict) and any(str(x).strip() for x in kapak.values()):
             paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak)))
-        paftalar.append(("Uygulama Projesi",
-                         X_PDF.uygulama_coklu_pdf(s) if coklu
-                         else X_PDF.uygulama_pdf(s)))
+        paftalar.append(("Uygulama Projesi", X_PDF.uygulama_pdf(s)))
         ad = _dosya_adi(_p, "Uygulama Projesi", "zip")
         #  Pakete çalışma kitabı ve PROJE DOSYASI da girer:  teslim paketi ile
         #  geri dönüş noktası aynı arşivde dursun.  ÇOKLU PROJEDE ASANSÖR
         #  BAŞINA AYRI KİTAP girer — mukavemet şablonu tek asansörlüktür.
         ekler = list(_paket_ekleri(veri, "uygulama"))
         try:
-            if coklu:
+            if s["adet"] > 1:
                 ekler += _asansor_kitaplari(s, _p)
             else:
                 ekler.append((os.path.splitext(ad)[0] + ".xlsx",
-                              X_MXLS.mukavemet_xlsx(s["girdi"], _p)))
+                              X_MXLS.mukavemet_xlsx(s["asansorler"][0]["girdi"], _p)))
         except Exception:                                     # noqa: BLE001
             pass          # şablon yoksa paket yine çıkar, yalnız kitap olmaz
         paket, sebep, tasti = X_DXF.proje_paketi(
