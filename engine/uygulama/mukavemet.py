@@ -3107,8 +3107,7 @@ def _tamponlar(g, o):
     #  ── m.5.8.1.5  TİP / HIZ UYUMU ────────────────────────────────────
     hiz_uygun = (not biriktirmeli) or v <= MT.TAMPON_BIRIKTIRMELI_AZAMI_HIZ
     ad += [
-        metin("Tampon tipinin beyan hızına uygunluğu  ( m.5.8.1.5 / m.5.8.1.6 ) :",
-              vurgu=True),
+        metin("Tip ve beyan hızı  ( m.5.8.1.5 / m.5.8.1.6 ) :", vurgu=True),
         kontrol(
             (f"Enerji biriktirmeli tampon:  v = {tr(v)} m/s  ≤  "
              f"{tr(MT.TAMPON_BIRIKTIRMELI_AZAMI_HIZ)} m/s" if biriktirmeli else
@@ -3120,14 +3119,12 @@ def _tamponlar(g, o):
     #  ── STROK ────────────────────────────────────────────────────────
     if katsayi is None:
         #  Lineer olmayan:  strok bağıntısı yok, tip deneyi belirler.
+        #  PAFTAYA TEK SATIR.  Uzun anlatım ekranda ⓘ altında durur
+        #  ( aciklamalar );  pafta hesap belgesidir, ders anlatmaz.
         ad += [
             metin("Strok  ( m.5.8.2.1.2 ) :", vurgu=True),
-            metin("Lineer olmayan tamponda strok bir bağıntıdan çıkmaz;  "
-                  "m.5.8.2.1.2.1 ortalama yavaşlamanın 1 gn'yi, 2,5 gn üstü "
-                  "sürenin 0,04 s'yi, tepe yavaşlamanın 6 gn'yi aşmamasını "
-                  "ister ve bunları TİP DENEYİNE bırakır.  Tamponun beyan "
-                  "yükü ( P + Q ) ve çarpma hızı için belgeli olduğu "
-                  "AT tip inceleme belgesinden doğrulanmalıdır."),
+            veri("", "Strok bağıntısı", "TİP DENEYİ", "",
+                 "m.5.8.2.1.2.1 — yavaşlama ölçütleri, AT tip inceleme belgesi"),
         ]
         gereken = None
     else:
@@ -3156,6 +3153,11 @@ def _tamponlar(g, o):
 
     b["adimlar"] = ad
     b["aciklamalar"] = [
+        "LİNEER OLMAYAN TAMPONDA STROK BİR BAĞINTIDAN ÇIKMAZ.  "
+        "m.5.8.2.1.2.1 ortalama yavaşlamanın 1 gn'yi, 2,5 gn üstü sürenin "
+        "0,04 s'yi, tepe yavaşlamanın 6 gn'yi aşmamasını ister ve bunları "
+        "TİP DENEYİNE bırakır;  tamponun beyan yükü ( P + Q ) ve çarpma hızı "
+        "için belgeli olduğu AT tip inceleme belgesinden doğrulanmalıdır.",
         "Tampon strokları YERLEŞİME de girer:  aynı sayı sığınma "
         "açıklıklarında ( m.5.2.5.7 / m.5.2.5.8 ) ve halat boyunda "
         "kullanılır — bkz. bölüm 'SIĞINMA ALANLARI'.",

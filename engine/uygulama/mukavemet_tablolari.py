@@ -706,10 +706,13 @@ KANAL_ISLEME_SEKILLERI = tuple(s[0] for s in KANAL_ISLEME)
 #  sınırı yoktur ( m.5.8.1.6 ).
 #
 #      ad · enerji biriktirmeli mi · strok katsayısı ( None = tip deneyi )
+#  AD KISA TUTULUR:  pafta değer sütunu 40 mm'dir, uzun ad üç satıra
+#  bölünüyordu.  Tipin standarttaki tam karşılığı bölümün KAYNAK sütununda
+#  ( m.5.8.2.1.1 · m.5.8.2.1.2 · m.5.8.2.2 ) zaten yazılı.
 TAMPON_TIPLERI = (
-    ("Enerji biriktirmeli - lineer  ( yaylı )", True, 0.135),
-    ("Enerji biriktirmeli - lineer olmayan  ( poliüretan )", True, None),
-    ("Enerji yutmalı  ( hidrolik )", False, 0.0674),
+    ("Yaylı  ( lineer )", True, 0.135),
+    ("Poliüretan  ( lineer olmayan )", True, None),
+    ("Hidrolik  ( enerji yutmalı )", False, 0.0674),
 )
 TAMPON_TIPLERI_ADLARI = tuple(t[0] for t in TAMPON_TIPLERI)
 #  m.5.8.2.1.1.1'in alt sınırı:  hesap ne verirse versin 65 mm'nin altına

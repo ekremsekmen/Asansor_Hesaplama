@@ -276,7 +276,29 @@ BILINEN_FARK = {
 SERBESTLESTIRILEN = {"agirlik_ray_arasi": "Karşı ağırlığın ölçüleri"}
 
 
+def _ek_satir_denetimi(r):
+    """Ek girdi satırları ofis sabitleri bloğuyla çakışmamalı.
+
+    İkisi de 'Veri Girişi'!A sütununa yazılır.  Ek girdi listesi büyüyünce
+    blok aşağı kaydırılmazsa etiketler birbirini EZİYOR ve hata sessiz
+    kalıyor:  ofis sabitleri yalnız varsayılandan farklıyken yazıldığı için
+    çoğu senaryoda blok boş oluyor ve çakışma görünmüyor.
+    """
+    from exports import mukavemet_xlsx as _X
+    _son = max(row for _a, row, *_x in _X.EK_GIRDI_HUCRELERI)
+    r.kontrol("ek girdi satırları ofis bloğuna taşmıyor",
+              not _X._ek_satir_cakismasi(),
+              f"→ son ek girdi satırı {_son}, ofis başlığı {_X.OFIS_BASLIK}")
+    r.kontrol("ek girdi satır numaraları benzersiz",
+              len({row for _a, row, *_x in _X.EK_GIRDI_HUCRELERI})
+              == len(_X.EK_GIRDI_HUCRELERI))
+    r.kontrol("ofis bloğu arama penceresi başlığı kapsıyor",
+              _X.OFIS_BASLIK in _X.OFIS_ARAMA,
+              f"→ {_X.OFIS_BASLIK} ∉ {_X.OFIS_ARAMA}")
+
+
 def _girdi_sozlesmesi(r, wb):
+    _ek_satir_denetimi(r)
     """engine/mukavemet_girdi.py ↔ 'Veri Girişi' sayfası."""
     from openpyxl.utils import range_boundaries
     ws = wb["Veri Girişi"]

@@ -405,14 +405,14 @@ EK_GIRDI_HUCRELERI = (
     #  sormaz, dolayısıyla m.5.8.1.5'in hız sınırını ve m.5.8.2'nin strok
     #  bağıntısını denetleyemez.  Adet de yoktur:  kuyu tabanı kuvveti
     #  m.5.2.1.8.5'e göre tampon BAŞINA düşer  ( bkz. sapma ㊵ ).
+    ("tampon_tipi",           258, "Tampon tipi  ( m.5.8.1 )",       "—"),
+    ("kabin_tampon_adedi",    259, "Kabin tamponu adedi",            "adet"),
+    ("agirlik_tampon_adedi",  260, "Ağırlık tamponu adedi",          "adet"),
     #  ASKI NOKTASI ( S ) — Ek C.1.2.  Kitap yalnız kabin merkezinin
     #  kaçıklığını sorar;  halatların NEREDEN asıldığı ayrı bir noktadır ve
     #  C.2.2.1 / C.2.3.1'in ( xQ − xs ) · ( yp − ys ) kollarına girer.
     ("aski_kaciklik_x",       261, "xs — askı noktasının x kaçıklığı", "mm"),
     ("aski_kaciklik_y",       262, "ys — askı noktasının y kaçıklığı", "mm"),
-    ("tampon_tipi",           258, "Tampon tipi  ( m.5.8.1 )",       "—"),
-    ("kabin_tampon_adedi",    259, "Kabin tamponu adedi",            "adet"),
-    ("agirlik_tampon_adedi",  260, "Ağırlık tamponu adedi",          "adet"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -422,8 +422,13 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  oluyordu — aynı projenin sonucu dosyadan geçince değişiyordu.
 #  Blok, yukarıdaki ek girdi listesi büyüdükçe aşağı kayar;  konum yalnız
 #  YAZMA içindir, okuma başlığı arayarak bulur ( _ofis_basligi ).
-OFIS_BASLIK = 261
-OFIS_BAS = 263
+#  BLOK, EK GİRDİ LİSTESİ BÜYÜDÜKÇE AŞAĞI KAYAR.  Liste 260'ta bitiyordu,
+#  askı noktası ( xs · ys ) eklenince 262'ye indi ve başlık 261'de kalınca
+#  ÜST ÜSTE bindi:  teslim kopyasında xs'in etiketi ofis başlığıyla
+#  eziliyordu.  Aşağıdaki iki sayı bu yüzden listenin sonuna göre ayarlanır;
+#  _ek_satir_cakismasi() ikisinin bir daha çakışmamasını denetler.
+OFIS_BASLIK = 264
+OFIS_BAS = 266
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -457,6 +462,18 @@ def _ofis_yaz(vg, g):
         vg[f"A{satir}"] = US.ETIKET.get(anahtar, (anahtar,))[0]
         vg[f"B{satir}"] = deger
         vg[f"C{satir}"] = anahtar
+
+
+def _ek_satir_cakismasi():
+    """Ek girdi satırları ofis sabitleri bloğuna taşıyor mu?
+
+    İkisi de aynı sütunda ( 'Veri Girişi'!A ) yazılır;  ek girdi listesi
+    büyüdüğünde blok aşağı kaydırılmazsa etiketler birbirini eziyor ve
+    hata SESSİZ kalıyor — ofis sabitleri yalnız varsayılandan farklıyken
+    yazıldığı için çoğu testte blok boş oluyor.  Bu yüzden ayrı denetlenir.
+    """
+    son = max(r for _a, r, *_x in EK_GIRDI_HUCRELERI)
+    return son >= OFIS_BASLIK
 
 
 def _ofis_basligi(vg):

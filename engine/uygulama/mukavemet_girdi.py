@@ -287,6 +287,19 @@ ALANLAR = (
     ("agirlik_carpma_arasi", "B125", "Ağırlık tamponu - çarpma plakası arası", "mm", "sayi", None, 150),
 )
 
+#  İŞARETLİ ( NEGATİF OLABİLEN ) ALANLAR
+#  TS EN 81-50 Ek C.1.2 ray eksenini ORİJİN alan bir Kartezyen sistem kurar:
+#  kabin merkezi, boş kabin kütlesi, beyan yükü, askı ve kapı konumları bu
+#  eksene göre İŞARETLİ koordinatlardır.  Ray ekseninin bir yanı artı, öbür
+#  yanı eksidir ve işaret momentin YÖNÜNÜ belirler — C.2.2.1'in ( yp − ys )
+#  kolu, iki nokta ray ekseninin ayrı yanlarındaysa büyür, aynı yanındaysa
+#  küçülür.  Bu alanları "negatif olamaz" saymak, kaçıklığı yalnız tek yöne
+#  izin vermek demekti;  ELEport'un örnek projesinde de Yp = −15,0 cm'dir.
+#
+#  ÖTEKİ ALANLAR NEGATİF OLAMAZ:  uzunluk, kütle, çap, sehim ve adet
+#  büyüklüktür, işareti yoktur.
+ISARETLI_ALANLAR = ("kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y")
+
 #  Hızlı erişim
 ALAN = {a[0]: a for a in ALANLAR}
 HUCRE_ALAN = {a[1]: a[0] for a in ALANLAR}
@@ -584,7 +597,9 @@ def dogrula(g):
             hata.append(f"{ad}: geçersiz seçim — {d!r}. "
                         f"Seçenekler: {', '.join(str(x) for x in secenekler)}.")
             continue
-        if tur == "sayi" and (not _sayi(d) or d < 0):
+        if tur == "sayi" and not _sayi(d):
+            hata.append(f"{ad}: sayı olmalı ( {d!r} girildi ).")
+        elif tur == "sayi" and d < 0 and anahtar not in ISARETLI_ALANLAR:
             hata.append(f"{ad}: negatif olmayan bir sayı olmalı ( {d!r} girildi ).")
 
     #  Tutarlılık
