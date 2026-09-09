@@ -17,8 +17,9 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageBreak,
-                                PageTemplate, Paragraph, Spacer, Table, TableStyle)
+from reportlab.platypus import (BaseDocTemplate, Flowable, Frame, KeepTogether,
+                                PageBreak, PageTemplate, Paragraph, Spacer,
+                                Table, TableStyle)
 
 from engine.ortak.steps import tr, trn
 
@@ -152,6 +153,73 @@ def _p(metin, stil="n"):
     return Paragraph(s, S[stil])
 
 
+def _kisalt(metin, font, boy, en):
+    """Metni verilen genişliğe sığdırır;  sığmazsa sonuna "…" koyar."""
+    t = str(metin or "")
+    if pdfmetrics.stringWidth(t, font, boy) <= en:
+        return t
+    while t and pdfmetrics.stringWidth(t + "…", font, boy) > en:
+        t = t[:-1]
+    return t + "…"
+
+
+def _isaret_adi(onek, ad):
+    """Yürüyen bölüm adı:  "ASANSÖR 2 · Yolcu  ›  4 - Askı halatları"."""
+    onek = str(onek or "").strip()
+    return f"{onek}  ›  {ad}" if onek else str(ad or "")
+
+
+# ------------------------------------------------- yürüyen bölüm adı
+class _BolumIsareti(Flowable):
+    """Görünmez işaret — sayfa altındaki "şu an bu bölümdesiniz" yazısını besler.
+
+    21 sayfalık bir paftada 6. sayfayı açan kişi hangi bölüme baktığını
+    göremiyordu:  bölüm başlığı sayfalar önce kalmış olabiliyor.  Bu işaret
+    bölüm başlığının hemen önüne konur ve ÇİZİLDİĞİNDE belgeye hangi bölümde
+    olduğumuzu söyler.
+
+    SAYFANIN BÖLÜMÜ, SAYFANIN TEPESİNDEKİ BÖLÜMDÜR.  Bir sayfa önceki
+    bölümün kuyruğuyla başlayıp ortasında yeni bölüme geçebilir;  o sayfanın
+    yazısı BAŞTAKİNİ göstermelidir.  Bu yüzden işaret, yalnız sayfanın
+    tepesinde çizildiyse "bu sayfanın bölümü" olur;  aşağıda çizilirse
+    yalnız SONRAKİ sayfalar için geçerli olacak "son bölüm"ü günceller.
+    """
+
+    width = height = 0
+
+    #  Sayfanın ÜST ŞERİDİ:  bir bölüm bu kadar yukarıda başlıyorsa sayfayı
+    #  o bölüm açıyor demektir.  ( asansör bandı + aile bandı + bölüm başlığı
+    #  üst üste geldiğinde ilk bölüm işareti tepeden ~23 mm aşağıdadır. )
+    UST_SERIT = 30 * mm
+
+    def __init__(self, ad):
+        super().__init__()
+        self.ad = str(ad or "")
+
+    def wrap(self, *_a):                       # noqa: ANN002
+        return (0, 0)
+
+    def draw(self):
+        belge = getattr(self.canv, "_belge", None)
+        if belge is None:
+            return
+        if not belge.sayfa_isaretli:
+            belge.sayfa_isaretli = True        # bu sayfada ilk söz hakkı
+            try:
+                _x, y = self.canv.absolutePosition(0, 0)
+            except Exception:                                 # noqa: BLE001
+                y = 0.0
+            #  Sayfa bu bölümle AÇILIYORSA yazı budur.  Değilse sayfanın
+            #  tepesinde önceki bölümün kuyruğu vardır ve yazı — sayfa
+            #  başında konan taşıma değeri — olduğu gibi kalır.
+            #  BELGENİN İLK İŞARETİ her hâlükârda geçerlidir:  ondan önce
+            #  hiçbir bölüm yoktur, sayfanın tepesinde uyarı kutusu ya da
+            #  aile bandı olsa bile o sayfa bu bölüme aittir.
+            if belge.son_bolum is None or y >= belge.ust_sinir - self.UST_SERIT:
+                belge.sayfa_bolumu = self.ad
+        belge.son_bolum = self.ad
+
+
 # ---------------------------------------------------------------- belge iskeleti
 class _Belge(BaseDocTemplate):
     """
@@ -167,15 +235,45 @@ class _Belge(BaseDocTemplate):
     def __init__(self, buf, ust_baslik, alt_baslik, olcek=1.0, **kw):
         # Pafta PDF'leri proje antedi taşımaz; bu bilgiler yalnız kapaktadır.
         baslik = ust_baslik
-        super().__init__(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
-                         topMargin=28 * mm, bottomMargin=22 * mm,
+        #  KENAR BOŞLUKLARI DARALDI.  Eskiden içerik 15/15/28/22 mm içeriden
+        #  başlıyor, ÜSTÜNE de 12 mm içeriden bir çerçeve dikdörtgeni
+        #  çiziliyordu;  DXF'te A4 çerçevesi ile pafta arasında görünen
+        #  boşluk buydu.  Dikdörtgen kalktı, içerik A4'ün kendisine oturuyor.
+        super().__init__(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm,
+                         topMargin=20 * mm, bottomMargin=16 * mm,
                          title=baslik, author="",
                          subject=alt_baslik, creator="Asansör Proje Programı", **kw)
         self.ust_baslik, self.alt_baslik = ust_baslik, alt_baslik
         self.olcek = k = float(olcek) if olcek else 1.0
         cerceve = Frame(self.leftMargin / k, self.bottomMargin / k,
                         self.width / k, self.height / k, id="ana")
-        self.addPageTemplates([PageTemplate(id="std", frames=cerceve, onPage=self._sayfa)])
+        #  YÜRÜYEN BÖLÜM ADI.  onPage sayfanın BAŞINDA, içerik çizilmeden
+        #  çalışır — orada henüz o sayfada hangi bölüm olduğu bilinmez.  Bu
+        #  yüzden yazı sayfa BİTİMİNDE ( onPageEnd ) konur;  o an
+        #  _BolumIsareti işaretleri çizilmiş olur.
+        self.son_bolum = None          # en son çizilen bölüm ( sayfalar arası taşınır )
+        self.sayfa_bolumu = None       # bu sayfanın TEPESİNDEKİ bölüm
+        self.sayfa_isaretli = False    # bu sayfada işaret çizildi mi
+        self.ust_sinir = A4[1] - self.topMargin
+        self.addPageTemplates([PageTemplate(id="std", frames=cerceve,
+                                            onPage=self._sayfa,
+                                            onPageEnd=self._sayfa_sonu)])
+
+    def _sayfa_sonu(self, cnv, doc):    # noqa: ARG002
+        """Sayfanın bölümünü alt şeride yazar  ( içerik çizildikten sonra )."""
+        ad = self.sayfa_bolumu
+        if not ad:
+            return
+        #  YAZI ALT ŞERİTTEDİR, üstte değil:  üst şeridin ortasında 100 mm
+        #  genişliğinde pafta başlığı durur ( sol kenarı 55 mm ), yanına ancak
+        #  40 mm sığardı — bölüm adı sürekli kırpılırdı.  Alt şeritte sayfa
+        #  numarasının karşısında 150 mm boş yer var ve okuyucu zaten sayfa
+        #  numarasına bakarken görüyor.
+        cnv.saveState()
+        cnv.setFillColor(GRI)
+        cnv.setFont(F, 6.4)
+        cnv.drawString(14 * mm, 6.6 * mm, _kisalt(ad, F, 6.4, 150 * mm))
+        cnv.restoreState()
 
     #  reportlab'in onPage geri çağrısı ( canvas, doc ) imzasıyla çağrılır;
     #  `doc` bu paftada kullanılmaz ama imzadan çıkarılamaz.
@@ -185,29 +283,37 @@ class _Belge(BaseDocTemplate):
         tüm hesap kalın bir çerçeve içinde, üstte tek başlık şeridi,
         altta sayfa numarası.  Dolgu yoktur; yalnız çizgi.
         """
+        cnv._belge = self          # _BolumIsareti buradan belgeye ulaşır
+        #  Yeni sayfa, önceki sayfanın bölümüyle AÇILIR;  sayfanın tepesinde
+        #  yeni bir bölüm başlıyorsa işaret bunu değiştirir.
+        self.sayfa_bolumu = self.son_bolum
+        self.sayfa_isaretli = False
         cnv.saveState()
         w, h = A4
-        sol, sag = 12 * mm, w - 12 * mm
-        ust, alt = h - 12 * mm, 12 * mm
+        sol, sag = 14 * mm, w - 14 * mm
+        #  SAYFA ÇERÇEVESİ ÇİZİLMEZ.  Eskiden 12 mm içeriden kalın bir
+        #  dikdörtgen vardı;  paftayı bir tablo gibi kutuluyordu, sayfa başına
+        #  dört çizgi ediyordu ve DXF'te A4 çerçevesinin içinde ikinci bir
+        #  çerçeve olarak görünüp aradaki boşluğu yaratıyordu.  Sayfanın
+        #  sınırını A4'ün kendisi ve DXF şablonundaki çerçeve gösterir.
+        #  Kalan iki çizgi GERÇEK bir ayrım yapar:  başlığın altı ve
+        #  sayfa numarasının üstü.
         cnv.setStrokeColor(SIYAH)
-        cnv.setLineWidth(1.2)
-        cnv.rect(sol, alt, sag - sol, ust - alt, stroke=1, fill=0)
-        #  Üst şerit: belge adı ( solda ) — çerçevenin İÇİNDE, altında çizgi
-        #  Pafta başlığı BİR KEZ yazılır — çerçevenin üst şeridinde, ortalı.
         cnv.setFillColor(SIYAH)
         cnv.setFont(FB, 12)
-        cnv.drawCentredString((sol + sag) / 2, ust - 8.2 * mm, self.ust_baslik)
+        cnv.drawCentredString((sol + sag) / 2, h - 13.6 * mm, self.ust_baslik)
         cnv.setLineWidth(0.8)
-        cnv.line(sol, ust - 11.4 * mm, sag, ust - 11.4 * mm)
+        cnv.line(sol, h - 16.6 * mm, sag, h - 16.6 * mm)
         #  Alt şerit: sayfa numarası ( sağda ), üstünde çizgi
-        cnv.line(sol, alt + 7.0 * mm, sag, alt + 7.0 * mm)
+        alt = 0.0
+        cnv.line(sol, alt + 11.0 * mm, sag, alt + 11.0 * mm)
         cnv.setFillColor(GRI)
         cnv.setFont(F, 6.4)
         #  KAYNAK DİZESİ PAFTAYA BASILMAZ.  Standart ve baskı bilgisi zaten her
         #  hesap satırının "kaynak" kolonunda yazılı; alt bilgide tekrarlanması
         #  paftayı kalabalıklaştırıyordu.  Bilgi dosyanın ÖZELLİKLERİNDE
         #  ( subject ) taşınmaya devam eder.
-        cnv.drawRightString(sag - 3 * mm, alt + 2.4 * mm, f"Sayfa {cnv.getPageNumber()}")
+        cnv.drawRightString(sag, alt + 6.6 * mm, f"Sayfa {cnv.getPageNumber()}")
         cnv.restoreState()
         #  Çerçeve içeriği bundan sonra çizilir; ölçek yalnız ONU etkiler.
         #  Sayfa değişiminde çizim durumu sıfırlandığı için her sayfada
@@ -225,8 +331,11 @@ def _baslik_seridi(metin, kaynak=""):
               colWidths=[_w(108 * mm), _w(72 * mm)])
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOX", (0, 0), (-1, 0), _c(0.7), SIYAH),
-        ("LINEABOVE", (0, 0), (-1, 0), _c(1.2), SIYAH),
+        #  Kutu değil, İKİ KURAL:  üstte kalın ( bölümün başladığı yer ),
+        #  altta ince ( başlığı satırlardan ayırır ).  Kutu dört çizgi ederdi,
+        #  ikisi her bölümde gereksizdi.
+        ("LINEABOVE", (0, 0), (-1, 0), _c(1.1), SIYAH),
+        ("LINEBELOW", (0, 0), (-1, 0), _c(0.4), SIYAH),
         ("TOPPADDING", (0, 0), (-1, -1), 3.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.0),
         ("LEFTPADDING", (0, 0), (0, 0), 3), ("RIGHTPADDING", (1, 0), (1, 0), 3),
         ("ALIGN", (1, 0), (1, 0), "RIGHT"),
@@ -245,6 +354,20 @@ def _adim_tablosu(adimlar):
         tip = a.get("tip")
         bas = i                       # bu adımın ilk satırı
         if tip == "metin":
+            #  KARAR SATIRI mı, ALT BAŞLIK mı?  kontrol() adımında `aciklama`
+            #  karşılaştırmanın KENDİSİDİR ( "Dt / dh = 36,92 ≥ 40" ) ve vurgu
+            #  açıktır;  metin() alt başlığında ise aciklama boştur.  İkisi de
+            #  aynı biçimde basılıyordu:  karar satırı alt başlık gibi
+            #  görünüyor, KARŞILAŞTIRMA ise paftaya hiç geçmiyordu — oysa
+            #  denetime giden çıktıda kararın dayanağı görünmelidir.
+            if a.get("vurgu") and str(a.get("aciklama") or "").strip():
+                veriler.append(["", _p(a["aciklama"], "n"), "",
+                                _p(f"<b>{a['deger']}</b>", "sag"), "", ""])
+                stil += [("SPAN", (1, i), (2, i)), ("SPAN", (3, i), (5, i)),
+                         ("TOPPADDING", (0, i), (-1, i), 1.4),
+                         ("BOTTOMPADDING", (0, i), (-1, i), 4.6)]
+                i += 1
+                continue
             veriler.append([_p(f"<b>{a['deger']}</b>", "n"), "", "", "", "", ""])
             stil += [("SPAN", (0, i), (2, i)),
                      ("TOPPADDING", (0, i), (-1, i), 4), ("BOTTOMPADDING", (0, i), (-1, i), 3)]
@@ -265,7 +388,6 @@ def _adim_tablosu(adimlar):
                             _p(a["metin"], "sag"), _p(a["birim"], "n"), _p(a["kaynak"], "kaynak")])
             stil += [("SPAN", (1, i), (2, i)),
                      ("BOTTOMPADDING", (0, i), (-1, i), 4),
-                     ("LINEBELOW", (0, i), (-1, i), _c(0.4), CIZGI),
                      #  DENKLEM ile sayıların yerine konmuş hâli AYRILMAZ.
                      ("NOSPLIT", (0, bas), (-1, i))]
             i += 1
@@ -273,25 +395,30 @@ def _adim_tablosu(adimlar):
         veriler.append([_p(f"<b>{a['sembol']}</b>", "n"), _p(a["aciklama"], "n"),
                         _p("=", "n") if a["sembol"] or a["aciklama"] else "",
                         _p(a["metin"], "sag"), _p(a["birim"], "n"), _p(a["kaynak"], "kaynak")])
-        stil += [("LINEBELOW", (0, i), (-1, i), _c(0.4), SIYAH)]
         i += 1
 
-    #  TAM IZGARA:  ofis paftasında her satır çerçeveli bir hücredir.  Dikey
-    #  çizgiler değer / birim / kaynak kolonlarını ayırır — dolgu kalktığı
-    #  için sayıların hizasını artık bu çizgiler tutuyor.
-    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm),
-                                  _w(30 * mm), _w(18 * mm), _w(30 * mm)])
+    #  IZGARA YOK.  Hesap satırları bir çizelge değil, okunacak bir metindir:
+    #  yapıyı HİZA ve TİPOGRAFİ taşır, çizgi değil.  Eskiden her satırın altı
+    #  çizgiliydi, tablo kutuluydu ve değer / kaynak kolonları dikey
+    #  ayraçlarla bölünüyordu — sayfa başına 46 çizgi ediyordu ve pafta
+    #  hesap yerine hesap TABLOSU gibi görünüyordu.  O çizgilerin hepsi
+    #  DXF'e de birebir geçiyor, CAD'de gereksiz binlerce nesne yaratıyordu.
+    #
+    #  Kalan tek yapısal çizgi bölüm başlığının altı ile SONUÇ şerididir
+    #  ( bkz. _baslik_seridi · _sonuc_kutusu ) — onlar gerçekten bir sınır
+    #  gösterir.  Satır aralığı biraz açıldı ki çizgisiz de ayrışsınlar.
+    #  DEĞER SÜTUNU GENİŞ.  30 mm iken "1.450 × 1.350" ve "Altı Kesik V
+    #  Kanal" gibi değerler ikiye bölünüyordu;  sayı sütununda satır kırılması
+    #  okumayı bozar.
+    #  SEMBOL SÜTUNU 13 mm iken "Nequiv (t)" ikiye düşüyordu;  sembol tek
+    #  satırda okunmalı, açıklama sütunu 3 mm'yi rahat verir.
+    t = Table(veriler, colWidths=[_w(16 * mm), _w(75 * mm), _w(5 * mm),
+                                  _w(40 * mm), _w(14 * mm), _w(30 * mm)])
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.9), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.9),
         ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ("ALIGN", (2, 0), (2, -1), "CENTER"),
-        #  Yalnız İKİ dikey ayraç:  değerin solunda ve kaynağın solunda.
-        #  Birim, değerin devamıdır — araya çizgi girince boş birim
-        #  hücrelerinde başıboş bir çizgi gibi görünüyordu.
-        ("BOX", (0, 0), (-1, -1), _c(0.7), SIYAH),
-        ("LINEBEFORE", (3, 0), (3, -1), _c(0.5), SIYAH),
-        ("LINEBEFORE", (5, 0), (5, -1), _c(0.5), SIYAH),
     ] + stil))
     return t
 
@@ -299,15 +426,39 @@ def _adim_tablosu(adimlar):
 def _sonuc_kutusu(sonuc):
     if not sonuc:
         return None
-    satirlar = [[_p(sonuc.get("baslik", "SONUÇ"), "sonuc"), _p(sonuc.get("metin", ""), "sonuc")]]
-    t = Table(satirlar, colWidths=[_w(52 * mm), _w(128 * mm)])
-    t.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEABOVE", (0, 0), (-1, 0), 1.2, SIYAH),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.5, SIYAH),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 2),
-    ]))
+    _bas = str(sonuc.get("baslik", "SONUÇ"))
+    _hkm = str(sonuc.get("metin", ""))
+    #  BAŞLIK SÜTUNU KENDİ İÇERİĞİNE GÖRE.  Sabit genişlikte iki dert birden
+    #  çıkıyordu:  dar tutulunca "KONTROL Amin ≤ Akabin ≤ Amax" ikiye düşüyor,
+    #  geniş tutulunca hükmün kendisi ( "… olduğundan temel topraklaması
+    #  yeterlidir." 126 mm ) kırılıyordu.  Ölçü yazının gerçeğinden alınır.
+    _bg = pdfmetrics.stringWidth(_bas, FB, 9) + 4 * mm
+    #  ÇOK UZUN BAŞLIK YAN YANA DİZİLMEZ.  "KONTROL Dreg/dreg ≥ 30 · Fçekme ≥
+    #  max( 300 N ; 2 × 1.000,00 N ) · T'min/F'reg ≥ 8" üç satıra düşüyor ve
+    #  yanında tek başına "UYGUNDUR." kalıyordu — okunmuyordu.  Böyle bir
+    #  başlık kendi satırını alır, hüküm altına geçer.
+    if _bg > 78 * mm:
+        satirlar = [[_p(_bas, "sonuc")], [_p(_hkm, "sonuc")]]
+        t = Table(satirlar, colWidths=[_w(180 * mm)])
+        t.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEABOVE", (0, 0), (-1, 0), 1.2, SIYAH),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.5, SIYAH),
+            ("TOPPADDING", (0, 0), (-1, 0), 4), ("BOTTOMPADDING", (0, 0), (-1, 0), 0.5),
+            ("TOPPADDING", (0, 1), (-1, 1), 0.5), ("BOTTOMPADDING", (0, 1), (-1, 1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2), ("LEFTPADDING", (0, 1), (0, 1), 10),
+        ]))
+    else:
+        satirlar = [[_p(_bas, "sonuc"), _p(_hkm, "sonuc")]]
+        _bg = max(_bg, 46 * mm)
+        t = Table(satirlar, colWidths=[_w(_bg), _w(180 * mm - _bg)])
+        t.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEABOVE", (0, 0), (-1, 0), 1.2, SIYAH),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.5, SIYAH),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+        ]))
     ogeler = [Spacer(1, 1.5 * mm), t]
     for alt in sonuc.get("alt", []) or []:
         ogeler.append(_p(alt, "not"))
@@ -380,7 +531,10 @@ def _notlar(notlar):
     #  dış blok, iç bloğun yüksekliğini "sonsuz" okur ( wrap 0xffffff döner )
     #  ve sayfada yer olsa bile her seferinde sayfa atlar.  Notlar zaten
     #  bölümün kuyruk bloğunun içinde, tek parça hâlinde taşınıyor.
-    o = [_p("▪  " + str(n), "not") for n in notlar]
+    #  ÇİFTE MADDE İMİ OLMAZ.  Bazı notlar metnin kendisinde "▪" ya da "⚠"
+    #  ile başlıyor;  önüne bir de burası "▪" koyunca "▪  ▪ …" çıkıyordu.
+    o = [_p(("" if str(n).lstrip()[:1] in ("▪", "⚠", "•") else "▪  ") + str(n), "not")
+         for n in notlar]
     o[0].spaceBefore = 1.2 * mm
     return o
 
@@ -423,7 +577,7 @@ def _bas_orta_son(adimlar):
 
 #  Bir bölümün TAMAMI bu alana sığıyorsa sayfaya bölünmeden basılır.
 #  ( A4 eksi kenar boşlukları — bkz. _Belge.__init__ )
-SAYFA_ALANI = (A4[0] - 30 * mm, A4[1] - 50 * mm)
+SAYFA_ALANI = (A4[0] - 28 * mm, A4[1] - 36 * mm)
 #  Bir bölüm sayfanın bu kadarından KISAYSA hiç bölünmez.  Sınır yoksa uzun
 #  bölümler de bütün hâlde atlar ve arkalarında yarım sayfa boşluk bırakır —
 #  bölünmüş bir hesaptan daha kötü görünür.
@@ -444,7 +598,7 @@ def _yukseklik(akis, gen, yuk):
     return toplam
 
 
-def _bolum(b, ust=None, bosluk=None, sayfa=None):
+def _bolum(b, ust=None, bosluk=None, sayfa=None, onek=None):
     """
     Bir hesap bölümünü basar.
 
@@ -459,6 +613,10 @@ def _bolum(b, ust=None, bosluk=None, sayfa=None):
     #  Başlık ile tablosu ARASINDA boşluk yok: ofis paftasındaki gibi tek
     #  bloktur, başlığın alt çizgisi tablonun üst çizgisidir.
     bas = _baslik_seridi(b["baslik"], b.get("kaynak", ""))
+    #  onek None ise sayfa üstü bölüm yazısı istenmiyor demektir ( trafik
+    #  paftası tek sayfadır, orada üst yazının anlamı yok ).
+    isaret = ([_BolumIsareti(_isaret_adi(onek, b["baslik"]))]
+              if onek is not None else [])
     parcalar = [_adim_tablosu(g)
                 for g in _bas_orta_son(b.get("adimlar") or []) if g]
     if b.get("cetvel"):
@@ -466,9 +624,20 @@ def _bolum(b, ust=None, bosluk=None, sayfa=None):
     #  Paftada iki liste de basılır: "notlar" bu bölümün sonucuna ait satırlar,
     #  "aciklamalar" yöntemi anlatan bilgi metinleri.  Ekranda ikincisi ⓘ
     #  simgesine toplanır; çıktıda hiçbir şey eksilmez.
-    kuyruk = list(_sonuc_kutusu(b.get("sonuc")) or []) + \
-        _notlar(list(b.get("notlar") or []) + list(b.get("aciklamalar") or []))
-    ustluk = ([ust] if ust is not None else []) + [bas]
+    #  PAFTAYA NOT BASILMAZ.  Bölüm biter bitmez SONUÇ gelir.
+    #
+    #  Eskiden her bölümün altına "notlar" ve "aciklamalar" listeleri birden
+    #  basılıyordu:  yöntem anlatımları, kabullerin gerekçeleri, kaynak
+    #  kitaptan ayrılma sebepleri…  23 sayfalık bir paftanın 3 sayfası buydu
+    #  ve hiçbiri hesabın kendisine bir şey katmıyordu — sayılar zaten
+    #  satırlarda, hüküm zaten SONUÇ şeridinde, her satırın dayanağı zaten
+    #  kaynak kolonunda yazılı.
+    #
+    #  BİLGİ KAYBOLMAZ:  ikisi de motorun çıktısında durmaya devam eder ve
+    #  ARAYÜZDE bölüm başlığının yanındaki ⓘ altında okunur.  Pafta ise
+    #  denetime giden belgedir;  orada hesap olur, ders anlatımı olmaz.
+    kuyruk = list(_sonuc_kutusu(b.get("sonuc")) or [])
+    ustluk = ([ust] if ust is not None else []) + [bas] + isaret
     #  Bloklar arası boşluk SPACER olarak değil, ilk öğenin "spaceBefore"u
     #  olarak verilir.  ReportLab sayfanın tepesindeki spaceBefore'u yok sayar;
     #  ayrı bir Spacer konsaydı hem her sayfa boşlukla başlar hem de
@@ -503,7 +672,8 @@ def _cetvel_tablosu(cetvel):
                         _p(trn(c["guc"], 0), "sag"), _p(c["birim"], "n"), _p(c["sigorta"], "n")])
     veriler.append(["", _p("<b>ASANSÖRÜN KURULU GÜCÜ</b>", "n"), _p("=", "n"),
                     _p(trn(toplam, 0), "sag"), _p("W", "n"), ""])
-    t = Table(veriler, colWidths=[_w(13 * mm), _w(84 * mm), _w(5 * mm), _w(30 * mm), _w(18 * mm), _w(30 * mm)])
+    t = Table(veriler, colWidths=[_w(13 * mm), _w(78 * mm), _w(5 * mm),
+                                  _w(40 * mm), _w(14 * mm), _w(30 * mm)])
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -543,10 +713,15 @@ def _uyari_kutusu(metinler, hata=False):
 def _kv_tablo(satirlar, genislikler=(70 * mm, 110 * mm), vurgu_son=False):
     veriler = [[_p(f"<b>{a}</b>", "n"), _p(b, "n")] for a, b in satirlar]
     t = Table(veriler, colWidths=[_w(x) for x in genislikler])
+    #  TAM IZGARA DEĞİL, YALNIZ SATIR ÇİZGİLERİ.  Bu iki kolonlu bir
+    #  "büyüklük → değer" listesidir;  hesap sayfaları çizgisizken burada tam
+    #  ızgara olması paftanın geri kalanıyla ayrışıyordu.  Yatay çizgiler
+    #  satırları ayırmaya yeter, dikey ayraç okumaya bir şey katmıyor.
     stil = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.9), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.9),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("GRID", (0, 0), (-1, -1), _c(0.4), CIZGI),]
+            ("LINEABOVE", (0, 0), (-1, 0), _c(0.4), CIZGI),
+            ("LINEBELOW", (0, 0), (-1, -1), _c(0.4), CIZGI),]
     if vurgu_son:
         stil.append(("LINEABOVE", (0, len(veriler) - 1), (-1, len(veriler) - 1), 0.9, SIYAH))
     t.setStyle(TableStyle(stil))
@@ -733,8 +908,10 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
             continue
         ust = _baslik_seridi(f"{a['baslik']}" + (f"   —   {a['tanim']}" if a["tanim"] else ""),
                              "AVAN PROJE HESAPLARI")
+        _onek = f"{a['baslik']}" + (f" · {a['tanim']}" if a["tanim"] else "")
         for i, b in enumerate(a["bolumler"]):
-            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
+            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI,
+                         onek=_onek)
 
     # ---- makine dairesi
     #  MAKİNE DAİRESİZ ( MRL ) SİSTEMDE BU BÖLÜM HİÇ BASILMAZ.  Makine dairesi
@@ -749,7 +926,7 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
     #  yalnız uyarı metni için gerekli.
     mk = sonuc.get("makine_dairesi") or {}
     if mk.get("aktif"):
-        ic += _bolum(mk["bolum"], bosluk=6 * mm, sayfa=SAYFA_ALANI)
+        ic += _bolum(mk["bolum"], bosluk=6 * mm, sayfa=SAYFA_ALANI, onek="")
     elif mk.get("mk_yok") is False:
         ust = _baslik_seridi("MAKİNE DAİRESİ AYDINLATMASI", "TS EN 81-20")
         ust.spaceBefore = 6 * mm
@@ -761,7 +938,8 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
                          "Temel ( ızgara ) + paralel çubuk topraklayıcı")
     if tp.get("aktif"):
         for i, b in enumerate(tp["bolumler"]):
-            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
+            ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI,
+                         onek="")
     else:
         ust.spaceBefore = 6 * mm
         ic += [KeepTogether([ust] + _uyari_kutusu([tp.get("uyari", "")], hata=True))]
@@ -769,7 +947,8 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
     # ---- SONUÇ ÖZETİ  ( en sonda )  —  imza kutusuyla birlikte tek blok
     ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "tüm asansörler")
     ozet_bas.spaceBefore = 6 * mm
-    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _avan_ozet_tablo(sonuc),
+    ic += [KeepTogether([ozet_bas, _BolumIsareti("SONUÇ ÖZETİ"),
+                         Spacer(1, 1.2 * mm), _avan_ozet_tablo(sonuc),
                          Spacer(1, 5 * mm), _imza_kutusu()])]
     doc.build(ic)
     buf.seek(0)
@@ -861,11 +1040,12 @@ def mukavemet_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
 
     ust = _baslik_seridi("ASANSÖR MUKAVEMET HESAPLARI", "UYGULAMA PROJESİ")
     for i, b in enumerate(sonuc.get("bolumler") or []):
-        ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI)
+        ic += _bolum(b, ust=ust if i == 0 else None, sayfa=SAYFA_ALANI, onek="")
 
     ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "on hesap bölümü")
     ozet_bas.spaceBefore = 6 * mm
-    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _mukavemet_ozet(sonuc),
+    ic += [KeepTogether([ozet_bas, _BolumIsareti("SONUÇ ÖZETİ"),
+                         Spacer(1, 1.2 * mm), _mukavemet_ozet(sonuc),
                          Spacer(1, 5 * mm), _imza_kutusu()])]
     doc.build(ic)
     buf.seek(0)
@@ -919,12 +1099,13 @@ def _uygulama_govdesi(sonuc, ust_ek=""):
         elif i == muk_sayi:
             ust = _baslik_seridi("ELEKTRİK VE TOPRAKLAMA HESAPLARI", kaynak)
             ust.spaceBefore = 6 * mm
-        ic += _bolum(b, ust=ust, sayfa=SAYFA_ALANI)
+        ic += _bolum(b, ust=ust, sayfa=SAYFA_ALANI, onek=ust_ek)
 
     ozet_bas = _baslik_seridi(
         "SONUÇ ÖZETİ", f"{len(sonuc.get('bolumler') or [])} hesap bölümü")
     ozet_bas.spaceBefore = 6 * mm
-    ic += [KeepTogether([ozet_bas, Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc),
+    ic += [KeepTogether([ozet_bas, _BolumIsareti(_isaret_adi(ust_ek, "SONUÇ ÖZETİ")),
+                         Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc),
                          Spacer(1, 5 * mm), _imza_kutusu()])]
     return ic
 
@@ -983,10 +1164,13 @@ def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
         bas = _baslik_seridi("PROJE GENELİ HESAPLAR",
                              "bütün asansörler için bir kez")
         ic.append(bas)
+        #  Bu sayfayı açan şey PROJE GENELİ bandıdır;  ilk bölüm işareti
+        #  açıklama kutusunun altında kaldığı için üst yazıyı band koyar.
+        ic.append(_BolumIsareti("PROJE GENELİ HESAPLAR"))
         ic.append(Spacer(1, 1.5 * mm))
         ic += _pg_aciklamasi(len(asansorler))
         for b in pg:
-            ic += _bolum(b, sayfa=SAYFA_ALANI)
+            ic += _bolum(b, sayfa=SAYFA_ALANI, onek="PROJE GENELİ")
     doc.build(ic)
     buf.seek(0)
     return buf.read()

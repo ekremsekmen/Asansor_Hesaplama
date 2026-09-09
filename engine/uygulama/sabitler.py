@@ -68,6 +68,36 @@ VARSAYILAN = {
     "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
     "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm     ( 11!S58 )
 
+    # ── ②b KASNAK ATALETİ  ( TS EN 81-50 m.5.11.2.2 ) ────────────────
+    #  Tahrik hesabındaki  Σ( mP·iP·a ) / r  terimi kasnağın ATALET
+    #  MOMENTİNİ ister:  mP = J / R².  J bir bileşen özelliğidir ve
+    #  standart onu imalatçıdan bekler — elimizde yoktur ve sahada da
+    #  kimse veri sayfasından okuyup girmez.  Bu yüzden kasnak, çapı ve
+    #  halat düzeni bilinen bir DÖKÜM DİSK olarak modellenir:
+    #
+    #      J = ½·π·ρ·A·( R⁴ − R₁⁴ )  +  ½·π·ρ·A₁·R₁⁴
+    #      R  = Dp / 2          ( saptırma kasnaklarının ortalama çapı )
+    #      R₁ = ( Dp − göbek ) / 2
+    #      A  = ( ns−1 )·1,6·dr + kanal payı        ( kasnak genişliği )
+    #      A₁ = A × göbek genişlik oranı
+    #
+    #  Aşağıdaki dört sayı STANDARTTA YOKTUR, ofis kabulüdür — ekranda
+    #  durur ve değiştirilebilir.  Model, ELEport'un yayımlanmış örnek
+    #  paftasıyla doğrulanmıştır:  Dp = 294 mm · 7 × 6,5 mm halat için
+    #  J = 0,2920 kg·m² hesaplanır, paftalarında 0,29 yazar  ( %0,7 ).
+    "kasnak_yogunluk":   7400,  # ρ — döküm kasnak, kg/m³
+    "kasnak_gobek_pay":    40,  # Dp − 40  →  göbek incelme çapı, mm
+    "kasnak_kanal_payi":   30,  # A bağıntısının sabit payı, mm
+    "kasnak_gobek_orani": 0.25, # A₁ = A × 0,25
+    #  Askı düzenine göre KASNAK ADEDİ.  Bu iki sayı TAHMİN DEĞİLDİR:
+    #  TS EN 81-50 Ek D'nin 2:1 çözümlü örneği katsayıları AÇIK yazar —
+    #      T1 … + mPcar · 2 · a / 2 …        ( kabin tarafı  : 2 kasnak )
+    #      T2 … − mPcwt · 1 · a / 2 …        ( ağırlık tarafı: 1 kasnak )
+    #  Başka bir düzende ( ör. kabin altında tek kasnak ) buradan değiştirilir.
+    #  1:1'de kasnak yoktur, terim sıfırdır  ( koşul III ).
+    "kasnak_adet_kabin":    2,  # r > 1 iken kabin tarafındaki kasnak sayısı
+    "kasnak_adet_agirlik":  1,  # r > 1 iken ağırlık tarafındaki kasnak sayısı
+
     # ── ③ SIĞINMA PAYLARI  ( kabin / kuyu geometrisi ) ───────────────
     #  Bunlar kabin imalatına bağlı ofis kabulleridir;  TS EN 81-20 sayısı
     #  DEĞİLDİR.  Standardın asgari açıklıkları ( 100 · 500 · 300 mm ve
@@ -126,6 +156,9 @@ ARALIK = {
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
     "k1_ani": (1, 10), "k3_yardimci": (1, 10),
     "yan_yatak_L_X": (0, 5000),
+    "kasnak_yogunluk": (1000, 20000), "kasnak_gobek_pay": (0, 500),
+    "kasnak_kanal_payi": (0, 500), "kasnak_gobek_orani": (0, 1),
+    "kasnak_adet_kabin": (0, 10), "kasnak_adet_agirlik": (0, 10),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
     "paten_payi": (0, 5000), "tavan_payi": (0, 5000),
     "revizyon_payi": (0, 5000), "etek_payi": (0, 5000),
@@ -154,6 +187,12 @@ GRUPLAR = (
      "aşağıdakiler ofis kabulüdür",
      ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani", "k3_yardimci",
       "yan_yatak_L_X")),
+    ("②b KASNAK ATALETİ",
+     "tahrik hesabındaki Σ( mP·iP·a )/r terimi — TS EN 81-50 kasnağın atalet "
+     "momentini imalatçıdan ister;  aşağıdaki dört sayı kasnağı döküm disk "
+     "olarak modelleyen OFİS KABULÜDÜR",
+     ("kasnak_yogunluk", "kasnak_gobek_pay", "kasnak_kanal_payi",
+      "kasnak_gobek_orani", "kasnak_adet_kabin", "kasnak_adet_agirlik")),
     ("③ SIĞINMA PAYLARI",
      "kabin gövde ve kuyu geometrisi — kabin imalatına bağlıdır, "
      "TS EN 81-20 sayısı değildir",
@@ -174,6 +213,19 @@ GRUPLAR = (
 )
 
 ETIKET = {
+    #  ── kasnak ataleti  ( TS EN 81-50 m.5.11.2.2 · Ek D )
+    "kasnak_yogunluk": ("Kasnak malzemesi yoğunluğu ρ (kg/m³)",
+                        "döküm kasnak;  J = ½·π·ρ·A·(R⁴−R₁⁴) + ½·π·ρ·A₁·R₁⁴"),
+    "kasnak_gobek_pay": ("Kasnak göbek incelme payı (mm)",
+                         "R₁ = ( Dp − pay ) / 2 — göbekteki et kalınlığı azalması"),
+    "kasnak_kanal_payi": ("Kasnak genişliği sabit payı (mm)",
+                          "A = ( ns−1 )·1,6·dr + pay — kanal dışındaki kenar payı"),
+    "kasnak_gobek_orani": ("Kasnak göbek genişlik oranı",
+                           "A₁ = A × oran — göbeğin incelmiş bölümünün genişliği"),
+    "kasnak_adet_kabin": ("Kabin tarafındaki kasnak sayısı iPcar (adet)",
+                          "TS EN 81-50 Ek D'nin 2:1 örneği  mPcar·2·a/2  yazar"),
+    "kasnak_adet_agirlik": ("Ağırlık tarafındaki kasnak sayısı iPcwt (adet)",
+                            "Ek D'nin aynı örneği  mPcwt·1·a/2  yazar"),
     "k3_yardimci": ("Yardımcı donanım darbe katsayısı k3",
                     "TS EN 81-20 Çizelge 14 k3'e SAYI VERMEZ — "
                     "'imalatçı tarafından, gerçek tesise göre belirlenir'"),

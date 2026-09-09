@@ -243,14 +243,18 @@ def calistir():
         pg.evaluate("mGruplariKapat()")
         r.esit("hepsi kapalıyken okunan girdi kümesi değişmiyor",
                pg.evaluate("Object.keys(mukavemetGirdi()).length"), _ga)
-        #  ON DÖRT BÖLÜMÜN HEPSİ TIKLANABİLİR.  Elektrik bölümleri ( 11-14 )
-        #  bir süre eşlemede yoktu:  mukavemet satırları girdisine götürüyor,
+        #  BÖLÜMLERİN HEPSİ TIKLANABİLİR.  Elektrik bölümleri bir süre
+        #  eşlemede yoktu:  mukavemet satırları girdisine götürüyor,
         #  aydınlatma ve gerilim düşümü satırları ölü duruyordu.
+        #  SAYI ELLE YAZILMAZ — motora bölüm eklenince ( ör. TAMPONLAR )
+        #  test kendiliğinden takip etsin;  aranan şey "hepsi gidilebilir".
+        _satir = pg.eval_on_selector_all(
+            "#m_sonuc tr.m-gidilir td.etiket",
+            "e=>e.map(x=>x.textContent.trim().split(' ')[0])")
         r.esit("sonuç tablosunda bölüm satırlarının hepsi tıklanabilir",
-               pg.eval_on_selector_all(
-                   "#m_sonuc tr.m-gidilir td.etiket",
-                   "e=>e.map(x=>x.textContent.trim().split(' ')[0])"),
-               [str(_i) for _i in range(1, 15)])
+               _satir,
+               [str(_i) for _i in
+                range(1, pg.evaluate("SON.m.bolumler.length") + 1)])
 
         #  ── ÇOKLU ASANSÖR  ( 1 - 4 asansör, tek proje )
         #  Asansör adedi SEÇİLİR ( ekle/sil değil ):  bir binada kaç asansör
@@ -430,11 +434,32 @@ def calistir():
         r.esit("proje geneli bölüm hiçbir asansörde kalmıyor",
                pg.evaluate("SON.mc.asansorler.map(a=>a.bolumler.filter("
                            "b=>b.proje_geneli).length)"), [0, 0])
-        r.kontrol("proje geneli hesaplar asansör panelinde YOK",
+        r.kontrol("proje geneli hesaplar asansörün bölüm listesinde YOK",
                   "TOPRAKLAYICI" not in pg.inner_text("#m_sonuc"))
-        r.kontrol("proje geneli hesaplar PROJE sekmesinde",
+        #  BLOK ASANSÖR SEKMESİNDEDİR, Proje sayfasında değil:  girdileri
+        #  ( MRL · temel ölçüleri · şerit boyu ) da bu sekmede duruyor.
+        r.kontrol("proje geneli hesaplar kendi bloğunda",
                   "TOPRAKLAYICI" in pg.inner_text("#p_geneli")
                   and "PROJE GENELİ HESAPLAR" in pg.inner_text("#p_geneli"))
+        r.esit("proje geneli bloğu asansör sayfasında",
+               pg.eval_on_selector("#p_geneli", "e=>e.closest('section').id"),
+               "s-mukavemet")
+        #  MRL İŞARETLİYKEN MAKİNE DAİRESİ ÖLÇÜLERİ GİZLENİR.  Ortada duran
+        #  ve doldurulabilen kutular "hesap yapılacak" izlenimi veriyordu.
+        _gor = ("e=>{const a=e.closest('.alan')||e;"
+                " return !(a.hidden||getComputedStyle(a).display==='none');}")
+        r.kontrol("MRL kaldırılınca makine dairesi ölçüleri görünür",
+                  pg.eval_on_selector("#m_mk_uzunluk", _gor))
+        pg.check("#m_mk_yok")
+        pg.wait_for_timeout(1800)
+        r.kontrol("MRL işaretlenince makine dairesi ölçüleri gizlenir",
+                  not pg.eval_on_selector("#m_mk_uzunluk", _gor))
+        r.kontrol("MRL'de makine dairesi bölümü hesaba girmiyor",
+                  pg.evaluate("(SON.mc.proje_geneli||[]).every("
+                              "b=>b.baslik.indexOf('MAKİNE DAİRESİ')<0)"),
+                  f"→ {pg.evaluate('(SON.mc.proje_geneli||[]).map(b=>b.baslik)')}")
+        pg.uncheck("#m_mk_yok")
+        pg.wait_for_timeout(1800)
         #  Girdi hangi asansör sekmesinde yazılırsa yazılsın TEK değerdir
         pg.evaluate("mAsansorSec(0)")
         pg.wait_for_timeout(1600)
@@ -444,10 +469,12 @@ def calistir():
         pg.wait_for_timeout(1600)
         #  Temizlik — sonraki koşuyu bozmasın
         pg.evaluate("mTumGruplariAc()")
-        pg.check("#m_mk_yok")
+        #  ÖNCE ölçüler boşaltılır, SONRA MRL işaretlenir:  MRL işaretliyken
+        #  makine dairesi kutuları gizlenir ve doldurulamaz.
         for _a in ("m_mk_uzunluk", "m_mk_genislik", "m_temel_a",
                    "m_temel_b", "m_serit_L"):
             pg.fill(f"#{_a}", "")
+        pg.check("#m_mk_yok")
         pg.wait_for_timeout(2000)
         #  HER ASANSÖR KENDİ GİRDİSİYLE hesaplanır:  sonuçta girdi de dönüyor,
         #  aktif asansörün girdisi ikisine birden gönderilmiş olsa iki motor
@@ -538,9 +565,12 @@ def calistir():
         #      yüzden madde denetlenemez ve bölüm HESAP EKSİK der ( sapma ⑲ ).
         _kalan = pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
                              "b.sonuc.uygun===false).map(b=>b.baslik)")
-        r.esit("varsayılanda üç bölüm kalıyor", len(_kalan), 3)
-        r.kontrol("kalanlar motor gücü, askı halatları ve regülatör",
-                  sorted(x[:1] for x in _kalan) == ["1", "4", "5"], f"→ {_kalan}")
+        #    · TAHRİK YETENEĞİ — acil frenlemede ivme işaretleri Ek D'ye göre
+        #      düzeltilince ( sapma ㊳ ) oran %36 büyüdü;  kitabın örneği
+        #      139°'lik sarılma ve sertleştirilmemiş kanalla sınırı aşıyor.
+        r.esit("varsayılanda dört bölüm kalıyor", len(_kalan), 4)
+        r.kontrol("kalanlar motor gücü, askı halatları, regülatör ve tahrik",
+                  sorted(x[:1] for x in _kalan) == ["1", "4", "5", "6"], f"→ {_kalan}")
         #  GİRDİ AKORDEONU.  Alanlar artık gruplara ayrıldı ve kapalı gruptaki
         #  alan "görünür değil" sayılır — Playwright dolduramaz.  Test alanları
         #  id ile doldurduğu için bütün grupları açıyoruz;  akordeonun kendi
@@ -551,8 +581,13 @@ def calistir():
         pg.fill("#m_saptirma_kasnak_capi", "280")
         pg.fill("#m_motor_gucu", "7.5")
         pg.fill("#m_guvenlik_devreye_kuvvet", "200")
+        #  Tahrik için iki bileşen bilgisi daha:  sertleştirilmiş kanal
+        #  ( f = μ / sin(γ/2) ) ve denge zinciri.
+        pg.select_option("#m_kanal_isleme", "Sertleştirilmiş")
+        pg.select_option("#m_denge_zinciri", "Var")
         pg.wait_for_timeout(1500)
-        r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti girilince "
+        r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · "
+                  "sertleştirilmiş kanal · denge zinciri girilince "
                   "bütün bölümler uygun",
                   pg.evaluate("SON.m.ozet.tumu_uygun === true"),
                   f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
@@ -577,8 +612,16 @@ def calistir():
         pg.wait_for_timeout(1200)
 
         #  Girdi değişince yeniden hesaplanmalı ve sonuç DÖNMELİ
+        #  50'lik rayda λ = 3000 / 10,51 = 285 > 250:  ω tanımsız kalır,
+        #  BURKULMA kontrolü düşer ama hesap durmaz ( uyarı verilir ).
         pg.select_option("#m_kabin_ray_profili", "50 x 50 x 5")
         pg.wait_for_timeout(1400)
+        r.kontrol("küçük ray profili hesabı DURDURMUYOR",
+                  pg.evaluate("SON.m && SON.m.aktif === true"),
+                  f"→ {pg.evaluate('SON.m && SON.m.hata')}")
+        r.kontrol("küçük ray profili narinlik uyarısı veriyor",
+                  pg.evaluate("(SON.m.uyarilar||[]).some(u=>u.indexOf('narin')>=0)"),
+                  f"→ {pg.evaluate('SON.m.uyarilar')}")
         r.kontrol("küçük ray profili uygunsuz sonuç veriyor",
                   pg.evaluate("SON.m.ozet.tumu_uygun === false"))
         r.kontrol("takılan bölüm kılavuz raylar",

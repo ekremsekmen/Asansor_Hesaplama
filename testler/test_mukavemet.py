@@ -33,8 +33,12 @@ SAYFA = "11-Muk. Hesapları"
 
 #  bölüm sırası  →  o bölümde bulunması gereken Excel hücreleri
 #  ( hücre adresi , ne olduğu )
+#  BÖLÜM İNDEKSİ DEĞİL KİMLİK.  Sözlük eskiden 0-9 sıra numarasıyla
+#  anahtarlıydı;  araya yeni bir bölüm girince ( TAMPONLAR, sıra 10 )
+#  ondan sonraki bütün hücreler yanlış bölümde aranmaya başladı.
+#  Kimlik bölümün değişmez adıdır, sıradan etkilenmez.
 HUCRELER = {
-    0: [("AQ16", "Gh  toplam halat ağırlığı"),
+    "motor_gucu": [("AQ16", "Gh  toplam halat ağırlığı"),
         ("AQ19", "lh  halat uzunluğu"),
         ("AQ11", "F1  kabin ve aksesuar yükü"),
         ("AQ13", "Ga  karşı ağırlık yükü"),
@@ -43,7 +47,7 @@ HUCRELER = {
         ("AQ21", "M  moment"),
         ("AQ23", "N  hesaplanan motor gücü"),
         ("X25",  "HP  motor gücü")],
-    1: [("C47",  "F  kaide üzerindeki en büyük kuvvet"),
+    "makine_konstruksiyonu": [("C47",  "F  kaide üzerindeki en büyük kuvvet"),
         ("I51",  "F1  yan yatak putreli"),
         ("O53",  "FB"),
         ("AK53", "FA"),
@@ -51,21 +55,21 @@ HUCRELER = {
         ("J65",  "σe  eğilme gerilmesi"),
         ("O71",  "λ  ham narinlik"),
         ("K73",  "σb  burkulma gerilmesi")],
-    2: [("X84",  "kabin alanı")],
-    3: [("N97",  "Dt / dh"),
+    "kabin_alani": [("X84",  "kabin alanı")],
+    "aski_halatlari": [("N97",  "Dt / dh"),
         ("T112", "Kp"),
         ("P114", "Nequiv(p)"),
         ("V116", "Nequiv"),
         ("T125", "Sf  halat güvenlik katsayısı"),
         ("T126", "S  gerçek güvenlik katsayısı")],
-    4: [("AI134", "gh  regülatör halatı ağırlığı"),
+    "regulator_halati": [("AI134", "gh  regülatör halatı ağırlığı"),
         ("J142",  "Dreg / dreg"),
         ("W146",  "f  sürtünme değeri"),
         ("AF146", "e^(f·α')"),
         ("W151",  "Freg"),
         ("J156",  "F'reg"),
         ("G161",  "T'min / F'reg")],
-    5: [("U174", "A  kasnaklar arası yatay mesafe"),
+    "tahrik_yetenegi": [("U174", "A  kasnaklar arası yatay mesafe"),
         ("Z178", "B  kasnaklar arası düşey mesafe"),
         ("C184", "θ"),
         ("S184", "α  sarılma açısı"),
@@ -79,7 +83,7 @@ HUCRELER = {
         ("AH278", "T1  bloke"), ("AF283", "T2  bloke"),
         ("O242", "e^(f·α) yükleme"), ("O257", "e^(f·α) frenleme"),
         ("O285", "e^(f·α) bloke")],
-    6: [("AH291", "Mg  kabin rayı kütlesi"),
+    "kabin_raylari": [("AH291", "Mg  kabin rayı kütlesi"),
         ("AH293", "xc"), ("AH295", "xp"), ("AH303", "Fs  eşik kuvveti"),
         ("Z309", "xQ  durum 1"), ("Z312", "yQ  durum 2"),
         ("AY321", "C.2.1 D1 Fx"), ("AU324", "C.2.1 D1 σx"),
@@ -106,7 +110,7 @@ HUCRELER = {
         ("L508", "C.2.3 Fx"), ("AU511", "C.2.3 σx"),
         ("Z530", "C.2.3 σm"), ("AF532", "C.2.3 σc"),
         ("Z537", "C.2.3 σF"), ("AH542", "C.2.3 δx")],
-    7: [("AH550", "ağırlık derinliği"), ("AH551", "ağırlık genişliği"),
+    "agirlik_raylari": [("AH550", "ağırlık derinliği"), ("AH551", "ağırlık genişliği"),
         ("N562",  "Dxa"), ("AL562", "Dya"),
         ("AH554", "Mg  ağırlık rayı kütlesi"),
         ("AP566", "Fx"), ("AU569", "σx"),
@@ -114,10 +118,10 @@ HUCRELER = {
         ("AE580", "Fv"), ("AL583", "σv"),
         ("Z595",  "σF"),
         ("AH600", "δx"), ("AH603", "δy")],
-    8: [("AH611", "LR  ray boyu"),
+    "kuyu_tabani": [("AH611", "LR  ray boyu"),
         ("AX611", "FKR"), ("AN616", "FAR"),
         ("AF621", "Fkt"), ("AI627", "Fat")],
-    9: [("AI635", "b - üst paten"), ("AI636", "c.2 - kabin üstü"),
+    "siginma_alanlari": [("AI635", "b - üst paten"), ("AI636", "c.2 - kabin üstü"),
         ("AI637", "a - revizyon kutusu"), ("AI638", "b - paten/halat"),
         ("AD638", "serbest boşluk"), ("AI640", "Ç.2 - ağırlık üst pateni"),
         ("AI645", "a - kuyu tabanı"), ("AI646", "a.1 - kabin eteği"),
@@ -150,7 +154,7 @@ def calistir():
                      f"→ {s.get('hata')}"):
         return r
     b = s["bolumler"]
-    r.esit("bölüm sayısı", len(b), 10)
+    r.esit("bölüm sayısı", len(b), 11)
     for i, bl in enumerate(b):
         r.kontrol(f"bölüm {i + 1} başlığı dolu", bool(bl.get("baslik")))
         r.kontrol(f"bölüm {i + 1} adım üretti", len(bl.get("adimlar") or []) > 0)
@@ -170,10 +174,14 @@ def calistir():
     #      "güvenlik tertibatını devreye sokmak için gerekenin iki katı"dır ve
     #      o kuvvet İMALATÇI VERİSİDİR.  Kitabın örneğinde yoktur;  madde
     #      denetlenemediği için bölüm "HESAP EKSİK" der ( sapma ⑲ ).
+    #    · TAHRİK YETENEĞİ — acil frenlemede ivme işaretleri Ek D'ye göre
+    #      düzeltilince ( sapma ㊳ ) T1/T2 oranı %36 büyüdü ve kitabın örneği
+    #      sarılma açısı 139° · sertleştirilmemiş kanalla sınırı aşıyor.
+    #      Kitap ters işaretle 1,20 diyip "uygun" gösteriyordu.
     _kalan = [x["baslik"] for x in b if (x.get("sonuc") or {}).get("uygun") is False]
-    r.esit("örnek proje üç bölümden kalıyor", len(_kalan), 3)
-    r.kontrol("kalan bölümler motor gücü, askı halatları ve regülatör",
-              sorted(x[:1] for x in _kalan) == ["1", "4", "5"], f"→ {_kalan}")
+    r.esit("örnek proje dört bölümden kalıyor", len(_kalan), 4)
+    r.kontrol("kalanlar motor gücü, askı halatları, regülatör ve tahrik",
+              sorted(x[:1] for x in _kalan) == ["1", "4", "5", "6"], f"→ {_kalan}")
     r.kontrol("regülatör bölümü EKSİK diyor, UYGUN DEĞİL değil",
               any("HESAP EKSİK" in (x.get("sonuc") or {}).get("metin", "")
                   for x in b if x["baslik"].startswith("5 ")))
@@ -181,10 +189,15 @@ def calistir():
     _oran = 240 / 6.5
     r.kontrol("örnek proje 40 eşiğini sağlamıyor", _oran < 40, f"→ {_oran}")
     #  İkisi de giderilince bütün bölümler uygun olmalı
+    #  TAHRİK için iki bileşen bilgisi daha gerekir:  kanalın SERTLEŞTİRİLMİŞ
+    #  olması ( f = μ / sin(γ/2) — EN 81-50 m.5.11.2.3.1.2 ) ve DENGE ZİNCİRİ
+    #  ( boş kabin en üstteyken dengesiz halat kütlesini götürür ).  İkisi de
+    #  kitabın örneğinde beyan edilmemiştir;  gerçek projede imalatçıdan gelir.
     _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280,
-                     "motor_gucu": 7.5, "guvenlik_devreye_kuvvet": 200})
-    r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti girilince "
-              "bütün bölümler uygun",
+                     "motor_gucu": 7.5, "guvenlik_devreye_kuvvet": 200,
+                     "kanal_isleme": "Sertleştirilmiş", "denge_zinciri": "Var"})
+    r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · sertleştirilmiş "
+              "kanal · denge zinciri girilince bütün bölümler uygun",
               _d["aktif"] and _d["ozet"]["tumu_uygun"],
               "→ " + ", ".join(x["baslik"] for x in (_d.get("bolumler") or [])
                                if (x.get("sonuc") or {}).get("uygun") is False))
@@ -199,8 +212,13 @@ def calistir():
     import openpyxl
     ws = openpyxl.load_workbook(KAYNAK, data_only=True)[SAYFA]
 
-    for i, liste in HUCRELER.items():
-        havuz = [a["deger"] for a in b[i]["adimlar"]
+    _kimlikler = {x["kimlik"]: x for x in b}
+    for kimlik, liste in HUCRELER.items():
+        _bl = _kimlikler.get(kimlik)
+        if _bl is None:
+            r.kontrol(f"bölüm {kimlik} üretildi", False)
+            continue
+        havuz = [a["deger"] for a in _bl["adimlar"]
                  if isinstance(a["deger"], (int, float))
                  and not isinstance(a["deger"], bool)]
         for hucre, ne in liste:
@@ -208,7 +226,7 @@ def calistir():
                 continue                 # bilerek ayrıldık — TEST 10 denetler
             bek = ws[hucre].value
             bulundu = any(_yakin(x, bek) for x in havuz)
-            r.kontrol(f"böl.{i + 1}  {hucre}  {ne}", bulundu,
+            r.kontrol(f"böl.{_bl['sira']}  {hucre}  {ne}", bulundu,
                       f"→ Excel {bek!r} bölümün adımlarında yok")
 
     #  Özet değerleri birebir.  Bilerek ayrıldığımız hücreler ( ör. AQ23 —
@@ -247,7 +265,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 34)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 40)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
         #    · TS EN 81-20 / 81-50 maddesi
@@ -291,8 +309,16 @@ def _sapmalar(r):
     r.kontrol("⑤ Rm 440 ara değerlemesi doğru",
               _yakin(_w[440], _w[370] + (_w[520] - _w[370]) * (440 - 370) / 150),
               f"→ {_w}")
+    #  λ EN KÜÇÜK atalet yarıçapından ölçülür ( sapma ㊴ ):  varsayılan
+    #  89 x 62 x 15,88 rayda imin = iy = 18,23 mm, konsol 3.000 mm →  λ = 165.
+    #  ( ix = 19,48 ile 155 çıkıyordu. )
+    _lam = _MTb.OMEGA_LAMBDA_MIN
+    import math as _m
+    _lam = max(_lam, _m.ceil(3000 / min(_MTb.ray("89 x 62 x 15,88", "ix"),
+                                        _MTb.ray("89 x 62 x 15,88", "iy"))))
+    r.esit("⑤ λ en küçük atalet yarıçapından", _lam, 165)
     r.kontrol("⑤ Rm 370'te Excel tablosuyla aynı",
-              _yakin(_w[370], _MTb.omega(155)), f"→ {_w[370]!r}")
+              _yakin(_w[370], _MTb.omega(_lam)), f"→ {_w[370]!r}")
 
     #  ⑥ acil frenlemede μ HALAT hızına bağlı  ( EN 81-50 m.5.11.2.3.2 )
     #  EN 81-50'nin çözümlü örneği:  kabin 1 m/s, askı 2:1 → μ = 0,083
@@ -552,7 +578,8 @@ def _sapmalar(r):
     r.kontrol("⑧ artık ayrı bir min_kabin_ustu sabiti yok",
               "min_kabin_ustu" not in _S, f"→ {sorted(_S)}")
 
-    _b10 = [b for b in s["bolumler"] if b["baslik"].startswith("10")][0]
+    #  SIRAYA DEĞİL KİMLİĞE BAK:  araya bölüm girince numara kayıyor.
+    _b10 = [b for b in s["bolumler"] if b["kimlik"] == "siginma_alanlari"][0]
     _sinir = {}
     for a in _b10["adimlar"]:
         _ac = str(a.get("aciklama") or "")
@@ -623,11 +650,21 @@ def _denetim_bulgulari(r):
                            kabin_ray_profili="50 x 50 x 5",
                            kabin_konsol_arasi=3900))
     _h3 = _MG.dogrula(_g3)
-    r.kontrol("B3  λ > 250 girdi doğrulamasında reddediliyor",
-              any("narin" in x and "konsollar arası" in x for x in _h3),
-              f"→ {_h3}")
-    r.kontrol("B3  hata, izin verilen en büyük aralığı söylüyor",
-              any("3.845" in x or "3845" in x for x in _h3), f"→ {_h3}")
+    #  λ > 250 GİRDİYİ REDDETMEZ, UYARIR.  ω tanımsız kalır ve yalnız
+    #  BURKULMA kontrolü düşer;  eğilme, birleşik gerilme, flanş ve sehim
+    #  hesapları geçerlidir.  Hesabı büsbütün durdurmak öteki bölümlerin
+    #  sonucunu da gizliyordu ( ELEport da "σk cannot be calculated" der ).
+    r.esit("B3  λ > 250 girdi doğrulamasında REDDEDİLMİYOR", _h3, [])
+    _u3 = _MG.uyarilar(_g3)
+    r.kontrol("B3  uyarı listesinde bildiriliyor",
+              any("narin" in x and "konsollar arası" in x for x in _u3),
+              f"→ {_u3}")
+    #  Senaryonun rayı 50 x 50 x 5:  imin = iy = 10,51 mm  →  250 × 10,51
+    #  = 2.628 mm.  ( ix = 15,38 ile 3.845 çıkıyordu — bkz. sapma ㊴. )
+    r.kontrol("B3  uyarı, izin verilen en büyük aralığı söylüyor",
+              any("2628" in x or "2.628" in x for x in _u3), f"→ {_u3}")
+    r.kontrol("B3  burkulma kontrolü DÜŞÜYOR",
+              MK.hesapla(_g3)["bolumler"][6]["sonuc"]["uygun"] is False)
     #  İKİNCİ KALKAN:  doğrulama atlansa bile motor çökmemeli
     _dog = MK.MG.dogrula
     try:
@@ -1351,8 +1388,9 @@ def _girdi_yollari(r):
         s = MK.hesapla(ek)
         r.kontrol(f"varyant koşuyor: {ek}", s["aktif"], f"→ {s.get('hata')}")
         if s["aktif"]:
-            r.kontrol(f"varyant 10 bölüm üretti: {list(ek)[0]}",
-                      len(s["bolumler"]) == 10)
+            r.kontrol(f"varyant bütün bölümleri üretti: {list(ek)[0]}",
+                      len(s["bolumler"]) == len(MK.BOLUM_URETICILERI),
+                      f"→ {len(s['bolumler'])}")
 
     #  ── Fiziksel sınır kalkanları ve yeni 4 girdi testleri
     #  1. Balata boyu fiziksel sınırları: 0, 10 mm ve paten aralığını aşanlar reddedilmeli

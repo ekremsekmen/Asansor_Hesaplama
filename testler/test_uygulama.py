@@ -46,9 +46,12 @@ def calistir():
     if not r.kontrol("tam girdiyle hesap koşuyor", s["aktif"], f"→ {s.get('hata')}"):
         return r
     adlar = _bolum_adlari(s)
-    r.esit("mukavemet bölüm sayısı", s["mukavemet_bolum_sayisi"], 10)
-    r.esit("toplam bölüm  ( 10 mukavemet + 4 elektrik + 3 topraklama )",
-           len(adlar), 17)
+    #  SAYI ELLE YAZILMAZ:  mukavemet motoruna bölüm eklenince ( ör.
+    #  TAMPONLAR ) bu testin de kendiliğinden takip etmesi gerekir.
+    _MUK = len(MK.BOLUM_URETICILERI)
+    r.esit("mukavemet bölüm sayısı", s["mukavemet_bolum_sayisi"], _MUK)
+    r.esit(f"toplam bölüm  ( {_MUK} mukavemet + 4 elektrik + 3 topraklama )",
+           len(adlar), _MUK + 7)
     for i, ad in enumerate(adlar, 1):
         r.kontrol(f"bölüm {i} sırayla numaralı", ad.startswith(f"{i} -"),
                   f"→ {ad!r}")
@@ -267,8 +270,12 @@ def calistir():
     #  "TEMİZ PROJE" için imalatçı kuvveti de gerekir:  TS EN 81-20
     #  m.5.6.2.2.1.1 d)'nin ikinci sınırı onsuz DENETLENEMEZ ve bölüm
     #  "HESAP EKSİK" der ( sapma ⑲ ).
+    #  TAHRİK YETENEĞİ için kanalın sertleştirilmiş olması ve denge zinciri
+    #  de gerekir;  ivme işaretleri Ek D'ye göre düzeltilince ( sapma ㊳ )
+    #  kitabın çıplak örneği tahrikten kalıyor.
     _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280,
-                  motor_gucu=7.5, guvenlik_devreye_kuvvet=200)
+                  motor_gucu=7.5, guvenlik_devreye_kuvvet=200,
+                  kanal_isleme="Sertleştirilmiş", denge_zinciri="Var")
     _t = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)))
     r.kontrol("② temiz proje uygun", _t["ozet"]["tumu_uygun"] is True)
     #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil
@@ -276,7 +283,9 @@ def calistir():
                                      saptirma_kasnak_capi=280, motor_gucu=37,
                                      kolon_kesit=95, makine_kesit=1.5,
                                      makine_uzunluk=2)))
-    _b14 = [b for b in _s2["bolumler"] if b["baslik"].startswith("14")][0]
+    #  SIRAYA DEĞİL KİMLİĞE BAK:  mukavemet tarafına bölüm eklenince
+    #  ( TAMPONLAR ) elektrik bölümlerinin numarası kayıyor.
+    _b14 = [b for b in _s2["bolumler"] if b["kimlik"] == "gerilim_dusumu"][0]
     r.kontrol("② akım yetersizken BÖLÜM uygun değil",
               _b14["sonuc"]["uygun"] is False, f"→ {_b14['sonuc']}")
     r.kontrol("② bölümün alt satırında I2 ≤ Iz2 kontrolü var",
@@ -452,7 +461,8 @@ def calistir():
     r.kontrol("eksik elektrik girdisiyle de hesap koşuyor", s["aktif"],
               f"→ {s.get('hata')}")
     if s["aktif"]:
-        r.esit("topraklama olmadan bölüm sayısı", len(s["bolumler"]), 14)
+        r.esit("topraklama olmadan bölüm sayısı", len(s["bolumler"]),
+               len(MK.BOLUM_URETICILERI) + 4)
         r.kontrol("topraklamasız özet Re taşımıyor", s["ozet"]["Re"] is None)
 
     s = UY.hesapla({"mk_yok": False})
@@ -465,7 +475,8 @@ def calistir():
     s = UY.hesapla(dict(TAM, mk_yok=False, mk_uzunluk=4, mk_genislik=3))
     r.kontrol("makine daireli hesap koşuyor", s["aktif"], f"→ {s.get('hata')}")
     if s["aktif"]:
-        r.esit("makine daireli bölüm sayısı", len(s["bolumler"]), 18)
+        r.esit("makine daireli bölüm sayısı", len(s["bolumler"]),
+               len(MK.BOLUM_URETICILERI) + 8)
         r.kontrol("makine dairesi aydınlatması eklendi",
                   any("MAKİNE DAİRESİ" in a for a in _bolum_adlari(s)))
 
@@ -512,7 +523,7 @@ def calistir():
     tek = MK.hesapla(TAM)
     birlikte = UY.hesapla(TAM)
     r.esit("mukavemet bölümleri tek başına koşanla birebir aynı",
-           [b["baslik"] for b in birlikte["bolumler"][:10]],
+           [b["baslik"] for b in birlikte["bolumler"][:len(MK.BOLUM_URETICILERI)]],
            [b["baslik"] for b in tek["bolumler"]])
     for anahtar in ("N_hesap", "Sf", "ray_boyu", "FKR", "FAR", "Fkt", "Fat"):
         r.esit(f"mukavemet özeti değişmedi: {anahtar}",
@@ -667,7 +678,8 @@ def calistir():
                   "→ küçük temelde de topraklama uygun çıktı, kontrol atlandı")
     r.kontrol("çoklu: asansörlerin bölüm numaraları boşluksuz",
               all([b["baslik"].split("-")[0].strip()
-                   for b in a["bolumler"]] == [str(i) for i in range(1, 15)]
+                   for b in a["bolumler"]]
+                  == [str(i) for i in range(1, len(a["bolumler"]) + 1)]
                   for a in _c["asansorler"]),
               f"→ {[b['baslik'].split('-')[0].strip() for b in _c['asansorler'][1]['bolumler']]}")
 

@@ -66,6 +66,21 @@ ALANLAR = (
      _s(700, 800, 900, 1000, 1100, 1200, 1300, 1400), 900),
     ("uzun_pervaz",       "F69",  "Uzun pervaz",                       "mm",   "sayi", None, 90),
     ("kabin_kaciklik",    "C76",  "Kabin merkezinin y ekseninde kaçıklığı", "mm", "sayi", None, 0),
+    #  ASKI NOKTASI ( S ) — KAÇIKLIKTAN AYRI BİR NOKTADIR.
+    #  Ek C.1.2 ray eksenini orijin alıp beş nokta tanımlar:  kabin merkezi
+    #  ( C ), boş kabin kütlesi ( P ), beyan yükü ( Q ), ASKI ( S ) ve kapı.
+    #  Kaçıklık ağırlığın NEREDE DURDUĞU, askı ise NEREDEN ASILDIĞIDIR;  ray
+    #  kuvveti ikisinin arasındaki moment kolundan doğar — C.2.2.1 ve
+    #  C.2.3.1 bu yüzden ( xQ − xs ) ve ( yp − ys ) yazar.
+    #  Kabin ortada olup askı kaçık olabilir ( o zaman kaçıklık 0 iken kuvvet
+    #  vardır ), ya da kabin kaçık olup kendi üstünden asılı olabilir ( o
+    #  zaman boş kabinin momenti sıfırlanır ).
+    #  C.2.1'DE ( güvenlik tertibatı ) BU NOKTA GEÇMEZ:  tertibat RAYI
+    #  kavradığı için tepki ray ekseninden ölçülür.  Bölümün hükmünü genelde
+    #  o durum verdiğinden ( k1 = 2 ), varsayılan 0 çoğu projede sonucu
+    #  değiştirmez — ama eksantrik askılı yerleşimde gerçek değer girilmelidir.
+    ("aski_kaciklik_x",   "",     "Askı noktasının x kaçıklığı  ( xs )", "mm", "sayi", None, 0),
+    ("aski_kaciklik_y",   "",     "Askı noktasının y kaçıklığı  ( ys )", "mm", "sayi", None, 0),
     ("agirlik_yeri",      "C77",  "Karşı ağırlık yeri",                "—",    "secim",
      _s("Sağ", "Sol", "Arka"), "Sağ"),
     ("kapi_agirligi",     "F127", "Kabin kapısı ağırlığı  ( F_D1 )",   "kg",   "sayi", None, 75),
@@ -250,6 +265,19 @@ ALANLAR = (
      ("Yok",) + MT.DARBE_TIPLERI_ADLARI, "Yok"),
 
     # ── TAMPONLAR ─────────────────────────────────────────────────────
+    #  TİP, KONTROLÜN KENDİSİNİ SEÇER.  TS EN 81-20 m.5.8.1 tamponları üçe
+    #  ayırır ve her birine başka bir kural bağlar ( strok formülü, hız
+    #  sınırı );  tip sorulmadan bu kuralların hiçbiri denetlenemiyordu.
+    #  Kaynak kitapta bu alan yoktur — ofis poliüretan kullanıyor, varsayılan
+    #  odur ( teslim kopyasına ayrı blokta yazılır ).
+    ("tampon_tipi",         "",     "Tampon tipi",                     "—",    "secim",
+     MT.TAMPON_TIPLERI_ADLARI, MT.TAMPON_TIPLERI_ADLARI[1]),
+    #  ADET, KUYU TABANINA DÜŞEN KUVVETİ BÖLER.  m.5.2.1.8.5 kuvveti
+    #  "evenly distributed between the total number of car buffers" der:
+    #  toplam 4·gn·(P+Q)'dur ama döşemenin TAŞIYACAĞI şey tampon BAŞINA
+    #  düşendir.  Kaynak kitapta bu alan yok, toplam kuvvet veriliyordu.
+    ("kabin_tampon_adedi",  "",     "Kabin tamponu adedi",             "adet", "sayi", None, 1),
+    ("agirlik_tampon_adedi", "",    "Ağırlık tamponu adedi",           "adet", "sayi", None, 1),
     ("kabin_tampon_baba",   "F118", "Kabin tamponu baba yüksekliği",   "mm",   "sayi", None, 1000),
     ("agirlik_tampon_baba", "F119", "Ağırlık tamponu baba yüksekliği", "mm",   "sayi", None, 300),
     ("kabin_tampon_ezilme", "B121", "Kabin tamponu ezilme miktarı",    "mm",   "sayi", None, 90),
@@ -357,7 +385,8 @@ GRUPLAR = (
     ("Kabin ve kapı",
      ("kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
       "uzun_pervaz",
-      "kabin_kaciklik", "agirlik_yeri", "kapi_agirligi", "kapi_mekanizma_payi")),
+      "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
+      "agirlik_yeri", "kapi_agirligi", "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
      ("durak_yukseklikleri", "son_kat_yuksekligi", "kaide_yuksekligi",
       "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar",
@@ -387,7 +416,8 @@ GRUPLAR = (
                        "agirlik_malzemesi", "agirlik_ray_arasi",
                        "agirlik_guvenlik_tertibati")),
     ("Tamponlar",
-     ("kabin_tampon_baba", "agirlik_tampon_baba", "kabin_tampon_ezilme",
+     ("tampon_tipi", "kabin_tampon_adedi", "agirlik_tampon_adedi",
+      "kabin_tampon_baba", "agirlik_tampon_baba", "kabin_tampon_ezilme",
       "kabin_carpma_arasi", "kabin_tampon_boyu", "agirlik_tampon_ezilme",
       "agirlik_carpma_arasi")),
 )
@@ -428,6 +458,7 @@ BOLUM_GRUBU = {
     #  uzunluk ) kuvvete girmez.  Pertürbasyon taraması Tamponlar grubundaki
     #  yedi alanın da bu bölümü hiç değiştirmediğini gösterdi.
     "kuyu_tabani":           ("Kılavuz raylar", "Karşı ağırlık"),
+    "tamponlar":             ("Tamponlar", "Asansör teknik bilgileri"),
     "siginma_alanlari":      ("Durak ve kuyu", "Tamponlar"),
 }
 
@@ -690,33 +721,6 @@ def dogrula(g):
     #  ------------------------------------------------------------------
     #  RAY NARİNLİĞİ  λ = konsol arası / ix        TS EN 81-50 m.5.10.3
     #  ------------------------------------------------------------------
-    #  ω tablosu YALNIZ 20 ≤ λ ≤ 250 arasında tanımlıdır.  Üst sınırın
-    #  dışında ω yoktur;  motor bunu ham bir Python hatasıyla ( None ile
-    #  çarpım ) bildiriyordu ve kullanıcı hangi alanın sorunlu olduğunu
-    #  göremiyordu.  50 x 50 x 5 rayda sınır 3.845 mm'dir — varsayılan
-    #  3.000 mm konsol aralığına yakın, yani gerçekçi bir girdiyle
-    #  karşılaşılıyordu.
-    #
-    #  ALT SINIRDA HATA YOKTUR:  λ < 20 burkulmanın belirleyici olmadığı
-    #  bölgedir, motor λ'yı 20'ye yuvarlar ( makine kaidesinde de öyle ).
-    for ray_alan, konsol_alan, ne in (
-            ("kabin_ray_profili", "kabin_konsol_arasi", "Kabin"),
-            ("agirlik_ray_profili", "agirlik_konsol_arasi", "Karşı ağırlık")):
-        prof, l = g.get(ray_alan), g.get(konsol_alan)
-        ix = MT.ray(prof, "ix") if prof else None
-        if _sayi(ix) and ix > 0 and _sayi(l) and l > 0:
-            lam = l / ix
-            if lam > MT.OMEGA_LAMBDA_MAX:
-                azami = MT.OMEGA_LAMBDA_MAX * ix
-                hata.append(
-                    f"{ne} rayı fazla narin:  λ = konsol arası / ix = "
-                    f"{l:g} / {ix:g} = {lam:.1f}  >  {MT.OMEGA_LAMBDA_MAX}. "
-                    "TS EN 81-50 m.5.10.3'ün ω tablosu bu narinliğin ötesinde "
-                    f"tanımlı değildir. '{ALAN[konsol_alan][2]}' en çok "
-                    f"{azami:.0f} mm olabilir ( '{prof}' rayı için ), ya da daha "
-                    "büyük kesitli bir ray profili seçilmelidir.")
-
-    #  ------------------------------------------------------------------
     #  TAHRİK KASNAĞI GEOMETRİSİ            TS EN 81-50 m.5.11.2 / m.5.11.3
     #  ------------------------------------------------------------------
     #  Sarılma açısı α = 180° − arctan( ( Ra − 2·R1 ) / B ) bağıntısı TEK
@@ -792,6 +796,97 @@ def dogrula(g):
                     f"m.5.6.2.2.1.3 b)'nin verdiği µmax = {REG_MU_AZAMI:g} "
                     "değerini aşamaz.")
     return hata
+
+
+def uyarilar(g):
+    """Hesabı DURDURMAYAN ama paftaya yazılması gereken uyarılar.
+
+    ``dogrula`` hesabı imkânsız kılan girdileri reddeder;  burası hesabın
+    yapılabildiği ama bir kontrolün DÜŞECEĞİ durumları bildirir.  İkisi ayrı
+    kanaldır:  biri projeyi hiç hesaplatmaz, öteki sonucu "uygun değil"
+    yapar ve sebebini yazar.
+    """
+    uyari = []
+    #  ------------------------------------------------------------------
+    #  ω tablosu YALNIZ 20 ≤ λ ≤ 250 arasında tanımlıdır.  Üst sınırın
+    #  dışında ω yoktur;  motor bunu ham bir Python hatasıyla ( None ile
+    #  çarpım ) bildiriyordu ve kullanıcı hangi alanın sorunlu olduğunu
+    #  göremiyordu.  50 x 50 x 5 rayda sınır 3.845 mm'dir — varsayılan
+    #  3.000 mm konsol aralığına yakın, yani gerçekçi bir girdiyle
+    #  karşılaşılıyordu.
+    #
+    #  ALT SINIRDA HATA YOKTUR:  λ < 20 burkulmanın belirleyici olmadığı
+    #  bölgedir, motor λ'yı 20'ye yuvarlar ( makine kaidesinde de öyle ).
+    #  BURKULMA YALNIZ GÜVENLİK TERTİBATI ÇALIŞTIĞINDA VARDIR.
+    #  ω, Ek C.2.1.2'de ( güvenlik tertibatının çalışması ) geçer;  C.2.2 ve
+    #  C.2.3 normal çalışma hâlleridir ve orada Fv = Mg·gn + Fp'dir, ω yoktur.
+    #  Kabinde tertibat her zaman vardır;  karşı ağırlıkta ise SEÇİME bağlıdır.
+    #  Tertibat yoksa rayı sıkıştıran Fk de yoktur, λ > 250 bir şeyi
+    #  düşürmez — orada uyarmak yanlış alarm olurdu.
+    _agirlik_gt = str(g.get("agirlik_guvenlik_tertibati") or "Yok") != "Yok"
+    for ray_alan, konsol_alan, ne, _gerekli in (
+            ("kabin_ray_profili", "kabin_konsol_arasi", "Kabin", True),
+            ("agirlik_ray_profili", "agirlik_konsol_arasi", "Karşı ağırlık",
+             _agirlik_gt)):
+        if not _gerekli:
+            continue
+        prof, l = g.get(ray_alan), g.get(konsol_alan)
+        #  NARİNLİK EN KÜÇÜK ATALET YARIÇAPINDAN ÖLÇÜLÜR  ( m.5.10.3:
+        #  "i is the MINIMUM radius of gyration" ).  Burada ix okunuyordu;
+        #  kataloğun altı profilinden beşinde iy < ix olduğu için tablo
+        #  dışına düşen geometriler ( λ > 250 ) sessizce kabul ediliyordu.
+        _ix = MT.ray(prof, "ix") if prof else None
+        _iy = MT.ray(prof, "iy") if prof else None
+        imin = min(_ix, _iy) if _sayi(_ix) and _sayi(_iy) else None
+        if _sayi(imin) and imin > 0 and _sayi(l) and l > 0:
+            lam = l / imin
+            if lam > MT.OMEGA_LAMBDA_MAX:
+                azami = MT.OMEGA_LAMBDA_MAX * imin
+                #  GİRDİ REDDEDİLMEZ, UYARILIR.  Eskiden burası hata veriyor ve
+                #  bütün proje hesaplanamıyordu.  Oysa λ > 250 yalnız ω'yı
+                #  tanımsız bırakır:  eğilme, birleşik gerilme, flanş ve sehim
+                #  hesapları geçerliliğini korur.  Motor ω = None'ı zaten
+                #  karşılıyor — bölüm "TABLO DIŞI" der ve burkulma kontrolü
+                #  DÜŞER, yani sonuç UYGUN DEĞİL çıkar.  ELEport'un paftası da
+                #  aynı şeyi yapar:  "when λ > 250 … σk also cannot be
+                #  calculated".  Hesabı büsbütün durdurmak, kullanıcıya öteki
+                #  bölümlerin sonucunu da göstermiyordu.
+                uyari.append(
+                    f"{ne} rayı fazla narin:  λ = konsol arası / imin = "
+                    f"{l:g} / {imin:g} = {lam:.1f}  >  {MT.OMEGA_LAMBDA_MAX}. "
+                    "TS EN 81-50 m.5.10.3'ün ω tablosu bu narinliğin ötesinde "
+                    "tanımlı değildir;  BURKULMA HESABI YAPILAMAZ ve bölüm "
+                    f"uygun çıkmaz. '{ALAN[konsol_alan][2]}' en çok "
+                    f"{azami:.0f} mm olabilir ( '{prof}' rayı için ), ya da daha "
+                    "büyük kesitli bir ray profili seçilmelidir.")
+
+    #  ------------------------------------------------------------------
+    #  TAM EZİLME = KURULU YÜKSEKLİĞİN %90'I   TS EN 81-20 m.5.8.2.1.2.2
+    #  ------------------------------------------------------------------
+    #  Madde "fully compressed" terimini TANIMLAR:  Çizelge 2'nin uç
+    #  konumlarında tampon, kurulu yüksekliğinin %90'ı kadar ezilmiş sayılır
+    #  ( bağlantı elemanları daha azıyla sınırlıyorsa o kadar ).  Program bu
+    #  sayıyı sığınma açıklıklarında kullanır:
+    #      kuyu dibi açıklığı = baba + ( tampon boyu − ezilme )
+    #  Girilen ezilme gerçeğinden KÜÇÜKSE açıklık OLDUĞUNDAN BÜYÜK çıkar ve
+    #  m.5.2.5.8'in 500 mm'si yanlışlıkla sağlanmış görünür — emniyetsiz yön.
+    #  Lineer olmayan tamponda uyarılır;  lineer ve hidrolikte strok zaten
+    #  bağıntıyla denetlendiği için burada tekrarlanmaz.
+    _tip = g.get("tampon_tipi")
+    if _tip and MT.tampon(_tip)[2] is None:
+        _boy, _ez = g.get("kabin_tampon_boyu"), g.get("kabin_tampon_ezilme")
+        if _sayi(_boy) and _sayi(_ez) and _boy > 0:
+            _tam = MT.TAMPON_TAM_EZILME_ORANI * _boy
+            if _ez < _tam - 0.5:
+                uyari.append(
+                    f"Kabin tamponu ezilmesi ({_ez:g} mm), kurulu yüksekliğin "
+                    f"%{MT.TAMPON_TAM_EZILME_ORANI * 100:.0f}'ından "
+                    f"({_tam:.0f} mm) küçük.  TS EN 81-20 m.5.8.2.1.2.2 "
+                    "\"tam ezilmiş\" durumu bu oranla tanımlar;  daha küçük bir "
+                    "değer kuyu dibi açıklığını olduğundan BÜYÜK gösterir. "
+                    "Bağlantı elemanları ezilmeyi gerçekten sınırlıyorsa değer "
+                    "doğrudur, yoksa tampon boyuyla uyumlu hâle getirilmelidir.")
+    return uyari
 
 
 def toplam_ray_boyu(g):

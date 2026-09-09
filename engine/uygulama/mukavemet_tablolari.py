@@ -688,6 +688,45 @@ KANAL_ISLEME = (
 )
 
 KANAL_ISLEME_SEKILLERI = tuple(s[0] for s in KANAL_ISLEME)
+
+
+# =====================================================================
+#  TAMPON TİPLERİ            TS EN 81-20 m.5.8.1 / m.5.8.2
+# =====================================================================
+#  Standart tamponları ÜÇE ayırır ve her birine BAŞKA kural bağlar:
+#
+#    lineer  ( yaylı )          m.5.8.2.1.1  strok ≥ 0,135·v² , en az 65 mm
+#    lineer olmayan             m.5.8.2.1.2  strok formülü YOK — tip deneyiyle
+#      ( poliüretan )                        doğrulanır ( yavaşlama ölçütleri )
+#    enerji yutmalı             m.5.8.2.2.1  strok ≥ 0,0674·v²
+#      ( hidrolik )
+#
+#  Ayrıca m.5.8.1.5:  enerji biriktirmeli tamponlar ( lineer VE lineer
+#  olmayan ) YALNIZ v ≤ 1 m/s'de kullanılabilir;  enerji yutmalıda hız
+#  sınırı yoktur ( m.5.8.1.6 ).
+#
+#      ad · enerji biriktirmeli mi · strok katsayısı ( None = tip deneyi )
+TAMPON_TIPLERI = (
+    ("Enerji biriktirmeli - lineer  ( yaylı )", True, 0.135),
+    ("Enerji biriktirmeli - lineer olmayan  ( poliüretan )", True, None),
+    ("Enerji yutmalı  ( hidrolik )", False, 0.0674),
+)
+TAMPON_TIPLERI_ADLARI = tuple(t[0] for t in TAMPON_TIPLERI)
+#  m.5.8.2.1.1.1'in alt sınırı:  hesap ne verirse versin 65 mm'nin altına
+#  inilemez.  m.5.8.2.2.1'de böyle bir alt sınır yoktur.
+TAMPON_ASGARI_STROK = 65.0
+#  m.5.8.1.5:  enerji biriktirmeli tamponun kullanılabildiği en yüksek hız
+TAMPON_BIRIKTIRMELI_AZAMI_HIZ = 1.0
+#  m.5.8.2.1.2.2:  "tam ezilmiş" = kurulu tampon yüksekliğinin %90'ı
+TAMPON_TAM_EZILME_ORANI = 0.90
+
+
+def tampon(ad):
+    """Tampon tipi satırı  ->  ( ad , biriktirmeli_mi , strok_katsayisi )."""
+    for t in TAMPON_TIPLERI:
+        if t[0] == ad:
+            return t
+    return TAMPON_TIPLERI[1]        # tanınmayan ad: poliüretan sayılır
 _SURTUNME_SUTUN = {"yukleme": 1, "fren": 2, "bloke": 3}
 
 

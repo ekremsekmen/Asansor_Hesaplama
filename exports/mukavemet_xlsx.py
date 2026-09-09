@@ -400,6 +400,19 @@ EK_GIRDI_HUCRELERI = (
     #  gelen gerçek genişlik varsa tahmine gerek yoktur ( bkz. ㊱ ).
     ("agirlik_genisligi",     256, "Gy — karşı ağırlık genişliği",   "mm"),
     ("agirlik_derinligi",     257, "Gx — karşı ağırlık derinliği",   "mm"),
+    #  TAMPON TİPİ VE ADEDİ.  Kitap tamponu yalnız YERLEŞİM ölçüsü olarak
+    #  tanır ( baba yüksekliği · ezilme · uzunluk );  hangi TİP olduğunu
+    #  sormaz, dolayısıyla m.5.8.1.5'in hız sınırını ve m.5.8.2'nin strok
+    #  bağıntısını denetleyemez.  Adet de yoktur:  kuyu tabanı kuvveti
+    #  m.5.2.1.8.5'e göre tampon BAŞINA düşer  ( bkz. sapma ㊵ ).
+    #  ASKI NOKTASI ( S ) — Ek C.1.2.  Kitap yalnız kabin merkezinin
+    #  kaçıklığını sorar;  halatların NEREDEN asıldığı ayrı bir noktadır ve
+    #  C.2.2.1 / C.2.3.1'in ( xQ − xs ) · ( yp − ys ) kollarına girer.
+    ("aski_kaciklik_x",       261, "xs — askı noktasının x kaçıklığı", "mm"),
+    ("aski_kaciklik_y",       262, "ys — askı noktasının y kaçıklığı", "mm"),
+    ("tampon_tipi",           258, "Tampon tipi  ( m.5.8.1 )",       "—"),
+    ("kabin_tampon_adedi",    259, "Kabin tamponu adedi",            "adet"),
+    ("agirlik_tampon_adedi",  260, "Ağırlık tamponu adedi",          "adet"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -422,7 +435,7 @@ EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
 EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
                      "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri",
-                     "asansor_adi")
+                     "asansor_adi", "tampon_tipi")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -725,6 +738,74 @@ def _standarda_uydur(wb, g):
         else:
             l = f"2*VLOOKUP('Veri Girişi'!{profil},TABLOLAR!I69:N74,3,0)"
         ws[hucre] = eski.replace("(1+2*", f"({l}+2*")
+
+    #  ㊴  BURKULMA NARİNLİĞİ EN KÜÇÜK ATALET YARIÇAPINDAN
+    #  EN 81-50 m.5.10.3 sembol listesi:  "i is the MINIMUM radius of
+    #  gyration".  Kitap ray tablosunun 8. sütununu ( ix ) okuyordu;  9.
+    #  sütun ( iy ) hiç okunmuyordu ve ISO 7465 T raylarının çoğunda iy < ix.
+    #  MIN( ix ; iy ) yazılır — bkz. mukavemet.EXCEL_FARKLARI.
+    _ray = "'Veri Girişi'!E73"
+    ws["AV354"] = (f"=AH290/MIN(VLOOKUP({_ray},TABLOLAR!I60:S65,8,0),"
+                   f"VLOOKUP({_ray},TABLOLAR!I60:S65,9,0))")
+
+    #  ㊳  ACİL FRENLEMEDE İVME İŞARETLERİ  —  EN 81-50 m.5.11.2.2 · Ek D
+    #  "Üst işlem, beyan yüklü kabin AŞAĞI yönde yavaşlarken;  alt işlem, boş
+    #  kabin YUKARI yönde yavaşlarken."  Kitap ikisini de ters yazıyordu:
+    #  yüklü kabin en altta frenlerken KABİN tarafına ( gn − a ), AĞIRLIK
+    #  tarafına ( gn + a ) veriyordu.  Ek D'nin çözümlü örneği tersini yazar.
+    #  Aşağıda yalnız İŞARETLER çevrilir;  hücrelerin bileşenleri korunur.
+    #
+    #  fren_alt  ( %100 yüklü kabin en altta — ÜST işlem )
+    ws["D250"] = "=((E247+H247+K247+M247)*(Q247+T247))/D248"     # ( gn + a )
+    ws["D255"] = "=(D252+G252)*(I252-L252)/D253"                 # ( gn − a )
+    ws["L255"] = "=T252*(W252-(Z252*(AA252+AC252)/AA253))"       # MSR ( gn − a·… )
+    #  fren_ust  ( boş kabin en üstte — ALT işlem, hepsi ters )
+    ws["D264"] = "=(E261+H261+K261+M261)*(Q261-T261)/D262"       # ( gn − a )
+    ws["L264"] = "=AD261*(AH261-(AJ261*(AK261+AM261)/AK262))"    # MSR ( gn − a·… )
+    ws["AH264"] = "=D264+I264+L264-P264-S264+V264+X264"          # iPTD −
+    ws["D269"] = "=(D266+G266)*(I266+L266)/D267"                 # ( gn + a )
+
+    #  ㊷  ASKI KASNAKLARININ ATALETİ  —  Σ( mP·iP·a ) / r
+    #  Kitapta bu terim YOKTUR;  m.5.11.2.2 ( koşul III ) ve Ek D taşır.
+    #  Bileşen hücrelerinden ÜÇÜ boştur ( BB247 · BB261 · AQ266 = 0 ), terim
+    #  oraya yazılır;  dördüncüsü için AJ255'in toplamına AQ252 eklenir.
+    #
+    #  SABİT SAYI DEĞİL FORMÜL YAZILIR.  Teslim edilen kopya girdileriyle
+    #  birlikte gider ve kullanıcı orada bir değeri değiştirdiğinde kitabın
+    #  kendini yeniden hesaplaması gerekir.  Ayrıca "düzeltilmiş kaynak"
+    #  ( girdisiz ) kopyada sabit yazmak, kitabın KENDİ değerleriyle
+    #  ayrışmaya yol açıyordu.
+    _vg = lambda h: f"'{GIRDI}'!{h}"
+    _Dp, _ns, _dr = _vg("F100"), _vg("B98"), _vg("B99")
+    _a, _r = _vg("B133"), _vg("B100")
+    _R = f"(({_Dp}/2)/1000)"
+    _R1 = f"((({_Dp}-{O['kasnak_gobek_pay']!r})/2)/1000)"
+    _A = f"((({_ns}-1)*1.6*{_dr}+{O['kasnak_kanal_payi']!r})/1000)"
+    _A1 = f"({_A}*{O['kasnak_gobek_orani']!r})"
+    _rho = repr(float(O["kasnak_yogunluk"]))
+    _J = (f"(0.5*PI()*{_rho}*{_A}*({_R}^4-{_R1}^4)"
+          f"+0.5*PI()*{_rho}*{_A1}*{_R1}^4)")
+    _mP = f"({_J}/{_R}^2)"
+
+    def _terim(adet, isaret):
+        """Σ( mP·iP·a )/r  —  askı oranı 1 ise sıfır  ( koşul III )."""
+        return (f"=IF({_r}>1,{isaret}{_mP}*{float(adet)!r}*{_a}/{_r},0)")
+
+    ws["BB247"] = _terim(O["kasnak_adet_kabin"], "")     # fren_alt T1  ( + )
+    ws["AQ252"] = _terim(O["kasnak_adet_agirlik"], "-")  # fren_alt T2  ( − )
+    ws["AJ255"] = "=D255+I255+L255-P255-S255+V255+AQ252"
+    ws["BB261"] = _terim(O["kasnak_adet_kabin"], "-")    # fren_ust T1  ( − )
+    ws["AQ266"] = _terim(O["kasnak_adet_agirlik"], "")   # fren_ust T2  ( + )
+
+    at = wb["Askı Tipleri"]
+    at["P128"] = ("=%s*('%s'!D250+'%s'!I250+'%s'!L250+'%s'!P250+'%s'!S250"
+                  "+'%s'!V250)" % ((MK.SABIT["FRcar_katsayi"],) + (HESAP,) * 6))
+    at["P129"] = ("=%s*('%s'!D255+'%s'!I255+'%s'!L255-'%s'!P255-'%s'!S255"
+                  "+'%s'!AQ252)" % ((MK.SABIT["FRcwt_katsayi"],) + (HESAP,) * 6))
+    at["Q128"] = ("=%s*('%s'!D264+'%s'!I264+'%s'!L264-'%s'!P264-'%s'!S264"
+                  "+'%s'!V264)" % ((MK.SABIT["FRcar_katsayi"],) + (HESAP,) * 6))
+    at["Q129"] = ("=%s*('%s'!D269+'%s'!I269+'%s'!L269+'%s'!P269+'%s'!S269"
+                  "+'%s'!V269)" % ((MK.SABIT["FRcwt_katsayi"],) + (HESAP,) * 6))
 
     #  ⑤  ω ray çeliğine bağlı  —  EN 81-50 m.5.10.3
     ws["AD354"] = _omega_formulu("AV355", "'Veri Girişi'!B131")

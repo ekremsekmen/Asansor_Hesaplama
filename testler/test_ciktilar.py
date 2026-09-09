@@ -255,10 +255,25 @@ def calistir():
 
         m = _metin(PE.trafik_pdf(TR.hesapla_tek(dict(GT, bodrum=2)), PROJE))
         for beklenen in ("Bodrum durak adedi", "Toplam durak adedi",
-                         "Toplam seyahat mesafesi", "H (Tablo-3)"):
+                         "Toplam seyahat mesafesi"):
             r.kontrol(f"tek pafta: '{beklenen}' basıldı", beklenen in m)
         m0 = _metin(PE.trafik_pdf(TR.hesapla_tek(GT), PROJE))
-        r.kontrol("bodrumsuzda bodrum notu basılmıyor", "H (Tablo-3)" not in m0)
+        #  PAFTAYA NOT BASILMIYOR ( bkz. pdf_export._bolum ):  bodrumun H ve
+        #  S'yi değiştirmediğini anlatan açıklama cümlesi artık yalnız
+        #  EKRANDA ⓘ altında.  Paftada bodrumun görünürlüğü SAYIYLA denetlenir
+        #  — açıklama metniyle değil.
+        r.kontrol("paftada açıklama metni basılmıyor",
+                  "H (Tablo-3)" not in m and "H (Tablo-3)" not in m0)
+        _bd = lambda t: t[t.find("Bodrum durak adedi"):][:70]
+        r.kontrol("bodrum durak adedi paftada DEĞERİYLE görünüyor",
+                  "2" in _bd(m) and "0" in _bd(m0),
+                  f"→ {_bd(m)[:44]!r} · {_bd(m0)[:44]!r}")
+        #  Açıklama motorun çıktısında DURMAYA devam eder — ekran onu okur.
+        _bs = TR.hesapla_tek(dict(GT, bodrum=2))
+        r.kontrol("bodrum açıklaması motorda duruyor",
+                  any("H (Tablo-3)" in str(x)
+                      for b_ in _bs.get("bolumler", [])
+                      for x in (b_.get("aciklamalar") or [])))
         #  ara değerli kapı ve erişilebilirlik uyarıları
         m = _metin(PE.trafik_pdf(TR.hesapla_tek(dict(GT, kapi_genisligi=1000)), PROJE))
         r.kontrol("1000 mm ara değer uyarısı paftada", "enterpolasyon" in m)

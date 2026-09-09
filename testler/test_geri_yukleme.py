@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.avan import hesap as AV
+from engine.uygulama import mukavemet_tablolari as MT   # noqa: E402
 from exports import hucre_haritasi as H          # noqa: E402
 from exports import xlsx_export as XE            # noqa: E402
 from exports import xlsx_import as XI            # noqa: E402
@@ -392,7 +393,15 @@ def calistir():
            #  Karşı ağırlığın KENDİ ölçüleri  ( TS EN 81-50 Ek C.2.2 · Gx · Gy )
            #  Eskiden türetiliyorlardı:  genişlik ray arasından, derinlik
            #  malzemeden.  İkisi de kaldırıldı, ölçüler artık girdi.
-           "agirlik_genisligi": 850, "agirlik_derinligi": 130}
+           "agirlik_genisligi": 850, "agirlik_derinligi": 130,
+           #  Tampon tipi ve adedi  ( TS EN 81-20 m.5.8.1 · m.5.2.1.8.5 ).
+           #  Kitap tamponu yalnız yerleşim ölçüsü olarak tanır;  tip ve adet
+           #  teslim kopyasına ek blokta yazılır ve geri okunur.
+           "tampon_tipi": MT.TAMPON_TIPLERI_ADLARI[2],
+           "kabin_tampon_adedi": 2, "agirlik_tampon_adedi": 2,
+           #  Askı noktası ( S ) — kabin kaçıklığından AYRI bir nokta
+           #  ( TS EN 81-50 Ek C.1.2 );  C.2.2 ve C.2.3'ün moment koluna girer.
+           "aski_kaciklik_x": 40, "aski_kaciklik_y": -25}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

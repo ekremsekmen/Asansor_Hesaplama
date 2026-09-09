@@ -110,6 +110,7 @@ async function mukavemetKur(){
   if(MUK_ASANSORLER.length > 1 || Object.keys(MUK_ASANSORLER[0]||{}).length)
     mAsansorYukle(MUK_AKTIF);
   if($('m_adet')) $('m_adet').value = String(MUK_ADET);
+  mMakineDairesiKutulari();
   mAsansorSekmeleriTazele();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
@@ -430,9 +431,26 @@ function mMalzemeDerinligi(){
   if(v !== undefined && v !== null) d.value = mSayi(v);
 }
 
+/*  MAKİNE DAİRESİ ÖLÇÜLERİ MRL'DE GİZLENİR.
+    Avan sayfası bunu zaten yapıyordu ( a_mk_olculer );  uygulama sayfasında
+    kutular MRL işaretliyken de duruyordu.  Ortada duran ve doldurulabilen
+    iki kutu, "makine dairesi hesabı yapılacak" izlenimi veriyor;  hesap ise
+    -doğru olarak- MRL'de o bölümü hiç üretmiyor.  Kutuyu gizlemek çelişkiyi
+    kaynağında bitirir.  Değer SİLİNMEZ:  MRL kaldırılırsa geri gelir. */
+function mMakineDairesiKutulari(){
+  const k = $(M_ID('mk_yok'));
+  if(!k) return;
+  for(const a of ['mk_uzunluk', 'mk_genislik']){
+    const e = $(M_ID(a));
+    const kap = e && (e.closest('.alan') || e);
+    if(kap) kap.hidden = k.checked;
+  }
+}
+
 function mukavemetPlanla(hedef){
   if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = true;
   if(hedef && hedef.id === M_ID('agirlik_malzemesi')) mMalzemeDerinligi();
+  mMakineDairesiKutulari();
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);
