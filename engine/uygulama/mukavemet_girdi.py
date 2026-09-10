@@ -364,8 +364,11 @@ TABLO_GEREKLI = (
       ("A", "Gr", "Ix", "Iy", "Wx", "Wy", "c")]
      + [(k, (lambda p, k=k: MT.ray_geo(p, k))) for k in ("h1_b_f", "h1_f")],
      "kesit değerleri"),
+    #  iy DE ARANIR:  burkulma en küçük atalet yarıçapından hesaplanır
+    #  ( bkz. mukavemet._makine ), eksik profil sessizce geçmemelidir.
     ("dikine_kiris", [("A", lambda x: MT.npu(x, "A")),
-                      ("ix", lambda x: MT.npu(x, "ix"))], "kesit değerleri"),
+                      ("ix", lambda x: MT.npu(x, "ix")),
+                      ("iy", lambda x: MT.npu(x, "iy"))], "kesit değerleri"),
     ("yan_yatak", [("Wx", lambda x: MT.npu(x, "Wx"))], "kesit değerleri"),
     ("halat_capi", [("1 m ağırlığı", MT.halat_agirlik),
                     ("kopma yükü", MT.halat_kopma)], "halat verisi"),

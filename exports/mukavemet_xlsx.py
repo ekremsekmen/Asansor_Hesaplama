@@ -365,8 +365,8 @@ EK_GIRDI_HUCRELERI = (
     ("temel_b",               235, "Temel genişliği",                "m"),
     ("serit_L",               236, "Topraklama şeridi boyu",         "m"),
     ("mk_yok",                237, "Makine dairesiz  ( MRL )",       "EVET / HAYIR"),
-    ("mk_uzunluk",            238, "Makine dairesi uzunluğu",        "m"),
-    ("mk_genislik",           239, "Makine dairesi genişliği",       "m"),
+    ("mk_uzunluk",            238, "Makine dairesi uzunluğu",        "mm"),
+    ("mk_genislik",           239, "Makine dairesi genişliği",       "mm"),
     #  Kaynak kitapta karşılığı olmayan iki yeni girdi
     #  ( 240 "toplam_verim" idi;  Δη kalkınca anahtar da kalktı — satır
     #    numarası yeniden kullanılmıyor ki eski kitaplar karışmasın. )
@@ -765,6 +765,17 @@ def _standarda_uydur(wb, g):
     ws["AV354"] = (f"=AH290/MIN(VLOOKUP({_ray},TABLOLAR!I60:S65,8,0),"
                    f"VLOOKUP({_ray},TABLOLAR!I60:S65,9,0))")
 
+    #  ㊸  KAİDE BURKULMASI ZAYIF EKSENDEN  —  λ = L1 / min( ix ; iy )
+    #  Kitap NPU tablosunun 14. sütununu ( ix ) okuyordu;  17. sütun ( iy )
+    #  hiç okunmuyordu.  Çubuk EN KÜÇÜK atalet yarıçapına sahip eksende
+    #  burkulur — NPU 120'de ix = 4,62 cm ama iy = 1,59 cm'dir.
+    #  Ofis şasenin zayıf ekseni mesnetlediğini beyan etmişse ( sabit = 1 )
+    #  kitabın kendi formülü korunur.
+    if not O["kaide_zayif_eksen_mesnetli"]:
+        _npu = "TABLOLAR!M36:AH53"
+        ws["AB38"] = (f"=MIN(VLOOKUP($AE$36,{_npu},14,0),"
+                      f"VLOOKUP($AE$36,{_npu},17,0))*10")
+
     #  ㊳  ACİL FRENLEMEDE İVME İŞARETLERİ  —  EN 81-50 m.5.11.2.2 · Ek D
     #  "Üst işlem, beyan yüklü kabin AŞAĞI yönde yavaşlarken;  alt işlem, boş
     #  kabin YUKARI yönde yavaşlarken."  Kitap ikisini de ters yazıyordu:
@@ -983,9 +994,33 @@ def _standarda_uydur(wb, g):
             f"{float(O['denge_zinciri_orani']) / 100.0!r},0)")
     _mt = ("(IFERROR(VLOOKUP('Veri Girişi'!B107,TABLOLAR!$D$61:$G$64,4,0),0)"
            "+IFERROR(VLOOKUP('Veri Girişi'!B108,TABLOLAR!$D$61:$G$64,4,0),0))")
-    ws["AQ9"] = (f"=(AQ14+AQ15)-AQ13+AQ8"
+    #  ㊹  DENGESİZLİK İKİ HAREKET YÖNÜNDEN DE OKUNUR
+    #  ( AQ14 = Q · AQ15 = P · AQ13 = Ga ).  Kitap yalnız dolu kabinin
+    #  yukarı çıkışını yazıyordu;  boş kabin aşağı inerken motor karşı
+    #  ağırlığı kaldırır ve dengesizlik Ga − P = q·Q olur.  q = 0,50'de
+    #  ikisi eşit, q > 0,50'de İKİNCİSİ belirleyicidir.
+    _gden = "MAX((AQ14+AQ15)-AQ13,AQ13-AQ15)"
+    ws["AQ9"] = (f"={_gden}+AQ8"
                  f"+AQ18*AQ20*'Veri Girişi'!B100*'Veri Girişi'!C63*(1-{_lam})"
                  f"+0.5*'Veri Girişi'!C63*{_mt}")
+
+    #  ㊺  KABİN AÇIKLIKLARI EN ÜST KONUMDA ÖLÇÜLÜR  —  Çizelge 2
+    #  Kitabın KENDİ başlığı doğruyu yazar:  A634 = "Karşı ağırlık tam
+    #  kapanmış tampon üzerinde otururken :".  Ama altındaki formüller
+    #  ölçüyü son durak kotundan alır;  kabinin o konuma çıkarken kazandığı
+    #  yükseklik hiç düşülmez.  Kabin şu kadar yükselir:
+    #      ağırlık çarpma plakası arası ( B125 )
+    #    + ağırlık tamponu ezilmesi     ( B124 )
+    #    + 0,035·v²·1000                ( C61 = beyan hızı )
+    #  AD638 de artık 0,10 m'dir:  0,035·v² payı sınıra değil ÖLÇÜYE girer
+    #  ( m.5.2.5.7.2 b ).  AO639 = AI636/1000 olduğu için sığınma hacminin
+    #  yüksekliği kendiliğinden düzelir.  AI640 ( Ç.2 ) ve kuyu dibi
+    #  satırları KENDİ uç konumlarından ölçülür — onlara dokunulmaz.
+    _yks = ("('Veri Girişi'!$B$125+'Veri Girişi'!$B$124"
+            "+0.035*'Veri Girişi'!$C$61^2*1000)")
+    for _h in ("AI635", "AI636", "AI637", "AI638"):
+        ws[_h] = f"{ws[_h].value}-{_yks}"
+    ws["AD638"] = MK.SIGINMA["min_paten_tavan"]
 
     #  ㉟  SIĞINMA HACMİ TİPİ  —  beyan edilen duruş kitaba da yazılır.
     #  Kitapta ölçüler ve "( EN 81-20 Çizelge 3 - çömelmiş duruş )" açıklaması

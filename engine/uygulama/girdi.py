@@ -58,8 +58,8 @@ EK_ALANLAR = (
     ("temel_b",         "Temel genişliği",                   "m",    "sayi", None, None),
     ("serit_L",         "Topraklama şeridi boyu",            "m",    "sayi", None, None),
     ("mk_yok",          "Makine dairesiz  ( MRL )",          "—",    "onay", None, True),
-    ("mk_uzunluk",      "Makine dairesi uzunluğu",           "m",    "sayi", None, None),
-    ("mk_genislik",     "Makine dairesi genişliği",          "m",    "sayi", None, None),
+    ("mk_uzunluk",      "Makine dairesi uzunluğu",           "mm",   "sayi", None, None),
+    ("mk_genislik",     "Makine dairesi genişliği",          "mm",   "sayi", None, None),
 )
 
 EK_ALAN = {a[0]: a for a in EK_ALANLAR}

@@ -307,5 +307,137 @@ class BagimsizDenetim(unittest.TestCase):
             "gevşek halat sebebi adımlarda görünmüyor")
 
 
+
+
+class UcDuzeltmeDenetimi(unittest.TestCase):
+    """2026-09-10'da bulunan üç hatanın standart tarafından doğrulanması.
+
+    Beklenen değerler kaynak Excel'den ya da altın çıktıdan ALINMAZ;  her
+    test standardın kendi cümlesinden ya da fizikten türetilir.
+    """
+
+    #  ── 1)  MOTOR GÜCÜ İKİ HAREKET YÖNÜNDEN ────────────────────────
+    def _motor_gucu(self, q):
+        s = M.hesapla({"_ofis": {"q_denge": q}})
+        self.assertTrue(s["aktif"], s.get("hata"))
+        return s["ozet"]["N_hesap"]
+
+    def test_motor_gucu_q_ekseninde_simetriktir(self):
+        """q ve ( 1−q ) aynayı verir:  dengesizliğin BÜYÜKLÜĞÜ aynıdır.
+
+        Dolu kabin yukarı  → ( 1−q )·Q ,  boş kabin aşağı → q·Q.
+        q = 0,40'ta birincisi 0,60·Q, q = 0,60'ta ikincisi 0,60·Q'dur;
+        motorun görmesi gereken güç ikisinde de aynı olmalıdır.
+        """
+        for q in (0.30, 0.35, 0.40, 0.45):
+            self.assertAlmostEqual(self._motor_gucu(q), self._motor_gucu(1 - q),
+                                   places=9, msg=f"q = {q}")
+
+    def test_motor_gucu_en_kucuk_q_yarimda(self):
+        """Denge q = 0,50'de tamdır;  iki yana da sapınca güç ARTMALIDIR."""
+        yarim = self._motor_gucu(0.50)
+        for q in (0.30, 0.40, 0.45, 0.55, 0.60, 0.70):
+            self.assertGreater(self._motor_gucu(q), yarim, f"q = {q}")
+
+    def test_bos_kabin_yonu_q_buyukken_belirleyicidir(self):
+        """q > 0,50'de dengesizlik q·Q'dur;  Gmax bunu içermelidir."""
+        Q = 800.0
+        for q in (0.60, 0.70):
+            s = M.hesapla({"beyan_yuku": Q, "_ofis": {"q_denge": q}})
+            self.assertTrue(s["aktif"], s.get("hata"))
+            #  Gmax = Gden + Gs + MSR − MCR + MTrav;  Gden = q·Q olmalı
+            Gmax = s["_h"]["AQ9"]
+            self.assertGreaterEqual(Gmax, q * Q, f"q = {q}")
+            self.assertLess(Gmax, q * Q + 200, f"q = {q}  ( artık terimler )")
+
+    #  ── 2)  KABİN AÇIKLIKLARI EN ÜST KONUMDA  ( Çizelge 2 ) ────────
+    def _ust_acikliklar(self, **ek):
+        s = M.hesapla(dict(ek))
+        self.assertTrue(s["aktif"], s.get("hata"))
+        h = s["_h"]
+        return [h["AI635"], h["AI636"], h["AI637"], h["AI638"]]
+
+    def test_agirlik_tampon_acikligi_ust_bosluktan_dusulur(self):
+        """Çizelge 2:  kabinin en üst konumu = ağırlık TAM EZİLMİŞ tampon üzerinde.
+
+        Karşı ağırlığın tampona inişi artarsa kabin o kadar daha yükselir;
+        kabin üstü açıklıkları AYNI kadar AZALMALIDIR.
+        """
+        taban = self._ust_acikliklar()
+        artan = self._ust_acikliklar(agirlik_carpma_arasi=150 + 60)
+        for a, b in zip(taban, artan):
+            self.assertAlmostEqual(b, a - 60, places=6)
+
+    def test_tampon_ezilmesi_ust_bosluktan_dusulur(self):
+        taban = self._ust_acikliklar()
+        artan = self._ust_acikliklar(agirlik_tampon_ezilme=90 + 40)
+        for a, b in zip(taban, artan):
+            self.assertAlmostEqual(b, a - 40, places=6)
+
+    def test_hiz_payi_ust_bosluktan_dusulur(self):
+        """Çizelge 2 dipnot a:  0,035·v²  ( 1,15·v'de durma yolunun yarısı )."""
+        v1, v2 = 1.0, 1.6
+        taban = self._ust_acikliklar(beyan_hizi=v1)
+        hizli = self._ust_acikliklar(beyan_hizi=v2)
+        fark = 0.035 * (v2 ** 2 - v1 ** 2) * 1000
+        for a, b in zip(taban, hizli):
+            self.assertAlmostEqual(b, a - fark, places=6)
+
+    def test_kuyu_dibi_acikliklari_yukselmeden_etkilenmez(self):
+        """Kuyu dibi ölçüleri KABİN tampon üzerindeyken alınır — ağırlık tamponu girmez."""
+        s1 = M.hesapla()
+        s2 = M.hesapla({"agirlik_carpma_arasi": 260, "agirlik_tampon_ezilme": 140})
+        for hucre in ("AI645", "AI646", "AI647", "AI648"):
+            self.assertAlmostEqual(s1["_h"][hucre], s2["_h"][hucre], places=9,
+                                   msg=hucre)
+
+    def test_paten_tavan_siniri_standardin_yazdigi_gibi(self):
+        """m.5.2.5.7.2 b):  0,10 m.  Hız payı sınıra değil ÖLÇÜYE girer."""
+        for v in (0.63, 1.0, 1.6, 2.5):
+            s = M.hesapla({"beyan_hizi": v})
+            self.assertTrue(s["aktif"], s.get("hata"))
+            self.assertEqual(s["_h"]["AD638"], 100, f"v = {v}")
+
+    #  ── 3)  BURKULMA ZAYIF EKSENDE ─────────────────────────────────
+    def test_kaide_burkulmasi_en_kucuk_atalet_yaricapindan(self):
+        """Çubuk en küçük atalet yarıçapına sahip eksende burkulur."""
+        for olcu in T.NPU_OLCULERI:
+            ix, iy = T.npu(olcu, "ix"), T.npu(olcu, "iy")
+            if ix is None or iy is None:
+                continue
+            s = M.hesapla({"dikine_kiris": olcu})
+            self.assertTrue(s["aktif"], f"{olcu}: {s.get('hata')}")
+            self.assertAlmostEqual(s["_h"]["AB38"], min(ix, iy) * 10, places=9,
+                                   msg=f"NPU {olcu}")
+
+    def test_zayif_eksende_narinlik_buyur(self):
+        """iy < ix olan profilde λ, güçlü eksenden bulunandan BÜYÜK olmalı."""
+        s = M.hesapla({"dikine_kiris": 120})
+        L1 = s["girdi"]["sase_yuksekligi"]
+        self.assertGreater(s["_h"]["O71"], L1 / (T.npu(120, "ix") * 10))
+        self.assertAlmostEqual(s["_h"]["O71"], L1 / (T.npu(120, "iy") * 10),
+                               places=9)
+
+    def test_mesnet_beyani_gucli_eksene_dondurur(self):
+        """Şase zayıf ekseni bağlıyorsa burkulma o eksende olamaz — ix geçerli."""
+        s = M.hesapla({"dikine_kiris": 120,
+                       "_ofis": {"kaide_zayif_eksen_mesnetli": 1}})
+        self.assertTrue(s["aktif"], s.get("hata"))
+        self.assertAlmostEqual(s["_h"]["AB38"], T.npu(120, "ix") * 10, places=9)
+
+    def test_zayif_eksen_kucuk_profilde_karari_cevirir(self):
+        """NPU 40x20 ve 50x25:  güçlü eksende 'uygun', zayıf eksende değil."""
+        for olcu in ("40x20", "50x25"):
+            zayif = M.hesapla({"dikine_kiris": olcu})
+            gucli = M.hesapla({"dikine_kiris": olcu,
+                               "_ofis": {"kaide_zayif_eksen_mesnetli": 1}})
+            b_z = next(x for x in zayif["bolumler"]
+                       if x.get("kimlik") == "makine_konstruksiyonu")
+            b_g = next(x for x in gucli["bolumler"]
+                       if x.get("kimlik") == "makine_konstruksiyonu")
+            self.assertTrue(b_g["sonuc"]["uygun"], f"NPU {olcu} güçlü eksen")
+            self.assertFalse(b_z["sonuc"]["uygun"], f"NPU {olcu} zayıf eksen")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -679,6 +679,77 @@ EXCEL_FARKLARI = (
      "        Gh ve F1 DEĞİŞMEDİ:  onlar kabin tarafındaki gerçek yüktür ve "
      "kaide, halat güvenlik katsayısı, tahrik ve Tst onlara dayanır.",
      ("AQ9",)),
+    ("Kaide burkulması GÜÇLÜ eksenden hesaplanıyordu",
+     "fiziksel  —  burkulma en küçük atalet yarıçapı eksenindedir",
+     "Dikine kirişin narinliği λ = L1/ix ile bulunuyordu — yani profilin "
+     "GÜÇLÜ ekseninden.  NPU tablosunda iy sütunu vardır ama hiç okunmuyordu.",
+     "Çubuk EN KÜÇÜK atalet yarıçapına sahip eksende burkulur;  λ o eksenden "
+     "hesaplanır.  U profilinde iki eksen çok ayrışır — NPU 120'de "
+     "ix = 46,2 mm ama iy = 15,9 mm'dir  ( λ 23,8 yerine 69,2 ).\n"
+     "        BÜYÜKLÜĞÜ:  ω varsayılan projede 1,05 yerine 1,41 çıkar "
+     "( %34 ).  Büyük profillerde σb zaten σem'in çok altında olduğu için "
+     "karar dönmez;  KÜÇÜK PROFİLLERDE DÖNER — varsayılan yüklerde "
+     "NPU 40x20 için σb 90,5 yerine 394,4 N/mm², NPU 50x25 için 58,0 "
+     "yerine 181,6 N/mm² ( σem = 130 ).  Her ikisi de 'UYGUN'dan "
+     "'UYGUN DEĞİL'e döner.\n"
+     "        ix HÂLÂ SEÇİLEBİLİR ama artık BEYANLA:  şase kirişi zayıf "
+     "ekseninde yanal mesnetliyse burkulma o eksende olamaz.  Bu bir "
+     "kabuldür ve Sabitler sekmesindeki 'Kaide zayıf ekseni mesnetli' "
+     "anahtarıyla açıkça yapılır;  varsayılanı 0'dır ( mesnet yok ).",
+     ("AB38", "AB39", "O71", "Z71", "K73")),
+    ("Motor gücü yalnız TEK hareket yönünden hesaplanıyordu",
+     "fiziksel  —  motor iki yönde de dengesizliği yenmek zorundadır",
+     "Dengesiz yük Gden = ( Q + P ) − Ga, yani ( 1−q )·Q olarak yazılır.  "
+     "Bu YALNIZ dolu kabinin yukarı çıkışıdır.  Boş kabin aşağı inerken "
+     "motor KARŞI AĞIRLIĞI KALDIRIR ve o yöndeki dengesizlik Ga − P = q·Q "
+     "kadardır;  hiç hesaplanmıyordu.",
+     "İki uç durum hesaplanır ve büyüğü alınır:\n"
+     "            Gden₁ = ( Q + P ) − Ga = ( 1 − q )·Q   ( dolu kabin yukarı )\n"
+     "            Gden₂ = Ga − P         = q·Q           ( boş kabin aşağı )\n"
+     "            Gden  = MAX ( Gden₁ ; Gden₂ )\n"
+     "        q = 0,50'de ikisi eşittir — kitabın tamamı bu kabul üzerine "
+     "kurulu olduğu için eksik hiç görünmemişti.  Ama q ofis sabitidir "
+     "( 0,2 – 0,8 ) ve q > 0,50'de belirleyici olan İKİNCİSİDİR.\n"
+     "        BÜYÜKLÜĞÜ VE YÖNÜ:  varsayılan projede ( 800 kg · 1 m/s · 2:1 · "
+     "Nsç = 4,9 kW ) eski hesap q = 0,60'ta 4,36 kW diyip motoru UYGUN "
+     "sayıyordu;  aynadaki q = 0,40 durumu 6,21 kW ile UYGUN DEĞİL "
+     "veriyordu.  Oysa iki durumun dengesizliği de 480 kg'dır.  Eski "
+     "bağıntıda q büyüdükçe gereken güç DÜŞÜYOR görünüyordu — 0,50'nin "
+     "üstünde bu ters ve emniyetsizdir.  Düzeltmeyle iki uç simetrik çıkar "
+     "( q = 0,40 ve q = 0,60 → 6,21 kW ) ve en küçük güç q = 0,50'dedir.",
+     ("AQ9",)),
+    ("Kabin üstü açıklıkları ANMA durak kotundan ölçülüyordu",
+     "TS EN 81-20 Çizelge 2  ·  m.5.2.5.7.1  ·  m.5.2.5.7.2",
+     "Kabin tavanı açıklıkları ve sığınma hacminin yüksekliği doğrudan son "
+     "kat yüksekliğinden bulunuyordu.  Karşı ağırlığın tampona inişi ve "
+     "tamponun ezilmesiyle kabinin YÜKSELDİĞİ hiç düşülmüyordu.  0,035·v² "
+     "payı ise yalnız TEK satırın sınırına ekleniyordu.",
+     "m.5.2.5.7.1 ve m.5.2.5.7.2 açıklıkları 'kabin EN ÜST KONUMUNDAYKEN' "
+     "ister;  Çizelge 2 o konumu tahrikli asansörde şöyle tanımlar:  "
+     "'karşı ağırlık tam ezilmiş tampon üzerinde + 0,035·v²'.  Kabin son "
+     "durak kotundan şu kadar yukarı çıkabilir:\n"
+     "            yükselme = ağırlık çarpma arası + tampon ezilmesi "
+     "+ 0,035·v²·1000\n"
+     "        Bu değer ilk dört kabin satırından ve Ç.3 sığınma hacminin "
+     "yüksekliğinden DÜŞÜLÜR.  0,035·v² payı artık sınıra değil ölçüye "
+     "girdiği için 'b - Paten/halat bağlantısı' satırının sınırı da "
+     "standardın yazdığı 0,10 m'ye döner.\n"
+     "        KİTABIN KENDİ BAŞLIĞI DOĞRUYU YAZAR:  11!A634 = 'Karşı ağırlık "
+     "tam kapanmış tampon üzerinde otururken :' — koşul yazılı, formüller "
+     "uygulamıyordu.\n"
+     "        Ç.2 VE KUYU DİBİ SATIRLARI DEĞİŞMEDİ:  onlar kendi uç "
+     "konumlarından ( kabin tam ezilmiş tampon üzerinde ) ölçülür ve zaten "
+     "doğru kuruludur.\n"
+     "        BÜYÜKLÜĞÜ:  varsayılan tampon değerleriyle ( 150 + 90 ) ve "
+     "v = 1 m/s'de yükselme 275 mm'dir.  Açıklıklar bu kadar BÜYÜK "
+     "gösteriliyordu — emniyetsiz taraf.  Son kat yüksekliği 3.400 mm olan "
+     "bir projede eski hesap 'UYGUNDUR' derken kabin üstü açıklığı 1.150 mm "
+     "yerine 875 mm, revizyon açıklığı 650 yerine 375 mm, paten/halat "
+     "açıklığı 350 yerine 75 mm çıkar — üç kontrol birden düşer.\n"
+     "        m.5.2.5.6.1.2 ( yavaşlama denetimi ) ve m.5.2.5.6.1.3 ( denge "
+     "halatı kilitleme tertibatı ) payın azaltılmasına izin verir;  program "
+     "bu indirimleri UYGULAMAZ — emniyetli taraftadır.",
+     ("AI635", "AI636", "AI637", "AI638", "AD638")),
 )
 
 #  Testlerin okuduğu düz küme
@@ -774,6 +845,9 @@ SIGINMA = {
     #  madde numarası standardın kendi metnindendir.
     #  ---------------------------------------------------------------
     "min_ust_paten":         100,   # m.5.2.5.6.2  ilave kılavuzlu yol   0,10 m
+    #  m.5.2.5.7.2 b):  paten / makara, halat bağlantısı ve düşey sürgülü
+    #  kapı başlığı ile kuyu tavanı arası, kabin EN ÜST KONUMDAYKEN 0,10 m.
+    "min_paten_tavan":       100,
     #  m.5.2.5.7.3:  kabin üstünde ayakta durulabilen her alanın üzerindeki
     #  serbest yükseklik, seçilen sığınma hacminin yüksekliği kadardır —
     #  çömelmiş duruşta ( Çizelge 3, tip 2 ) 1,00 m.  Ayrı bir sabit
@@ -904,7 +978,23 @@ def _motor(g, o):
     mt = sum(MT.kablo_agirligi(g.get(k)) or 0.0
              for k in ("kablo_tipi_1", "kablo_tipi_2"))
     MTrav = 0.5 * H * mt                             # gezici kablo dengesizliği
-    Gden = (Q + P) - Ga                              # dengelenmeyen beyan yükü
+    #  İKİ HAREKET YÖNÜ DE HESAPLANIR.  Motoru zorlayan yalnız "dolu kabin
+    #  yukarı" değildir;  BOŞ KABİN AŞAĞI inerken motor karşı ağırlığı
+    #  KALDIRIR ve o taraftaki dengesizlik  Ga − P = q·Q  kadardır.
+    #
+    #      dolu kabin yukarı :  ( Q + P ) − Ga  =  ( 1 − q )·Q
+    #      boş  kabin aşağı  :  Ga − P          =  q·Q
+    #
+    #  q = 0,50'de ikisi eşittir — kaynak kitabın tamamı bu kabul üzerine
+    #  kurulu olduğu için eksik hiç görünmemişti.  Ama q ofis sabitidir ve
+    #  0,2 – 0,8 arasında değiştirilebilir:  q > 0,50'de BELİRLEYİCİ OLAN
+    #  İKİNCİ DURUMDUR ve program onu hiç hesaplamıyordu.  Sonuç emniyetsiz
+    #  ve yönü terstir — q büyüdükçe gereken güç düşüyor görünüyordu
+    #  ( q = 0,60'ta 4,36 kW;  aynadaki q = 0,40'ta 6,21 kW ).
+    Gden_dolu = (Q + P) - Ga              # dolu kabin yukarı
+    Gden_bos = Ga - P                     # boş kabin aşağı  ( ağırlık yukarı )
+    Gden = max(Gden_dolu, Gden_bos)
+    Gden_yon = "dolu kabin yukarı" if Gden_dolu >= Gden_bos else "boş kabin aşağı"
     Gmax = Gden + O["Gs"] + MSR - MCR + MTrav
     #  MİL KUVVETİ VE MOMENT ASKI ORANINA GÖRE İNDİRGENİR.
     #  Kitap bu iki satırı kabin tarafındaki yükle yazıyordu.  2:1 palangalı
@@ -985,8 +1075,13 @@ def _motor(g, o):
               f"{trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)}", Ga, "kg"),
         veri("Gs", "Sürtünme yükü", O["Gs"], "kg", "OFİS STANDARDI"),
         metin("Dengesiz  ( artan )  yükün bileşenleri :"),
-        hesap("Gden = ( Q + P ) − Ga        ( dengelenmeyen beyan yükü )",
-              f"( {trn(Q, 0)} + {trn(P, 0)} ) − {tr(Ga)}", Gden, "kg"),
+        hesap("Gden₁ = ( Q + P ) − Ga        ( dolu kabin yukarı )",
+              f"( {trn(Q, 0)} + {trn(P, 0)} ) − {tr(Ga)}", Gden_dolu, "kg"),
+        hesap("Gden₂ = Ga − P        ( boş kabin aşağı — ağırlık kalkar )",
+              f"{tr(Ga)} − {trn(P, 0)}", Gden_bos, "kg"),
+        hesap("Gden = MAX ( Gden₁ ; Gden₂ )",
+              f"MAX ( {tr(Gden_dolu)} ; {tr(Gden_bos)} )", Gden, "kg",
+              f"belirleyici :  {Gden_yon}"),
         veri("H", "Seyir mesafesi", H, "m", "GİRİŞ"),
         hesap("MSR = i × H × gh × ns" if r != 1 else "MSR = H × gh × ns",
               (f"{trn(r, 0)} × {tr(H)} × {tr(gh)} × {trn(nh, 0)}" if r != 1
@@ -1042,11 +1137,13 @@ def _motor(g, o):
         "yalnız TEK yoldan girer:  halat boyu ( dolayısıyla Gh ) iki katına "
         "çıkar. Verime AYRICA girmez — askı ( palanga ) kaybı η'nın "
         "içindedir ve eski Δη = 0,10 düşüşü kaldırılmıştır.",
-        "Gmax, kabin EN ALTTA ve TAM YÜKLÜ iken yukarı çıkarken motorun "
-        "yenmesi gereken dengesiz kütledir. Ga = P + q·Q kabulüyle "
-        "dengelenmeyen beyan yükü Gden = ( 1 − q )·Q'dur;  üstüne halatın iki "
-        "taraf arasındaki FARKI ( MSR ) ve gezici kablonun yarısı eklenir, "
-        "denge zincirinin karşıladığı kısım ( MCR ) düşülür.",
+        "Gmax, motorun yenmesi gereken EN BÜYÜK dengesiz kütledir ve İKİ "
+        "HAREKET YÖNÜ karşılaştırılarak bulunur: dolu kabin yukarı çıkarken "
+        "Gden₁ = ( Q + P ) − Ga = ( 1 − q )·Q, boş kabin aşağı inerken motor "
+        "karşı ağırlığı kaldırır ve Gden₂ = Ga − P = q·Q olur. q = 0,50'de "
+        "ikisi eşittir; q > 0,50'de BELİRLEYİCİ OLAN İKİNCİSİDİR. Seçilenin "
+        "üstüne halatın iki taraf arasındaki FARKI ( MSR ) ve gezici kablonun "
+        "yarısı eklenir, denge zincirinin karşıladığı kısım ( MCR ) düşülür.",
         "MSR = i·H·gh·ns:  askı oranı çarpan olarak girer çünkü 2:1'de kabin "
         "1 m indiğinde kabin tarafındaki halat 2 m uzar. Denge zinciri 1:1 "
         "asıldığı için tam dengeleme ( λ = %100 ) tam bu kütleyi ister."]
@@ -1100,7 +1197,25 @@ def _makine(g, o):
     #  NPU tablosunun 14. sütunu:  atalet YARIÇAPI ix ( cm ).  Excel bu satırı
     #  "Imin — eylemsizlik momenti" diye adlandırır ama λ = L1 / imin
     #  bağıntısında yarıçap kullanılır; adlandırma matematiğe göre yapıldı.
-    imin = MT.npu(g["dikine_kiris"], "ix") * 10         # cm → mm
+    #
+    #  BURKULMA ZAYIF EKSENDE OLUR.  Kaynak kitap ( ve program, uzun süre )
+    #  yalnız ix'i okuyordu;  oysa bir çubuk EN KÜÇÜK atalet yarıçapına sahip
+    #  eksende burkulur.  U profilinde iki eksen çok ayrışır — NPU 120'de
+    #  ix = 46,2 mm ama iy = 15,9 mm'dir ( λ 23,8 yerine 69,2 ).  ix ile
+    #  hesaplanan ω burkulma etkisini KÜÇÜK gösterir;  NPU 40x20 ve 50x25'te
+    #  varsayılan yüklerde bile karar "UYGUN"dan "UYGUN DEĞİL"e döner.
+    #
+    #  ix DOĞRU OLABİLİR — ama ancak kiriş zayıf eksende MESNETLİYSE.  Bu bir
+    #  KABULDÜR ve sessizce yapılamaz:  şase yanal bağlıysa ofis bunu
+    #  "kaide_zayif_eksen_mesnetli" anahtarıyla AÇIKÇA beyan eder ve ω yine
+    #  ix'ten hesaplanır.  Beyan yoksa emniyetli taraf olan min( ix ; iy )
+    #  kullanılır.
+    _ix = MT.npu(g["dikine_kiris"], "ix") * 10          # cm → mm
+    _iy = MT.npu(g["dikine_kiris"], "iy") * 10          # cm → mm
+    _mesnetli = bool(O["kaide_zayif_eksen_mesnetli"])
+    imin = _ix if _mesnetli else min(_ix, _iy)
+    _eksen = "ix  ( zayıf eksen mesnetli )" if _mesnetli else (
+        "ix" if _ix <= _iy else "iy  ( zayıf eksen )")
     Wx = MT.npu(g["yan_yatak"], "Wx") * 1000            # cm³ → mm³
 
     F = k1 * gn * (o["Q"] + o["P"] + o["Gh"] + o["Ga"] + Gm)
@@ -1137,8 +1252,8 @@ def _makine(g, o):
         veri("L1", "Dikine kirişin boyu", L1, "mm", "GİRİŞ"),
         veri("A", "Dikine kirişin kesit alanı", A, "mm²",
              f"NPU {g['dikine_kiris']}", 0),
-        veri("imin", "Dikine kirişin atalet yarıçapı", imin, "mm",
-             f"NPU {g['dikine_kiris']}"),
+        veri("imin", "Dikine kirişin en küçük atalet yarıçapı", imin, "mm",
+             f"NPU {g['dikine_kiris']}  ·  {_eksen}"),
         veri("Wx", "Yan yatağın mukavemet momenti", Wx, "mm³",
              f"NPU {g['yan_yatak']}", 0),
         veri("σem", "Emniyet gerilmesi ( ST 37 )", O["sigma_em"], "N/mm²", "OFİS STANDARDI"),
@@ -1175,7 +1290,13 @@ def _makine(g, o):
         "Mmax = FA·X.  Burkulmada σb = FB·ω/A ( omega yöntemi ) ve "
         "λ = L1/imin — yani burkulma boyu Lk = L1 alınır, iki ucu mafsallı "
         "kabulüdür ( β = 1,0 ).  Kolon tek ucundan ankastre, öbür ucu "
-        "serbestse bu kabul narinliği OLDUĞUNDAN KÜÇÜK gösterir."]
+        "serbestse bu kabul narinliği OLDUĞUNDAN KÜÇÜK gösterir.",
+        "imin, profilin İKİ EKSENİNİN EN KÜÇÜĞÜDÜR:  çubuk zayıf eksende "
+        "burkulur.  U profilinde iki eksen çok ayrışır ( NPU 120: ix = 46,2 "
+        "mm · iy = 15,9 mm ).  Yalnız ix ile hesaplamak ω'yı ve dolayısıyla "
+        "σb'yi OLDUĞUNDAN KÜÇÜK gösterir.  Şase kirişi zayıf eksende yanal "
+        "mesnetliyse ix geçerlidir;  bu bir KABULDÜR ve Sabitler sekmesindeki "
+        "'Kaide zayıf ekseni mesnetli' anahtarıyla açıkça beyan edilir."]
     #  İKİSİ DE YÖNTEM ANLATIMI — paftaya değil, ekrandaki ⓘ'ye.
     b["aciklamalar"] += [
         "Darbe katsayısı k1 ve emniyet gerilmesi σem OFİS KABULLERİDİR "
@@ -2967,22 +3088,65 @@ def _siginma(g, o):
     #  Kuyu tabanı ile kabinin en alt kısmı arası
     a_dip = g["kabin_tampon_baba"] + (g["kabin_tampon_boyu"] - g["kabin_tampon_ezilme"])
 
+    #  ------------------------------------------------------------------
+    #  KABİNİN EN ÜST KONUMU  ( Çizelge 2 )  —  ölçüm burada yapılır
+    #  ------------------------------------------------------------------
+    #  m.5.2.5.7.1 ve m.5.2.5.7.2 açıklıkları "kabin EN ÜST KONUMUNDAYKEN"
+    #  ister;  Çizelge 2 bu konumu tahrikli asansör için şöyle tanımlar:
+    #
+    #      karşı ağırlık TAM EZİLMİŞ tampon üzerinde  +  0,035·v²
+    #
+    #  Yani kabin, son durak kotundan şu kadar YUKARI çıkabilir:
+    #      karşı ağırlığın tampona inişi  ( çarpma plakası arası )
+    #    + tamponun ezilmesi
+    #    + 0,035·v²                       ( 1,15·v'de yerçekimi durma yolunun
+    #                                       yarısı — Çizelge 2 dipnotu a )
+    #
+    #  Program bu yükselmeyi HİÇ DÜŞMÜYORDU:  ölçüler anma durak kotundan
+    #  alınıyordu.  0,035·v² payı yalnız TEK satırın sınırına ekleniyordu
+    #  ( cebirsel olarak doğruydu ) ama tampon terimleri hiçbir yerde yoktu.
+    #  Varsayılan projede eksik 275 mm'dir ve kabin üstü açıklıkları
+    #  OLDUĞUNDAN BÜYÜK gösteriyordu — emniyetsiz taraf.
+    #
+    #  m.5.2.5.6.1.2/.3 bu payın azaltılmasına izin verir ( yavaşlama
+    #  denetimi, denge halatı kilitleme tertibatı );  program bu indirimleri
+    #  UYGULAMAZ — emniyetli taraftadır.
+    #
+    #  Standart bunun için karşı ağırlık paravanına levha da ister:  "kabin
+    #  en üst durak kotundayken karşı ağırlık ile tamponu arasındaki azami
+    #  açıklık" ( m.5.2.5.7.1 ).  O açıklık burada agirlik_carpma_arasi'dır.
+    yukselme = (g["agirlik_carpma_arasi"] + g["agirlik_tampon_ezilme"]
+                + (bosluk - K["min_ust_paten"]))       # ( bosluk − 100 ) = 35·v²
+
     #  Excel'deki "HESAPLANAN" sütunu  ( 11!AI635 … AI648 )
     HUCRE = ("AI635", "AI636", "AI637", "AI638", "AI640",
              "AI645", "AI646", "AI647", "AI648")
+    #  İLK DÖRT SATIR KABİN AÇIKLIĞIDIR ve kabinin EN ÜST KONUMUNDA ölçülür
+    #  ( Çizelge 2 ):  anma durak kotundan bulunan değerden `yukselme`
+    #  düşülür.  Dördüncü satırın sınırı ESKİDEN 0,10 + 0,035·v² idi — pay
+    #  ölçüye değil sınıra ekleniyordu;  artık pay ölçünün kendisindedir ve
+    #  sınır standardın yazdığı gibi 0,10 m'dir  ( m.5.2.5.7.2 b ).
+    #
+    #  Ç.2 VE KUYU DİBİ SATIRLARINA DOKUNULMAZ:  Ç.2 karşı ağırlığın uç
+    #  konumudur ( Çizelge 2:  KABİN tam ezilmiş tampon üzerinde + 0,035·v² )
+    #  ve `yigin` üzerinden zaten doğru kuruludur;  kuyu dibi ölçüleri de
+    #  kabin tampon üzerindeyken alınır.
     satir = [
         ("b - Üst paten / rayın üst ucu arası",
-         K["min_ust_paten"], SK - K["kabin_yuksekligi"] - K["paten_payi"] - K["tavan_payi"]),
+         K["min_ust_paten"],
+         SK - K["kabin_yuksekligi"] - K["paten_payi"] - K["tavan_payi"] - yukselme),
         #  m.5.2.5.7.3 — sınır, seçilen sığınma hacminin yüksekliğidir;
         #  ikisi ayrışmasın diye tek yerden okunur.
         ("c.2 - Kabin üstü / kuyu tavanının en alt kısmı arası",
-         K["ust_hacim"][2] * 1000, SK - K["kabin_ust_donanim"] - K["tavan_payi"]),
+         K["ust_hacim"][2] * 1000,
+         SK - K["kabin_ust_donanim"] - K["tavan_payi"] - yukselme),
         ("a - Revizyon kutusu / kuyu tavanının en alt kısmı arası",
          K["min_revizyon"],
-         SK - K["kabin_ust_donanim"] - K["revizyon_payi"] - K["tavan_payi"]),
+         SK - K["kabin_ust_donanim"] - K["revizyon_payi"] - K["tavan_payi"]
+         - yukselme),
         ("b - Paten / halat bağlantısı - kuyu tavanı arası",
-         bosluk, SK - K["kabin_ust_donanim"] - K["revizyon_payi"]
-         - K["paten_payi"] - K["tavan_payi"]),
+         K["min_paten_tavan"], SK - K["kabin_ust_donanim"] - K["revizyon_payi"]
+         - K["paten_payi"] - K["tavan_payi"] - yukselme),
         ("Ç.2 - Karşı ağırlık üst pateni / rayın üst ucu arası",
          bosluk, c2_agirlik),
         ("a - Kuyu tabanı / kabinin en alt kısımları arası",
@@ -2998,9 +3162,18 @@ def _siginma(g, o):
           hesap("Serbest boşluk = ( 0,1 + 0,035 × v² ) × 1000",
                 f"( 0,1 + 0,035 × {tr(v)}² ) × 1000", bosluk, "mm",
                 "TS EN 81-20 Çiz.2 + m.5.2.5.6.2"),
+          hesap("Kabinin en üst konuma yükselmesi  =  ağırlık çarpma arası "
+                "+ tampon ezilmesi + 0,035 × v² × 1000",
+                f"{trn(g['agirlik_carpma_arasi'], 0)} + "
+                f"{trn(g['agirlik_tampon_ezilme'], 0)} + "
+                f"{trn(bosluk - K['min_ust_paten'], 0)}",
+                yukselme, "mm",
+                "TS EN 81-20 Çiz.2  ·  kabin açıklıkları bu konumda ölçülür", 0),
           metin("Kabin tavanı üzerindeki sığınma alanları  ( m.5.2.5.7 ) :",
                 vurgu=True)]
-    _kay(o, AD638=bosluk)
+    #  AD638 artık 0,1 + 0,035·v² DEĞİL:  pay ölçünün kendisine taşındı,
+    #  sınır standardın yazdığı gibi 0,10 m'dir  ( m.5.2.5.7.2 b ).
+    _kay(o, AD638=K["min_paten_tavan"])
     uygunlar = []
     for i, (etiket, asgari, hesaplanan) in enumerate(satir):
         _kay(o, **{HUCRE[i]: hesaplanan})
@@ -3015,7 +3188,8 @@ def _siginma(g, o):
         ad.append(kontrol(f"{trn(hesaplanan, 0)} mm  ≥  {trn(asgari, 0)} mm", uygun))
 
     #  Sığınma hacimleri  ( EN 81-20 Çizelge 3 — çömelmiş duruş )
-    ust_h = (SK - K["kabin_ust_donanim"] - K["tavan_payi"]) / 1000.0
+    #  Sığınma hacmi de KABİN EN ÜST KONUMDAYKEN sağlanmalıdır ( m.5.2.5.7.1 )
+    ust_h = (SK - K["kabin_ust_donanim"] - K["tavan_payi"] - yukselme) / 1000.0
     for etiket, tip, (a, bb, c), olcu in (
             ("Ç.3 - Kabin üstünde sığınma hacmi", tip_ust,
              K["ust_hacim"], ((W + 40) / 1000.0, (D + 20) / 1000.0, ust_h)),
@@ -3045,10 +3219,16 @@ def _siginma(g, o):
         "Ray dibi açıklığı, parça raya yatay XH ≤ 0,15 m uzaklıkta olduğu "
         "kabulüyle Şekil 7'den 0,10 m alınır; daha uzaktaki parçalar için "
         "sınır 0,30 m ( XH = 0,30 ) ve 0,50 m ( XH ≥ 0,50 ) olur.",
-        "Serbest boşluğa eklenen 0,035 × v² terimi TS EN 81-20'de açıklığın "
-        "değil, kabinin EN ÜST KONUMUNUN tanımındadır ( Çizelge 2 ). Burada "
-        "kuyu ölçüleri anma konumundan alındığı için aynı eşitsizlik, terim "
-        "sınıra eklenerek yazılmıştır — cebirsel olarak birebir aynıdır.",
+        "KABİN AÇIKLIKLARI EN ÜST KONUMDA ÖLÇÜLÜR. TS EN 81-20 m.5.2.5.7.1 "
+        "ve m.5.2.5.7.2 açıklıkları 'kabin en üst konumundayken' ister; "
+        "Çizelge 2 bu konumu tahrikli asansörde 'karşı ağırlık tam ezilmiş "
+        "tampon üzerinde + 0,035·v²' diye tanımlar. Kabin son durak "
+        "kotundan bu kadar yukarı çıkabilir ve ilk dört satırdan bu yükselme "
+        "DÜŞÜLMÜŞTÜR. Ç.2 ve kuyu dibi satırları kendi uç konumlarından "
+        "( kabin tampon üzerinde ) ölçüldüğü için onlara girmez. "
+        "m.5.2.5.6.1.2 ve m.5.2.5.6.1.3'ün izin verdiği indirimler "
+        "( yavaşlama denetimi, denge halatı kilitleme tertibatı ) "
+        "UYGULANMAZ — emniyetli taraftır.",
         "SIĞINMA HACMİ TİPİ BİR BEYANDIR. TS EN 81-20 m.5.2.5.7.1 ve "
         "m.5.2.5.8.1 üç duruştan BİRİNİ ister: dik ( 0,40 × 0,50 × 2,00 m ), "
         "çömelme ( 0,50 × 0,70 × 1,00 m ) ve — yalnız kuyu dibinde — yatarak "

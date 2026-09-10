@@ -67,6 +67,13 @@ VARSAYILAN = {
     #  değildir;  kitabın kullandığı 1,2 varsayılan olarak korunur.
     "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
     "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm     ( 11!S58 )
+    #  BURKULMA EKSENİ.  Çubuk EN KÜÇÜK atalet yarıçapına sahip eksende
+    #  burkulur;  program bu yüzden min( ix ; iy ) kullanır.  Şase, dikine
+    #  kirişi zayıf ekseninde yanal olarak MESNETLİYORSA burkulma o eksende
+    #  olamaz ve λ güçlü eksenden ( ix ) hesaplanır.  Bu bir KABULDÜR:
+    #  varsayılan 0'dır ( mesnet yok — emniyetli taraf ), ofis mesnedi
+    #  çizimle gösterebiliyorsa 1 yapar.  ( 0 / 1 )
+    "kaide_zayif_eksen_mesnetli": 0,
 
     # ── ②b KASNAK ATALETİ  ( TS EN 81-50 m.5.11.2.2 ) ────────────────
     #  Tahrik hesabındaki  Σ( mP·iP·a ) / r  terimi kasnağın ATALET
@@ -155,7 +162,7 @@ ARALIK = {
     "kanal_beta": (0, MT.BETA_AZAMI),
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
     "k1_ani": (1, 10), "k3_yardimci": (1, 10),
-    "yan_yatak_L_X": (0, 5000),
+    "yan_yatak_L_X": (0, 5000), "kaide_zayif_eksen_mesnetli": (0, 1),
     "kasnak_yogunluk": (1000, 20000), "kasnak_gobek_pay": (0, 500),
     "kasnak_kanal_payi": (0, 500), "kasnak_gobek_orani": (0, 1),
     "kasnak_adet_kabin": (0, 10), "kasnak_adet_agirlik": (0, 10),
@@ -186,7 +193,7 @@ GRUPLAR = (
      "makine kaidesi ve ray hesabı — TS EN 81-20 bu yük modelini VERMEZ, "
      "aşağıdakiler ofis kabulüdür",
      ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani", "k3_yardimci",
-      "yan_yatak_L_X")),
+      "yan_yatak_L_X", "kaide_zayif_eksen_mesnetli")),
     ("②b KASNAK ATALETİ",
      "tahrik hesabındaki Σ( mP·iP·a )/r terimi — TS EN 81-50 kasnağın atalet "
      "momentini imalatçıdan ister;  aşağıdaki dört sayı kasnağı döküm disk "
@@ -250,6 +257,10 @@ ETIKET = {
     "k1_makarali": ("k1 — ani frenlemeli makaralı", "makine kaidesi darbe katsayısı"),
     "k1_ani": ("k1 — ani frenlemeli", "makine kaidesi darbe katsayısı;  kaideyi kaymalıya göre 2,5 kat büyütür"),
     "yan_yatak_L_X": ("Yan yatak mesnet payı (mm)", "X = L − bu değer"),
+    "kaide_zayif_eksen_mesnetli": (
+        "Kaide zayıf ekseni mesnetli  ( 0 / 1 )",
+        "0 = mesnet yok, λ en küçük atalet yarıçapından ( emniyetli ) · "
+        "1 = şase zayıf ekseni bağlıyor, λ güçlü eksenden ( ix )"),
     "kabin_yuksekligi": ("Kabin gövde yüksekliği (mm)", "üst paten – ray üst ucu payı"),
     "kabin_ust_donanim": ("Kabin üstü kotu (mm)", "kabin üstü serbest yükseklik hesabında"),
     "paten_payi": ("Paten payı (mm)", ""),
