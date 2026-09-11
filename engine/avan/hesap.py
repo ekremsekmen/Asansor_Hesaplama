@@ -113,7 +113,33 @@ SABIT_B_ARALIK = {
 OFIS_VARSAYILAN = {
     # kesin sabitler — yönetmelik / malzeme fiziği
     "U": 380,                 # Şebeke gerilimi (fazlar arası), V
-    "kappa": 56,              # Bakır iletkenlik, m/(Ω·mm²)
+    #  ------------------------------------------------------------------
+    #  κ  —  BAKIRIN İLETKENLİĞİ  ( m/Ω·mm² )        2026-09-12
+    #  ------------------------------------------------------------------
+    #  56, bakırın 20 °C'DEKİ değeridir.  Kablo yük altında ısınır, direnci
+    #  artar, iletkenliği düşer;  ε = 100·P·L/(κ·S·U²) bağıntısında κ paydada
+    #  olduğu için 56 ile hesaplanan gerilim düşümü GERÇEKTEN KÜÇÜK çıkar —
+    #  proje kâğıtta geçer, sahada sınırı aşabilir.  Yön EMNİYETSİZDİ.
+    #
+    #  TS HD 60364-5-52 EK-G  ( TSE'nin tercüme edip yayımladığı Türk
+    #  standardı ) hesabın tabanını açıkça tanımlar:
+    #      ρ1 = "20 °C'deki özdirencin 1,25 katı olarak alınan NORMAL ÇALIŞMA
+    #            KOŞULLARINDAKİ iletkenin özdirenci"   —  bakır için
+    #            0,0225 Ω·mm²/m   →   κ = 1 / 0,0225 = 44,4
+    #
+    #  Elektrik İç Tesisleri Yönetmeliği m.57 klasik formülü verir ve Türk
+    #  pratiği 56 kullanır;  ikisi de savunulabilir, SIKI OLANI seçildi.
+    #  EMO'nun kendi yayını ( EMO İzmir, Mayıs 2017, "Alçak Gerilim Elektrik
+    #  Tesislerinde Gerilim Düşümü Hesapları" ) yönetmelik hükümlerinin
+    #  standarda göre yeniden düzenlenmesini önerir.
+    #
+    #  ÖLÇÜLDÜ:  86 etkin avan senaryosunda 56 → 44,4 ε'yi ×1,26 büyütür ve
+    #  İKİ projede karar döner ( ε 2,385 → 3,008 % ve 2,441 → 3,079 % ).
+    #  Risk bandı:  56'da ε'si %2,38–3,00 arasında çıkanlar.
+    #
+    #  Ofis sabitidir — ekrandan 56'ya döndürülebilir ve paftada hangi
+    #  değerin kullanıldığı kaynak sütununda yazar.
+    "kappa": 44.4,            # Bakır, normal çalışma koşulları  ( ρ1 = 1,25·ρ20 )
     "eps_max": 3,             # İzin verilen gerilim düşümü, %
     # ofis malzeme standardı — asansör bazında
     "gr": 17.91,              # Kılavuz ray birim kütlesi, kg/m
@@ -865,7 +891,11 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     b6["adimlar"] = [
         veri("U", "Şebeke gerilimi ( fazlar arası )", U_sebeke, "V", "GİRİŞ", 0),
         veri("cosφ", "Güç katsayısı", cosfi, "—", "SABİTLER B"),
-        veri("κ", "İletken iletkenliği", kappa, "m/Ω·mm²", "GİRİŞ", 0),
+        veri("κ", "İletken iletkenliği", kappa, "m/Ω·mm²",
+             ("TS HD 60364-5-52 EK-G  ·  ρ1 = 1,25 × ρ20  ( normal çalışma )"
+              if abs(kappa - 44.4) < 0.05 else
+              ("20 °C değeri  —  işletme sıcaklığında ε daha büyüktür"
+               if abs(kappa - 56) < 0.05 else "GİRİŞ")), 1),
         veri("Pm", "Makine ( motor ) anma gücü  —  mil gücü", g_motor_mil, "W",
              "GİRİŞ  ( Nsç )", 0),
         veri("ηm", "Motorun elektrik verimi", _eta_m, "—", "SABİTLER B"),

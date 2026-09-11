@@ -1140,7 +1140,12 @@ def calistir():
                               #  Δη kalkınca N düştü:  11 → 7,5 kW kademesi
                               ("Nsc", 7.5)):
         r.esit(f"çözülmüş girdi {anahtar}", c["asansorler"][0][anahtar], beklenen)
-    for anahtar, beklenen in (("U", 380), ("kappa", 56), ("eps_max", 3),
+    #  κ ofis varsayılanı TS HD 60364-5-52 EK-G'ye çekildi ( ρ1 = 1,25·ρ20
+    #  → 0,0225 Ω·mm²/m ).  Sayıyı BURAYA ikinci kez yazmak yerine tek
+    #  kaynaktan okunur;  değişirse test sessizce eskimez.
+    for anahtar, beklenen in (("U", 380),
+                              ("kappa", AV.sabitler(None)["kappa"]),
+                              ("eps_max", 3),
                               ("beta", 150), ("cubuk_sayisi", 4)):
         r.esit(f"çözülmüş ortak {anahtar}", c["ortak"][anahtar], beklenen)
     r.kontrol("çözme işlemi özgün girdiyi bozmuyor", "gr" not in O_AS)
@@ -1449,7 +1454,8 @@ def calistir():
               f"→ {_s['I']}")
     r.kontrol("B5  ε1 de Pşeb ile hesaplanıyor  ( ε1 ∝ P1 )",
               _yakin_o(_s["eps1"],
-                       100 * _s["P_kurulu"] * _s["L1"] / (56 * _s["S1"] * 380 ** 2))
+                       100 * _s["P_kurulu"] * _s["L1"]
+                       / (AV.sabitler(None)["kappa"] * _s["S1"] * 380 ** 2))
               if all(_s.get(k) is not None for k in ("eps1", "L1", "S1")) else True,
               f"→ {_s.get('eps1')!r}")
     #  Denetimin bildirdiği karar çeviren birleşimler
@@ -1468,7 +1474,7 @@ def calistir():
     r.kontrol("B5  ε2 Pşeb ile hesaplanıyor  ( mil gücünün 1/ηm katı )",
               _e2 is not None and _yakin_o(
                   _e2, 100 * (_s["Nsc"] * 1000 / _etam) * _s["L2"]
-                  / (56 * _s["S2"] * 380 ** 2), 1e-6),
+                  / (AV.sabitler(None)["kappa"] * _s["S2"] * 380 ** 2), 1e-6),
               f"→ ε2 = {_e2!r}")
 
     #  ------------------------------------------------------------------
