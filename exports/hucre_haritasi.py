@@ -113,6 +113,13 @@ AVAN_ASANSOR = {           # satır : alan adı
     55: "makine_tipi",
 }
 AVAN_SABIT_SAYFA = "SABİTLER"
+AVAN_TABLO_SAYFA = "TABLOLAR"
+#  Koruma iletkeni ( PE ) — Çizelge-8.  Merdiven TABLOLAR'ın ilk boş
+#  sütununa ( L ) yazılır;  asansör paftasında bölüm 6, şablonda 140.
+#  satırdaki dipnotla biter, blok onun altına eklenir.
+AVAN_PE_SUTUN = "L"
+AVAN_PE_BASLIK = 141
+
 AVAN_SABIT = {
     "i_palanga":          "C22",
     "q_denge":            "C23",

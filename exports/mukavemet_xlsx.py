@@ -567,6 +567,12 @@ BEYAN_LISTE_HUCRE = "C59"
 
 ELEKTRIK = "12-Elk.Hesapları"
 
+#  Koruma iletkeni ( PE ) — Çizelge-8.  Merdiven TABLOLAR'ın ilk boş
+#  sütununa;  blok elektrik sayfasının 66–67. boş satırlarına yazılır
+#  ( akım kontrolü 65'te biter, aydınlatma bölümü 68'de başlar ).
+PE_SUTUN = "BG"
+PE_SATIR = 66
+
 
 #  TABLOLAR!D47:G52  —  kanal şekli · açı · Nequiv(t)
 KANAL_TABLO_SATIRI = {
@@ -613,6 +619,27 @@ def _msr_dagilimi(wb):
         d = at[hucre].value
         if isinstance(d, str) and eski in d:
             at[hucre] = d.replace(eski, yeni)
+
+
+def _koruma_iletkeni(wb):
+    """Çizelge-8'in iki satırını elektrik sayfasına ekler  ( m.9-e1/ii )."""
+    from engine.avan import tablolar as AT
+    wsT = wb["TABLOLAR"]
+    wsT[f"{PE_SUTUN}1"] = "Standart kesit ( mm² )"
+    for i, k in enumerate(AT.STANDART_KESITLER, start=2):
+        wsT[f"{PE_SUTUN}{i}"] = k
+    merdiven = (f"TABLOLAR!${PE_SUTUN}$2"
+                f":${PE_SUTUN}${len(AT.STANDART_KESITLER) + 1}")
+    ws = wb[ELEKTRIK]
+    for j, (sembol, aciklama, hucre) in enumerate((
+            ("SPE1", "Koruma iletkeni — AT-TAS arası  ( Çizelge-8 · m.9-e1/ii )", "W33"),
+            ("SPE2", "Koruma iletkeni — TAS-Motor arası  ( Çizelge-8 · m.9-e1/ii )", "W34"))):
+        r = PE_SATIR + j
+        ws[f"A{r}"] = sembol
+        ws[f"C{r}"] = ":"
+        ws[f"D{r}"] = aciklama
+        ws[f"W{r}"] = AT.koruma_iletkeni_formulu(hucre, merdiven)
+        ws[f"AB{r}"] = "mm²"
 
 
 def _elektrik_sayfasi(wb, g):
@@ -955,6 +982,15 @@ def _standarda_uydur(wb, g):
     #  girdileriyle hiçbiri aynı değildi;  ekran ile teslim edilen kitap
     #  farklı hesap yapıyordu.  Artık aynı sayıları kullanırlar.
     _elektrik_sayfasi(wb, g)
+
+    #  ㊾  KORUMA İLETKENİ ( PE ) KESİTLERİ  —  Çizelge-8
+    #  Elektrik Tesislerinde Topraklamalar Yönetmeliği m.9-e1/ii.  Kitabın
+    #  elektrik sayfasında S1 · S2 · akım kontrolü var, KORUMA İLETKENİ yok.
+    #  Koruma iletkeni topraklama iletkeni DEĞİLDİR:  besleme kablosunun
+    #  içindeki damardır ve kesiti faz kesitinden türer.  Merdiven TABLOLAR'ın
+    #  boş bir sütununa yazılır, hücreler FORMÜL alır — kitapta S1 elle
+    #  değiştirilirse PE de takip etsin diye.
+    _koruma_iletkeni(wb)
 
     #  ⑩  Beyan yükü listesi EN 81-20 Çizelge 6'ya tamamlanır
     #  Kitabın açılır listesi ( 'Veri Girişi'!$S$2:$S$23 ) standardın 28

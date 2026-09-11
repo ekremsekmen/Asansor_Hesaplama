@@ -819,6 +819,32 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     I2 = I_motor
     akim2_uygun = sayi_mi(I2) and sayi_mi(Iz2) and I2 <= Iz2
 
+    #  ------------------------------------------------------------------
+    #  KORUMA İLETKENİ ( PE ) KESİTİ
+    #  ------------------------------------------------------------------
+    #  Elektrik Tesislerinde Topraklamalar Yönetmeliği m.9-e1/ii · Çizelge-8.
+    #  KORUMA İLETKENİ, TOPRAKLAMA İLETKENİ DEĞİLDİR:  birincisi besleme
+    #  kablosunun içindeki damardır ve kesiti faz kesitinden türer;  ikincisi
+    #  ana baradan toprak elektroduna gider ve kendi kuralı vardır ( bakırda
+    #  16 mm² ).  Program topraklama bölümünde elektrodun DİRENCİNİ hesaplar,
+    #  iletkenin kesitini değil.  Bu satırlar bölüm 6'dadır çünkü hesaplanan
+    #  şey bir KABLO DAMARININ KESİTİDİR ve S1 · S2 · kablo tipi buradadır.
+    #
+    #  m.9-e1/iv ( ortak PE, en büyük ana iletkene göre ) UYGULANMAZ:  o kural
+    #  TEK bir PE'nin birçok devreye ORTAK hizmet ettiği durum içindir.  Kolon
+    #  hattı ile makine beslemesi ayrı kablolardır, her birinin kendi PE damarı
+    #  vardır;  ardışıktırlar, ortak değil.
+    SPE1, SPE1_ham, SPE1_yuv = T.koruma_iletkeni_kesiti(S1)
+    SPE2, SPE2_ham, SPE2_yuv = T.koruma_iletkeni_kesiti(S2)
+
+    def _pe_kaynak(S, ham, yuvarlandi):
+        if ham is None:
+            return "kesit okunamadı"
+        kural = ("S ≤ 16 → S" if S <= 16 else
+                 ("16 < S ≤ 35 → 16" if S <= 35 else "S > 35 → S/2"))
+        return kural + (f"  ·  {tr(ham)} bir üst standart kesite yuvarlandı"
+                        if yuvarlandi else "")
+
     b6 = Bolum("6 -  GERİLİM DÜŞÜMÜ VE KESİT KONTROLÜ", "Elektrik İç Tesisleri Yönetmeliği",
                kimlik="gerilim_dusumu")
     b6["aciklamalar"] = [
@@ -827,6 +853,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         "makine besleme hattı yalnız motoru besler.",
         "Her iki hatta da motorun ŞEBEKEDEN ÇEKTİĞİ güç ( Pşeb = Pm / ηm ) akar; "
         "Nsç motorun mil gücüdür ve hattı o değil, ondan büyük olan Pşeb yükler.",
+        "SPE  —  koruma iletkeni, besleme kablosunun bakır damarı kabul edilmiştir "
+        "( Çizelge-8 ancak PE ile ana iletken aynı malzemedense geçerlidir ). "
+        "Kablo dışında çekilen bir PE hiçbir şekilde 2,5 mm²'den ( mekanik korumalı ) "
+        "ya da 4 mm²'den ( korumasız ) küçük olamaz  —  m.9-e1/iii.",
     ]
     b6["notlar"] = [
         "Aydınlatma ve priz devrelerinde izin verilen gerilim düşümü %1,5'tir; bu devrelerin "
@@ -876,6 +906,15 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
              else "tablo dışı — kontrol edilemedi", "A",
              "TABLOLAR / IEC 60364-5-52" if Iz_kesin
              else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
+        metin("Koruma iletkeni ( PE ) kesitleri  —  Çizelge-8 :"),
+        veri("SPE1", "Kolon hattı koruma iletkeni  ( asgari )",
+             SPE1 if SPE1 is not None else "kontrol edilemedi — kesit tablo dışı",
+             "mm²" if SPE1 is not None else "",
+             _pe_kaynak(S1, SPE1_ham, SPE1_yuv), 1),
+        veri("SPE2", "Makine besleme koruma iletkeni  ( asgari )",
+             SPE2 if SPE2 is not None else "kontrol edilemedi — kesit tablo dışı",
+             "mm²" if SPE2 is not None else "",
+             _pe_kaynak(S2, SPE2_ham, SPE2_yuv), 1),
     ]
     #  MAKİNE BESLEME HATTI ( S2 ) DA SONUCA GİRER.
     #  Kaynak Excel bu kontrolü hiç yapmaz ve program bir süre yalnız ⚠ uyarı

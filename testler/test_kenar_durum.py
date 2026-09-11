@@ -1631,6 +1631,37 @@ def calistir():
     r.esit("ek nüfus yokken fazladan satır eklenmiyor",
            len([n for n in _nt0 if n.startswith(("Ek nüfus —", "Toplam  b"))]), 0)
 
+    # ------------------------------- Koruma iletkeni ( PE )  —  Çizelge-8
+    #  Elektrik Tesislerinde Topraklamalar Yönetmeliği m.9-e1/ii.
+    #  Beklenen değerler ÇİZELGEDEN, motorun kendi çıktısından değil.
+    for S, bek in ((1.5, 1.5), (2.5, 2.5), (4, 4), (6, 6), (10, 10), (16, 16),
+                   (25, 16), (35, 16), (50, 25), (70, 35),
+                   #  S/2 standart kesite düşmeyen satırlar:  BİR ÜST kesit
+                   (95, 50), (120, 70), (150, 95), (185, 95),
+                   (240, 120), (300, 150), (400, 240)):
+        r.esit(f"Çizelge-8  S = {S} → SPE", T.koruma_iletkeni_kesiti(S)[0], bek)
+    #  Çizelge bir ASGARİ verir:  seçilen kesit ham değerin ALTINA düşemez.
+    r.kontrol("SPE hiçbir S'te ham değerin altına düşmüyor",
+              all(T.koruma_iletkeni_kesiti(S)[0] >= T.koruma_iletkeni_kesiti(S)[1]
+                  for S in T.STANDART_KESITLER))
+    #  Monotonluk:  faz kesiti büyürken PE küçülemez.
+    _pe = [T.koruma_iletkeni_kesiti(S)[0] for S in T.STANDART_KESITLER]
+    r.kontrol("SPE faz kesitiyle birlikte artıyor  ( azalmıyor )",
+              all(a <= b for a, b in zip(_pe, _pe[1:])), f"→ {_pe}")
+    #  Seçilen kesit her zaman STANDART merdivende olmalı.
+    r.kontrol("SPE her zaman standart bir kesit",
+              all(T.koruma_iletkeni_kesiti(S)[0] in T.STANDART_KESITLER
+                  for S in (3, 7.5, 22, 44, 77, 111, 199, 333)))
+    #  Yuvarlama bayrağı yalnız ham değer standart değilken kalkar.
+    r.esit("95 mm² yuvarlandı bayrağı", T.koruma_iletkeni_kesiti(95)[2], True)
+    r.esit("50 mm² yuvarlanmadı", T.koruma_iletkeni_kesiti(50)[2], False)
+    #  Kenar durumlar sessizce sayı uydurmamalı.
+    for bozuk in (None, 0, -5, "6", True):
+        r.kontrol(f"SPE({bozuk!r}) kontrol edilemedi",
+                  T.koruma_iletkeni_kesiti(bozuk)[0] is None)
+    r.kontrol("merdivenin üstünde SPE = None",
+              T.koruma_iletkeni_kesiti(900)[0] is None)
+
     return r
 
 

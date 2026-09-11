@@ -385,6 +385,74 @@ def kablo_iz(kesit):
     return KABLO_IZ.get(kesit)
 
 
+# --------------- Koruma iletkeni ( PE ) kesiti
+#  Elektrik Tesislerinde Topraklamalar Yönetmeliği  m.9-e1/ii  ·  Çizelge-8
+#  ( harmonize karşılığı:  TS HD / IEC 60364-5-54  Tablo 54.2 )
+#
+#      S ≤ 16        →   Sp = S
+#      16 < S ≤ 35   →   Sp = 16
+#      S > 35        →   Sp = S / 2
+#
+#  YUVARLAMA YÖNÜ MEVZUAT HÜKMÜDÜR.  Çizelge-8'in altındaki cümle:
+#  "Çizelge-8'in kullanılması sonunda standart kesit değerler elde edilmez
+#  ise bir üst standart kesitli iletken kullanılmak zorundadır."  Çizelge
+#  bir ASGARİ verir;  S/2 standart bir kesite düşmediğinde aşağı yuvarlamak
+#  asgarinin altına düşmek olur.  ( ELEport'un örnek paftası 150 mm² için
+#  75 → 70 yazar;  doğrusu 95'tir.  Kendi tablosunun 95 · 120 · 185
+#  satırlarında yukarı yuvarladığı hâlde. )
+#
+#  Çizelge-8 yalnız PE ile ana iletken AYNI MALZEMEDENSE geçerlidir;
+#  asansör kolon hattında ikisi de bakırdır.
+STANDART_KESITLER = (1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120,
+                     150, 185, 240, 300, 400)
+
+
+def koruma_iletkeni_formulu(S_hucre, merdiven, koruma=None):
+    """Çizelge-8'i EXCEL FORMÜLÜ olarak kurar  —  kitap kendini hesaplasın diye.
+
+        S_hucre   faz kesitini tutan hücre      ( ör. "E123" )
+        merdiven  standart kesit merdiveninin MUTLAK aralığı
+                  ( ör. "TABLOLAR!$L$2:$L$18" )
+        koruma    doluysa formül bu koşula sarılır ( sayfanın kendi
+                  "asansör etkin mi" kalkanı, ör. 'GİRİŞ!$C$27=""' )
+
+    MATCH( … ; 1 ) sıralı listede ham değerden KÜÇÜK EŞİT en büyük satırı
+    verir;  o satır ham'dan küçükse bir alta geçilir.  Yani her zaman
+    "ham'dan küçük olmayan en küçük standart kesit" seçilir — Çizelge-8'in
+    altındaki "bir üst standart kesitli iletken kullanılmak zorundadır"
+    hükmü budur.  Merdivenin üstüne taşan değerde INDEX #REF! verir;
+    IFERROR onu boş bırakır ( motor da None döner ).
+    """
+    ham = f'IF({S_hucre}<=16,{S_hucre},IF({S_hucre}<=35,16,{S_hucre}/2))'
+    yer = f'MATCH({ham},{merdiven},1)'
+    f = (f'IFERROR(INDEX({merdiven},{yer}'
+         f'+IF(INDEX({merdiven},{yer})<{ham},1,0)),"")')
+    if koruma:
+        f = f'IF({koruma},"",{f})'
+    return "=" + f
+
+
+def koruma_iletkeni_kesiti(S):
+    """Faz kesiti S ( mm² ) için asgari koruma iletkeni kesiti  ( mm² ).
+
+    Döner:  ( Sp, ham, yuvarlandi_mi )
+        Sp            standart kesite yukarı yuvarlanmış değer
+        ham           çizelgenin verdiği ham değer  ( S · 16 · S/2 )
+        yuvarlandi_mi ham değer standart kesit değilse True
+
+    S standart merdivenin en büyük değerini aşarsa Sp = None döner;
+    sessizce yanlış bir sayı üretmektense kontrol edilemediği söylenir.
+    """
+    if not sayi_mi(S) or S <= 0:
+        return None, None, False
+    ham = S if S <= 16 else (16.0 if S <= 35 else S / 2.0)
+    ustler = [k for k in STANDART_KESITLER if k >= ham]
+    if not ustler:
+        return None, ham, False
+    Sp = min(ustler)
+    return Sp, ham, (Sp != ham)
+
+
 def kablo_iz_sinir(kesit):
     """
     Tabloda BULUNMAYAN kesitler için GÜVENLİ ALT SINIR verir.

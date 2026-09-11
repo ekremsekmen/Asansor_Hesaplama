@@ -419,6 +419,43 @@ def calistir():
               abs(_h8["AX611"] - (_bek8 + _ray8)) > 1,
               "→ hâlâ çift sayılıyor")
 
+    #  ⑨  KORUMA İLETKENİ ( PE ) HER İKİ PROJEDE DE PAFTAYA GİRİYOR
+    #  Uygulama projesinin 15. bölümü avan motorunun gerilim_dusumu bölümüdür;
+    #  tek kaynaktan beslendiği için iki paftada da AYNI satırlar çıkmalı.
+    #  Beklenen değer ÇİZELGE-8'den türetilir, motorun kendi satırından değil.
+    def _pe_satirlari(bolumler):
+        b = next(x for x in bolumler if x.get("kimlik") == "gerilim_dusumu")
+        return {str(a.get("sembol")): a for a in b["adimlar"]
+                if isinstance(a, dict) and str(a.get("sembol") or "") in ("SPE1", "SPE2")}
+
+    _u9 = UY.hesapla()
+    _pu = _pe_satirlari(_u9["bolumler"])
+    r.esit("⑨ uygulama paftasında iki PE satırı", len(_pu), 2)
+    _av9 = AV.hesapla({"ortak": {"temel_a": 26.55, "temel_b": 16.4, "beta": 150,
+                                 "cubuk_sayisi": 4, "mk_uzunluk": 3000,
+                                 "mk_genislik": 2500},
+                       "sabitler": {},
+                       "asansorler": [{"tanim": "A", "kapasite": 10, "V": 1.6,
+                                       "eta": 0.85, "Hk": 32.85,
+                                       "kuyu_genisligi": 1800, "kabin_boyu": 1450,
+                                       "kabin_genisligi": 1300,
+                                       "makine_tipi": "Dişlisiz",
+                                       "S1": 150, "S2": 95}]})
+    _pa = _pe_satirlari(_av9["asansorler"][0]["bolumler"])
+    r.esit("⑨ avan paftasında iki PE satırı", len(_pa), 2)
+    #  S/2'nin standart kesite düşmediği satır:  150 → 75 → BİR ÜST = 95
+    r.esit("⑨ SPE1 bir üst standart kesite yuvarlanıyor  ( 150 → 95 )",
+           _pa["SPE1"]["deger"], AVT.koruma_iletkeni_kesiti(150)[0])
+    r.esit("⑨ SPE2 çizelgeyle aynı  ( 95 → 50 )",
+           _pa["SPE2"]["deger"], AVT.koruma_iletkeni_kesiti(95)[0])
+    r.kontrol("⑨ yuvarlama paftada kaynak sütununda yazıyor",
+              "bir üst standart" in str(_pa["SPE1"].get("kaynak") or ""),
+              f"→ {_pa['SPE1'].get('kaynak')!r}")
+    r.kontrol("⑨ koruma iletkeni topraklama bölümüne konulmadı",
+              not any(str(a.get("sembol") or "").startswith("SPE")
+                      for b in ((_av9.get("topraklama") or {}).get("bolumler") or [])
+                      for a in b["adimlar"] if isinstance(a, dict)))
+
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı
     #  notları "kesin seçim UYGULAMA PROJESİNDE yapılır" der;  avan paftasında

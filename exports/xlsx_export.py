@@ -22,6 +22,7 @@ import openpyxl
 
 from engine.avan import hesap as E_AVAN
 from engine.avan import trafik as E_TRF
+from engine.avan import tablolar as T
 from . import hucre_haritasi as H
 from .sablon_denetim import dogrula
 
@@ -199,6 +200,37 @@ def avan_xlsx(veriler: dict, proje: dict = None) -> bytes:
         h = hesaplanan.get(i) or {}
         deger = (h.get("ozet") or {}).get("motor_sigorta") if h.get("aktif") else None
         _yaz(wb[sayfa], H.AVAN_SIGORTA_HUCRE, deger)
+
+    # 5) KORUMA İLETKENİ ( PE ) KESİTLERİ  —  Çizelge-8
+    #    Elektrik Tesislerinde Topraklamalar Yönetmeliği m.9-e1/ii.  Kitapta
+    #    bu kalem HİÇ YOKTU:  paftada S1 · S2 · Iz var, koruma iletkeninden
+    #    söz edilmiyordu.  Standart kesit merdiveni TABLOLAR'ın boş bir
+    #    sütununa yazılır ve hücreler FORMÜL alır — kitap S1'i değiştirene
+    #    kadar kendi kendine hesaplamaya devam etsin diye.
+    wsT = wb[H.AVAN_TABLO_SAYFA]
+    _yaz(wsT, f"{H.AVAN_PE_SUTUN}1", "Standart kesit ( mm² )")
+    for i, k in enumerate(T.STANDART_KESITLER, start=2):
+        _yaz(wsT, f"{H.AVAN_PE_SUTUN}{i}", k)
+    _merdiven = (f"{H.AVAN_TABLO_SAYFA}!${H.AVAN_PE_SUTUN}$2"
+                 f":${H.AVAN_PE_SUTUN}${len(T.STANDART_KESITLER) + 1}")
+    for i in range(1, 5):
+        sayfa = H.avan_asansor_sayfasi(i)
+        if sayfa not in wb.sheetnames:
+            continue
+        wsA = wb[sayfa]
+        wsA[f"C{H.AVAN_PE_BASLIK}"] = "Koruma iletkeni ( PE ) kesitleri  —  Çizelge-8 :"
+        for j, (sembol, aciklama, s_hucre) in enumerate((
+                ("SPE1", "Kolon hattı koruma iletkeni  ( asgari )", "E123"),
+                ("SPE2", "Makine besleme koruma iletkeni  ( asgari )", "E128"))):
+            r = H.AVAN_PE_BASLIK + 1 + j
+            wsA[f"A{r}"] = sembol
+            wsA[f"B{r}"] = ":"
+            wsA[f"C{r}"] = aciklama
+            wsA[f"D{r}"] = "="
+            wsA[f"E{r}"] = T.koruma_iletkeni_formulu(
+                s_hucre, _merdiven, f'{H.AVAN_SAYFA}!$C$27=""')
+            wsA[f"F{r}"] = "mm²"
+            wsA[f"G{r}"] = "Çizelge-8  ·  m.9-e1/ii"
 
     for sh in wb.worksheets:
         sh.views.sheetView[0].tabSelected = (sh.title == "ÖZET")
