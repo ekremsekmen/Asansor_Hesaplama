@@ -23,6 +23,7 @@ from datetime import date
 import openpyxl
 
 from engine.ortak import ofis as OFIS
+from engine.ortak.steps import evet_mi
 from exports.hucre_haritasi import IMZA, IMZALAR
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import mukavemet_girdi as MG
@@ -413,6 +414,10 @@ EK_GIRDI_HUCRELERI = (
     #  C.2.2.1 / C.2.3.1'in ( xQ − xs ) · ( yp − ys ) kollarına girer.
     ("aski_kaciklik_x",       261, "xs — askı noktasının x kaçıklığı", "mm"),
     ("aski_kaciklik_y",       262, "ys — askı noktasının y kaçıklığı", "mm"),
+    ("reg_halat_birim_kutle", 263, "Regülatör halatı 1 m ağırlığı  ( imalatçı )", "kg/m"),
+    ("reg_halat_kopma_kN",    264, "Regülatör halatı kopma yükü  ( imalatçı )", "kN"),
+    ("makine_raya_biniyor",   265, "Makine yükünün yolu",  "bina / raylar"),
+    ("raya_binen_yuk",        266, "Bir raya düşen makine yükü  ( imalatçı )", "kg"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -427,8 +432,8 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  ÜST ÜSTE bindi:  teslim kopyasında xs'in etiketi ofis başlığıyla
 #  eziliyordu.  Aşağıdaki iki sayı bu yüzden listenin sonuna göre ayarlanır;
 #  _ek_satir_cakismasi() ikisinin bir daha çakışmamasını denetler.
-OFIS_BASLIK = 264
-OFIS_BAS = 266
+OFIS_BASLIK = 268
+OFIS_BAS = 270
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -440,7 +445,7 @@ EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
 EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
                      "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri",
-                     "asansor_adi", "tampon_tipi")
+                     "asansor_adi", "tampon_tipi", "makine_raya_biniyor")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -912,6 +917,23 @@ def _standarda_uydur(wb, g):
     #  tek sayar:  ray kütlesi ayrı, güvenlik tertibatı tepkisi ayrıdır.
     ws["AO611"] = "=AU351-AK351*AM351"
 
+    #  ㊽  KUYU TABANINDA RAYA BAĞLI DONANIM k3 İLE ÇARPILIR
+    #  TS EN 81-20 m.5.2.1.8.4, tabanın taşıyacağı kalemleri sayarken raya
+    #  bağlı donanımın yanına "any additional reaction (N) occurring during
+    #  emergency stopping ( e.g. load on traction sheave due to REBOUND when
+    #  machine on rails )" ekler;  bunun katsayısı m.5.7.4.3'ün k3'üdür.
+    #  Kitap bölüm 7 ve 8'de k3'ü uygular ( W354 · W583 ) ama bölüm 9'da
+    #  MY'yi çarpansız toplar.  Çarpan kitabın KENDİ k3 hücrelerinden
+    #  okunur ki kitap kendi kendini hesaplamaya devam etsin.
+    #  k3 hücreleri kitapta sabit 1,2 yazılıydı;  ofis sabiti değiştirilirse
+    #  kitap motorla ayrışırdı.  Artık projenin kendi k3'ü yazılır.
+    ws["W354"] = float(O["k3_yardimci"])
+    ws["W583"] = float(O["k3_yardimci"])
+    ws["AX611"] = "=(Z611*AD611*AH611/Z612)+(W354*AL611)+AO611"
+    ws["AN616"] = "=(U616*Y616*AC616/U617)+(W583*AG616)"
+    ws["P611"] = "k3 x M"
+    ws["N616"] = "k3 x Ma"
+
     #  ㉜  Fp ( KLİPS İTME KUVVETİ ) CANLI HÜCRELERE BAĞLANIR
     #  Ek C.2.1.2 / C.2.2.2 / C.2.3.2 uyarınca Fv = Mg·gn + Fp'dir.  Şablonda
     #  bu hücreler ( AP351, X452, X580 ) sabit 0 yazılıydı.  Artık Veri Girişi'ndeki
@@ -1022,6 +1044,69 @@ def _standarda_uydur(wb, g):
         ws[_h] = f"{ws[_h].value}-{_yks}"
     ws["AD638"] = MK.SIGINMA["min_paten_tavan"]
 
+    #  ㊻  P'NİN STANDARTTAKİ TANIMI  —  ray · tampon · kuyu tabanı
+    #  TS EN 81-20 m.5.2.1.8.5 · m.5.2.1.8.6 · m.5.7.2.3.2:
+    #      "P is the mass of the empty car and components supported by the
+    #       car, i.e. part of the travelling cable, compensating
+    #       ropes/chains (if any), etc."
+    #  Kitap bu hücrelerde düz boş kabin kütlesini ( 'Veri Girişi'!C75 )
+    #  okuyor.  BÖLÜM 1'İN P'Sİ ( AQ15 ) VE KAİDE YÜK MODELİ DOKUNULMAZ —
+    #  onlar kabin tarafındaki gerçek yüktür, zincir/kablo oraya Gmax ile
+    #  ayrı girer.
+    _pstd = ("('Veri Girişi'!$C$75"
+             f"+AQ18*AQ20*'Veri Girişi'!$B$100*'Veri Girişi'!$C$63*{_lam}"
+             f"+0.5*'Veri Girişi'!$C$63*{_mt})")
+    for _h in ("AG321", "AG327", "AG335", "AG341", "AD351",
+               "AQ412", "AP421", "AP432", "AO441", "Y505", "Y514"):
+        ws[_h] = f"={_pstd}"
+    #  m.5.2.1.8.5:  F = 4·gn·( P + Q )
+    ws["X621"] = f"={_pstd}+'Veri Girişi'!C59"
+    #  m.5.2.1.8.6:  F = 4·gn·( P + q·Q ).  q da ofis sabitinden gelir;
+    #  kitap buraya 0,5'i çivilemişti ve q değiştiğinde motorla ayrışıyordu.
+    ws["AA627"] = f"={_pstd}+('Veri Girişi'!C59*{float(O['q_denge'])!r})"
+    #  xp DE ORTAK AĞIRLIK MERKEZİDİR  ( m.5.7.2.3.2:  "...shall be the mass
+    #  centre of gravity OF THEM" ).  Kapı momenti değişmez, yalnız TOPLAM
+    #  kütleye bölünür:
+    #      xp = xc − mkapı·( D/2 + pay ) / P
+    #  ( cebirsel olarak  [ Pboş·xpboş + ( P−Pboş )·xc ] / P  ile birebir. )
+    ws["AH295"] = ("=AH293-(('Veri Girişi'!F127*(('Veri Girişi'!C74/2)"
+                   f"+'Veri Girişi'!F128))/{_pstd})")
+    #  ㉛'in en olumsuz yön seçimi de aynı P ile yapılır.
+    ws["Z309"] = (f"=IF(ABS({_Q}*({_xc}+{_dx})+{_pstd}*{_xp})"
+                  f">=ABS({_Q}*({_xc}-{_dx})+{_pstd}*{_xp}),"
+                  f"{_xc}+{_dx},{_xc}-{_dx})")
+
+    #  ㊼  MAKİNE RAYLARA BİNİYORSA Maux 150 N DEĞİLDİR  —  m.5.7.2.3.7
+    #  Kitap 11!AH292'ye 150 N ( ≈ 15 kg ) çivilemiş:  raya cıvatalanan
+    #  şalter/kam/kanal.  Makine dairesi olan asansörde doğrudur.  Makine
+    #  dairesiz tesiste makine rayın üstüne biner ve standart ek yük
+    #  durumlarını ister.  Değer, kitabın KENDİ hücrelerinden kurulur:
+    #      Maux = ( Gm + Tst ) · gn ,   Tst = ( F1 + Ga + MCR ) / r
+    #  m.5.2.1.8.4 aynı kalemi kuyu tabanı için de anar ( AL611 = AH292 ).
+    #  Maux RAY BAŞINADIR ( m.5.7.2.3.7 ):  türetilen toplam, kabin rayı
+    #  sayısına ( 'Veri Girişi'!B115 ) bölünür.  Elle girilen sayı zaten bir
+    #  raya düşen yüktür, bölünmez.
+    if MK.MT.makine_raya_mi(g.get("makine_raya_biniyor")):
+        _elle = g.get("raya_binen_yuk")
+        if _pozitif_sayi(_elle):
+            ws["AH292"] = float(_elle) * MK.SABIT["gn"]
+        else:
+            _mcr = (f"AQ18*AQ20*'Veri Girişi'!$B$100*'Veri Girişi'!$C$63*{_lam}")
+            _tst = f"((AQ11+AQ13+{_mcr})/'Veri Girişi'!$B$100)"
+            ws["AH292"] = (f"=(('Veri Girişi'!$F$126+{_tst})"
+                           f"/'Veri Girişi'!$B$115)*{MK.SABIT['gn']!r}")
+
+    #  ㊻ ( devamı )  KARŞI AĞIRLIK RAYI DA ZİNCİRİ GÖRÜR  —  m.5.7.2.3.3
+    #  "The guiding forces of a counterweight Mcwt ... shall be evaluated
+    #   taking into account ... the forces due to compensating ropes/chains
+    #   (if any), tensioned or not."
+    #  Ağırlık EN ÜST konumdayken zincirin tamamı o taraftadır;  kabin
+    #  rayıyla aynı anda olmadığı için çift sayma değildir.
+    _mcwt = ("('Veri Girişi'!$C$80"
+             f"+AQ18*AQ20*'Veri Girişi'!$B$100*'Veri Girişi'!$C$63*{_lam})")
+    for _h in ("AA566", "AA572"):
+        ws[_h] = f"={_mcwt}"
+
     #  ㉟  SIĞINMA HACMİ TİPİ  —  beyan edilen duruş kitaba da yazılır.
     #  Kitapta ölçüler ve "( EN 81-20 Çizelge 3 - çömelmiş duruş )" açıklaması
     #  hücreye ÇİVİLİDİR.  Program duruşu girdiden alıyor;  yamalanmazsa pafta
@@ -1071,6 +1156,20 @@ def _standarda_uydur(wb, g):
         ws["AQ18"] = float(g["halat_birim_kutle"])
     if _pozitif_sayi(g.get("halat_kopma_kN")):
         ws["AH109"] = float(g["halat_kopma_kN"]) * 1000.0
+    #  REGÜLATÖR HALATI DA AYNI KALIBI KULLANIR.  Kitap AI134 ( halat kütlesi )
+    #  ve AI136 ( kopma yükü ) için hep lif özlü tablosunu okur;  çelik özlü
+    #  regülatör halatında bu değerler düşük kalır ve UYGUN tasarımlar
+    #  reddedilir.  AI134'te yalnız VLOOKUP'ın yerine sayı konur — boy
+    #  ifadesi olduğu gibi kalsın ki kitapta durak yükseklikleri değişince
+    #  takip etsin.
+    _rk = g.get("reg_halat_birim_kutle")
+    if _pozitif_sayi(_rk):
+        _f = ws["AI134"].value
+        _bas = "=VLOOKUP(AI130,TABLOLAR!A32:B43,2,0)"
+        if isinstance(_f, str) and _f.startswith(_bas):
+            ws["AI134"] = "=" + repr(float(_rk)) + _f[len(_bas):]
+    if _pozitif_sayi(g.get("reg_halat_kopma_kN")):
+        ws["AI136"] = float(g["reg_halat_kopma_kN"]) * 1000.0
 
     #  ⑳  REGÜLATÖR:  ÇEKME KUVVETİ VE İKİNCİ SINIR
     #      m.5.6.2.2.1.1 d)  regülatörün ÜRETTİĞİ kuvveti sınırlar — kasnağın
@@ -1111,7 +1210,8 @@ def _standarda_uydur(wb, g):
         if (g.get("agirlik_guvenlik_tertibati") or "Yok") != "Yok" else None
     if _agt:
         #  k1 · gn · Mcwt / n   —  ray kütlesi bu kalemde YOKTUR
-        ws["AN616"] = ("=(U616*Y616*AC616/U617)+AG616+"
+        #  ( raya bağlı donanım ㊽ uyarınca k3 ile çarpılır — W583 )
+        ws["AN616"] = ("=(U616*Y616*AC616/U617)+(W583*AG616)+"
                        f"({repr(float(_agt))}*{MK.SABIT['gn']}"
                        "*'Veri Girişi'!C80/'Veri Girişi'!B116)")
 

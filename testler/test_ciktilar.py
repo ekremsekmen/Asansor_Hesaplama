@@ -1173,7 +1173,10 @@ def calistir():
     #  Sf de motordan okunur:  altı kesik V kanal Çizelge 2'nin V satırına
     #  oturunca 17,63 → 23,61 oldu ( bkz. EXCEL_FARKLARI ).
     _sf = f"{_msn['ozet']['Sf']:.2f}".replace(".", ",")
-    for _ara in (_ngucu, _sf, _fkr, "58.860"):
+    #  Kuyu tabanı tampon kuvveti de MOTORDAN okunur:  P'ye gezici kablo ve
+    #  denge zinciri girince 58.860 → 59.389 oldu ( bkz. EXCEL_FARKLARI ).
+    _fkt = f"{_msn['ozet']['Fkt']:,.0f}".replace(",", ".")
+    for _ara in (_ngucu, _sf, _fkr, _fkt):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
                   f"→ paftada yok")
     r.kontrol("mukavemet PDF'inde makine tipi ve η görünüyor",

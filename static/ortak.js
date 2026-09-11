@@ -548,7 +548,16 @@ function alanaYaz(e, val){
       const x = parseFloat(o); return isFinite(x) && Math.abs(x-sayi) < 1e-9; });
     if(esles !== undefined){ e.value = esles; return; }
   }
-  e.value = secenekler.includes('') ? '' : s;
+  //  EŞLEŞME YOK:  SEÇİM KUTUSU BOŞA DÜŞMEZ.
+  //  Boş bir <select> value olarak "" gönderir ve motor "boş bırakılamaz"
+  //  der — oysa kullanıcı hiçbir şey yapmamıştır.  Bu yola şunlar düşer:
+  //    · eski bir proje dosyasındaki artık geçersiz bir seçenek,
+  //    · tarayıcıda saklı ESKİ BİÇİM bir değer  ( ör. onay kutusundan
+  //      seçime çevrilmiş bir alanın true/false'u ),
+  //    · tablo değişince kalkan bir profil/ölçü.
+  //  Bu durumda listenin KENDİ varsayılanı korunur:  form açılışta doğru
+  //  seçenekle çizilmiştir, ona dokunulmaz.
+  if(secenekler.includes('')){ e.value = ''; }
 }
 
 /*  Yeni proje yüklenmeden önce ilgili bölüm TEMİZLENİR.

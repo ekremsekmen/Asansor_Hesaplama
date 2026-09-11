@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.uygulama import mukavemet as MK                       # noqa: E402
 from engine.uygulama import mukavemet_tablolari as MT             # noqa: E402
-from testler.ortak import Rapor                          # noqa: E402
+from testler.ortak import P_std as _P_std, Rapor                          # noqa: E402
 
 KAYNAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "templates", "MUKAVEMET_HESABI.xlsx")
@@ -265,7 +265,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 43)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 47)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
         #    · TS EN 81-20 / 81-50 maddesi
@@ -294,7 +294,7 @@ def _sapmalar(r):
 
     #  ③ Durum 2'de xQ = xc
     _xc = s["_h"]["AH293"]
-    _bek = 2 * 9.81 * (800 * _xc + 700 * s["_h"]["AH295"]) / (2 * 3400)
+    _bek = 2 * 9.81 * (800 * _xc + _P_std(s) * s["_h"]["AH295"]) / (2 * 3400)
     r.kontrol("③ Durum 2 Fx, xQ = xc ile hesaplanıyor",
               _yakin(s["_h"]["AY335"], _bek), f"→ {s['_h']['AY335']!r} ≠ {_bek!r}")
 
@@ -443,14 +443,14 @@ def _sapmalar(r):
     _Wy = _MTx.ray(_gc["kabin_ray_profili"], "Wy")
     _xc, _xp = _hc["AH293"], _hc["AH295"]
     _xQ = _xc + _gc["kabin_derinligi"] / 8.0
-    _Fx = _k1 * 9.81 * (_gc["beyan_yuku"] * _xQ + _gc["kabin_agirligi"] * _xp) / (_n * _hh)
+    _Fx = _k1 * 9.81 * (_gc["beyan_yuku"] * _xQ + _P_std(_sc) * _xp) / (_n * _hh)
     r.kontrol("EN 81-50 C.2.1.1 a)  Fx = k1·gn·(Q·xQ+P·xP)/(n·h)",
               _yakin(_hc["AY321"], _Fx), f"→ motor {_hc['AY321']!r}, standart {_Fx!r}")
     r.kontrol("EN 81-50 C.2.1.1 a)  σy = (3·Fx·l/16)/Wy",
               _yakin(_hc["AU324"], 3 * _Fx * _l / 16 / _Wy),
               f"→ motor {_hc['AU324']!r}")
     #  C.2.1.2 burkulma
-    _Fv = _k1 * 9.81 * (_gc["kabin_agirligi"] + _gc["beyan_yuku"]) / _n + _hc["AH291"] * 9.81
+    _Fv = _k1 * 9.81 * (_P_std(_sc) + _gc["beyan_yuku"]) / _n + _hc["AH291"] * 9.81
     r.kontrol("EN 81-50 C.2.1.2  Fv = k1·gn·(P+Q)/n + Mg·gn",
               _yakin(_hc["AU351"], _Fv), f"→ motor {_hc['AU351']!r}, standart {_Fv!r}")
 
@@ -1078,11 +1078,19 @@ def _denetim_bulgulari(r):
         _mcwt = _s3["girdi"]["karsi_agirlik"]   # bölüm 6 tahrik · bölüm 8 ray
         r.esit(f"C3  q = {_q}  →  Ga = Mcwt", (_ga, _mcwt),
                (700 + _q * 800, 700 + _q * 800))
-        #  Ağırlık tamponu da aynı kütleyi görür
-        r.kontrol(f"C3  q = {_q}  ağırlık tamponu aynı kütleyle",
+        #  AĞIRLIK TAMPONU STANDARDIN KENDİ BAĞINTISINI KULLANIR.
+        #  m.5.2.1.8.6:  F = 4·gn·( P + q·Q )  ve oradaki P "boş kabin +
+        #  gezici kablo payı + denge zinciri"dir — karşı ağırlığın fiziksel
+        #  kütlesi değil.  Zincirsiz bir tesiste ikisi neredeyse eşittir;
+        #  zincir takılınca ayrışırlar ve standardın yazdığı BÜYÜK olandır.
+        r.kontrol(f"C3  q = {_q}  ağırlık tamponu m.5.2.1.8.6 bağıntısıyla",
                   _yakin(_s3["ozet"]["Fat"],
-                         MK.SABIT["tampon_katsayi"] * MK.SABIT["gn"] * _mcwt),
+                         MK.SABIT["tampon_katsayi"] * MK.SABIT["gn"]
+                         * (_P_std(_s3) + _q * 800)),
                   f"→ {_s3['ozet']['Fat']!r}")
+        r.kontrol(f"C3  q = {_q}  Fat ≥ 4·gn·Mcwt  ( fiziksel kütlenin üstünde )",
+                  _s3["ozet"]["Fat"] >= MK.SABIT["tampon_katsayi"]
+                  * MK.SABIT["gn"] * _mcwt - 1e-6)
 
     #  ══════════════════════════════════════════════════════════════
     #  DÖRDÜNCÜ TUR  —  SINIR DURUMLARI
@@ -1228,21 +1236,34 @@ def _denetim_bulgulari(r):
     #  Kapının kabin merkezine göre katkısı:  mkapı·( D/2 + pay ) / P
     _gv = _MG.tamamla(_MG.varsayilanlar())
     _kapi = _gv["kapi_agirligi"] * (1400 / 2 + _gv["kapi_mekanizma_payi"]) / 650
+
+    #  m.5.7.2.3.2:  P'nin etki noktası, P'yi oluşturan kütlelerin ORTAK
+    #  ağırlık merkezidir.  Kapı düzeltmesi boş kabin kütlesine göre yapılır;
+    #  gezici kablo ve zincirin yatay konumu bilinmediği için kabin
+    #  merkezinde ( xc ) kabul edilir.
+    def _xp_bek(_xc, _s):
+        _Pb, _Ps = 650.0, _P_std(_s)
+        return (_Pb * (_xc - _kapi) + (_Ps - _Pb) * _xc) / _Ps
+
     _degerler = []
     for _rk in (500, 650, 830, 1000):
-        _xc, _xp, _ = _xcxp(ray_kapi_arasi=_rk)
+        _xc, _xp, _s5 = _xcxp(ray_kapi_arasi=_rk)
         _degerler.append((_rk, _xc, _xp))
-        r.kontrol(f"E2  RK={_rk}: xp = xc − mkapı·(D/2+pay)/P",
-                  _xp is not None and abs(_xp - (_xc - _kapi)) < 1e-9,
-                  f"→ xc={_xc}, xp={_xp}, beklenen {_xc - _kapi if _xc is not None else None}")
+        _bk = _xp_bek(_xc, _s5) if _xc is not None else None
+        r.kontrol(f"E2  RK={_rk}: xp = ortak ağırlık merkezi  ( m.5.7.2.3.2 )",
+                  _xp is not None and abs(_xp - _bk) < 1e-9,
+                  f"→ xc={_xc}, xp={_xp}, beklenen {_bk}")
     #  ASIL BULGU:  xp artık ray–kapı arasını İZLİYOR  ( eskiden sabitti )
     r.kontrol("E2  xp ray–kapı arasıyla değişiyor",
               len({round(x[2], 6) for x in _degerler}) == len(_degerler),
               f"→ {[(x[0], x[2]) for x in _degerler]}")
     #  Ray ekseni kabin merkezinden geçerken ( xc = 0 ) xp yalnız kapıdır
-    _xc0, _xp0, _ = _xcxp(ray_kapi_arasi=1400 / 2 + MK.SABIT["kabin_merkez_payi"])
-    r.kontrol("E2  xc = 0 iken xp = −kapı katkısı", abs(_xc0) < 1e-9
-              and abs(_xp0 + _kapi) < 1e-9, f"→ xc={_xc0}, xp={_xp0}")
+    _xc0, _xp0, _s0 = _xcxp(ray_kapi_arasi=1400 / 2 + MK.SABIT["kabin_merkez_payi"])
+    #  xc = 0'da yalnız kapı momenti kalır;  eklenen kütleler xc'de olduğu
+    #  için momente katkı vermez, sadece paydayı büyütür.
+    r.kontrol("E2  xc = 0 iken xp = −kapı momenti / P", abs(_xc0) < 1e-9
+              and abs(_xp0 + 650.0 * _kapi / _P_std(_s0)) < 1e-9,
+              f"→ xc={_xc0}, xp={_xp0}")
     #  EMNİYETSİZ YÖN:  ray kapıya yaklaştıkça devirici moment BÜYÜR
     _mom = []
     for _rk in (500, 830):

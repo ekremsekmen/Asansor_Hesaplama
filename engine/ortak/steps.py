@@ -171,3 +171,21 @@ class Bolum(dict):
         if kimlik:
             self["kimlik"] = kimlik
             self["ad"] = basliktan_ad(baslik)
+
+
+#  ---------------------------------------------------------------------
+#  ONAY ( EVET / HAYIR ) ALANLARI  —  TEK YERDE
+#  ---------------------------------------------------------------------
+#  Aynı altı satır dört ayrı dosyada kopyalanmıştı ( avan · mukavemet ·
+#  girdi · xlsx ).  Onay alanı üç kanaldan gelir:  arayüzden True/False,
+#  Excel'den "EVET"/"HAYIR", eski proje dosyalarından "Var"/"Yok".  Kopyalar
+#  zamanla ayrışır ve aynı kutu bir yerde işaretli, öbüründe işaretsiz
+#  sayılırdı.
+def evet_mi(x):
+    """Onay alanı işaretli mi  —  arayüz · Excel · eski dosya."""
+    if isinstance(x, bool):
+        return x
+    if x is None:
+        return False
+    return str(x).strip().lower() in ("evet", "e", "var", "true", "1", "yes",
+                                      "x", "✓")

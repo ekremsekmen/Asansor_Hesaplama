@@ -100,6 +100,35 @@ a{color:var(--mavi2)}
 
 /* ---------------------------------------------------------- form */
 .alan{margin-bottom:11px}
+/*  KURAL GEREĞİ GİZLENEN ALAN.  Arama süzgeci [hidden] kullanır;  kural
+    gizlemesi AYRI bir sınıf kullanmalı, yoksa "tüm grupları aç" ( hidden'ı
+    temizler ) kuralı da siler ve alan geri gelir.                          */
+.alan.kural-disi{display:none !important}
+
+/*  İKİ DÜĞMELİ SEÇİM  ( onay alanının görünümü ).
+    SINIF ADI ".secim-ikili" — ".ikili" ZATEN ALINMIŞTIR ( satır 41:  sayfanın
+    iki sütunlu ana düzeni ).  Bir kez o adla yazıldı ve grid düzenini
+    ezip sol sütunu çökertti;  ad seçerken dosyada aranmalıdır.
+    Alttaki checkbox tek doğruluk kaynağıdır ve EKRANDAN KALKMAZ — yalnız
+    görsel olarak saklanır;  klavye ve ekran okuyucu erişimi ile otomatik
+    testlerin ona ulaşması sürsün diye display:none KULLANILMAZ.            */
+/*  !important ŞART:  aşağıdaki ".alan input,.alan select{width:100%}" kuralı
+    daha yüksek özgüllüktedir ( sınıf + eleman ) ve tek sınıflı bu kuralı
+    ezer.  Ezince kutu 380 px genişliğinde kalıp sol sütunu çökertiyordu —
+    durak düğmeleri dar ekranda iki satıra sarıyordu.                        */
+.gorsel-gizli{position:absolute !important;width:1px !important;
+  height:1px !important;margin:-1px !important;padding:0 !important;
+  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);
+  white-space:nowrap;border:0 !important}
+.secim-ikili{display:flex;gap:3px;padding:3px;border:1px solid var(--cizgi);
+  border-radius:9px;background:var(--gri-ac)}
+.secim-dg{flex:1;padding:7px 10px;border:0;border-radius:6px;background:transparent;
+  cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:var(--gri);
+  white-space:nowrap;line-height:1.25;transition:background .13s,color .13s,box-shadow .13s}
+.secim-dg:hover:not(.secili){background:#fff;color:var(--mavi)}
+.secim-dg.secili{background:var(--mavi2);color:#fff;
+  box-shadow:0 1px 3px rgba(18,62,107,.28)}
+.gorsel-gizli:focus-visible+.secim-ikili{outline:2px solid var(--mavi2);outline-offset:2px}
 .alan:last-child{margin-bottom:0}
 .alan label{display:block;font-size:11.5px;font-weight:600;color:var(--gri);margin-bottom:3px;line-height:1.35}
 .alan .ipucu{font-weight:400;color:#8A96A3;font-size:10.5px}

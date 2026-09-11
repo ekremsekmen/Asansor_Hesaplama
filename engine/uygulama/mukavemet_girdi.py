@@ -15,6 +15,7 @@ avan kitabından gelir; buradakiler bu Excel'in kendi tablolarıdır ve
 bilerek ayrı tutulmuştur ( bkz. engine/mukavemet_tablolari.py ).
 """
 from engine.ortak import ofis as OFIS
+from engine.ortak.steps import evet_mi
 from engine.uygulama import mukavemet_tablolari as MT
 
 #  Kabin durak yüksekliklerinin Excel'deki yeri:  G12:G34  ( 20 durak +
@@ -166,6 +167,15 @@ ALANLAR = (
     ("reg_kanal_acisi",   "F122", "Regülatör kanal açısı",             "°",    "sayi", None, 40),
     ("reg_surtunme",      "F123", "Regülatör sürtünme faktörü  ( μ )", "—",    "sayi", None, 0.2),
     ("reg_gergi_agirligi", "F124", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
+    #  KATALOG VERİSİ ASKI HALATINDA VARDI, REGÜLATÖRDE YOKTU.  TS 12385-5
+    #  tablosu yalnız LİF ÖZLÜ halatları kapsar;  regülatör halatları çoğu
+    #  zaman çelik özlüdür ve kopma yükleri belirgin biçimde yüksektir
+    #  ( 6 mm:  tablo 23,1 kN — piyasadaki çelik özlü 28 kN ).  Program bu
+    #  yüzden UYGUN tasarımları reddedebiliyordu.  Boş bırakılırsa tablo.
+    ("reg_halat_birim_kutle", "", "Regülatör halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+     "kg/m", "sayi", None, None),
+    ("reg_halat_kopma_kN", "",   "Regülatör halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
+     "kN",   "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 d):  regülatörün ürettiği çekme kuvveti,
     #  "güvenlik tertibatını devreye sokmak için GEREKENİN İKİ KATI" ile
     #  300 N'un BÜYÜĞÜNDEN az olamaz.  O kuvvet İMALATÇI VERİSİDİR;  kitap
@@ -178,6 +188,39 @@ ALANLAR = (
     #  ( imalatçı kataloğu ).  Motor gücü "UYGUN" çıkıp kasnak yükü aşılmış bir
     #  makine seçilebiliyordu:  hiçbir şey bakmıyordu.  Boş bırakılırsa kontrol
     #  yapılmaz ve pafta bunu açıkça yazar.
+    #  ── MAKİNE YÜKÜNÜN YOLU  ( TS EN 81-20 m.5.7.2.3.7 ) ──────────────
+    #  "If the machine or rope suspensions are FIXED TO THE GUIDE RAILS,
+    #   additional load cases according to the Table 13 shall be considered."
+    #  m.5.2.1.8.4 aynı durumu kuyu tabanı için de anar:  "...load on traction
+    #  sheave due to rebound WHEN MACHINE ON RAILS".
+    #
+    #  Makine dairesiz ( MRL ) tesiste makine kuyunun üstündedir ve yükü ya
+    #  RAYLARA ya da BİNA YAPISINA iner.  Standart makinenin nereye
+    #  oturabileceğine dair kapalı bir liste vermez — m.5.2.1.8.1 "yapı
+    #  taşıyacak, ayrıntısı ulusal yapı yönetmeliğinde" der.  Hesabı
+    #  değiştiren TEK ayrım, yükün asansörün KENDİ parçasına ( raya ) değip
+    #  değmediğidir.
+    #
+    #  KİRİŞ TEK BAŞINA CEVAP DEĞİLDİR:  makinenin altındaki platformun
+    #  uçları raylara cıvatalıysa yük yine raya iner — "Kılavuz raylara".
+    #
+    #  ONAY KUTUSU DEĞİL, AÇIK SEÇİM.  İşaretsiz bir kutu SESSİZ VARSAYIMDIR:
+    #  kullanıcı dokunmadığında program onun adına "bina yapısına" diye karar
+    #  vermiş oluyordu ve bu yalnız paftadaki uyarı satırında görünüyordu.
+    #  Seçim olarak sorulunca hangi yolun kabul edildiği HESAP SATIRI olur.
+    #  ( Eski projeler ve Excel kitapları True/'EVET' taşır;  MT.makine_raya_mi
+    #    ikisini de anlar. )
+    ("makine_raya_biniyor", "",   "Makine yükünün yolu",
+     "—",    "secim", MT.MAKINE_YUK_YOLU, MT.MAKINE_YUK_YOLU[0]),
+    #  RAY BAŞINA okunur — m.5.7.2.3.7 Maux'u "per guide rail" diye tanımlar.
+    #  Boş bırakılırsa ( Gm + Tst ) / ray sayısı olarak TÜRETİLİR:  makinenin
+    #  kendi ağırlığı + tahrik kasnağına gelen statik yük, iki kabin rayına
+    #  simetrik paylaşılmış kabul edilir.  Asimetrik bağlantıda ya da yükün
+    #  bir kısmı duvara gidiyorsa imalatçının verdiği BİR RAYA DÜŞEN sayı
+    #  buraya yazılır ( ELEport:  "calculated separately, the larger value
+    #  should be taken" ).
+    ("raya_binen_yuk",    "",     "Bir raya düşen makine yükü  ( imalatçı — boşsa türetilir )",
+     "kg",   "sayi", None, None),
     ("makine_tst",        "",     "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
      "kg", "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 a):  devreye girme hızı beyan hızının en az
@@ -338,6 +381,8 @@ OPSIYONEL_ALANLAR = ("asansor_adi",
                      "paten_balata_boyu", "guvenlik_devreye_kuvvet",
                      "reg_devreye_hizi", "makine_tst",
                      "halat_birim_kutle", "halat_kopma_kN",
+                     "reg_halat_birim_kutle", "reg_halat_kopma_kN",
+                     "raya_binen_yuk",
                      "saptirma_kasnak_min_capi")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
@@ -412,7 +457,8 @@ GRUPLAR = (
       "tahrik_kasnak_capi", "saptirma_kasnak_capi",
       "saptirma_kasnak_min_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
-      "yan_yatak_boyu", "makine_tipi", "makine_tst")),
+      "yan_yatak_boyu", "makine_tipi", "makine_tst",
+      "makine_raya_biniyor", "raya_binen_yuk")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
       "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
@@ -420,8 +466,8 @@ GRUPLAR = (
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
      ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
-      "reg_gergi_agirligi", "guvenlik_devreye_kuvvet",
-      "reg_devreye_hizi")),
+      "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
+      "guvenlik_devreye_kuvvet", "reg_devreye_hizi")),
     ("Kılavuz raylar",
      ("kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
       "agirlik_konsol_arasi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
@@ -477,7 +523,6 @@ BOLUM_GRUBU = {
     "tamponlar":             ("Tamponlar", "Asansör teknik bilgileri"),
     "siginma_alanlari":      ("Durak ve kuyu", "Tamponlar"),
 }
-
 
 
 def arayuz_alanlari():
@@ -566,6 +611,15 @@ def tamamla(g):
         g["halat_arasi"] = g.get("halat_arasi_yan")
     #  2. bükülgen kablo kat kapısı tipinden türetilir  ( Veri Girişi!B108 )
     g["kablo_tipi_2"] = MT.kapi_kablosu(g.get("kat_kapisi_tipi"))
+    #  ESKİ BİÇİM:  makine yükünün yolu bir zamanlar ONAY KUTUSUYDU ve
+    #  True / "EVET" olarak kaydediliyordu.  Eski .uygulama dosyaları ve
+    #  teslim edilmiş Excel kitapları bu değeri taşır;  seçime çevrilmezse
+    #  doğrulama "geçersiz seçim — True" deyip projeyi hiç açmaz.
+    _yy = g.get("makine_raya_biniyor")
+    if _yy is not None and _yy not in MT.MAKINE_YUK_YOLU:
+        g["makine_raya_biniyor"] = (MT.MAKINE_YUK_YOLU[1]
+                                    if MT.makine_raya_mi(_yy)
+                                    else MT.MAKINE_YUK_YOLU[0])
     return g
 
 
@@ -704,7 +758,10 @@ def dogrula(g):
     #  Üst sınır o hatayı yakalar.
     for _ad, _alt, _ust in (("halat_birim_kutle", 0.02, 5.0),
                             ("halat_kopma_kN", 5.0, 2000.0),
+                            ("reg_halat_birim_kutle", 0.02, 5.0),
+                            ("reg_halat_kopma_kN", 5.0, 2000.0),
                             ("makine_tst", 100.0, 100000.0),
+                            ("raya_binen_yuk", 1.0, 50000.0),
                             ):
         _v = g.get(_ad)
         if _v is None or _v == "":
@@ -825,6 +882,31 @@ def uyarilar(g):
     yapar ve sebebini yazar.
     """
     uyari = []
+    #  ------------------------------------------------------------------
+    #  MAKİNE DAİRESİZ TESİSTE MAKİNENİN YÜKÜ BİR YERE GİDER.
+    #  TS EN 81-20 m.5.7.2.3.7 makine raya bağlıysa EK YÜK DURUMLARI ister.
+    #  Kutu işaretsizse program yükü BİNA YAPISINA verilmiş kabul eder ve
+    #  raya yalnız ofis kabulü olan ufak donanımı ( 150 N ) koyar.  Bu bir
+    #  KABULDÜR ve sessiz kalmamalıdır:  makine gerçekten raylara biniyorsa
+    #  ray ve kuyu tabanı yükü olduğundan küçük çıkar.
+    #  ------------------------------------------------------------------
+    #  Makine dairesi VARKEN kutu işaretliyse seçim yok sayılır — sessiz
+    #  kalmamalı, çünkü kullanıcı işaretlediğini sanır.
+    if not evet_mi(g.get("mk_yok")) and MT.makine_raya_mi(g.get("makine_raya_biniyor")):
+        uyari.append(
+            "'Makine yükü kılavuz raylara biniyor' seçimi YOK SAYILDI — proje "
+            "makine daireli. Makine kendi kaidesinde durur ve yükü bölüm "
+            "2'de hesaplanır; aynı yükü raya da bindirmek onu iki kez sayardı. "
+            "Seçim ancak 'Makine dairesiz ( MRL )' işaretliyken uygulanır.")
+    if evet_mi(g.get("mk_yok")) and not MT.makine_raya_mi(g.get("makine_raya_biniyor")):
+        uyari.append(
+            "MAKİNE YÜKÜ BİNA YAPISINA AKTARILIYOR — makine dairesiz ( MRL ) "
+            "sistemde makinenin yükü kuyu üstü kirişe, duvara ya da konsola "
+            "iner ve bu yapı TS EN 81-20 m.5.2.1.8.1 ile Ek E uyarınca İNŞAAT "
+            "PROJESİNDE hesaplanır;  paftada verilen yük o hesabın girdisidir. "
+            "Makinenin ya da altındaki kirişin uçları kılavuz raylara "
+            "bağlıysa 'Makine yükünün yolu' alanından 'Kılavuz raylara' "
+            "seçilmelidir — m.5.7.2.3.7 o durumda ek yük durumları ister.")
     #  ------------------------------------------------------------------
     #  ω tablosu YALNIZ 20 ≤ λ ≤ 250 arasında tanımlıdır.  Üst sınırın
     #  dışında ω yoktur;  motor bunu ham bir Python hatasıyla ( None ile

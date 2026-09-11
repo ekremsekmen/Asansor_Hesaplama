@@ -27,7 +27,7 @@ from engine.uygulama import mukavemet as MK                     # noqa: E402
 from engine.uygulama import hesap as UY                      # noqa: E402
 from engine.uygulama import girdi as UG                # noqa: E402
 from engine.uygulama import sabitler as US             # noqa: E402
-from testler.ortak import Rapor                        # noqa: E402
+from testler.ortak import P_std as _P_std, Rapor                        # noqa: E402
 
 #  Topraklama ve kolon hattı olmadan elektrik bölümlerinin bir kısmı boş kalır
 TAM = {"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45}
@@ -407,8 +407,13 @@ def calistir():
     _gn8 = MK.SABIT["gn"]
     _ray8 = _gn8 * MT.ray(_s8["girdi"]["kabin_ray_profili"], "Gr") * \
         _s8["ozet"]["ray_boyu"]
-    _bek8 = _ray8 + MK.SABIT["MY_kabin"] + (_h8["AU351"] - _h8["AH291"] * _gn8)
-    r.kontrol("⑧ FKR = ray kütlesi + bileşen + güv.tert. tepkisi",
+    #  Raya bağlı donanım k3 ile çarpılır:  m.5.2.1.8.4 tabanın taşıyacağı
+    #  kalemler arasında "additional reaction … due to REBOUND when machine
+    #  on rails" der, katsayısı m.5.7.4.3'ün k3'üdür  ( bölüm 7 ile aynı ).
+    _k38 = US.sabitler(_s8["girdi"].get("_ofis"))["k3_yardimci"]
+    _bek8 = (_ray8 + _k38 * MK.SABIT["MY_kabin"]
+             + (_h8["AU351"] - _h8["AH291"] * _gn8))
+    r.kontrol("⑧ FKR = ray kütlesi + k3 × bileşen + güv.tert. tepkisi",
               _yakin(_h8["AX611"], _bek8), f"→ {_h8['AX611']!r} ≠ {_bek8!r}")
     r.kontrol("⑧ ray ağırlığı iki kez sayılmıyor",
               abs(_h8["AX611"] - (_bek8 + _ray8)) > 1,
@@ -598,8 +603,16 @@ def calistir():
         sonuc = MK.hesapla({"_ofis": {"q_denge": q}})
         r.esit(f"denge {q}: türetilen kütle", sonuc["girdi"]["karsi_agirlik"], beklenen)
         r.esit(f"denge {q}: motor kütlesi", sonuc["_h"]["AQ13"], beklenen)
-        r.kontrol(f"denge {q}: tampon yükü aynı kütleden",
-                  abs(sonuc["ozet"]["Fat"] - 4 * 9.81 * beklenen) < 1e-7)
+        #  AĞIRLIK TAMPONU m.5.2.1.8.6'NIN KENDİ BAĞINTISIYLA:
+        #  F = 4·gn·( P + q·Q ) — oradaki P "boş kabin + gezici kablo payı +
+        #  denge zinciri"dir, karşı ağırlığın fiziksel kütlesi değil.
+        #  Asıl denetlenen şey q'nun her yere AYNI geçmesi:  beklenen kütle
+        #  700 + q·800 olduğuna göre q buradan geri okunur.
+        _qe = (beklenen - 700) / 800.0
+        r.kontrol(f"denge {q}: tampon yükü m.5.2.1.8.6 bağıntısıyla",
+                  abs(sonuc["ozet"]["Fat"]
+                      - 4 * 9.81 * (_P_std(sonuc) + _qe * 800)) < 1e-7,
+                  f"→ {sonuc['ozet']['Fat']!r}")
 
     from engine.ortak import ofis as _OF
     otomatik = UY.hesapla({"kabin_agirligi": None})

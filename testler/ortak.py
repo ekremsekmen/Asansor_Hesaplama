@@ -103,3 +103,27 @@ def hata_hucresi_ara(xlsx_yolu):
                             bulunan.append(f"{ws.title}!{c.coordinate} = {c.value}")
                             break
     return bulunan
+
+
+def P_std(sonuc):
+    """TS EN 81-20'nin P'si  —  MOTORDAN OKUNMAZ, tablolardan yeniden kurulur.
+
+    m.5.2.1.8.5 · m.5.2.1.8.6 · m.5.7.2.3.2 üçü de aynı cümleyle tanımlar:
+    "P is the mass of the empty car and components supported by the car,
+    i.e. part of the travelling cable, compensating ropes/chains (if any),
+    etc."  Yani boş kabin kütlesi DEĞİL.
+
+    Testler bu değeri bağımsız kursun diye burada durur;  motorun kendi
+    ``P_std``ini okumak, hesabı kendisiyle doğrulamak olurdu.
+    """
+    from engine.uygulama import mukavemet_tablolari as T
+    from engine.uygulama import sabitler as S
+    g = sonuc["girdi"]
+    r = 2 if str(g["aski_orani"]).strip() in ("2", "2:1") else 1
+    H = g["seyir_mesafesi"]
+    MSR = r * H * T.halat_agirlik(g["halat_capi"]) * g["halat_adedi"]
+    lam = ((S.VARSAYILAN["denge_zinciri_orani"] or 0) / 100.0
+           if str(g.get("denge_zinciri") or "").strip() == "Var" else 0.0)
+    mt = sum(T.kablo_agirligi(g.get(k)) or 0.0
+             for k in ("kablo_tipi_1", "kablo_tipi_2"))
+    return g["kabin_agirligi"] + lam * MSR + 0.5 * H * mt

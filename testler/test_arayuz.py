@@ -55,6 +55,20 @@ def adetSec(pg, n):
     return acik[0] if acik else None
 
 
+def _mrl_sec(pg, mrl):
+    """Makine dairesi seçimi — İKİ DÜĞMELİ görünüm.
+
+    Alan veri modelinde hâlâ bir onay kutusudur ama ekranda iki düğmeyle
+    gösterilir ve kutu görsel olarak saklanır ( .gorsel-gizli ).  Playwright
+    saklı kutuya dokunamaz;  test de KULLANICI GİBİ düğmeye basar — zaten
+    doğrusu budur, ekranda olmayan bir şeyi sürmek gerçek kullanımı sınamaz.
+    """
+    #  Düğme kapalı bir akordeonun içindeyse tıklanamaz;  gruplar açılır.
+    pg.evaluate("mTumGruplariAc()")
+    pg.click(f'.secim-ikili[data-icin="m_mk_yok"] .secim-dg[data-deger="{1 if mrl else 0}"]')
+    pg.wait_for_timeout(300)
+
+
 def calistir():
     print("\n\033[1mTEST 5 — ARAYÜZ (tarayıcı)\033[0m")
     r = Rapor("Arayüz")
@@ -160,8 +174,13 @@ def calistir():
         r.kontrol("başlık uygulama projesini gösteriyor",
                   "UYGULAMA" in pg.inner_text("#ust_ad"),
                   f"→ {pg.inner_text('#ust_ad')!r}")
-        r.esit("uygulama formu 10 grup üretti",
-               pg.eval_on_selector_all("#m_form .m-grup", "e=>e.length"), 10)
+        #  GRUP SAYISI MOTORDAN OKUNUR.  Çivili sayı, forma bir grup
+        #  eklendiğinde ( "Makine yerleşimi" ) sessizce eskiyordu.
+        from engine.uygulama import girdi as _UGrp
+        _grup_sayisi = len(_UGrp.arayuz_alanlari()["gruplar"])
+        r.esit(f"uygulama formu {_grup_sayisi} grup üretti",
+               pg.eval_on_selector_all("#m_form .m-grup", "e=>e.length"),
+               _grup_sayisi)
 
         #  ── GİRDİ AKORDEONU  ( 86 girdi tek sütunda bulunamıyordu )
         #  Kapalı grup DOM'da KALIR;  yalnız görünmez.  Hesabın okuduğu alan
@@ -423,7 +442,7 @@ def calistir():
         #  sekmesinde ve paftanın en sonunda — asansör sekmelerinde
         #  tekrarlanmaz.  Makine dairesi ve temel girilince bölümler doğar.
         pg.evaluate("mTumGruplariAc()")
-        pg.uncheck("#m_mk_yok")
+        _mrl_sec(pg, False)
         for _a, _d in (("m_mk_uzunluk", "4"), ("m_mk_genislik", "3"),
                        ("m_temel_a", "20"), ("m_temel_b", "12"),
                        ("m_serit_L", "64")):
@@ -450,7 +469,7 @@ def calistir():
                 " return !(a.hidden||getComputedStyle(a).display==='none');}")
         r.kontrol("MRL kaldırılınca makine dairesi ölçüleri görünür",
                   pg.eval_on_selector("#m_mk_uzunluk", _gor))
-        pg.check("#m_mk_yok")
+        _mrl_sec(pg, True)
         pg.wait_for_timeout(1800)
         r.kontrol("MRL işaretlenince makine dairesi ölçüleri gizlenir",
                   not pg.eval_on_selector("#m_mk_uzunluk", _gor))
@@ -458,7 +477,58 @@ def calistir():
                   pg.evaluate("(SON.mc.proje_geneli||[]).every("
                               "b=>b.baslik.indexOf('MAKİNE DAİRESİ')<0)"),
                   f"→ {pg.evaluate('(SON.mc.proje_geneli||[]).map(b=>b.baslik)')}")
-        pg.uncheck("#m_mk_yok")
+        #  MAKİNE YÜKÜNÜN YOLU YALNIZ MRL'DE SORULUR  ( TS EN 81-20 m.5.7.2.3.7 ).
+        #  Makine dairesi varsa makine kendi kaidesindedir;  aynı yükü raya da
+        #  bindirmek onu iki kez saymak olur.
+        r.kontrol("MRL'de makine yükü yolu soruluyor",
+                  pg.eval_on_selector("#m_makine_raya_biniyor", _gor)
+                  and pg.eval_on_selector("#m_raya_binen_yuk", _gor))
+        _mrl_sec(pg, False)
+        pg.wait_for_timeout(1800)
+        r.kontrol("makine dairesi varken makine yükü yolu SORULMUYOR",
+                  not pg.eval_on_selector("#m_makine_raya_biniyor", _gor)
+                  and not pg.eval_on_selector("#m_raya_binen_yuk", _gor))
+        #  KURAL GİZLEMESİ ARAMA SÜZGECİYLE KAVGA ETMEMELİ.
+        #  mTumGruplariAc() ve mAramaUygula() [hidden] üzerinde çalışır;  kural
+        #  gizlemesi aynı niteliği kullanırsa grupları açmak gizlenen alanı
+        #  GERİ GETİRİYORDU — bu, mk_uzunluk için de geçerli eski bir hataydı.
+        pg.evaluate("mTumGruplariAc()")
+        pg.wait_for_timeout(900)
+        r.kontrol("tüm grupları aç, kural gizlemesini BOZMUYOR",
+                  not pg.eval_on_selector("#m_makine_raya_biniyor", _gor),
+                  "→ mTumGruplariAc() gizli alanı geri getirdi")
+        pg.fill("#m_ara", "makine")
+        pg.wait_for_timeout(900)
+        r.kontrol("arama süzgeci de kural gizlemesini bozmuyor",
+                  not pg.eval_on_selector("#m_makine_raya_biniyor", _gor))
+        pg.fill("#m_ara", "")
+        pg.wait_for_timeout(900)
+        #  Arama temizlenince YALNIZ son seçili grup açık kalır;  kutuya
+        #  ulaşabilmek için gruplar yeniden açılır.
+        pg.evaluate("mTumGruplariAc()")
+        pg.wait_for_timeout(600)
+        _mrl_sec(pg, True)
+        pg.wait_for_timeout(1500)
+        pg.evaluate("mTumGruplariAc()")
+        pg.wait_for_timeout(900)
+        r.kontrol("MRL'de tüm grupları aç, ölçüleri geri getirmiyor",
+                  not pg.eval_on_selector("#m_mk_uzunluk", _gor))
+        #  İKİ DÜĞMELİ SEÇİM:  düğme, alttaki kutuyu ve hesabı sürmeli.
+        r.kontrol("MRL düğmesi seçili görünüyor",
+                  pg.eval_on_selector(
+                      '.secim-ikili[data-icin="m_mk_yok"] .secim-dg[data-deger="1"]',
+                      "e=>e.classList.contains('secili')"))
+        r.kontrol("düğme alttaki onay kutusunu sürüyor",
+                  pg.evaluate("document.getElementById('m_mk_yok').checked"))
+        #  SEÇİM KUTUSU BOŞA DÜŞMEZ.  Listede olmayan bir değer yazılırsa
+        #  ( eski proje dosyası · tablodan kalkan profil ) varsayılan korunur;
+        #  boşalan bir <select> "" gönderip motoru "boş bırakılamaz" dedirtiyordu.
+        _onceki = pg.input_value("#m_makine_raya_biniyor")
+        pg.evaluate("alanaYaz(document.getElementById('m_makine_raya_biniyor'),"
+                    " 'artik-olmayan-bir-secenek')")
+        r.esit("listede olmayan değer seçim kutusunu BOŞALTMIYOR",
+               pg.input_value("#m_makine_raya_biniyor"), _onceki)
+        _mrl_sec(pg, False)
         pg.wait_for_timeout(1800)
         #  Girdi hangi asansör sekmesinde yazılırsa yazılsın TEK değerdir
         pg.evaluate("mAsansorSec(0)")
@@ -474,7 +544,7 @@ def calistir():
         for _a in ("m_mk_uzunluk", "m_mk_genislik", "m_temel_a",
                    "m_temel_b", "m_serit_L"):
             pg.fill(f"#{_a}", "")
-        pg.check("#m_mk_yok")
+        _mrl_sec(pg, True)
         pg.wait_for_timeout(2000)
         #  HER ASANSÖR KENDİ GİRDİSİYLE hesaplanır:  sonuçta girdi de dönüyor,
         #  aktif asansörün girdisi ikisine birden gönderilmiş olsa iki motor
@@ -854,10 +924,33 @@ def calistir():
         r.kontrol("ofis verimi motor gücünü değiştiriyor", _n1 < _n0,
                   f"→ önce {_n0}, sonra {_n1}")
         pg.fill("#uof_sigma_em", "100")
+        #  KAİDE HESABI MAKİNE DAİRESİ İSTER.  Varsayılan proje MRL'dir ve
+        #  bölüm 2 orada uygunluk beyan etmez ( "UYGULANMAZ" ) — σem'i
+        #  düşürmenin etkisini görebilmek için makine dairesi açılır.
+        #  ( Kutu akordeon içindedir;  gruplar önce açılır. )
+        pg.click(".sekme[data-sekme='mukavemet']")
+        pg.wait_for_timeout(300)
+        pg.evaluate("mTumGruplariAc()")
+        _mrl_sec(pg, False)
+        #  MAKİNE DAİRESİ AÇILINCA ÖLÇÜSÜ ZORUNLU OLUR ( girdi doğrulaması );
+        #  doldurulmazsa hesap hiç koşmaz ve SON.m boş kalır.
+        pg.fill("#m_mk_uzunluk", "4000")
+        pg.fill("#m_mk_genislik", "3000")
         pg.wait_for_timeout(2200)
         _b2 = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
         r.kontrol("σem düşürülünce makine kaidesi kalıyor",
                   _b2.get("uygun") is False, f"→ {_b2}")
+        #  MRL'ye dönünce kaide hesabı uygunluk beyan etmemeli
+        _mrl_sec(pg, True)
+        pg.wait_for_timeout(2200)
+        _b2m = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
+        r.kontrol("MRL'de makine kaidesi uygunluk beyan etmiyor",
+                  _b2m.get("uygun") is None and "UYGULANMAZ" in _b2m.get("metin", ""),
+                  f"→ {_b2m}")
+        #  Kutu VARSAYILAN durumunda ( MRL ) bırakılır ve SABİTLER sekmesine
+        #  dönülür — aşağıdaki "Tümünü varsayılana döndür" düğmesi oradadır.
+        pg.click(".sekme[data-sekme='sabitler']")
+        pg.wait_for_timeout(600)
         r.kontrol("σem satırı kaynağını OFİS STANDARDI diye yazıyor",
                   "OFİS STANDARDI" in pg.evaluate(
                       "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"

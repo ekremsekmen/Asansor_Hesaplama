@@ -76,6 +76,9 @@ EK_GRUP = ("Elektrik ve topraklama  ( uygulama projesi )",
 #
 #  PROJE GENELİ BÖLÜMLER DE ARTIK EŞLENİYOR.  Numara ile eşlenemiyorlardı:
 #  makine dairesi varsa topraklama 16'dan, yoksa 15'ten başlıyordu.
+#  Grup adı iki yerde geçtiği için tek sabitte durur.
+YERLESIM_GRUBU_ADI = "Makine yerleşimi"
+
 EK_BOLUM_GRUBU = {
     "kabin_aydinlatma":          ("Kabin ve kapı",),        # ← kabin ölçüleri
     "kuyu_aydinlatma":           (EK_GRUP[0], "Durak ve kuyu"),   # ← KG · kuyu boyu
@@ -85,7 +88,12 @@ EK_BOLUM_GRUBU = {
     #  kabin ölçüsü ( kabin armatür adedi ).
     "kurulu_guc":                ("Makine ve motor", "Kabin ve kapı"),
     "gerilim_dusumu":            (EK_GRUP[0], "Makine ve motor"),  # ← S1 · L1 · S2 · L2
-    "makine_dairesi_aydinlatma": (EK_GRUP[0],),             # ← makine dairesi ölçüsü
+    #  MAKİNE DAİRESİ ÖLÇÜLERİ ARTIK "Makine yerleşimi" GRUBUNDA  ( en üstte ):
+    #  seçim 11 bölümden üçünü belirlediği için elektrik grubunun dibinden
+    #  alındı  ( bkz. YERLESIM_GRUBU ).
+    #  Ölçüler elektrik grubunda, MRL kutusu yerleşim grubunda:  ikisi de
+    #  bu bölümü besler, sonuçtan tıklanınca ikisi de açılmalı.
+    "makine_dairesi_aydinlatma": (EK_GRUP[0], YERLESIM_GRUBU_ADI),
     "topraklama_yatay":          (EK_GRUP[0],),             # ← temel a · b · şerit L
     "topraklama_dikey":          (EK_GRUP[0],),
     "topraklama_toplam":         (EK_GRUP[0],),
@@ -93,16 +101,46 @@ EK_BOLUM_GRUBU = {
 
 
 
+#  MAKİNE YERLEŞİMİ EN BAŞTA SORULUR.  Bu iki soru birlikte 11 bölümden
+#  üçünü belirler:
+#     · makine dairesi var mı        →  bölüm 2 ( kaide ) uygulanır mı ·
+#                                       aydınlatma ve elektrik hesapları
+#     · makine yükü raylara biniyor mu →  bölüm 7 ( ray ) Maux ·
+#                                       bölüm 9 ( kuyu tabanı ) FKR
+#  Bu kadar şey belirleyen bir seçim formun dibinde duramaz;  eskiden
+#  "Elektrik ve topraklama" grubunun içinde, en altta duruyordu — çünkü o
+#  zamanlar YALNIZ aydınlatma hesabını etkiliyordu.
+#  ÖLÇÜLER BURADA DEĞİL.  mk_uzunluk / mk_genislik YALNIZ makine dairesi
+#  aydınlatma hesabına girer ( engine/avan/hesap.hesapla_makine_dairesi );
+#  mukavemetin 11 bölümünün hiçbirini etkilemezler.  Formun en üstünde,
+#  üç bölüm belirleyen mk_yok ile yan yana durmaları önem sırasını
+#  bozuyordu — ölçüler kendi hesabının yanında, "Elektrik ve topraklama"
+#  grubunda durur.
+YERLESIM_GRUBU = (YERLESIM_GRUBU_ADI,
+                  ("mk_yok", "makine_raya_biniyor", "raya_binen_yuk"))
+
+
 def arayuz_alanlari():
     """Formun kendini üretmesi için tüm gruplar  ( mukavemet + elektrik )."""
     veri = MG.arayuz_alanlari()
+    _ek = {a: {"anahtar": a, "hucre": "", "etiket": et, "birim": b,
+               "tur": t, "secenekler": list(s) if s is not None else None,
+               "varsayilan": v}
+           for a, et, b, t, s, v in EK_ALANLAR}
     veri["gruplar"].append({
         "ad": EK_GRUP[0],
-        "alanlar": [{"anahtar": a, "hucre": "", "etiket": et, "birim": b,
-                     "tur": t, "secenekler": list(s) if s is not None else None,
-                     "varsayilan": v}
-                    for a, et, b, t, s, v in EK_ALANLAR],
+        "alanlar": [_ek[a] for a, *_x in EK_ALANLAR
+                    if a not in YERLESIM_GRUBU[1]],
     })
+    #  Yerleşim grubu İKİ KAYNAKTAN toplanır:  makine dairesi alanları proje
+    #  geneli ( burada ), makine yükünün yolu asansör başına ( mukavemet ).
+    _muk = {f["anahtar"]: f for gr in veri["gruplar"] for f in gr["alanlar"]}
+    _yer = [(_ek.get(a) or _muk.get(a)) for a in YERLESIM_GRUBU[1]]
+    for gr in veri["gruplar"]:
+        gr["alanlar"] = [f for f in gr["alanlar"]
+                         if f["anahtar"] not in YERLESIM_GRUBU[1]]
+    veri["gruplar"].insert(0, {"ad": YERLESIM_GRUBU[0],
+                               "alanlar": [f for f in _yer if f]})
     veri["bolum_grubu"].update({no: list(gr)
                                 for no, gr in EK_BOLUM_GRUBU.items()})
     return veri

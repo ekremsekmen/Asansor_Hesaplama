@@ -111,6 +111,7 @@ async function mukavemetKur(){
     mAsansorYukle(MUK_AKTIF);
   if($('m_adet')) $('m_adet').value = String(MUK_ADET);
   mMakineDairesiKutulari();
+  mIkiliTazele();
   mAsansorSekmeleriTazele();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
@@ -245,6 +246,42 @@ function mukavemetKimlik(){
     ( mukavemet_girdi.ALANLAR ) ve Excel'e yazma / Excel'den geri okuma onu
     oradan kullanmaya devam ediyor — görünümden kalkması o eşleşmeye
     dokunmaz. */
+/*  ONAY ALANLARININ İKİ DÜĞMELİ GÖRÜNÜMÜ.
+    { etiket , [ kapalı şıkkı , açık şıkkı ] }
+
+    ETİKET DE DEĞİŞİR:  alanın kendi adı olumsuz kurulmuştur ( "Makine
+    dairesiz" ) ve düğmelerin üstünde tekrar edince kafa karıştırıyordu —
+    "Makine dairesiz" başlığı altında "Makine daireli" düğmesi.  Başlık
+    SORUYU sorar ( "Makine dairesi" ), düğmeler CEVABI verir ( "Var" / "Yok" ).
+    Kısa şıklar ayrıca satır sarmaz, düğmeler tek satırda durur.
+
+    Yalnız GÖRÜNÜMdür;  alanın türü ve kaydedilen değer değişmez.           */
+const IKILI_ETIKET = {
+  mk_yok: { etiket: 'Makine dairesi', secenek: ['Var', 'Yok  ( MRL )'] },
+};
+
+/*  Düğmeye basılınca alttaki checkbox'ı günceller ve hesabı tetikler.
+    Kutu tek doğruluk kaynağıdır;  düğmeler yalnız onu gösterir.            */
+function mIkiliSec(id, deger){
+  const e = $(id); if(!e) return;
+  e.checked = !!deger;
+  e.dispatchEvent(new Event('change', {bubbles:true}));
+  mIkiliTazele();
+}
+
+/*  Checkbox nereden değişirse değişsin ( düğme · geri yükleme · test )
+    düğmelerin işaretli olanı ona uydurulur.                                */
+function mIkiliTazele(){
+  document.querySelectorAll('#m_form .secim-ikili').forEach(k=>{
+    const e = $(k.dataset.icin); if(!e) return;
+    k.querySelectorAll('.secim-dg').forEach(d=>{
+      const secili = (d.dataset.deger === '1') === !!e.checked;
+      d.classList.toggle('secili', secili);
+      d.setAttribute('aria-checked', secili ? 'true' : 'false');
+    });
+  });
+}
+
 function mAlan(f){
   //  PROJE GENELİ ROZETİ.  Alan asansöre değil BİNAYA aitse söylenir:  dört
   //  asansörün sekmesinde de aynı kutu görünür ve aynı değeri taşır.
@@ -255,6 +292,27 @@ function mAlan(f){
     + (f.birim && f.birim !== '—' ? ` <span class="ipucu">(${kacis(f.birim)})</span>` : '')
     + pg;
   if(f.tur === 'onay'){
+    //  İKİLİ SEÇİM GÖRÜNÜMÜ.  Bazı onay alanları aslında İKİ ŞIKLI bir
+    //  tercihtir ( makine daireli / dairesiz ) ve işaretsiz bir kutu
+    //  "seçim yapılmadı" gibi durur.  İki düğme olarak gösterilir;  VERİ
+    //  MODELİ DEĞİŞMEZ — altta gerçek bir checkbox durur, kaydetme, geri
+    //  yükleme ve testler ona bakmaya devam eder.  Kutu ekrandan kalkmaz,
+    //  yalnız görsel olarak saklanır ( .gorsel-gizli ):  klavye ve ekran
+    //  okuyucu erişimi korunur.
+    const ik = IKILI_ETIKET[f.anahtar];
+    if(ik){
+      const id = M_ID(f.anahtar), a = f.varsayilan ? 1 : 0;
+      return `<div class="alan"><label>${kacis(ik.etiket)}${pg}</label>`
+        + `<input type="checkbox" class="gorsel-gizli" id="${id}"${f.varsayilan?' checked':''}>`
+        + `<div class="secim-ikili" role="group" aria-label="${kacis(ik.etiket)}"`
+        + ` data-icin="${id}">`
+        + ik.secenek.map((m, i)=>
+            `<button type="button" class="secim-dg${i===a?' secili':''}"`
+            + ` role="radio" aria-checked="${i===a}"`
+            + ` data-deger="${i}" onclick="mIkiliSec('${id}',${i})">${kacis(m)}</button>`
+          ).join('')
+        + `</div></div>`;
+    }
     return `<div class="alan"><label class="kutu-satir">`
       + `<input type="checkbox" id="${M_ID(f.anahtar)}"${f.varsayilan?' checked':''}>`
       + `<span>${kacis(f.etiket)}${pg}</span></label></div>`;
@@ -440,17 +498,29 @@ function mMalzemeDerinligi(){
 function mMakineDairesiKutulari(){
   const k = $(M_ID('mk_yok'));
   if(!k) return;
-  for(const a of ['mk_uzunluk', 'mk_genislik']){
-    const e = $(M_ID(a));
+  //  SINIF KULLANILIR, [hidden] DEĞİL.  Arama süzgeci ( mAramaUygula ) ve
+  //  "tüm grupları aç" ( mTumGruplariAc ) [hidden] üzerinde çalışır;  kural
+  //  gizlemesi de aynı niteliği kullanırsa ikisi birbirini siler — grupları
+  //  açmak MRL'de gizlenmesi gereken kutuyu geri getiriyordu.
+  const gizle = (ad, nezaman) => {
+    const e = $(M_ID(ad));
     const kap = e && (e.closest('.alan') || e);
-    if(kap) kap.hidden = k.checked;
-  }
+    if(kap) kap.classList.toggle('kural-disi', !!nezaman);
+  };
+  //  Ölçüler MRL'de gizlenir — makine dairesi yoksa hesap da yok.
+  for(const a of ['mk_uzunluk', 'mk_genislik']) gizle(a, k.checked);
+  //  MAKİNE YÜKÜNÜN YOLU İSE TERSİ:  yalnız MRL'de sorulur.  Makine dairesi
+  //  varsa makine kendi kaidesinde durur ( bölüm 2 ) ve yükü raya bindirmek
+  //  onu İKİ KEZ saymak olur.  Motor bu seçimi zaten makine daireli projede
+  //  yok sayar;  kutuyu gizlemek kullanıcıyı yanıltmamak içindir.
+  for(const a of ['makine_raya_biniyor', 'raya_binen_yuk']) gizle(a, !k.checked);
 }
 
 function mukavemetPlanla(hedef){
   if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = true;
   if(hedef && hedef.id === M_ID('agirlik_malzemesi')) mMalzemeDerinligi();
   mMakineDairesiKutulari();
+  mIkiliTazele();
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);
@@ -642,7 +712,10 @@ function mAramaUygula(){
   document.querySelectorAll('#m_form .m-grup').forEach(gr=>{
     let bulunan = 0;
     gr.querySelectorAll('.alan').forEach(a=>{
-      const es = (a.textContent || '').toLocaleLowerCase('tr').includes(q);
+      //  Kural gereği kapalı alan aramada da sayılmaz:  görünmeyen bir alanı
+      //  "1 sonuç" diye göstermek kullanıcıyı boş yere gruba sokar.
+      const kural = a.classList.contains('kural-disi');
+      const es = !kural && (a.textContent || '').toLocaleLowerCase('tr').includes(q);
       a.hidden = !es;
       if(es) bulunan++;
     });

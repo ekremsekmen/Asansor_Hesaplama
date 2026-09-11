@@ -30,7 +30,7 @@ from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
 from engine.ortak.steps import Bolum, hesap, kontrol, numarala, veri
-from engine.ortak.steps import metin, tr, trn
+from engine.ortak.steps import metin, tr, trn, evet_mi
 
 # =====================================================================
 #  KAYNAK EXCEL'DEN BİLEREK AYRILAN NOKTALAR
@@ -482,6 +482,25 @@ EXCEL_FARKLARI = (
      "emniyetli olsa da, listede bulunması gereken başka yüklerin ( ör. klips "
      "itme kuvveti Fp ) eksikliğini telafi etmez.",
      ("AX611",)),
+    ("Kuyu tabanında raya bağlı donanım geri tepme katsayısız",
+     "TS EN 81-20 m.5.2.1.8.4  ·  m.5.7.4.3",
+     "FKR ve FAR, raya bağlı donanım yükünü ( MY / Ma ) ÇARPANSIZ ekliyordu.  "
+     "Bölüm 7 ve 8 aynı donanımı k3 ile çarpar ( σk · σv · σc satırlarının "
+     "hepsi 'Fv + k3·MY' kurar );  bölüm 9'da çarpan düşüyordu.",
+     "m.5.2.1.8.4 kuyu tabanının taşıyacağı kalemleri sayarken 'any load due "
+     "to components fixed or linked to the guide(s) AND/OR any additional "
+     "reaction (N) occurring during EMERGENCY STOPPING ( e.g. load on "
+     "traction sheave due to REBOUND when machine on rails )' der.  Geri "
+     "tepmenin katsayısı m.5.7.4.3'ün k3'üdür:  'shall be multiplied with "
+     "the impact factor k3 … to take into account the possible car, "
+     "counterweight … BOUNCE when the car … is stopped by a safety "
+     "device'.\n"
+     "        Aynı donanım aynı geri tepmeyi rayın gövdesinde yaşayıp "
+     "tabanına yaşamıyor olamaz.  Yön EMNİYETSİZDİ:  inşaat projesine "
+     "bildirilen kuyu tabanı yükü olduğundan KÜÇÜK çıkıyordu.  Ofis "
+     "kabulünde ( MY = 150 N ) fark 30 N'dur;  makine raylara biniyorken MY "
+     "birkaç kN olur ve eksik de kN mertebesine çıkar.",
+     ("AX611", "AN616")),
     ("Acil frenleme yavaşlamasının alt sınırı",
      "TS EN 81-50 m.5.11.2.2.2",
      "Yalnız üst sınırı ( 1 gn ) denetler;  a = 0,05 m/s² gibi bir değer "
@@ -750,6 +769,92 @@ EXCEL_FARKLARI = (
      "halatı kilitleme tertibatı ) payın azaltılmasına izin verir;  program "
      "bu indirimleri UYGULAMAZ — emniyetli taraftadır.",
      ("AI635", "AI636", "AI637", "AI638", "AD638")),
+    ("P, ray ve tampon hesabında DÜZ boş kabin kütlesi alınıyordu",
+     "TS EN 81-20 m.5.2.1.8.5 · m.5.2.1.8.6 · m.5.7.2.3.2",
+     "Ray kuvvetlerinde ( Fk ), kuyu tabanı ve tampon kuvvetlerinde "
+     "( Fkt · Fat · FKR ) P olarak yalnız boş kabin kütlesi kullanılıyordu.  "
+     "Gezici kablonun kabin tarafındaki payı ve denge zinciri hiç girmiyordu.",
+     "Standart P'yi DÖRT ayrı yerde aynı cümleyle tanımlar:\n"
+     "            \"P is the mass of the empty car and components supported "
+     "by the car, i.e. part of the travelling cable, compensating "
+     "ropes/chains (if any), etc.\"\n"
+     "        m.5.7.2.3.1 a) 1) yatay kuvvetlerin kaynağını sayarken bunu "
+     "tekrar eder ( \"compensation means, travelling cables\" ), m.5.7.2.3.2 "
+     "ise \"such as ram, part of travelling cable, compensating ropes/chains "
+     "(if any) P\" der.  Kuyu tabanı için m.5.2.1.8.5 ve m.5.2.1.8.6'nın "
+     "sembol listeleri de aynı tanımı taşır.\n"
+     "            P = boş kabin + MTrav + MCR\n"
+     "        KARŞI AĞIRLIK RAYI DA PAYINI ALIR:  m.5.7.2.3.3 karşı ağırlığın "
+     "kılavuzlama kuvvetlerinin \"forces due to compensating ropes/chains "
+     "(if any), tensioned or not\" hesaba katılarak değerlendirilmesini "
+     "ister.  Zincirin tamamı hem kabin hem ağırlık tarafında sayılır;  iki "
+     "kontrol AYNI ANDA olmadığı ( kabin en üstte / ağırlık en üstte ) için "
+     "çift sayma değildir.\n"
+     "        BÖLÜM 1 VE 2 DEĞİŞMEDİ:  motorun F1 = P+Q+Gh'si kabin "
+     "tarafındaki gerçek yüktür ve zincir/kablo oraya zaten Gmax ile ayrı "
+     "girer;  kaide yük modeli ise standardın değil ofisin ( MMO 208/4 ).\n"
+     "        BÜYÜKLÜĞÜ:  zincirsiz H = 21 m'de eksik 13,5 kg ( P'nin "
+     "%1,9'u ).  Zincir takılınca 58 kg ( %8,3 ).  H = 57 m · 8 × 10 mm "
+     "halat · zincirli bir tesiste 328 kg — P'nin %30'u — ve yön hep "
+     "EMNİYETSİZDİR:  ray, tampon ve inşaat projesine bildirilen kuyu tabanı "
+     "yükü olduğundan küçük çıkıyordu.",
+     ("AU351", "AF621", "AI627", "AX611",
+      #  karşı ağırlık rayı  ( m.5.7.2.3.3 — zincir o tarafta da sayılır )
+      "AH278", "K285", "AP566", "AU569", "AH600", "AN616")),
+    ("Regülatör halatına katalog verisi girilemiyordu",
+     "TS EN 81-20 m.5.6.2.2.1.3 b)  ·  fiziksel  —  tablo halatı kapsamıyor",
+     "Askı halatında imalatçı alanları vardı ( 1 m ağırlığı · kopma yükü ), "
+     "regülatörde YOKTU:  değerler her zaman TS 12385-5'in LİF ÖZLÜ "
+     "tablosundan okunuyordu.",
+     "O tablo küçük çaplı ÇELİK ÖZLÜ regülatör halatlarını kapsamaz.  6 mm "
+     "için tablo 23,1 kN verir;  piyasadaki çelik özlü halat 28 kN'dir.  "
+     "Program bu yüzden UYGUN tasarımları reddedebiliyordu — emniyet "
+     "katsayısı 9,80 yerine 11,88 çıkar.\n"
+     "        Askı halatındaki kalıbın AYNISI kullanılır:  boş bırakılırsa "
+     "tablo, girilirse imalatçı değeri;  paftada hangisinin kullanıldığı "
+     "kaynak sütununda yazar.",
+     #  AI134 halatın kendi kütlesidir;  Freg ( W151 ), F'reg ( J156 ) ve
+     #  emniyet katsayısı ( G161 ) ondan türer.
+     ("AI134", "AI136", "W151", "J156", "G161")),
+    ("Makine raya bindiğinde Maux 150 N kalıyordu",
+     "TS EN 81-20 m.5.7.2.3.7  ·  m.5.2.1.8.4",
+     "Raya bağlı yardımcı donanım 11!AH292'de 150 N'a ( ≈ 15 kg ) "
+     "çivilenmişti ve girdisi yoktu.  Mukavemet motoru 'makine dairesi yok' "
+     "bilgisini HİÇ okumuyordu:  MRL işaretli proje ile makine daireli proje "
+     "hücre hücre AYNI çıkıyordu.",
+     "150 N makine dairesi OLAN asansörde doğrudur — rayda yalnız şalter, "
+     "kam, kanal vardır.  Makine dairesiz tesiste makine rayın üstüne biner "
+     "ve standart bunu adıyla anar:\n"
+     "            m.5.7.2.3.7  \"If the machine or rope suspensions are "
+     "fixed to the guide rails, additional load cases according to the "
+     "Table 13 shall be considered.\"\n"
+     "            m.5.2.1.8.4  \"...any additional reaction (N) occurring "
+     "during emergency stopping (e.g. load on traction sheave due to rebound "
+     "when machine on rails)\"\n"
+     "        YENİ GİRDİ İSTENMEZ, ELDEKİ İKİ SAYI YÖNLENDİRİLİR:\n"
+     "            Maux = ( Gm + Tst ) · gn / n        ( n = kabin rayı sayısı )\n"
+     "        Gm makinenin kendi ağırlığı ( girdi ), Tst tahrik kasnağına "
+     "gelen statik yük ( bölüm 1'de zaten hesaplanıyor ).  ELEport'un aynı "
+     "alandaki notu da bunu tarif eder:  \"the weight of the motor, the "
+     "loads on the traction sheave from the cabin and counterweight, and the "
+     "motor bedplate weight should all be summed\".\n"
+     "        Maux RAY BAŞINADIR.  m.5.7.2.3.7 bunu açıkça yazar:  \"Forces "
+     "and torques PER GUIDE RAIL ... Maux\".  Kitabın 150 N'u da ray "
+     "başınadır;  türetilen Gm + Tst ise TOPLAMDIR ve ray sayısına bölünür — "
+     "makine iki kabin rayı arasındaki kirişe oturur, yük simetrik "
+     "paylaşılır kabul edilir.\n"
+     "        BÜYÜKLÜĞÜ:  varsayılan projede 150 N yerine 7.974 N — 53 kat.  "
+     "Ray burkulma gerilmesi 53,2 → 80,6 N/mm², kuyu tabanı yükü "
+     "18.258 → 27.647 N.  Yön EMNİYETSİZDİ.\n"
+     "        ASİMETRİK MONTAJDA İMALATÇI SAYISI YAZILIR:  ELEport aynı "
+     "yerde \"the auxiliary equipment for both rails should be calculated "
+     "separately, and the LARGER value should be taken\" der.  'Bir raya "
+     "düşen makine yükü' alanı bu yüzden ray başına okunur ve türetmeyi "
+     "ezer.\n"
+     "        BÖLÜM 2 ARTIK UYGUNLUK BEYAN ETMEZ:  o bölüm döşemeye basan "
+     "NPU dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer;  MRL'de öyle "
+     "bir kaide yoktur ve eskiden yine de \"UYGUNDUR.\" yazıyordu.",
+     ("AH292", "AL455")),
 )
 
 #  Testlerin okuduğu düz küme
@@ -869,8 +974,9 @@ def _pozitif(x):
     return isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
 
 
-def _halat_verisi(g):
-    """Askı halatı birim kütlesi ve kopma yükü  —  KATALOG GİRDİSİ TABLOYU EZER.
+def _halat_verisi(g, cap="halat_capi", kutle="halat_birim_kutle",
+                  kopma="halat_kopma_kN"):
+    """Halat birim kütlesi ve kopma yükü  —  KATALOG GİRDİSİ TABLOYU EZER.
 
     Döner:  ( gh kg/m , Tmin N , gh_kaynak , Tmin_kaynak )
 
@@ -879,9 +985,9 @@ def _halat_verisi(g):
     Elle girilen değer tabloyu ezer ve paftaya kaynağı 'imalatçı kataloğu'
     olarak yazılır — hangi verinin kullanıldığı GÖRÜNÜR olmalıdır.
     """
-    dh = g.get("halat_capi")
+    dh = g.get(cap)
     gh_t, Tmin_t = MT.halat_agirlik(dh), MT.halat_kopma(dh)
-    gh_e, Tmin_e = g.get("halat_birim_kutle"), g.get("halat_kopma_kN")
+    gh_e, Tmin_e = g.get(kutle), g.get(kopma)
     tablo = f"TS 12385-5  ·  {MT.halat_tipi(dh)}"
     if _pozitif(gh_e):
         gh, gh_k = float(gh_e), "GİRİŞ — imalatçı kataloğu"
@@ -1045,7 +1151,40 @@ def _motor(g, o):
 
     #  λ ve zincir kütlesi TEK YERDE hesaplanır ( burada ) ve tahrik bölümü
     #  buradan okur — iki yerde ayrı türetilirse ayrışırlar.
-    o.update(lam=lam, MCR=MCR, MSR_dengesiz=MSR)
+    o.update(lam=lam, MCR=MCR, MSR_dengesiz=MSR, MTrav=MTrav)
+    #  ------------------------------------------------------------------
+    #  P'NİN STANDARTTAKİ TANIMI  —  ray · tampon · kuyu tabanı için
+    #  ------------------------------------------------------------------
+    #  TS EN 81-20 P'yi HER YERDE şöyle tanımlar  ( m.5.2.1.8.5 · m.5.2.1.8.6
+    #  · m.5.2.1.9 · m.5.7.2.3.2 ):
+    #
+    #      "P is the mass of the empty car and components supported by the
+    #       car, i.e. part of the travelling cable, compensating
+    #       ropes/chains (if any), etc."
+    #
+    #  Yani BOŞ KABİN KÜTLESİ DEĞİL:  gezici kablonun kabin tarafındaki payı
+    #  ve varsa denge zinciri de P'ye dâhildir.  m.5.7.2.3.1 a) 1) yatay
+    #  kuvvetlerin kaynağını sayarken bunu tekrar eder ( "compensation means,
+    #  travelling cables" ), m.5.7.2.3.2 de "such as ram, part of travelling
+    #  cable, compensating ropes/chains (if any) P" der.
+    #
+    #  Program ray, tampon ve kuyu tabanı hesaplarında düz boş kabin
+    #  kütlesini kullanıyordu.  Zincirsiz kısa kuyuda eksik %2, zincirli uzun
+    #  kuyuda %30'a çıkar — hep EMNİYETSİZ yönde.
+    #
+    #  NİÇİN AYRI BİR DEĞİŞKEN:  bölüm 1 ( motor ) ve bölüm 2 ( kaide ) P'yi
+    #  BAŞKA amaçla kullanır — F1 = P+Q+Gh kabin tarafındaki gerçek yüktür,
+    #  kaide yük modeli ise ofis kabulüdür ( MMO 208/4 ).  Onlara dokunulmaz.
+    #
+    #  ZİNCİRİN TAMAMI SAYILIR:  zincir kabin ile karşı ağırlık arasında U
+    #  yapar ve payı konuma göre değişir.  Kabin en üstteyken neredeyse
+    #  tamamı kabin tarafındadır — ray ve tampon en olumsuz konuma göre
+    #  denetlendiği için tamamı alınır.  Karşı ağırlık rayı da KENDİ en
+    #  olumsuz konumunda ( ağırlık en üstte ) aynı zinciri görür;  iki
+    #  kontrol AYNI ANDA olmadığı için bu çift sayma değildir
+    #  ( m.5.7.2.3.3:  "forces due to compensating ropes/chains (if any),
+    #  tensioned or not" ).
+    o["P_std"] = P + MCR + MTrav
     o.update(Q=Q, P=P, v=v, gh=gh, lh=lh, Gh=Gh, F1=F1, Ga=Ga, Gmax=Gmax,
              N_hesap=N, motor_uygun=uygun, r=r, nh=nh, dh=dh, Dt=Dt,
              Tst_hesap=Tst_h, Tst=Tst if Tst_verildi else None,
@@ -1165,10 +1304,12 @@ def _motor(g, o):
         "ağırlık, halat, kasnak ve rotor ataletleri — hesaba "
         "girmez; motor seçiminde üretici kalkış verisi ayrıca "
         "kontrol edilmelidir.",
-        "Karşı ağırlık denge oranı q = 0,50 olarak sabittir ( "
-        "Ga = P + Q/2 ). Kaynak çalışma kitabının tamamı bu kabul "
-        "üzerine kuruludur — karşı ağırlık kütlesi tahrik, ray ve "
-        "tampon hesaplarına da aynı yerden girer."]
+        "Karşı ağırlık denge oranı q bir OFİS SABİTİDİR ( Sabitler "
+        "sekmesi · varsayılan 0,50 · 0,20 – 0,80 arası ). Ga = P + q·Q "
+        "TEK YERDEN kurulur; tahrik, ray ve tampon hesapları karşı "
+        "ağırlığı aynı yerden okur, böylece q değiştiğinde bölümler "
+        "ayrışmaz. Kaynak çalışma kitabı burada q = 0,50'yi hücreye "
+        "çivilemişti."]
     _ne = []
     if hesaplanabilir and not (N is not None and N > 0 and g["motor_gucu"] >= N):
         _ne.append("motoru büyütün")
@@ -1244,7 +1385,10 @@ def _makine(g, o):
          K73=sigma_b)
 
     b = Bolum("MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", kimlik="makine_konstruksiyonu", kaynak="MMO 208/4 - m.3.4.6")
-    b["adimlar"] = [
+    b["adimlar"] = ([metin("MAKİNE DAİRESİZ ( MRL ) SİSTEM — aşağıdaki kaide "
+                           "hesabı uygulanmaz;  makine yükü bölüm 7'de "
+                           "raylara ya da bina yapısına verilir.", vurgu=True)]
+                    if evet_mi(g.get("mk_yok")) else []) + [
         veri("k1", "Darbe katsayısı", k1, "",
              f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
         veri("Gm", "Makine motor ağırlığı", Gm, "kg", "GİRİŞ ( üretici kataloğu )"),
@@ -1280,10 +1424,24 @@ def _makine(g, o):
         kontrol(f"σb = {tr(sigma_b)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['dikine_kiris']}", burkulma_uygun),
     ]
-    b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
-                  "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
-                           else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
-                  "uygun": bool(egilme_uygun and burkulma_uygun)}
+    #  MAKİNE DAİRESİ YOKSA BU HESAP UYGULANMAZ.  Bölüm, döşemeye basan NPU
+    #  dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer.  MRL'de öyle bir
+    #  kaide yoktur — makine ya raylara ya bina yapısına biner.  Hesap yine
+    #  üretilir ( kitapla hücre hücre karşılaştırılabilsin diye ) ama
+    #  UYGUNLUK BEYAN ETMEZ:  eskiden MRL projesinde de "UYGUNDUR." yazıyor,
+    #  denetçiye var olmayan bir kaidenin hesabını doğrulanmış gibi
+    #  gösteriyordu.
+    _mrl = evet_mi(g.get("mk_yok"))
+    if _mrl:
+        b["sonuc"] = {"baslik": "MAKİNE DAİRESİ KAİDESİ",
+                      "metin": "UYGULANMAZ — makine dairesiz ( MRL ) sistem. "
+                               "Makine yükünün yolu bölüm 7'de denetlenir.",
+                      "uygun": None}
+    else:
+        b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
+                      "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
+                               else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
+                      "uygun": bool(egilme_uygun and burkulma_uygun)}
     b["aciklamalar"] = [
         "Kiriş statiği:  açıklığı L olan basit kirişte, A mesnedinden X "
         "uzaktaki tekil yük için  FA = F1·(L−X)/L,  FB = F1·X/L,  "
@@ -1554,9 +1712,16 @@ def _regulator(g, o):
     #  Regülatör halatı kuyu boyunca iki kat gider  ( 11!AI134 )
     boy = ((sum(g["durak_yukseklikleri"]) + g["kaide_yuksekligi"]
             - S["ray_kaide_payi"]) * 2) / 1000.0
-    gh = MT.halat_agirlik(dreg) * boy
+    #  REGÜLATÖR HALATINDA DA KATALOG VERİSİ GEÇERLİDİR.  Askı halatında
+    #  imalatçı alanları vardı, regülatörde yoktu ve değerler HER ZAMAN
+    #  TS 12385-5'in lif özlü tablosundan okunuyordu.  O tablo küçük çaplı
+    #  çelik özlü regülatör halatlarını kapsamaz:  6 mm için 23,1 kN verir,
+    #  piyasadaki çelik özlü halat 28 kN'dir.  Program bu yüzden UYGUN
+    #  tasarımları reddedebiliyordu  ( 6,59 < 8 yerine 8,04 ≥ 8 ).
+    gh_m, Tmin, gh_kaynak, Tmin_kaynak = _halat_verisi(
+        g, "reg_halat_capi", "reg_halat_birim_kutle", "reg_halat_kopma_kN")
+    gh = gh_m * boy
     Gra = g["reg_gergi_agirligi"]
-    Tmin = MT.halat_kopma(dreg)
 
     oran = Dreg / dreg
     oran_uygun = oran >= S["Dreg_dreg_asgari"]
@@ -1624,14 +1789,15 @@ def _regulator(g, o):
         veri("μ", "Sürtünme faktörü", mu, "", "GİRİŞ"),
         veri("γ", "Kanal açısı", gama, "°", "GİRİŞ", 0),
         veri("α'", "Regülatör kasnağı sarılma açısı", alfa, "°", "Ofis kabulü", 0),
+        veri("", "Regülatör halatı 1 m ağırlığı", gh_m, "kg/m", gh_kaynak),
         hesap("gh = ( 1 m ağırlık ) × ( Σ durak + kaide − 200 ) × 2 / 1000",
-              f"{tr(MT.halat_agirlik(dreg))} × {tr(boy)}", gh, "kg"),
+              f"{tr(gh_m)} × {tr(boy)}", gh, "kg"),
         veri("Gra", "Regülatör alt ağırlığı ve kasnak kütlesi", Gra, "kg", "GİRİŞ"),
         veri("Fgt", "Güvenlik tertibatını devreye sokma kuvveti",
              F_devreye if devreye_var else "girilmedi", "N" if devreye_var else "",
              "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if devreye_var
              else "İMALATÇI VERİSİ — girilmediği için 2·Fgt sınırı denetlenemedi"),
-        veri("T'min", "Halatın en küçük kopma yükü", Tmin, "N", "TS 12385-5", 0),
+        veri("T'min", "Halatın en küçük kopma yükü", Tmin, "N", Tmin_kaynak, 0),
         metin("Güvenlik tertibatı tipi & beyan hızı  ( m.5.6.2.1.2.1 ) :"),
         veri("", "Kabin güvenlik tertibatı tipi", tertibat, "", "GİRİŞ"),
         kontrol(f"{tertibat} tertibat, v = {tr(v)} m/s"
@@ -2328,7 +2494,9 @@ def _ray_satirlari(eksen, kuvvet, F, l, W, I, adimlar, dstr=0.0):
 # =====================================================================
 def _kabin_raylari(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
-    Q, P = o["Q"], o["P"]
+    #  P STANDARTTAKİ TANIMIYLA:  boş kabin + gezici kablo payı + denge
+    #  zinciri  ( m.5.7.2.3.2 · bkz. _motor'daki P_std ).
+    Q, P = o["Q"], o["P_std"]
     k1, k2, k3 = o["k1"], S["k2"], O["k3_yardimci"]
     Fp = g["klips_itme_kuvveti"] or 0.0
     dstr_x, dstr_y = g["yapi_sehim_x"] or 0.0, g["yapi_sehim_y"] or 0.0
@@ -2340,7 +2508,81 @@ def _kabin_raylari(g, o):
 
     ray_boyu = MG.toplam_ray_boyu(g)
     Mg = ray_boyu * MT.ray(prof, "Gr")
+    #  ── RAYA BAĞLI YARDIMCI DONANIM  Maux  ( m.5.7.2.3.1 b) 2) ) ──────
+    #  Kaynak kitabın 150 N'u ( 11!AH292 ) ≈ 15 kg'dır:  raya cıvatalanan
+    #  şalter, kam, kanal.  MAKİNE DAİRESİ OLAN bir asansörde doğrudur —
+    #  makine yukarıda kendi kaidesinde durur.
+    #
+    #  MAKİNE DAİRESİZ ( MRL ) TESİSTE MAKİNE RAYIN ÜSTÜNE BİNER.  m.5.7.2.3.7
+    #  bunu adıyla anar:  "If the machine or rope suspensions are fixed to the
+    #  guide rails, additional load cases ... shall be considered."  Program
+    #  bu durumda da 150 N kullanıyordu — ELEport aynı alana 1.000 kg yazar,
+    #  yani 65 kat.
+    #
+    #  YENİ GİRDİ İSTENMEZ, ELDEKİ İKİ SAYI YÖNLENDİRİLİR:
+    #      makinenin kendi ağırlığı            Gm   ( girdi )
+    #    + tahrik kasnağına gelen statik yük   Tst  ( bölüm 1'de hesaplanıyor )
+    #  ELEport'un kendi notu da bunu tarif eder:  "the weight of the motor,
+    #  the loads on the traction sheave from the cabin and counterweight, and
+    #  the motor bedplate weight should all be summed".
+    #
+    #  Maux RAY BAŞINA BİR BÜYÜKLÜKTÜR.  m.5.7.2.3.7 açıkça böyle yazar:
+    #  "Forces and torques PER GUIDE RAIL due to auxiliary equipment fixed to
+    #   the guide rail Maux shall be considered".  Kitabın 150 N'u da ray
+    #  başınadır ( şalter · kam · kanal ), o yüzden bölünmez.
+    #
+    #  TÜRETİLEN DEĞER İSE TOPLAMDIR:  Gm + Tst makinenin tamamının yüküdür.
+    #  Ray sayısına bölünür — makine iki kabin rayı arasındaki bir kirişe
+    #  oturur ve yük simetrik paylaşılır kabul edilir.
+    #
+    #  ASİMETRİK MONTAJDA İMALATÇI SAYISI YAZILIR.  ELEport aynı yerde şunu
+    #  der:  "the auxiliary equipment for both rails should be calculated
+    #  separately, and the LARGER value should be taken".  'raya_binen_yuk'
+    #  alanı bu yüzden RAY BAŞINA okunur:  imalatçı asimetrik bir bağlantı
+    #  veriyorsa büyük olan raya düşen yük girilir ve türetme ezilir.
+    #  SEÇİM YALNIZ MAKİNE DAİRESİZ TESİSTE GEÇERLİDİR.  Makine dairesi
+    #  varsa makine kendi kaidesinde durur ve yükü bölüm 2'de hesaplanır;
+    #  aynı yükü bir de raya bindirmek onu İKİ KEZ saymaktır ve paftaya
+    #  çelişkili iki cümle yazar ( "kaide uygundur" + "makine raylarda" ).
+    #  Kutu işaretli kalsa bile burada YOK SAYILIR — motor kararı verir,
+    #  ekranın gizlemesi tek başına yetmez  ( eski proje dosyaları, Excel'den
+    #  geri yükleme ve elle düzenlenmiş girdiler ekranı atlar ).
+    #
+    #  KAPSAM DIŞI BIRAKILAN DURUM:  m.5.7.2.3.7 "machine OR ROPE SUSPENSIONS
+    #  are fixed to the guide rails" der.  Makine dairesi olan bir tesiste
+    #  saptırma kasnakları raya bağlanabilir;  o zaman raya binen yük makine
+    #  değil KASNAK TEPKİSİDİR ve Gm + Tst ile hesaplanamaz.  Bu durum bilerek
+    #  kapsam dışıdır — türetme yanlış sonuç verirdi.
+    _mrl = evet_mi(g.get("mk_yok"))
+    _raya = MT.makine_raya_mi(g.get("makine_raya_biniyor"))
     MY = S["MY_kabin"]
+    MY_kaynak = "Ofis kabulü"
+    if _mrl and _raya:
+        _elle = g.get("raya_binen_yuk")
+        if _pozitif(_elle):
+            _kutle = float(_elle)
+            MY_kaynak = "GİRİŞ — imalatçı  ( bir raya düşen makine yükü )"
+        else:
+            _toplam = (g["makine_agirligi"] or 0.0) + (o.get("Tst_hesap") or 0.0)
+            _kutle = _toplam / n if n else _toplam
+            MY_kaynak = (f"( Gm + Tst ) / {trn(n, 0)} ray"
+                         "  ( makine raylara biniyor — m.5.7.2.3.7 )")
+        MY = _kutle * gn
+    #  KUYU TABANI DA AYNI SAYIYI GÖRÜR.  m.5.2.1.8.4 kalemleri sayarken bunu
+    #  ADIYLA anar:  "...any additional reaction (N) occurring during
+    #  emergency stopping (e.g. LOAD ON TRACTION SHEAVE DUE TO REBOUND WHEN
+    #  MACHINE ON RAILS)".  Eskiden bölüm 9 sabiti doğrudan okuyordu ve
+    #  makine raya binse bile 150 N kalıyordu.
+    o["MY_kabin"] = MY
+    o["MY_kaynak"] = MY_kaynak
+    #  BİNAYA AKTARILAN YÜK.  Makine raya binmiyorsa yükü bina yapısına
+    #  gider;  m.5.2.1.8.1 "yapı ... makine tarafından uygulanan yükleri
+    #  taşıyabilecek" der ve Ek E bunu inşaat projesine devreder.  Program o
+    #  yapıyı HESAPLAMAZ ama SAYIYI VERİR — inşaat mühendisine gidecek
+    #  değeri kullanıcının ayrıca hesaplaması gerekmesin.
+    o["makine_binaya"] = (((g["makine_agirligi"] or 0.0)
+                           + (o.get("Tst_hesap") or 0.0)) * gn
+                          if (_mrl and not _raya) else None)
     sperm_g = MT.sigma_perm_guvenlik(g["ray_celigi_rm"])
     sperm_n = MT.sigma_perm_normal(g["ray_celigi_rm"])
     dperm = S["dperm_kabin"]
@@ -2371,10 +2613,27 @@ def _kabin_raylari(g, o):
     #      gövde  ( P − mkapı )  →  xc
     #      kapı   ( mkapı )      →  xc − ( D/2 + mekanizma payı )
     #      xp = [ (P−mkapı)·xc + mkapı·( xc − (D/2+pay) ) ] / P = xc − xp_kapı
-    xp_kapi = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P
-    xp = xc - xp_kapi
+    #  KAPI DÜZELTMESİ BOŞ KABİN KÜTLESİNE GÖRE YAPILIR.  Kapı, kabinin
+    #  KENDİ kütlesinin bir parçasıdır;  momenti boş kabin kütlesine bölünür.
+    P_bos = o["P"]
+    xp_kapi = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P_bos
+    xp_bos = xc - xp_kapi
+    #  m.5.7.2.3.2:  "The acting point of the masses of the empty car and
+    #  components supported by the car such as ram, part of travelling cable,
+    #  compensating ropes/chains (if any) P shall be the mass centre of
+    #  gravity OF THEM."  —  yani P'ye eklenen kütlelerin de bir konumu
+    #  vardır ve ortak ağırlık merkezi aranır.  Gezici kablonun ve zincirin
+    #  yatay konumu bilinmez;  kabin merkezinde ( xc ) kabul edilir — kapının
+    #  momentini seyreltmezler, kendi momentlerini xc'den katarlar:
+    #
+    #      xp = [ P_boş·xp_boş  +  ( MTrav + MCR )·xc ]  /  P
+    #
+    #  P = P_boş olduğunda ( zincirsiz, kablosuz ) eski davranışa döner.
+    _ek = P - P_bos
+    xp = ((P_bos * xp_bos + _ek * xc) / P) if P else xp_bos
     #  yp = yc:  kapı x yüzündedir, kabinin y merkezini kaydırmaz — bu yüzden
-    #  x'teki gibi ayrı bir kapı düzeltmesi yoktur.
+    #  x'teki gibi ayrı bir kapı düzeltmesi yoktur.  Eklenen kütleler de
+    #  kabin merkezinde kabul edildiği için yp değişmez.
     yp = yc
     #  ASKI NOKTASI ( S ) GİRDİDİR.  Ek C.1.2'nin tanımı:  "xs, ys is the
     #  position of the suspension (S) in relation to the guide rail cross
@@ -2419,13 +2678,25 @@ def _kabin_raylari(g, o):
     b = Bolum("KABİN KILAVUZ RAYLARININ HESAPLANMASI", kimlik="kabin_raylari",
               kaynak="TS EN 81-50 m.C.2.1 / C.2.2 / C.2.3")
     ad = [
+        hesap("P = boş kabin + gezici kablo payı + denge zinciri",
+              f"{trn(o['P'], 0)} + {tr(o.get('MTrav') or 0)} + {tr(o.get('MCR') or 0)}",
+              o["P_std"], "kg",
+              "TS EN 81-20 m.5.7.2.3.2  ·  P'nin standarttaki tanımı"),
         veri("h", "Patenler arası düşey mesafe", h, "mm", "GİRİŞ"),
         veri("l", "Ray konsolları arasındaki en uzun mesafe", l, "mm", "GİRİŞ"),
         veri("n", "Ray sayısı", n, "adet", "GİRİŞ", 0),
         veri("", "Ray profili", prof, "", "ISO 7465"),
         hesap("Mg = ray boyu × Gr", f"{tr(ray_boyu)} m × {tr(MT.ray(prof, 'Gr'))} kg/m",
               Mg, "kg"),
-        veri("MY", "Raylara bağlı yardımcı donanım kütlesi", MY, "N", "Ofis kabulü", 0),
+        *( [veri("", "Makine yükünün yolu",
+                 MT.MAKINE_YUK_YOLU[1] if _raya else MT.MAKINE_YUK_YOLU[0], "",
+                 "GİRİŞ  ·  TS EN 81-20 m.5.7.2.3.7")]
+            + ([veri("", "Bina yapısına aktarılan makine yükü",
+                     o["makine_binaya"], "N",
+                     "m.5.2.1.8.1 · Ek E  —  inşaat projesine bildirilir", 0)]
+               if o.get("makine_binaya") else [])
+            if _mrl else [] ),
+        veri("MY", "Raylara bağlı yardımcı donanım ağırlığı", MY, "N", MY_kaynak, 0),
         #  DARBE KATSAYILARI PAFTADA GÖRÜNSÜN.  k1 ve k2'nin değeri EN 81-20
         #  Çizelge 14'te YAZILIDIR;  k3 için çizelge sayı vermez ( "imalatçı
         #  tarafından, gerçek tesise göre belirlenir" ) — hangi sayının
@@ -2651,6 +2922,9 @@ def _kabin_raylari(g, o):
     uygunlar += [sm3 <= sperm_n, sc3 <= sperm_n, sf3 <= sperm_n,
                  dx3 <= dperm, dy3 <= dperm]
 
+    #  AH292 ( Maux ) ARTIK DEĞİŞKENDİR:  makine raya biniyorsa türetilir.
+    #  Kaydedilmezse kitapla karşılaştırılamaz ve sapma görünmez olur.
+    _kay(o, AH292=MY)
     _kay(o, AH291=Mg, AH293=xc, AH295=xp, AH299=xi, AH300=yi, AH303=Fs,
          AH304=sperm_g, AH305=sperm_n, Z309=xQ1, Z312=yQ2,
          AU351=Fk, AV354=l / p["imin"], AV355=lam, AD354=omega, AL354=sigma_k,
@@ -2709,8 +2983,14 @@ def _agirlik_raylari(g, o):
     p = _ray_ozellik(prof)
     n = g["agirlik_ray_sayisi"]
     h, l = g["agirlik_paten_arasi"], g["agirlik_konsol_arasi"]
-    Mcwt = g["karsi_agirlik"]
+    #  m.5.7.2.3.3:  karşı ağırlığın kılavuzlama kuvvetleri "denge
+    #  halatlarından/zincirlerinden ( varsa ) gelen kuvvetler" hesaba
+    #  katılarak değerlendirilir.  Ağırlık EN ÜST konumdayken zincirin
+    #  tamamı o taraftadır;  kabin rayıyla aynı anda olmadığı için çift
+    #  sayma değildir  ( bkz. _motor'daki P_std açıklaması ).
+    Mcwt = g["karsi_agirlik"] + (o.get("MCR") or 0.0)
     MY = S["MY_agirlik"]
+    o["MY_agirlik"] = MY
     sperm = MT.sigma_perm_normal(g["ray_celigi_rm"])
 
     gt = g.get("agirlik_guvenlik_tertibati") or "Yok"
@@ -2970,7 +3250,8 @@ def _agirlik_raylari(g, o):
 # =====================================================================
 def _kuyu_tabani(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
-    Q, P = o["Q"], o["P"]
+    #  P STANDARTTAKİ TANIMIYLA  ( m.5.2.1.8.5 / m.5.2.1.8.6 ).
+    Q, P = o["Q"], o["P_std"]
     LR = o["ray_boyu"] * 1000.0                      # mm
     Gr_k = MT.ray(g["kabin_ray_profili"], "Gr")
     Gr_a = MT.ray(g["agirlik_ray_profili"], "Gr")
@@ -2987,7 +3268,27 @@ def _kuyu_tabani(g, o):
     #  Fk'den ray kütlesinin payı düşülür;  geriye güvenlik tertibatı
     #  tepkisi ( k1·gn·(P+Q)/n ) ve varsa klips itme kuvveti kalır.
     guvenlik_tepkisi = o["Fk_kabin"] - o["Mg_kabin"] * gn
-    FKR = ray_agirlik + S["MY_kabin"] + guvenlik_tepkisi
+    #  ------------------------------------------------------------------
+    #  RAYA BAĞLI DONANIM KUYU TABANINA k3 İLE İNER      m.5.2.1.8.4
+    #  ------------------------------------------------------------------
+    #  Madde kalemleri sayarken "any load due to components fixed or linked
+    #  to the guide(s) AND/OR any additional reaction (N) occurring during
+    #  EMERGENCY STOPPING ( e.g. load on traction sheave due to REBOUND when
+    #  machine on rails )" der.  Geri tepmenin katsayısı m.5.7.4.3'ün
+    #  k3'üdür:  "shall be multiplied with the impact factor k3 … to take
+    #  into account the possible car … BOUNCE when the car … is stopped by a
+    #  safety device".
+    #
+    #  Bölüm 7 ve 8 bunu zaten doğru yapıyordu ( σk · σv · σc hep k3·MY ile
+    #  kurulur );  bölüm 9'da MY çarpansız ekleniyordu.  Aynı donanım aynı
+    #  geri tepmeyi rayın gövdesinde yaşayıp tabanına yaşamıyor olamaz.
+    #  Yön EMNİYETSİZDİ:  inşaat projesine bildirilen kuyu tabanı yükü
+    #  olduğundan küçük çıkıyordu — makine raylara biniyorken MY birkaç kN
+    #  olduğu için fark küçük değildir.
+    k3 = O["k3_yardimci"]
+    MY_k = (o.get("MY_kabin") or S["MY_kabin"])
+    MY_a = (o.get("MY_agirlik") or S["MY_agirlik"])
+    FKR = ray_agirlik + k3 * MY_k + guvenlik_tepkisi
     #  KARŞI AĞIRLIKTA GÜVENLİK TERTİBATI VARSA TEPKİSİ DE TABANA GELİR.
     #  Kabin tarafında bu kalem sayılıyordu, karşı ağırlıkta sayılmıyordu:
     #  tertibat "Kaymalı" seçilse bile FAR değişmiyordu.  Kuyu tabanı yükü
@@ -2995,7 +3296,12 @@ def _kuyu_tabani(g, o):
     #  Ray kütlesinin payı burada da bir kez sayılır ( Fk − Mg·gn ).
     agirlik_tepkisi = (o["Fk_agirlik"] - o["Mg_agirlik"] * gn
                        if o.get("Fk_agirlik") is not None else 0.0)
-    FAR = (gn * Gr_a * LR / 1000.0) + S["MY_agirlik"] + agirlik_tepkisi
+    FAR = (gn * Gr_a * LR / 1000.0) + k3 * MY_a + agirlik_tepkisi
+    #  m.5.2.1.8.5 ve m.5.2.1.8.6 iki bağıntıyı da AÇIKÇA bu P ile yazar
+    #  ( sembol listesinde "i.e. part of the travelling cable, compensating
+    #  ropes/chains (if any)" ).  Ağırlık tamponunda da standardın kendi
+    #  formülü 4·gn·( P + q·Q )'dur — karşı ağırlığın fiziksel kütlesi
+    #  değil, standardın tanımladığı yük yazılır.
     Fkt = S["tampon_katsayi"] * gn * (P + Q)
     Fat = S["tampon_katsayi"] * gn * (P + o["ofis"]["q_denge"] * Q)
     #  ADET SIFIR YA DA BOŞ GİRİLİRSE 1 SAYILIR:  bölme çökmesin ve
@@ -3007,22 +3313,30 @@ def _kuyu_tabani(g, o):
     b = Bolum("KUYU TABANINA GELEN YÜKLERİN HESAPLANMASI", kimlik="kuyu_tabani",
               kaynak="TS EN 81-20 m.5.2.1.8")
     b["adimlar"] = [
+        hesap("P = boş kabin + gezici kablo payı + denge zinciri",
+              f"{trn(o['P'], 0)} + {tr(o.get('MTrav') or 0)} + {tr(o.get('MCR') or 0)}",
+              o["P_std"], "kg",
+              "TS EN 81-20 m.5.2.1.8.5  ·  P'nin standarttaki tanımı"),
         veri("LR", "Kılavuz ray boyu", LR, "mm", "Σ durak + kaide − 200 + kuyu dibi − 300", 0),
         metin("Kabin raylarına gelen kuvvetler :"),
-        hesap("FKR = gn × Gr × LR / 1000 + MY + Fgt",
+        hesap("FKR = gn × Gr × LR / 1000 + k3 × MY + Fgt",
               f"{tr(gn)} × {tr(Gr_k)} × {trn(LR, 0)} / 1000 + "
-              f"{trn(S['MY_kabin'], 0)} + {tr(guvenlik_tepkisi)}", FKR, "N",
-              "EN 81-20 m.5.2.1.8.4"),
+              f"{tr(k3)} × {trn(MY_k, 0)} + {tr(guvenlik_tepkisi)}", FKR, "N",
+              "EN 81-20 m.5.2.1.8.4  ·  k3 : m.5.7.4.3 geri tepme"),
+        veri("MY", "Kabin rayına bağlı donanım yükü", MY_k, "N",
+             o.get("MY_kaynak") or "ofis kabulü", 0),
+        veri("k3", "Yardımcı donanım darbe katsayısı", k3, "",
+             "m.5.7.4.3  ·  ofis sabiti  ( bölüm 7 ile aynı )"),
         veri("Fgt", "Güvenlik tertibatı çalışma tepkisi  ( Fk − Mg·gn )",
              guvenlik_tepkisi, "N",
              "ray kütlesi ayrı kalemdir, iki kez sayılmaz"),
         metin("Ağırlık raylarına gelen kuvvetler :"),
-        hesap("FAR = gn × Gar × Lar / 1000 + Ma"
+        hesap("FAR = gn × Gar × Lar / 1000 + k3 × Ma"
               + ("  +  Fgt" if agirlik_tepkisi else ""),
               f"{tr(gn)} × {tr(Gr_a)} × {trn(LR, 0)} / 1000 + "
-              f"{trn(S['MY_agirlik'], 0)}"
+              f"{tr(k3)} × {trn(MY_a, 0)}"
               + (f" + {tr(agirlik_tepkisi)}" if agirlik_tepkisi else ""),
-              FAR, "N", "EN 81-20 m.5.2.1.8.4"),
+              FAR, "N", "EN 81-20 m.5.2.1.8.4  ·  k3 : m.5.7.4.3 geri tepme"),
         veri("Fgt", "Karşı ağırlık güvenlik tertibatı çalışma tepkisi",
              agirlik_tepkisi if agirlik_tepkisi else "tertibat yok",
              "N" if agirlik_tepkisi else "",

@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8770"],
       "port": 8770
+    },
+    {
+      "name": "avan-8760",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8760"],
+      "port": 8760
     }
   ]
 }

@@ -14,7 +14,7 @@ sayfalarının birebir Python karşılığıdır.
 import math
 from engine.avan import tablolar as T
 from engine.ortak.steps import (Bolum, veri, hesap, metin, tr, trn,
-                    yukari_yuvarla, tavana_yuvarla, sayi_mi)
+                    yukari_yuvarla, tavana_yuvarla, sayi_mi, evet_mi)
 
 
 # ---------------------------------------------------------------- SABİTLER
@@ -286,15 +286,6 @@ def _aydinlatma(a_m, b_m, E, OL, S):
     isik = E * a_m * b_m * S["kirlenme_faktoru"] / eta if eta else None
     Z = isik / OL if sayi_mi(isik) else None
     return k, eta, isik, Z
-
-
-def _evet_mi(x):
-    """Excel'den 'Evet' / 'Hayır', arayüzden True / False gelebilir."""
-    if isinstance(x, bool):
-        return x
-    if x is None:
-        return False
-    return str(x).strip().lower() in ("evet", "e", "var", "true", "1", "yes")
 
 
 #  Asansör kartında girilen değer aralık dışıysa program varsayılana döner.
@@ -1009,7 +1000,7 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
     #  Kutu hiç gönderilmemişse ( eski proje dosyaları ) eski davranışa
     #  dönülür: ölçü yoksa MRL kabul edilir.
     isaretli = "mk_yok" in (ortak or {})
-    mk_yok = _evet_mi(ortak.get("mk_yok"))
+    mk_yok = evet_mi(ortak.get("mk_yok"))
     olcu_var = sayi_mi(A) and sayi_mi(B) and A > 0 and B > 0
     if mk_yok:
         return {"aktif": False, "mk_yok": True,

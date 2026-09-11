@@ -790,3 +790,31 @@ def siginma_hacmi(tip, konum="dip"):
         if ad == tip:
             return (b, a, c) if konum == "ust" else (a, b, c)
     return None
+
+
+# =====================================================================
+#  MAKİNE YÜKÜNÜN YOLU   ( TS EN 81-20 m.5.7.2.3.7 · m.5.2.1.8.1 )
+# =====================================================================
+#  Standart makinenin NEREYE oturabileceğine dair kapalı bir liste vermez:
+#  m.5.2.1.8.1 "yapı taşıyacak, ayrıntısı ulusal yapı yönetmeliğinde" der.
+#  Mukavemet hesabını değiştiren TEK ayrım, yükün asansörün KENDİ parçasına
+#  ( kılavuz raya ) değip değmediğidir:
+#
+#    · raylara      →  m.5.7.2.3.7 ek yük durumları ister, Maux hesaba girer
+#    · bina yapısına →  kapsam DIŞI;  m.5.2.1.8.1 ve Ek E uyarınca inşaat
+#                       projesine BİLDİRİLİR  ( sayı paftada verilir )
+#
+#  Kuyu üstü kiriş · duvar · konsol ayrımı hesabı değiştirmez — üçü de
+#  "bina yapısına"dır.  Kirişin UÇLARI raylara cıvatalıysa yük yine raya
+#  iner ve "raylara" seçilir.
+MAKINE_YUK_YOLU = ("Bina yapısına", "Kılavuz raylara")
+MAKINE_YUK_YOLU_RAY = MAKINE_YUK_YOLU[1]
+
+
+def makine_raya_mi(deger):
+    """Seçim 'raylara' mı  —  eski onay kutusu ( True/'Evet' ) da anlaşılır."""
+    if isinstance(deger, bool):
+        return deger
+    m = str(deger or "").strip().lower()
+    return m in ("evet", "e", "var", "true", "1", "yes",
+                 MAKINE_YUK_YOLU_RAY.lower())

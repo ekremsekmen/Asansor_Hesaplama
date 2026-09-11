@@ -59,6 +59,22 @@ def senaryolar():
 
     E("varsayılan")
 
+    #  DENGE ZİNCİRİ:  P'ye giren MCR yolunu açar  ( m.5.2.1.8.5 · m.5.7.2.3.2 ).
+    #  Zincirsiz senaryolarda MCR = 0'dır ve ray / kuyu tabanı sapmaları
+    #  görünmez;  bu senaryo onları sınar.
+    E("denge zinciri var", denge_zinciri="Var")
+    #  MAKİNE RAYLARA BİNİYOR  ( MRL — m.5.7.2.3.7 ):  Maux artık 150 N değil.
+    #  Seçim yalnız MRL'de uygulanır ( makine dairesi varsa makine kendi
+    #  kaidesindedir ve yük iki kez sayılmamalıdır ).
+    E("makine raylara biniyor", mk_yok=True, makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY)
+    #  Zincir + karşı ağırlıkta güvenlik tertibatı:  ağırlık rayının ve kuyu
+    #  tabanının ( FAR ) zinciri gördüğü tek bileşim.
+    E("zincir + ağırlık güvenlik tertibatı", denge_zinciri="Var",
+      agirlik_guvenlik_tertibati=MT.DARBE_TIPLERI_ADLARI[0])
+    #  Regülatör halatı katalog verisi:  tabloyu ezer  ( AI134 · AI136 ).
+    E("regülatör katalog halatı", reg_halat_kopma_kN=28,
+      reg_halat_birim_kutle=0.30)
+
     #  Ray profilleri  —  kabin ve karşı ağırlık ayrı ayrı
     for p in MT.RAY_PROFILLERI:
         E(f"kabin rayı {p}", kabin_ray_profili=p)
