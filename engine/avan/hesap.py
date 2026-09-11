@@ -1024,6 +1024,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
             "I2": I2, "Iz2": Iz2, "akim2_uygun": akim2_uygun,
             "I_motor": I_motor, "sigorta_A": sigorta_A, "motor_sigorta": motor_sigorta,
             "Hk": Hk, "kablo_tipi": kablo_tipi, "S1": S1, "L1": L1, "S2": S2, "L2": L2,
+            #  Koruma iletkeni kesitleri özete girer:  ana potansiyel dengeleme
+            #  iletkeni TESİSİN EN BÜYÜK koruma iletkeninden türer ve tesis
+            #  birden çok asansör olabilir  ( m.9-j/1/i ).
+            "SPE1": SPE1, "SPE2": SPE2,
         },
     }
 
@@ -1111,7 +1115,7 @@ def serit_boyu_tahmin(a, b, goz=20.0):
     return ring + na * b + nb * a, ring, na, nb
 
 
-def hesapla_topraklama(ortak: dict, S: dict) -> dict:
+def hesapla_topraklama(ortak: dict, S: dict, en_buyuk_pe=None) -> dict:
     a = ortak.get("temel_a")
     b = ortak.get("temel_b")
     beta = _ortak_degeri(ortak, S, "beta")
@@ -1204,7 +1208,48 @@ def hesapla_topraklama(ortak: dict, S: dict) -> dict:
         "edilir. Rç bağıntısı çubuk çapını ve çubuklar arası etkileşimi içermeyen bir ön "
         "kabuldür — kesin değer ölçümle bulunur.",
     ]
-    return {"aktif": True, "bolumler": [b1, b2, b3],
+    #  ------------------------------------------------------------------
+    #  4 -  TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ
+    #  ------------------------------------------------------------------
+    #  Bölüm 1-3 toprak ELEKTRODUNUN direncini çözer;  bu bölüm ana topraklama
+    #  barasına bağlanması zorunlu İLETKENLERİN kesitlerini verir  ( m.9/d
+    #  baraya bağlanacakları sayar:  topraklama iletkenleri, koruma iletkenleri,
+    #  ana potansiyel dengeleme iletkenleri ).  Koruma iletkeni kesitleri
+    #  asansör paftasının 6. bölümündedir — hat başına ayrıdır;  buradakiler
+    #  TESİSİN TAMAMI için tektir ve en büyük koruma iletkeninden türer.
+    Sapd, apd_ham, apd_sinir = T.ana_potansiyel_dengeleme_kesiti(en_buyuk_pe)
+    Stopr, topr_dayanak = T.topraklama_iletkeni_kesiti(en_buyuk_pe)
+    b4 = Bolum("4 -  TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ",
+               "Elektrik Tesislerinde Topraklamalar Yönetmeliği",
+               kimlik="topraklama_iletkenleri")
+    if en_buyuk_pe is None:
+        b4["adimlar"] = [
+            metin("Kesitler tesisteki en büyük koruma iletkeninden türer; "
+                  "etkin asansör bulunmadığı için hesaplanamadı."),
+        ]
+    else:
+        b4["adimlar"] = [
+            veri("SPE", "Tesisteki en büyük koruma iletkeni kesiti",
+                 en_buyuk_pe, "mm²", "asansör paftaları bölüm 6", 1),
+            hesap("Sapd  =   0,5 · SPE        ( en az 6 mm² )",
+                  f"=   0,5  ·  {tr(en_buyuk_pe)}   =   {tr(apd_ham)}"
+                  + (f"   →   {trn(T.APD_UST_SINIR, 0)} mm² üst sınırı"
+                     if apd_sinir else ""),
+                  Sapd, "mm²", "m.9-j/1/i  ·  Çizelge-4b", 1),
+            veri("Stopr", "Topraklama iletkeni  ( asgari )", Stopr, "mm²",
+                 f"m.9/c  ·  {topr_dayanak}", 1),
+        ]
+    b4["ekran_notlari"] = [
+        "Ana potansiyel dengeleme iletkeni bakır için 25 mm²'den büyük olmak "
+        "zorunda değildir ( m.9-j/1/i ); başka metallerde eşdeğer iletkenlik aranır.",
+        "Topraklama iletkeni TOPRAĞA DÖŞENİYOR ve korozyona karşı KORUNMAMIŞSA "
+        "Çizelge-4a en az 25 mm² bakır ( ya da 50 mm² daldırma galvanizli demir ) ister.",
+        "Kablo içinde olmayan koruma iletkeni mekanik korumalıysa 2,5 mm²'den, "
+        "korumasızsa 4 mm²'den küçük olamaz ( m.9-e1/iii ).",
+    ]
+
+    return {"aktif": True, "bolumler": [b1, b2, b3, b4],
+            "Sapd": Sapd, "Stopr": Stopr, "en_buyuk_pe": en_buyuk_pe,
             "A": A, "r": r, "D": D, "Ry": Ry, "Rc": Rc, "Re": Re,
             "Re_max": Re_max, "uygun": uygun,
             "L": L, "L_kaynak": L_kaynak, "L_ring": L_ring,
@@ -1361,7 +1406,12 @@ def hesapla(veriler: dict) -> dict:
         asansorler.append(hesapla_asansor(a, ortak, S, i))
 
     mk = hesapla_makine_dairesi(ortak, S)
-    tp = hesapla_topraklama(ortak, S)
+    #  ANA POTANSİYEL DENGELEME "TESİSTEKİ EN BÜYÜK KORUMA İLETKENİ"NDEN
+    #  türer ( m.9-j/1/i ) — tesis dört asansörlü olabilir, hepsine bakılır.
+    _peler = [x for a in asansorler if a.get("aktif")
+              for x in ((a["ozet"].get("SPE1"), a["ozet"].get("SPE2")))
+              if sayi_mi(x)]
+    tp = hesapla_topraklama(ortak, S, max(_peler) if _peler else None)
 
     aktifler = [a for a in asansorler if a.get("aktif")]
     tesis_kurulu = sum(a["ozet"]["P_kurulu"] for a in aktifler)

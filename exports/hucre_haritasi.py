@@ -119,6 +119,10 @@ AVAN_TABLO_SAYFA = "TABLOLAR"
 #  satırdaki dipnotla biter, blok onun altına eklenir.
 AVAN_PE_SUTUN = "L"
 AVAN_PE_BASLIK = 141
+#  Topraklama ve potansiyel dengeleme iletkenleri:  TOPRAKLAMA sayfası
+#  34. satırda ( kabuller notu ) biter, blok onun altına eklenir.
+AVAN_TOPRAKLAMA_SAYFA = "TOPRAKLAMA"
+AVAN_ILETKEN_BASLIK = 36
 
 AVAN_SABIT = {
     "i_palanga":          "C22",

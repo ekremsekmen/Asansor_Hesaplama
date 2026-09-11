@@ -52,6 +52,12 @@ ESLESME = (
 #  hiçbir satırı değişmedi" hem de "eklenenler beklenenlerdir" denetlenir —
 #  yoksa genişletme, sessizce kaynak veriyi değiştirmenin kapısı olurdu.
 GENISLETILEN = {
+    #  T75/B ( 75 x 62 x 10 ) kitabın listesinde yoktu.  Orta kapasiteli
+    #  asansörlerin en yaygın rayıdır ve yokluğu, o rayla çizilmiş projeyi
+    #  programla HİÇ hesaplanamaz kılıyordu.  Kesit değerleri ISO 7465'ten;
+    #  iki bağımsız kaynak doğruluyor ( bkz. mukavemet_tablolari ).
+    "RAY_PROFILI":  {"eklenen": ("75 x 62 x 10",), "degisen": {}},
+    "RAY_GEOMETRI": {"eklenen": ("75 x 62 x 10",), "degisen": {}},
     #  EN 81-20 Çizelge 6'da olup kitapta olmayan beyan yükleri.
     "KABIN_ALANI": {
         "eklenen": (100, 1050, 1250, 1350, 1425, 1500, 2500),
@@ -261,6 +267,19 @@ BILINEN_FARK = {
     #  kapalı olduğu için o yüklerde hiç hesap yapılamıyordu.  Modül tabloyu
     #  standarda tamamladı;  teslim edilen kitabın listesi de genişletilir
     #  ( bkz. exports/mukavemet_xlsx._liste_tamamla ).
+    #  RAY LİSTESİ DE GENİŞLETİLDİ  —  T75/B kitapta yok  ( yukarıya bkz. ).
+    #  Teslim edilen kopyanın listesi ve VLOOKUP tabloları da genişletilir
+    #  ( bkz. exports/mukavemet_xlsx._ray_tablosu_genislet ).
+    "kabin_ray_profili": (["50 x 50 x 5", "70 x 65 x 9", "89 x 62 x 15,88",
+                           "90 x 75 x 16", "125 x 82 x 16", "127 x 89 x 16"],
+                          ["50 x 50 x 5", "70 x 65 x 9", "75 x 62 x 10",
+                           "89 x 62 x 15,88", "90 x 75 x 16", "125 x 82 x 16",
+                           "127 x 89 x 16"]),
+    "agirlik_ray_profili": (["50 x 50 x 5", "70 x 65 x 9", "89 x 62 x 15,88",
+                             "90 x 75 x 16", "125 x 82 x 16", "127 x 89 x 16"],
+                            ["50 x 50 x 5", "70 x 65 x 9", "75 x 62 x 10",
+                             "89 x 62 x 15,88", "90 x 75 x 16", "125 x 82 x 16",
+                             "127 x 89 x 16"]),
     "beyan_yuku": ([180, 225, 300, 320, 375, 400, 450, 525, 600, 630, 675,
                     750, 800, 825, 900, 975, 1000, 1125, 1200, 1275, 1600, 2000],
                    [100, 180, 225, 300, 320, 375, 400, 450, 525, 600, 630, 675,

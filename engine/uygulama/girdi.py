@@ -97,6 +97,10 @@ EK_BOLUM_GRUBU = {
     "topraklama_yatay":          (EK_GRUP[0],),             # ← temel a · b · şerit L
     "topraklama_dikey":          (EK_GRUP[0],),
     "topraklama_toplam":         (EK_GRUP[0],),
+    #  KESİTLER TESİSİN EN BÜYÜK KORUMA İLETKENİNDEN TÜRER;  o da yalnız
+    #  S1 · S2'den — gerilim düşümünün aksine motor gücü buraya girmez, bu
+    #  yüzden "Makine ve motor" grubu bu bölümü etkilemez.
+    "topraklama_iletkenleri":    (EK_GRUP[0],),
 }
 
 

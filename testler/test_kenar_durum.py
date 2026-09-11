@@ -1662,6 +1662,45 @@ def calistir():
     r.kontrol("merdivenin üstünde SPE = None",
               T.koruma_iletkeni_kesiti(900)[0] is None)
 
+    # ---------- Ana potansiyel dengeleme ve topraklama iletkeni  ( m.9-j · m.9/c )
+    #  Sapd = 0,5 × en büyük PE ,  en az 6 ,  en çok 25 mm² Cu.
+    for pe, bek in ((4, 6), (6, 6), (10, 6), (12, 6), (16, 10), (25, 16),
+                    (35, 25), (50, 25), (70, 25), (95, 25), (240, 25)):
+        r.esit(f"Çizelge-4b  PE = {pe} → Sapd", T.ana_potansiyel_dengeleme_kesiti(pe)[0], bek)
+    r.kontrol("Sapd hiçbir PE'de 6 mm²'nin altına inmiyor",
+              all(T.ana_potansiyel_dengeleme_kesiti(pe)[0] >= 6
+                  for pe in T.STANDART_KESITLER))
+    r.kontrol("Sapd 25 mm²'yi aşmıyor  ( m.9-j/1/i üst sınırı )",
+              all(T.ana_potansiyel_dengeleme_kesiti(pe)[0] <= 25
+                  for pe in T.STANDART_KESITLER))
+    #  ham ARTIK ÜST SINIRSIZ döner ( pafta "0,5·95 = 47,50" yazabilsin diye ),
+    #  bu yüzden ölçüt ham'ın kendisi değil, ham ile 25 mm²'nin KÜÇÜĞÜDÜR.
+    r.kontrol("Sapd bağlayıcı değerin altına düşmüyor",
+              all(T.ana_potansiyel_dengeleme_kesiti(pe)[0]
+                  >= min(T.ana_potansiyel_dengeleme_kesiti(pe)[1], T.APD_UST_SINIR)
+                  for pe in T.STANDART_KESITLER))
+    #  ham, üst sınır uygulanmadan önceki GERÇEK değer olmalı — paftadaki
+    #  "0,5 · SPE = …" satırı kendi içinde doğru çıksın.
+    for pe in (50, 95, 240):
+        r.esit(f"ham = 0,5 × {pe}  ( sınırsız )",
+               T.ana_potansiyel_dengeleme_kesiti(pe)[1], max(6, pe / 2))
+    r.esit("üst sınır bayrağı  PE = 70", T.ana_potansiyel_dengeleme_kesiti(70)[2], True)
+    r.esit("üst sınır bayrağı  PE = 25", T.ana_potansiyel_dengeleme_kesiti(25)[2], False)
+    #  Stopr:  m.9-e değeri ile Çizelge-4a'nın 16 mm²'sinin büyüğü.
+    for pe, bek in ((4, 16), (10, 16), (16, 16), (25, 25), (95, 95)):
+        r.esit(f"Çizelge-4a  PE = {pe} → Stopr", T.topraklama_iletkeni_kesiti(pe)[0], bek)
+    r.kontrol("Stopr hiçbir PE'de 16 mm²'nin altına inmiyor",
+              all(T.topraklama_iletkeni_kesiti(pe)[0] >= 16
+                  for pe in T.STANDART_KESITLER))
+    r.kontrol("Stopr koruma iletkeninden küçük olamaz",
+              all(T.topraklama_iletkeni_kesiti(pe)[0] >= pe
+                  for pe in T.STANDART_KESITLER))
+    for bozuk in (None, 0, -5, "6", True):
+        r.kontrol(f"Sapd({bozuk!r}) hesaplanmıyor",
+                  T.ana_potansiyel_dengeleme_kesiti(bozuk)[0] is None)
+        r.kontrol(f"Stopr({bozuk!r}) hesaplanmıyor",
+                  T.topraklama_iletkeni_kesiti(bozuk)[0] is None)
+
     return r
 
 

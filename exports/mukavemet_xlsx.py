@@ -18,6 +18,7 @@ NİÇİN:
 """
 import io
 import os
+import re
 from datetime import date
 
 import openpyxl
@@ -572,6 +573,11 @@ ELEKTRIK = "12-Elk.Hesapları"
 #  ( akım kontrolü 65'te biter, aydınlatma bölümü 68'de başlar ).
 PE_SUTUN = "BG"
 PE_SATIR = 66
+#  Topraklama ve potansiyel dengeleme iletkenleri:  "5.Temel Topraklama
+#  Hesabı" başlığının notu 215–217'de birleşik hücrededir, 218'den sonrası
+#  boştur.  O not TEMEL TOPRAKLAMA HESABINI bina projesine devreder;  buradaki
+#  kesitler ise asansörün KENDİ elektrik hesabının konusudur.
+ILETKEN_SATIR = 219
 
 
 #  TABLOLAR!D47:G52  —  kanal şekli · açı · Nequiv(t)
@@ -621,6 +627,59 @@ def _msr_dagilimi(wb):
             at[hucre] = d.replace(eski, yeni)
 
 
+def _ray_tablosu_genislet(wb):
+    """T75/B satırını kitabın ray tablolarına ve açılır listesine ekler.
+
+    Kitabın listesinde T75/B ( 75 x 62 x 10 ) yoktur;  orta kapasiteli
+    asansörlerin en yaygın rayıdır ve yokluğu o rayla çizilmiş bir projeyi
+    kitapta HİÇ hesaplanamaz kılıyordu.  Kitabın kendi satırlarına
+    DOKUNULMAZ — yalnız bir satır eklenir ve VLOOKUP aralıkları ile açılır
+    listenin kaynağı bir satır büyütülür.
+    """
+    from engine.uygulama import mukavemet_tablolari as MT
+    YENI = "75 x 62 x 10"
+    if YENI not in MT.RAY_PROFILLERI:
+        return
+    wsT = wb["TABLOLAR"]
+    ozellik = next(x for x in MT.RAY_PROFILI if x[0] == YENI)
+    geo = next(x for x in MT.RAY_GEOMETRI if x[0] == YENI)
+    #  Kesit tablosu  I60:S65  →  I60:S66
+    for i, deger in enumerate(ozellik):
+        wsT.cell(row=66, column=9 + i, value=deger)
+    #  Flanş geometrisi  I69:N74  →  I69:N75
+    for i, deger in enumerate(geo):
+        wsT.cell(row=75, column=9 + i, value=deger)
+    #  Açılır listenin kaynağı
+    wb["TEKNİK"]["K8"] = YENI
+    wb["Veri Girişi"]["Y8"] = "=TEKNİK!K8"
+    #  VLOOKUP ARALIKLARI SÜTUN SÜTUN DEĞİŞİR.  Kitap her aramada tablonun
+    #  yalnız gereken kadarını seçer:  I60:J65 · I60:K65 · I60:S65 …  Sabit
+    #  metin araması bunların yalnız birini yakalar ve geri kalan aramalar
+    #  yeni satırı görmeyip #YOK verir.  Bu yüzden son satır numarası
+    #  DÜZENLİ İFADEYLE, sütun harfi ne olursa olsun büyütülür.
+    #  Referanslar MUTLAK da olabilir  ( $I$60:$S$65 ) — $ işaretleri korunur.
+    kalip = re.compile(r"(\$?I\$?)60:(\$?[A-Z]{1,2}\$?)65\b"
+                       r"|(\$?I\$?)69:(\$?[A-Z]{1,2}\$?)74\b")
+
+    def _buyut(m):
+        if m.group(1):
+            return f"{m.group(1)}60:{m.group(2)}66"
+        return f"{m.group(3)}69:{m.group(4)}75"
+
+    for ws in wb.worksheets:
+        for satir in ws.iter_rows():
+            for c in satir:
+                v = c.value
+                if isinstance(v, str) and v.startswith("="):
+                    yeni_v = kalip.sub(_buyut, v)
+                    if yeni_v != v:
+                        c.value = yeni_v
+    #  Veri doğrulama  ( E73:F73 )
+    for dv in wb["Veri Girişi"].data_validations.dataValidation:
+        if dv.formula1 and "$Y$2:$Y$7" in str(dv.formula1):
+            dv.formula1 = str(dv.formula1).replace("$Y$2:$Y$7", "$Y$2:$Y$8")
+
+
 def _koruma_iletkeni(wb):
     """Çizelge-8'in iki satırını elektrik sayfasına ekler  ( m.9-e1/ii )."""
     from engine.avan import tablolar as AT
@@ -640,6 +699,24 @@ def _koruma_iletkeni(wb):
         ws[f"D{r}"] = aciklama
         ws[f"W{r}"] = AT.koruma_iletkeni_formulu(hucre, merdiven)
         ws[f"AB{r}"] = "mm²"
+
+    #  Topraklama ve ana potansiyel dengeleme iletkeni  —  m.9-j/1/i · m.9/c
+    #  İkisi de TESİSİN en büyük koruma iletkeninden türer;  tek asansörlük
+    #  kitapta o, bu sayfadaki iki PE'nin büyüğüdür.
+    r0 = ILETKEN_SATIR
+    ws[f"A{r0}"] = "6. Koruma ve Potansiyel Dengeleme İletkenleri"
+    _pe = f"MAX(W{PE_SATIR}:W{PE_SATIR + 1})"
+    for j, (sembol, aciklama, formul) in enumerate((
+            ("SPE", "Tesisteki en büyük koruma iletkeni kesiti", f"={_pe}"),
+            ("Sapd", "Ana potansiyel dengeleme iletkeni  ( m.9-j/1/i )",
+             AT.ana_potansiyel_dengeleme_formulu(f"W{r0 + 1}", merdiven)),
+            ("Stopr", "Topraklama iletkeni  ( m.9/c · Çizelge-4a )",
+             AT.topraklama_iletkeni_formulu(f"W{r0 + 1}"))), start=1):
+        ws[f"A{r0 + j}"] = sembol
+        ws[f"C{r0 + j}"] = ":"
+        ws[f"D{r0 + j}"] = aciklama
+        ws[f"W{r0 + j}"] = formul
+        ws[f"AB{r0 + j}"] = "mm²"
 
 
 def _elektrik_sayfasi(wb, g):
@@ -991,6 +1068,11 @@ def _standarda_uydur(wb, g):
     #  boş bir sütununa yazılır, hücreler FORMÜL alır — kitapta S1 elle
     #  değiştirilirse PE de takip etsin diye.
     _koruma_iletkeni(wb)
+
+    #  ㊿  T75/B RAYI KİTABA EKLENİR
+    #  Motorun kataloğu genişledi;  teslim edilen kitap onu tanımazsa
+    #  ekranda seçilen ray kitapta #YOK verir.
+    _ray_tablosu_genislet(wb)
 
     #  ⑩  Beyan yükü listesi EN 81-20 Çizelge 6'ya tamamlanır
     #  Kitabın açılır listesi ( 'Veri Girişi'!$S$2:$S$23 ) standardın 28

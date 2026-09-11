@@ -232,6 +232,34 @@ def avan_xlsx(veriler: dict, proje: dict = None) -> bytes:
             wsA[f"F{r}"] = "mm²"
             wsA[f"G{r}"] = "Çizelge-8  ·  m.9-e1/ii"
 
+    # 6) TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ  —  m.9-j/1/i · m.9/c
+    #    Kesitler TESİSİN TAMAMI için tektir ve en büyük koruma iletkeninden
+    #    türer;  bu yüzden dört asansör sayfasının PE hücrelerinin MAKSİMUMU
+    #    alınır.  MAX boş hücreyi ve metni yok sayar, dolayısıyla pasif
+    #    asansörler kendiliğinden dışarıda kalır.
+    wsE = wb[H.AVAN_TOPRAKLAMA_SAYFA]
+    _pe_hucreleri = ",".join(
+        f"'{H.avan_asansor_sayfasi(i)}'!E{H.AVAN_PE_BASLIK + 1}"
+        f":E{H.AVAN_PE_BASLIK + 2}"
+        for i in range(1, 5) if H.avan_asansor_sayfasi(i) in wb.sheetnames)
+    _r = H.AVAN_ILETKEN_BASLIK
+    wsE[f"A{_r}"] = "  4 -   TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ"
+    for sembol, aciklama, satir, formul in (
+            ("SPE", "Tesisteki en büyük koruma iletkeni kesiti", _r + 1,
+             f"=MAX({_pe_hucreleri})"),
+            ("Sapd", "Ana potansiyel dengeleme iletkeni  ( asgari )", _r + 2,
+             T.ana_potansiyel_dengeleme_formulu(f"E{_r + 1}", _merdiven)),
+            ("Stopr", "Topraklama iletkeni  ( asgari )", _r + 3,
+             T.topraklama_iletkeni_formulu(f"E{_r + 1}"))):
+        wsE[f"A{satir}"] = sembol
+        wsE[f"B{satir}"] = ":"
+        wsE[f"C{satir}"] = aciklama
+        wsE[f"D{satir}"] = "="
+        wsE[f"E{satir}"] = formul
+        wsE[f"F{satir}"] = "mm²"
+    wsE[f"G{_r + 2}"] = "m.9-j/1/i · Çizelge-4b"
+    wsE[f"G{_r + 3}"] = "m.9/c · Çizelge-4a"
+
     for sh in wb.worksheets:
         sh.views.sheetView[0].tabSelected = (sh.title == "ÖZET")
     wb.active = wb.index(wb["ÖZET"])

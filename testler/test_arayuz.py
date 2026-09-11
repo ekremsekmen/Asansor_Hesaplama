@@ -448,8 +448,10 @@ def calistir():
                        ("m_serit_L", "64")):
             pg.fill(f"#{_a}", _d)
         pg.wait_for_timeout(2500)
+        #  1 makine dairesi aydınlatması + 4 topraklama  ( 4. bölüm:
+        #  topraklama ve potansiyel dengeleme iletkeni kesitleri )
         r.esit("proje geneli bölümler üst seviyede",
-               pg.evaluate("(SON.mc.proje_geneli||[]).length"), 4)
+               pg.evaluate("(SON.mc.proje_geneli||[]).length"), 5)
         r.esit("proje geneli bölüm hiçbir asansörde kalmıyor",
                pg.evaluate("SON.mc.asansorler.map(a=>a.bolumler.filter("
                            "b=>b.proje_geneli).length)"), [0, 0])

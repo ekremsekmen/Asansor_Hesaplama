@@ -202,6 +202,14 @@ def _yaz(g, yol):
                 ws[h] = dy[i] if i < len(dy) else None
             continue
         ws[hucre] = g[anahtar]
+    #  T75/B KAYNAK KİTAPTA YOKTUR.  Motorun kataloğu ISO 7465'ten bir satır
+    #  genişletildi;  ham kitap o rayı tanımadığı için bütün VLOOKUP'lar #YOK
+    #  verir ve senaryo HİÇ kıyaslanamaz olurdu.  Teslim edilen kopyaya
+    #  uygulanan genişletmenin AYNISI buraya da uygulanır — satır EKLER,
+    #  kitabın hiçbir mevcut değerini değiştirmez  ( bkz.
+    #  exports/mukavemet_xlsx._ray_tablosu_genislet ).  Böylece bu test
+    #  genişletmenin kendisini de doğrulamış olur.
+    MX._ray_tablosu_genislet(wb)
     wb.save(yol)
 
 

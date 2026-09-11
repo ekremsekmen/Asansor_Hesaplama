@@ -32,9 +32,28 @@ def _ara(tablo, anahtar, sutun=1):
 #      Gr kg/m · A mm² · Ix mm⁴ · Iy mm⁴ · Wx mm³ · Wy mm³ · ix mm · iy mm
 #      c mm ( flanş ) · e mm
 # =====================================================================
+#
+#  T75/B EKLENDİ  ( 2026-09-11 ).  Orta kapasiteli asansörlerin en yaygın
+#  rayıdır ve listede yoktu:  T75/B ile çizilmiş bir proje programla HİÇ
+#  hesaplanamıyordu.  Değerlerin kaynağı satır satır:
+#      Gr · A · Ix · Iy · Wx · Wy   ISO 7465 T75 kesit verisi.  İKİ BAĞIMSIZ
+#                                   kaynak aynı sayıları veriyor:  ELEport'un
+#                                   örnek paftası ( 8,56 kg/m · 10,91 cm² ·
+#                                   40,29 · 26,47 cm⁴ · 9,29 · 7,06 cm³ ) ve
+#                                   ISO 7465 tablosu.
+#      ix · iy                      √( I / A ).  Bu türetme mevcut altı
+#                                   satırın hepsinde tabloyu yeniden üretir
+#                                   ( yalnız 125x82x16'nın iy'si ayrışır —
+#                                   ayrı bir konu ) ;  iy = 15,58 mm,
+#                                   ELEport'un paftasındaki 1,56 cm ile aynı.
+#      c                            ISO 7465:2011 B-grubu ölçü tablosu.
+#      e                            h1 − Ix/Wx.  Altı satırın hepsinde
+#                                   tabloyu birebir yeniden üretir;  zaten
+#                                   hesapta HİÇ okunmuyor.
 RAY_PROFILI = (
     ('50 x 50 x 5', 3.7, 475, 112400, 52500, 3150, 2100, 15.38, 10.51, 5, 14.3),
     ('70 x 65 x 9', 7.47, 951, 413000, 186500, 9240, 5350, 20.9, 14, 6, 20.4),
+    ('75 x 62 x 10', 8.564, 1091, 402900, 264700, 9290, 7060, 19.22, 15.58, 8, 18.63),
     ('89 x 62 x 15,88', 12.38, 1577, 598300, 524100, 14350, 11780, 19.48, 18.23, 9.5, 20.32),
     ('90 x 75 x 16', 13.55, 1730, 1020000, 530000, 20870, 11800, 24.3, 17.5, 10, 26.1),
     ('125 x 82 x 16', 18, 2290, 1511000, 1566000, 26200, 25100, 25.7, 25.2, 10, 24.3),
@@ -55,9 +74,20 @@ def ray(profil, ozellik):
 #  RAY PROFİLİ — FLANŞ GEOMETRİSİ             [ TABLOLAR!I69:N74 ]
 #      f mm · b mm · h1 mm · (h1−b−f) mm · (h1−f) mm
 # =====================================================================
+#
+#  T75/B:  f = 9 ve h1 = 62 ISO 7465:2011 B-grubu ölçü tablosundandır.
+#  b PATEN BALATASININ YARI GENİŞLİĞİDİR — ISO'nun ray ölçüsü değil, paten
+#  tedarikçisinin değeridir ve T75/B için kaynaklayamadım.  ISO'nun n ölçüsünün
+#  yarısı alındı ( n = 30 → 15 ) ;  bu kural T89 ( 34 → 17 ) , T90 ( 42 → 21 )
+#  ve T125 ( 42 → 21 ) satırlarında tutuyor, T127'de tutmuyor.  Etkisi
+#  SINIRLIDIR:  b yalnız kaymalı patenin flanş gerilmesine ve balata boyunun
+#  TÜRETİLEN varsayılanına girer;  balata boyu zaten bir girdidir ve
+#  girildiğinde türetme devre dışı kalır.  Küçük b, ( h1 − b − f )'yi
+#  büyüttüğü için EMNİYETLİ yöndedir.
 RAY_GEOMETRI = (
     ('50 x 50 x 5', 8, 13.5, 50, 28.5, 42),
     ('70 x 65 x 9', 8, 17, 65, 40, 57),
+    ('75 x 62 x 10', 9, 15, 62, 38, 53),
     ('89 x 62 x 15,88', 11.1, 17, 62, 33.9, 50.9),
     ('90 x 75 x 16', 10, 21, 75, 44, 65),
     ('125 x 82 x 16', 12, 21, 82, 49, 70),

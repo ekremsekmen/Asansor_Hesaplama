@@ -50,8 +50,8 @@ def calistir():
     #  TAMPONLAR ) bu testin de kendiliğinden takip etmesi gerekir.
     _MUK = len(MK.BOLUM_URETICILERI)
     r.esit("mukavemet bölüm sayısı", s["mukavemet_bolum_sayisi"], _MUK)
-    r.esit(f"toplam bölüm  ( {_MUK} mukavemet + 4 elektrik + 3 topraklama )",
-           len(adlar), _MUK + 7)
+    r.esit(f"toplam bölüm  ( {_MUK} mukavemet + 4 elektrik + 4 topraklama )",
+           len(adlar), _MUK + 8)
     for i, ad in enumerate(adlar, 1):
         r.kontrol(f"bölüm {i} sırayla numaralı", ad.startswith(f"{i} -"),
                   f"→ {ad!r}")
@@ -451,10 +451,78 @@ def calistir():
     r.kontrol("⑨ yuvarlama paftada kaynak sütununda yazıyor",
               "bir üst standart" in str(_pa["SPE1"].get("kaynak") or ""),
               f"→ {_pa['SPE1'].get('kaynak')!r}")
-    r.kontrol("⑨ koruma iletkeni topraklama bölümüne konulmadı",
-              not any(str(a.get("sembol") or "").startswith("SPE")
+    r.kontrol("⑨ hat başına PE satırları topraklama bölümüne kaymamış",
+              not any(str(a.get("sembol") or "") in ("SPE1", "SPE2")
                       for b in ((_av9.get("topraklama") or {}).get("bolumler") or [])
                       for a in b["adimlar"] if isinstance(a, dict)))
+
+    #  ⑩  TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ  ( m.9-j · m.9/c )
+    #  Ana potansiyel dengeleme "TESİSTEKİ en büyük koruma iletkeninden" türer
+    #  ( m.9-j/1/i ) — tesis çok asansörlüyse hepsine bakılmalı.
+    _ORTAK10 = {"temel_a": 26.55, "temel_b": 16.4, "beta": 150, "cubuk_sayisi": 4,
+                "mk_uzunluk": 3000, "mk_genislik": 2500}
+    _T10 = {"tanim": "A", "kapasite": 10, "V": 1.6, "eta": 0.85, "Hk": 32.85,
+            "kuyu_genisligi": 1800, "kabin_boyu": 1450, "kabin_genisligi": 1300,
+            "makine_tipi": "Dişlisiz"}
+
+    def _iletken_satirlari(asans):
+        s10 = AV.hesapla({"ortak": dict(_ORTAK10), "sabitler": {}, "asansorler": asans})
+        b = next(x for x in s10["topraklama"]["bolumler"]
+                 if x.get("kimlik") == "topraklama_iletkenleri")
+        d = {}
+        for a in b["adimlar"]:
+            if isinstance(a, dict):
+                ad = str(a.get("sembol") or "")
+                if not ad and str(a.get("formul") or "").startswith("Sapd"):
+                    ad = "Sapd"
+                if ad:
+                    d[ad] = a["deger"]
+        return s10, d
+
+    _s10, _d10 = _iletken_satirlari([dict(_T10, S1=6, S2=6)])
+    r.esit("⑩ topraklama bölümü dört alt bölüm",
+           len(_s10["topraklama"]["bolumler"]), 4)
+    r.esit("⑩ SPE = 6 → Sapd", _d10.get("Sapd"),
+           AVT.ana_potansiyel_dengeleme_kesiti(6)[0])
+    r.esit("⑩ SPE = 6 → Stopr", _d10.get("Stopr"),
+           AVT.topraklama_iletkeni_kesiti(6)[0])
+    #  ÇOK ASANSÖRDE EN BÜYÜK PE BELİRLER — tesis geneli bir iletkendir.
+    _s10c, _d10c = _iletken_satirlari([dict(_T10, S1=6, S2=6),
+                                       dict(_T10, S1=150, S2=95),
+                                       dict(_T10, S1=16, S2=10)])
+    r.esit("⑩ üç asansörde en büyük PE seçiliyor", _d10c.get("SPE"),
+           AVT.koruma_iletkeni_kesiti(150)[0])
+    r.esit("⑩ Sapd 25 mm² üst sınırında", _d10c.get("Sapd"), 25)
+    r.kontrol("⑩ tek asansörlük Sapd, çok asansörlüden büyük olamaz",
+              _d10.get("Sapd") <= _d10c.get("Sapd"))
+
+    #  ⑪  BURKULMA HESAPLANAMADIĞINDA PAFTA SEBEBİNİ YAZAR
+    #  λ, EN 81-50'nin ω çizelgesinin ( 20…250 ) dışına çıkarsa σk yoktur.
+    #  Eskiden satır "σk = —  ≤  σperm = 205" diye basılıp yanına UYGUN DEĞİL
+    #  yazıyordu:  boş hücrenin yanında bir ret.  Okuyan, gerilmenin sınırı
+    #  AŞTIĞINI sanar;  oysa hesap hiç yapılamamıştır.
+    _s11 = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı"})
+    _b11 = next(x for x in _s11["bolumler"] if x["kimlik"] == "agirlik_raylari")
+    _w11 = next((a["deger"] for a in _b11["adimlar"]
+                 if isinstance(a, dict) and str(a.get("sembol") or "") == "ω"), "yok")
+    r.kontrol("⑪ ofis varsayılanı ω'yı tablo dışına taşıyor", _w11 is None,
+              f"→ ω = {_w11!r}")
+    _metinler = " | ".join(str(a.get("aciklama") or "") for a in _b11["adimlar"]
+                           if isinstance(a, dict))
+    r.kontrol("⑪ satır 'HESAPLANAMADI' diyor, sessizce reddetmiyor",
+              "HESAPLANAMADI" in _metinler, f"→ {_metinler[:120]}")
+    r.kontrol("⑪ sebep ( λ ve çizelge sınırı ) paftada yazılı",
+              "286" in _metinler and "250" in _metinler)
+    r.kontrol("⑪ bölüm sonucu 'denetlenemedi' diyor",
+              "denetlenemedi" in str(_b11["sonuc"]["metin"]),
+              f"→ {_b11['sonuc']['metin'][:90]}")
+    #  Gerçekten AŞAN durumda mesaj değişmeli — ikisi farklı şeydir.
+    _s11b = MK.hesapla({"agirlik_guvenlik_tertibati": "Kaymalı",
+                        "agirlik_konsol_arasi": 2500})
+    _b11b = next(x for x in _s11b["bolumler"] if x["kimlik"] == "agirlik_raylari")
+    r.kontrol("⑪ ω varken mesaj 'denetlenemedi' demiyor",
+              "denetlenemedi" not in str(_b11b["sonuc"]["metin"]),
+              f"→ {_b11b['sonuc']['metin'][:90]}")
 
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı
@@ -518,7 +586,7 @@ def calistir():
     r.kontrol("makine daireli hesap koşuyor", s["aktif"], f"→ {s.get('hata')}")
     if s["aktif"]:
         r.esit("makine daireli bölüm sayısı", len(s["bolumler"]),
-               len(MK.BOLUM_URETICILERI) + 8)
+               len(MK.BOLUM_URETICILERI) + 9)
         r.kontrol("makine dairesi aydınlatması eklendi",
                   any("MAKİNE DAİRESİ" in a for a in _bolum_adlari(s)))
 
@@ -710,9 +778,10 @@ def calistir():
            ["1 - MAKİNE DAİRESİ AYDINLATMA HESABI",
             "2 - YATAY ( TEMEL ) TOPRAKLAYICI",
             "3 - DİKEY ( ÇUBUK ) TOPRAKLAYICI",
-            "4 - TOPLAM TOPRAKLAMA DİRENCİ VE KONTROL"])
+            "4 - TOPLAM TOPRAKLAMA DİRENCİ VE KONTROL",
+            "5 - TOPRAKLAMA VE POTANSİYEL DENGELEME İLETKENLERİ"])
     r.esit("çoklu: özet proje geneli bölümleri sayıyor",
-           _c["ozet"]["proje_geneli_adet"], 4)
+           _c["ozet"]["proje_geneli_adet"], 5)
     r.kontrol("çoklu: proje geneli uygunluğu özette",
               _c["ozet"]["proje_geneli_uygun"] is True)
     #  PROJE GENELİ HESAP "HEPSİ UYGUN"A GİRER.  Bölümler asansörlerden
@@ -913,6 +982,13 @@ def calistir():
             return baska[0] if baska else None
         if t == "sayi":
             v = simdiki if isinstance(simdiki, (int, float)) else 0
+            #  KESİT ALANLARI BASAMAK FONKSİYONUDUR.  Koruma iletkeni ve
+            #  potansiyel dengeleme kesitleri standart kesit merdivenine
+            #  yuvarlanır ve 6 mm² tabanı vardır;  +%15'lik bir itme
+            #  ( 6 → 7,9 ) hiçbir basamağı atlamaz ve bölüm kımıldamaz.
+            #  Bağı GERÇEKTEN sınamak için bir basamak aşan bir sıçrama gerekir.
+            if f["anahtar"] in ("kolon_kesit", "makine_kesit"):
+                return round(v * 8 + 1, 3)
             return round(v * 1.15 + 1, 3)
         return None                       # metin ve liste: sonuca girmez / ayrı denenir
 

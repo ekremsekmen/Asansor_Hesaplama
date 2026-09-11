@@ -2402,6 +2402,23 @@ def _sehim(F, l, I):
     return S["sehim_katsayi"] * l ** 3 * F / (S["sehim_bolen"] * S["E"] * I)
 
 
+def _burkulma_mesaji(lam, deger, sperm):
+    """Burkulma kontrolünün satır metni.
+
+    ω çizelgesi 20 ≤ λ ≤ 250 arasında tanımlıdır.  λ bunun ÜSTÜNDEYSE σk
+    hesaplanamaz ve satır eskiden  "σk = —  ≤  σperm = 205"  diye basılıp
+    yanına UYGUN DEĞİL yazıyordu:  boş bir hücrenin yanında bir RET.  Paftayı
+    okuyan, gerilmenin sınırı AŞTIĞINI sanır;  oysa hesap hiç yapılamamıştır.
+    Sebep yazılır ve iki çözümün ikisi de söylenir  ( λ = l / imin ).
+    """
+    if deger is None:
+        return (f"σk HESAPLANAMADI — λ = {trn(lam, 0)} , EN 81-50'nin ω "
+                f"çizelgesi {MT.OMEGA_LAMBDA_MIN} … {MT.OMEGA_LAMBDA_MAX} "
+                "arasını kapsar;  ray profilini büyütün ya da konsol "
+                "aralığını küçültün")
+    return f"σk = {tr(deger)}  ≤  σperm = {trn(sperm, 0)} N/mm²"
+
+
 def _burkulma_omega(l, imin, rm):
     """Narinlik ve ω  —  TS EN 81-50 m.5.10.3.
 
@@ -2844,8 +2861,7 @@ def _kabin_raylari(g, o):
         hesap("σk = ( Fk + k3 × MY ) × ω / A",
               f"( {tr(Fk)} + {tr(k3)} × {trn(MY, 0)} ) × {tr(omega)} / {trn(p['A'], 0)}",
               sigma_k, "N/mm²"),
-        kontrol(f"σk = {tr(sigma_k)}  ≤  σperm = {trn(sperm_g, 0)} N/mm²",
-                burkulma_uygun),
+        kontrol(_burkulma_mesaji(lam, sigma_k, sperm_g), burkulma_uygun),
     ]
     uygunlar.append(burkulma_uygun)
     _kesim("Eğilme gerilmesi  ( C.2.1 ) :", "k1 × gn × ( Q·xQ + P·xp ) / ( n × h )",
@@ -3179,12 +3195,13 @@ def _agirlik_raylari(g, o):
             veri("λ", "Yuvarlanmış burkulma narinliği  ( en az 20 )",
                  kg["lam"], "", "", 0),
             veri("ω", "Omega değeri", kg["omega"], "",
-                 (f"EN 81-50 m.5.10.3  ·  λ = {kg['lam']}"
-                  if kg["omega"] else "TABLO DIŞI — konsol aralığını küçültün"), 6),
+                 (f"EN 81-50 m.5.10.3  ·  λ = {kg['lam']}" if kg["omega"] else
+                  f"TABLO DIŞI — λ = {kg['lam']} > {MT.OMEGA_LAMBDA_MAX};  ray "
+                  "profilini büyütün ya da konsol aralığını küçültün"), 6),
             hesap("σk = ( Fk + k3 × MY ) × ω / A",
                   f"( {tr(kg['Fk'])} + {tr(k3)} × {trn(MY, 0)} ) × "
                   f"{tr(kg['omega'])} / {trn(p['A'], 0)}", kg["sk"], "N/mm²"),
-            kontrol(f"σk = {tr(kg['sk'])}  ≤  σperm = {trn(sg, 0)} N/mm²",
+            kontrol(_burkulma_mesaji(kg["lam"], kg["sk"], sg),
                     kg["sk"] is not None and 0 <= kg["sk"] <= sg),
             hesap("σ = σk + 0,9 × σm",
                   f"{tr(kg['sk'])} + 0,9 × {tr(kg['sm'])}", kg["sc"], "N/mm²",
@@ -3217,7 +3234,16 @@ def _agirlik_raylari(g, o):
                            else ("UYGUN DEĞİLDİR — karşı ağırlık güvenlik tertibatı v > 1,0 m/s "
                                  "için kaymalı tip olmalıdır ( TS EN 81-20 m.5.6.2.1.2.3 )"
                                  if not gt_tip_uygun else
-                                 "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün"),
+                                 #  ω yoksa RET'in sebebi gerilmenin sınırı aşması
+                                 #  değil, hesabın YAPILAMAMASIDIR;  ikisi farklı
+                                 #  şeylerdir ve çözümleri de farklıdır.
+                                 (f"UYGUN DEĞİLDİR — burkulma denetlenemedi:  λ = "
+                                  f"{trn(kg['lam'], 0)} , ω çizelgesi en çok "
+                                  f"{MT.OMEGA_LAMBDA_MAX}'ye kadar tanımlı.  Ağırlık "
+                                  "rayı profilini büyütün ya da konsol aralığını "
+                                  "küçültün"
+                                  if (kg and kg.get("omega") is None) else
+                                  "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün")),
                   "uygun": bool(all(kontroller))}
     _not8 = _ray_tutarsizlik_notu(prof)
     if _not8:

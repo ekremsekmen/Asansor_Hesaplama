@@ -407,6 +407,69 @@ STANDART_KESITLER = (1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120,
                      150, 185, 240, 300, 400)
 
 
+#  Ana potansiyel dengeleme iletkeni        m.9-j/1/i  ·  Çizelge-4b
+#      Sapd ≥ 0,5 × tesisteki EN BÜYÜK koruma iletkeni kesiti
+#      asgari  6 mm² Cu
+#      üst sınır 25 mm² Cu  ( "daha büyük olması gerekmez" )
+APD_ASGARI = 6
+APD_UST_SINIR = 25
+
+#  Topraklama iletkeni                       m.9/c  ·  Çizelge-4a
+#  Çizelge-4a YALNIZ TOPRAĞA DÖŞENEN iletken içindir ( başlığı bunu yazar );
+#  üç satırı vardır:
+#      korozyona korunmuş + mekanik korumalı   →  Madde 9-e'ye göre  ( = PE )
+#      korozyona korunmuş + mekanik korumasız  →  16 mm² Cu
+#      korozyona korunmamış                    →  25 mm² Cu
+#  Mekanik korumanın olup olmadığı avan aşamasında bilinmez;  program İKİ
+#  korozyona-korunmuş satırın BÜYÜĞÜNÜ verir — yani hem m.9-e'yi hem 16 mm²'yi
+#  sağlar.  Korozyona karşı korunmamış döşemede 25 mm² gerekir;  bu koşul
+#  satırın kaynak sütununda yazılıdır.
+TOPRAKLAMA_KORUNMUS = 16
+TOPRAKLAMA_KORUNMAMIS = 25
+
+
+def _ust_standart(deger):
+    """Değerden küçük olmayan en küçük standart kesit  ( yoksa None )."""
+    ustler = [k for k in STANDART_KESITLER if k >= deger]
+    return min(ustler) if ustler else None
+
+
+def ana_potansiyel_dengeleme_kesiti(en_buyuk_pe):
+    """Ana potansiyel dengeleme iletkeni kesiti  ( m.9-j/1/i · Çizelge-4b ).
+
+    Döner:  ( Sapd, ham, sinirlandi_mi )
+        ham          0,5 × en büyük PE ile 6 mm²'nin büyüğü  —  ÜST SINIR
+                     UYGULANMAMIŞ hâli.  Pafta bunu yazar:  "0,5 · 95 = 25"
+                     diye bir satır kendi içinde yanlıştır;  doğrusu
+                     "0,5 · 95 = 47,50  →  25 mm² üst sınırı"dır.
+        sinirlandi   25 mm² üst sınırı devreye girdiyse True
+
+    Çizelge-4b bir ASGARİ verir;  ham değer standart bir kesite düşmezse
+    Çizelge-8'deki mantıkla bir üst standart kesit alınır — aşağı yuvarlamak
+    asgarinin altına düşmek olurdu.
+    """
+    if not sayi_mi(en_buyuk_pe) or en_buyuk_pe <= 0:
+        return None, None, False
+    ham = max(APD_ASGARI, en_buyuk_pe / 2.0)
+    sinirlandi = ham > APD_UST_SINIR
+    baglayan = float(APD_UST_SINIR) if sinirlandi else ham
+    return _ust_standart(baglayan), ham, sinirlandi
+
+
+def topraklama_iletkeni_kesiti(en_buyuk_pe):
+    """Topraklama iletkeni kesiti  ( m.9/c · Çizelge-4a ).
+
+    Döner:  ( Stopr, belirleyen )
+        belirleyen  "m.9-e ( koruma iletkeni )" ya da "Çizelge-4a"  —
+                    hangi satırın bağladığını pafta yazabilsin diye.
+    """
+    if not sayi_mi(en_buyuk_pe) or en_buyuk_pe <= 0:
+        return None, None
+    if en_buyuk_pe >= TOPRAKLAMA_KORUNMUS:
+        return _ust_standart(en_buyuk_pe), "m.9-e  ( koruma iletkeni kesiti )"
+    return float(TOPRAKLAMA_KORUNMUS), "Çizelge-4a  ( 16 mm² Cu )"
+
+
 def koruma_iletkeni_formulu(S_hucre, merdiven, koruma=None):
     """Çizelge-8'i EXCEL FORMÜLÜ olarak kurar  —  kitap kendini hesaplasın diye.
 
@@ -424,12 +487,42 @@ def koruma_iletkeni_formulu(S_hucre, merdiven, koruma=None):
     IFERROR onu boş bırakır ( motor da None döner ).
     """
     ham = f'IF({S_hucre}<=16,{S_hucre},IF({S_hucre}<=35,16,{S_hucre}/2))'
-    yer = f'MATCH({ham},{merdiven},1)'
-    f = (f'IFERROR(INDEX({merdiven},{yer}'
-         f'+IF(INDEX({merdiven},{yer})<{ham},1,0)),"")')
+    f = ust_standart_formulu(ham, merdiven)
     if koruma:
         f = f'IF({koruma},"",{f})'
     return "=" + f
+
+
+def ust_standart_formulu(ham, merdiven):
+    """"ham'dan küçük olmayan en küçük standart kesit" — Excel ifadesi.
+
+    ``ham`` bir Excel İFADESİDİR ( hücre adı da olabilir ), ``merdiven``
+    standart kesit merdiveninin mutlak aralığı.  Başına "=" KONULMAZ;
+    çağıran kendi formülüne gömer.
+
+    MATCH( … ; 1 ) sıralı listede ham'dan küçük eşit en büyük satırı verir;
+    o satır ham'dan küçükse bir alta geçilir.  Merdivenin üstüne taşan
+    değerde INDEX #REF! verir, IFERROR onu boş bırakır.
+    """
+    yer = f'MATCH({ham},{merdiven},1)'
+    return (f'IFERROR(INDEX({merdiven},{yer}'
+            f'+IF(INDEX({merdiven},{yer})<{ham},1,0)),"")')
+
+
+def ana_potansiyel_dengeleme_formulu(pe_ifade, merdiven, koruma=None):
+    """Sapd Excel formülü  —  0,5 · PE , en az 6 , en çok 25 mm²."""
+    ham = f'MIN({APD_UST_SINIR},MAX({APD_ASGARI},{pe_ifade}/2))'
+    f = f'IF(N({pe_ifade})<=0,"",{ust_standart_formulu(ham, merdiven)})'
+    return "=" + (f'IF({koruma},"",{f})' if koruma else f)
+
+
+def topraklama_iletkeni_formulu(pe_ifade, koruma=None):
+    """Stopr Excel formülü  —  m.9-e değeri ile 16 mm²'nin büyüğü.
+
+    PE zaten standart merdivenden geldiği için yuvarlama gerekmez.
+    """
+    f = f'IF(N({pe_ifade})<=0,"",MAX({pe_ifade},{TOPRAKLAMA_KORUNMUS}))'
+    return "=" + (f'IF({koruma},"",{f})' if koruma else f)
 
 
 def koruma_iletkeni_kesiti(S):
