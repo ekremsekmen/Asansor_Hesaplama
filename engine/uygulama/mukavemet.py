@@ -583,7 +583,9 @@ EXCEL_FARKLARI = (
     ("Mil kuvveti ve moment askı oranından bağımsız",
      "MMO 208/7 - 2.4  ( ofis standardı )",
      "Pm = F1 − Ga ve M = Gmax × Dt/2 yazar;  askı oranı hiç girmez "
-     "( 11!AQ7 · AQ21 ).",
+     "( 11!AQ7 · AQ21 ).  Pm ile M FARKLI yükten kurulur:  F1 halatın tamamını "
+     "kabin tarafına koyar, hareket yönü, denge zinciri ve gezici kablo Pm'ye "
+     "girmez.",
      "2:1 palangalı bir sistemde tahrik kasnağının gördüğü kuvvet Gmax "
      "değil Gmax/i'dir — kasnak tarafındaki büyüklükler yarıya iner, halat "
      "hızı iki katına çıkar.  1275 kg · 2:1 · Dt = 240 mm örneğinde kitap "
@@ -591,7 +593,10 @@ EXCEL_FARKLARI = (
      "        MOTOR GÜCÜNÜ ETKİLEMEZ:  N = Gmax·v/(η·102) askı oranından "
      "bağımsızdır ve kitapta doğru kurulmuştur.  Pm ile M hiçbir hesaba "
      "girmez, yalnız paftaya basılır — ama paftadan moment okuyup makine "
-     "seçen bir okuyucuya iki katı bir sayı yazılıyordu.",
+     "seçen bir okuyucuya iki katı bir sayı yazılıyordu.\n"
+     "        Pm artık Gmax/i'dir:  gücü ve momenti belirleyen AYNI yük, M = "
+     "Pm × Dt/2.  Eskiden q = 0,60'ta Pm 185,7 kg basılırken belirleyici yük "
+     "269,1 kg idi ( %31 az ) ve zincir seçimi yalnız M'yi değiştiriyordu.",
      ("AQ7", "AQ21")),
     ("Regülatör çekme kuvveti ve ikinci alt sınırı",
      "TS EN 81-20 m.5.6.2.2.1.1 d)  /  m.5.6.2.2.1.3 b)",
@@ -1131,8 +1136,18 @@ def _motor(g, o):
     #  çıkar.  ( Gücü etkilemez:  N = Gmax·v / (η·102) askı oranından
     #  bağımsızdır ve doğrudur.  Ama paftadan MOMENT okuyup makine seçen bir
     #  okuyucuya iki katı bir sayı yazılıyordu. )
-    Pm = (F1 - Ga) / r                    # tahrik kasnağına gelen döndürme kuvveti
-    M = (Gmax / r) * (Dt / 2000.0)        # tahrik kasnağı momenti
+    #
+    #  Pm, GÜCÜ VE MOMENTİ BELİRLEYEN YÜKTEN TÜRER.  Kitap Pm'yi F1 − Ga ile,
+    #  M'yi Gmax ile kuruyordu;  ikisi aynı çalışma durumunu anlatmıyordu.
+    #  F1 halatın TAMAMINI kabin tarafına koyar, yön seçmez, denge zincirini
+    #  ve gezici kabloyu bilmez.  Gmax ise iki hareket yönünün büyüğünü,
+    #  dengesiz halatı, zinciri ve kabloyu taşır.  Sonuç:  q = 0,60'ta paftaya
+    #  "en büyük döndürme kuvveti" diye 185,7 kg basılıyor, momenti ve gücü
+    #  belirleyen yük ise 269,1 kg oluyordu ( %31 az );  zincir seçimi M'yi
+    #  değiştiriyor, Pm'yi değiştirmiyordu.  Pm hiçbir kontrole girmez ama
+    #  paftadan okunup makine seçilir.  Artık  M = Pm × Dt/2  birebir tutar.
+    Pm = Gmax / r                         # tahrik kasnağına gelen döndürme kuvveti
+    M = Pm * (Dt / 2000.0)                # tahrik kasnağı momenti
     #  TAHRİK KASNAĞINA GELEN STATİK YÜK.  Kasnak iki halat kolunu birden
     #  taşır;  Pm bunların FARKI ( döndüren kuvvet ), Tst ise TOPLAMIDIR.
     #  Palangalı sistemde her kol yükün yarısını çeker, bu yüzden askı
@@ -1261,14 +1276,12 @@ def _motor(g, o):
         hesap("Gmax = Gden + Gs + MSR − MCR + MTrav",
               f"{tr(Gden)} + {tr(O['Gs'])} + {tr(MSR)} − {tr(MCR)} + {tr(MTrav)}",
               Gmax, "kg"),
-        hesap("Pm = ( F1 − Ga ) / i" if r != 1 else "Pm = F1 − Ga",
-              (f"( {tr(F1)} − {tr(Ga)} ) / {trn(r, 0)}" if r != 1
-               else f"{tr(F1)} − {tr(Ga)}"), Pm, "kg",
-              "tahrik kasnağına gelen döndürme kuvveti"),
+        hesap("Pm = Gmax / i" if r != 1 else "Pm = Gmax",
+              (f"{tr(Gmax)} / {trn(r, 0)}" if r != 1 else f"{tr(Gmax)}"), Pm, "kg",
+              "tahrik kasnağına gelen en büyük döndürme kuvveti"),
         veri("Dt", "Tahrik kasnağı çapı", Dt, "mm", "GİRİŞ"),
-        hesap("M = ( Gmax / i ) × ( Dt / 2 )" if r != 1 else "M = Gmax × ( Dt / 2 )",
-              (f"( {tr(Gmax)} / {trn(r, 0)} ) × {tr(Dt / 2000.0)}" if r != 1
-               else f"{tr(Gmax)} × {tr(Dt / 2000.0)}"), M, "kg·m",
+        hesap("M = Pm × ( Dt / 2 )",
+              f"{tr(Pm)} × {tr(Dt / 2000.0)}", M, "kg·m",
               "tahrik kasnağı momenti"),
         veri("", "Makine tipi", g.get("makine_tipi") or "—", "", "GİRİŞ"),
         veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "",
@@ -2124,26 +2137,20 @@ ISLEM = {"yukleme": +1, "fren_alt": +1, "fren_ust": -1, "bloke": +1}
 #  satırlarıdır.
 ALFA_YOK = "HESAP EKSİK — sarılma açısı α girilmedi"
 
-#  ÇİFT SARIMDA 180°'Yİ AŞMAYAN AÇI TEK SARIMA AİTTİR.
-#  Çift sarımda halat kasnağın üzerinden iki kez geçer ve toplam sarım yarım
-#  turu aşar.  180° ve altı bir açıyla yükleme/frenleme kontrolleri emniyetli
-#  tarafta kalır ( geçerlidir ), bloke kontrolü ise GEVŞER:  3.888 senaryonun
-#  216'sında gerçek açıyla kalacak bir kontrol "UYGUNDUR" çıkıyordu.  O
-#  yüzden yalnız bloke kontrolü karara bağlanmaz.
-CIFT_SARIM_BLOKE = ("HESAP EKSİK — çift sarımda α 180°'yi aşmalı;  girilen "
-                    "açıyla bloke kontrolü karara bağlanamaz")
+#  AÇI KANALIN SARIM SAYISINA GÖRE FİZİKSEL DEĞİLSE HÜKÜM YOKTUR.
+#  Tek sarımda α en çok 180°, çift sarımda 180°'den büyüktür.  Bu, GİRDİ
+#  DOĞRULAMASINDA reddedilir ( bkz. MG.dogrula );  aşağısı motor doğrudan
+#  çağrıldığında devreye giren İKİNCİ KALKANDIR.  Eskiden çift sarımda 180°
+#  ve altı için ayrı bir "yarım hesap" yolu vardı ( üç kontrol hesaplanır,
+#  bloke eksik sayılır );  açı artık girdide reddedildiği için o yol hiçbir
+#  yoldan ulaşılamaz hâle geldi ve kaldırıldı.  İmkânsız bir açıyla hiçbir
+#  yük durumuna "UYGUN" basılmaz.
+ALFA_ARALIK_DISI = "sarılma açısı α kanalın sarım sayısına göre fiziksel değil"
 
-CIFT_SARIM_NOTU = (
-    "ÇİFT SARIM SEÇİLDİ, GİRİLEN α 180°'Yİ AŞMIYOR.  Çift sarımda halat tahrik "
-    "kasnağının üzerinden iki kez geçer ve toplam sarılma açısı yarım turu "
-    "aşar;  180° ve altı bir açı tek sarıma aittir.  TS EN 81-50 m.5.11.2.1 "
-    "yükleme ve frenleme için  T1/T2 ≤ e^(f·α),  bloke için  T1/T2 ≥ e^(f·α) "
-    "der — EŞİTSİZLİKLERİN YÖNÜ TERSTİR.  Küçük α ilk ikisinde sınırı daraltır "
-    "( emniyetli taraf;  o üç sonuç geçerlidir ), blokede ise GEVŞETİR — gerçek "
-    "açıyla kalacak bir kontrol 'UYGUNDUR' çıkabilir.  Bu yüzden BLOKE KONTROLÜ "
-    "KARARA BAĞLANMAMIŞTIR:  gerçek toplam açı saptırma düzeninden belirlenip "
-    "girilmelidir.  ( Nequiv(t) çift sarımda iki geçişle hesaba girer;  bkz. "
-    "bölüm 4. )")
+#  SERTLEŞTİRİLMEMİŞ DÜZ V KANAL STANDART DIŞIDIR ( m.5.11.2.3.1.2 ).  O da
+#  girdide reddedilir;  aşağısı ikinci kalkandır.
+KANAL_STANDART_DISI = ("alt kesilmesiz V kanal sertleştirilmemiş olamaz  "
+                       "( TS EN 81-50 m.5.11.2.3.1.2 )")
 
 
 def _tahrik(g, o):
@@ -2239,15 +2246,11 @@ def _tahrik(g, o):
     #  additional hardening process, in order to limit the deterioration of
     #  traction due to wear, an undercut is necessary."  Yani sertleştirilmemiş
     #  V kanalın ALT KESİLMESİ OLMALIDIR;  bu birleşim standardın dışındadır.
-    if (not yarim_daire) and (not sert) and not MT.kanal_alti_kesik_mi(sekil):
-        b["notlar"] = [
-            "STANDART DIŞI BİRLEŞİM:  TS EN 81-50 m.5.11.2.3.1.2, "
-            "sertleştirilmemiş kanalda aşınmadan doğan tahrik kaybını "
-            "sınırlamak için ALT KESİLMENİN GEREKLİ olduğunu söyler.  "
-            f"Seçilen '{sekil}' + '{g['kanal_isleme']}' birleşiminde alt "
-            "kesilme yoktur;  hesap β = 0 ile ( emniyetli tarafta ) "
-            "yapılmıştır ama kanal ya sertleştirilmeli ya da altı kesik "
-            "seçilmelidir."]
+    #  Bu birleşim girdide reddedilir ( MG.dogrula );  buraya ancak motor
+    #  doğrudan çağrılırsa gelinir.  Eskiden yalnız not düşülüyor ve sayısal
+    #  kontroller geçerse bölüm "UYGUNDUR" diyordu — artık hüküm de düşer.
+    kanal_standart_disi = ((not yarim_daire) and (not sert)
+                           and not MT.kanal_alti_kesik_mi(sekil))
     b["adimlar"] = [
         veri("R1", "Tahrik kasnağı yarıçapı", R1, "mm"),
         veri("α", "Halat sarılma açısı", alfa_derece, "°",
@@ -2357,15 +2360,6 @@ def _tahrik(g, o):
                      and sinir <= oran)
             metni = (f"e^(f·α) = {tr(sinir)}  ≤  T1/T2 = {tr(oran)}"
                      if gergin and sinir is not None else GEVSEK)
-            if alfa_var and cift_sarim and not alfa_uygun:
-                uygun, metni = False, CIFT_SARIM_BLOKE
-                kont_mesaj = "HESAP EKSİK"
-                #  SAYI PAFTADA KALIR AMA ÖLÇÜT SANILMAMALI.  "HESAP EKSİK"
-                #  yazan satırın hemen üstünde e^(f·α) = 1,82 ≤ T1/T2 = 15,97
-                #  duruyor;  okuyan mühendis bunu kendi gözüyle geçirebilir.
-                #  Sayının TEK SARIM açısından geldiği kendi satırında yazar.
-                sinir_kaynak = ("180°'yi aşmayan açıyla  —  çift sarımda "
-                                "karara dayanak DEĞİLDİR")
         else:
             oran = _oran(T1, T2)
             f_kul = f_yuk if durum == "yukleme" else f_fren
@@ -2383,6 +2377,13 @@ def _tahrik(g, o):
         elif not alfa_var:
             #  Açı yoksa sınır yok;  hüküm verilmez, sebep satırda yazar.
             uygun, metni, kont_mesaj = False, ALFA_YOK, "HESAP EKSİK"
+        elif not alfa_uygun or kanal_standart_disi:
+            #  İKİNCİ KALKAN — imkânsız açı ya da standart dışı kanalla
+            #  hesaplanan sınır bir ölçüt değildir;  satır "UYGUN" basmaz.
+            uygun = False
+            metni = (f"{ALFA_ARALIK_DISI} — hüküm verilemez" if not alfa_uygun
+                     else f"{KANAL_STANDART_DISI} — hüküm verilemez")
+            sinir_kaynak = "ölçüt DEĞİLDİR  ( girdi geçersiz )"
         tumu_uygun = tumu_uygun and uygun
         #  ORAN SATIRI KENDİ SAYILARINI VERMELİ.
         #  T1 ve T2 satırları TARAFA göre yazılır ( T1 = kabin tarafı ) —
@@ -2419,9 +2420,10 @@ def _tahrik(g, o):
 
     b["sonuc"] = {"baslik": "KONTROL      dört yük durumunda tahrik yeteneği",
                   "metin": "UYGUNDUR." if tumu_uygun else
-                           ("UYGUN DEĞİLDİR — girilen sarılma açısı α tek "
-                            "sarımlı kasnakta imkânsız ( en çok 180° )"
-                            if not alfa_uygun else "UYGUN DEĞİLDİR"),
+                           (f"UYGUN DEĞİLDİR — {ALFA_ARALIK_DISI}"
+                            if alfa_var and not alfa_uygun else
+                            f"UYGUN DEĞİLDİR — {KANAL_STANDART_DISI}"
+                            if kanal_standart_disi else "UYGUN DEĞİLDİR"),
                   "uygun": bool(tumu_uygun)}
     if not alfa_var and gevsek_var:
         #  Kesin başarısızlık eksikten güçlüdür:  bölüm "uygun değil" kalır,
@@ -2431,13 +2433,6 @@ def _tahrik(g, o):
     elif not alfa_var:
         b["sonuc"]["metin"] = ALFA_YOK
         b["eksik_hesap"] = ALFA_YOK
-    elif cift_sarim and not alfa_uygun:
-        #  Bölüm "uygun değil" DEĞİL, HESAP EKSİKTİR:  ilk üç durum geçse
-        #  bile bloke kontrolü denetlenemediği için proje "uygundur" çıkmaz.
-        #  ( Regülatör bölümündeki kalıbın aynısı — bkz. _regulator. )
-        b["sonuc"]["metin"] = CIFT_SARIM_BLOKE
-        b["eksik_hesap"] = CIFT_SARIM_BLOKE
-        b["notlar"] = (b.get("notlar") or []) + [CIFT_SARIM_NOTU]
     return b
 
 

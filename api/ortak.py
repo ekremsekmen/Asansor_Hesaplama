@@ -193,6 +193,30 @@ XLSX_TUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PROJE_UZANTI = {"avan": ".avan", "uygulama": ".uygulama"}
 
 
+#  Paketin EKSİK olduğunu arayüze söyleyen başlık notu ( X-Avan-Not içinde ).
+#  Pakete ayrıca bir metin dosyası konur;  not, kullanıcının ZIP'i açmadan
+#  da uyarılması içindir.
+PAKET_NOT_KITAP = "KITAP"
+
+
+def _uretilemeyen_dosya_notu(eksikler, dosya="URETILEMEYEN DOSYALAR.txt",
+                             aciklama="Aşağıdaki çalışma kitapları üretilemedi."):
+    """Pakete konan "neyin eksik olduğu" dosyası  →  ( ad , içerik ).
+
+    ÜRETİLEMEYEN KİTAP SESSİZCE ATLANAMAZ.  Paket dosyaları ( avan · trafik ·
+    uygulama ) eskiden kitap üretimi hata verince ``except Exception: pass``
+    ile devam ediyordu:  kullanıcı kitapsız bir ZIP indiriyor, farkına
+    varmıyordu.  Bütün paketler bu tek bildirimi kullanır.
+    """
+    return (dosya,
+            ("BU PAKETTE EKSİK VAR\r\n"
+             "====================\r\n\r\n"
+             f"{aciklama}\r\n"
+             "Paketteki dosyalar projenin TAMAMI DEĞİLDİR.\r\n\r\n"
+             + "\r\n".join(f"  •  {x}" for x in eksikler)
+             + "\r\n").encode("utf-8"))
+
+
 def _paket_ekleri(veri, mod):
     """ZIP'e konacak ek dosyalar — [ ( ad, bayt ) ].
 

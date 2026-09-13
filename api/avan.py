@@ -12,9 +12,10 @@ from datetime import date
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from api.ortak import (KOK, _BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi,
-                       _indir, _paket_ekleri, _proje_kimligi, _sayi,
-                       _sozluk_listesi, _temiz, _uretilemedi, belirsiz_sayi_mi)
+from api.ortak import (KOK, PAKET_NOT_KITAP, _BELIRSIZ, _RED, _belirsiz_hata,
+                       _dosya_adi, _indir, _paket_ekleri, _proje_kimligi, _sayi,
+                       _sozluk_listesi, _temiz, _uretilemedi,
+                       _uretilemeyen_dosya_notu, belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
@@ -366,27 +367,38 @@ def indir_proje_dwg(veri: dict = Body(...)):
         #  ile geri dönüş noktası aynı arşivde dursun.
         kok = os.path.splitext(ad)[0]
         ekler = list(_paket_ekleri(veri, "avan"))
+        #  KİTAP ÜRETİLEMEZSE PAKET YİNE ÇIKAR — AMA EKSİK SÖYLENİR.
+        #  Eskiden iki yerde ``except Exception: pass`` vardı;  trafik hesabı
+        #  hata döndürdüğünde de kitap hiçbir bildirim olmadan atlanıyordu.
+        eksikler = []
         if isinstance(trafik_ham, dict):
             try:
                 _t = E_TRF.hesapla(g)
-                if not _t.get("hata"):
+                if _t.get("hata"):
+                    eksikler.append("Trafik çalışma kitabı:  trafik hesabı "
+                                    f"yapılamadı ( {_t.get('hata')} )")
+                else:
                     ekler.append((f"{kok} - Trafik.xlsx",
                                   X_XLS.trafik_xlsx(_t.get("yol", "tek"), g,
                                                     _proje_kimligi(veri))))
-            except Exception:                                 # noqa: BLE001
-                pass          # şablon yoksa paket yine çıkar, kitap olmaz
+            except Exception as e:                            # noqa: BLE001
+                eksikler.append(f"Trafik çalışma kitabı:  {e}")
         if isinstance(avan_ham, dict):
             try:
                 ekler.append((f"{kok} - Avan.xlsx",
                               X_XLS.avan_xlsx(a, _proje_kimligi(veri))))
-            except Exception:                                 # noqa: BLE001
-                pass
+            except Exception as e:                            # noqa: BLE001
+                eksikler.append(f"Avan çalışma kitabı:  {e}")
+        if eksikler:
+            ekler.append(_uretilemeyen_dosya_notu(eksikler))
         paket, sebep, tasti = X_DXF.proje_paketi(paftalar, kok, ekler)
         yanit = _indir(paket, ad, "application/zip")
         #  Kullanıcının BİLMESİ GEREKENLER başlıkta taşınır:
         #    DXF   → DWG üretilemedi, pakette yalnız DXF var ( sebebi OKUBENI'de )
         #    TASMA → paftalar formatın çerçevesine sığmadı, taşan sayfalar var
-        notlar = ([ "DXF" ] if sebep else []) + ([ "TASMA" ] if tasti else [])
+        #    KITAP → bir çalışma kitabı üretilemedi ( ZIP'te URETILEMEYEN … )
+        notlar = (([ "DXF" ] if sebep else []) + ([ "TASMA" ] if tasti else [])
+                  + ([PAKET_NOT_KITAP] if eksikler else []))
         if notlar:
             yanit.headers["X-Avan-Not"] = ",".join(notlar)
         return yanit

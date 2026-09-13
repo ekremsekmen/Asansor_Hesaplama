@@ -14,9 +14,9 @@ import zipfile
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
-                       _paket_ekleri, _proje_kimligi, _sayi, _uretilemedi,
-                       belirsiz_sayi_mi)
+from api.ortak import (PAKET_NOT_KITAP, _BELIRSIZ, _RED, _belirsiz_hata,
+                       _dosya_adi, _indir, _paket_ekleri, _proje_kimligi, _sayi,
+                       _uretilemedi, _uretilemeyen_dosya_notu, belirsiz_sayi_mi)
 from engine.uygulama import girdi as E_UGR
 from engine.uygulama import sabitler as E_US
 from engine.uygulama import tablolar_gorunum as E_UTB
@@ -288,15 +288,20 @@ def _asansor_kitaplari(s, proje):
         except Exception as e:                                # noqa: BLE001
             eksikler.append(f"{etiket}:  {e}")
     if eksikler:
-        kitaplar.append((
-            "URETILEMEYEN ASANSORLER.txt",
-            ("BU PAKETTE EKSİK VAR\r\n"
-             "====================\r\n\r\n"
-             "Aşağıdaki asansörlerin mukavemet çalışma kitabı üretilemedi.\r\n"
-             "Paketteki dosyalar projenin TAMAMI DEĞİLDİR.\r\n\r\n"
-             + "\r\n".join(f"  •  {x}" for x in eksikler)
-             + "\r\n").encode("utf-8")))
+        kitaplar.append(_uretilemeyen_notu(eksikler))
     return kitaplar
+
+
+def _uretilemeyen_notu(eksikler):
+    """Pakete konan "neyin eksik olduğu" dosyası  →  ( ad , içerik ).
+
+    Çoklu ve tekli paket AYNI bildirimi kullanır;  eskiden tekli pakette
+    kitap üretilemezse ``except Exception: pass`` vardı ve kullanıcı kitapsız
+    bir ZIP indirip farkına varmıyordu.
+    """
+    return _uretilemeyen_dosya_notu(
+        eksikler, dosya="URETILEMEYEN ASANSORLER.txt",
+        aciklama="Aşağıdaki asansörlerin mukavemet çalışma kitabı üretilemedi.")
 
 
 def _dosya_parcasi(metin):
@@ -332,18 +337,23 @@ def indir_uygulama_dwg(veri: dict = Body(...)):
         #  geri dönüş noktası aynı arşivde dursun.  ÇOKLU PROJEDE ASANSÖR
         #  BAŞINA AYRI KİTAP girer — mukavemet şablonu tek asansörlüktür.
         ekler = list(_paket_ekleri(veri, "uygulama"))
-        try:
-            if s["adet"] > 1:
-                ekler += _asansor_kitaplari(s, _p)
-            else:
+        if s["adet"] > 1:
+            ekler += _asansor_kitaplari(s, _p)
+        else:
+            #  Kitap üretilemezse paket yine çıkar — ama EKSİK SÖYLENİR.
+            _tek = s["asansorler"][0]
+            try:
                 ekler.append((os.path.splitext(ad)[0] + ".xlsx",
-                              X_MXLS.mukavemet_xlsx(s["asansorler"][0]["girdi"], _p)))
-        except Exception:                                     # noqa: BLE001
-            pass          # şablon yoksa paket yine çıkar, yalnız kitap olmaz
+                              X_MXLS.mukavemet_xlsx(_tek["girdi"], _p)))
+            except Exception as e:                            # noqa: BLE001
+                ekler.append(_uretilemeyen_notu(
+                    [f"{_tek.get('no')} - {_tek.get('tanim') or ''}:  {e}"]))
         paket, sebep, tasti = X_DXF.proje_paketi(
             paftalar, os.path.splitext(ad)[0], ekler)
         yanit = _indir(paket, ad, "application/zip")
-        notlar = (["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
+        notlar = ((["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
+                  + ([PAKET_NOT_KITAP] if any(a == "URETILEMEYEN ASANSORLER.txt"
+                                              for a, _ in ekler) else []))
         if notlar:
             yanit.headers["X-Avan-Not"] = ",".join(notlar)
         return yanit

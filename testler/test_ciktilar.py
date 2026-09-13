@@ -1352,6 +1352,63 @@ def calistir():
             r.kontrol("paket OKUBENİ proje dosyasını anlatıyor",
                       "PROJE DOSYASI" in _z.read("OKUBENI.txt").decode("utf-8"))
 
+            #  AVAN PAKETİNDE ÜRETİLEMEYEN KİTAP SESSİZ KALMAZ
+            #  Eskiden iki yerde ``except Exception: pass`` vardı;  trafik
+            #  hesabı hata döndürdüğünde de kitap iz bırakmadan düşüyordu.
+            #  Artık ZIP'e URETILEMEYEN DOSYALAR.txt girer ve başlıkta KITAP
+            #  notu gider ( arayüz kullanıcıyı ZIP'i açmadan uyarır ).
+            import api.avan as _AVP
+            import testler.altin_uret as _AU
+            _avan_g = next(iter(_AU.avan_senaryolar()))
+            _trf_gecerli = _trf_hatali = None
+            for _t in _AU.senaryolar():
+                _hata = _AVP.E_TRF.hesapla(_AVP._trafik_girdi({"girdiler": _t})).get("hata")
+                if _AVP._belirsiz_hata():
+                    continue
+                if _hata and _trf_hatali is None:
+                    _trf_hatali = _t
+                if not _hata and _trf_gecerli is None:
+                    _trf_gecerli = _t
+                if _trf_gecerli and _trf_hatali:
+                    break
+
+            def _avan_paket(trafik, bozuk=None):
+                asil = {k: getattr(_AVP.X_XLS, k) for k in ("avan_xlsx", "trafik_xlsx")}
+                if bozuk:
+                    def _hata(*_a, **_k):
+                        raise FileNotFoundError("şablon bulunamadı")
+                    setattr(_AVP.X_XLS, bozuk, _hata)
+                try:
+                    y = _AVP.indir_proje_dwg({"kapak": {"project_title": "Deneme"},
+                                              "girdiler": {"avan": _avan_g,
+                                                           "trafik": trafik}})
+                finally:
+                    for k, f in asil.items():
+                        setattr(_AVP.X_XLS, k, f)
+                z = _zf.ZipFile(io.BytesIO(y.body))
+                notu = "URETILEMEYEN DOSYALAR.txt"
+                return (y.headers.get("X-Avan-Not") or "").split(","), z.namelist(), \
+                    (z.read(notu).decode("utf-8") if notu in z.namelist() else "")
+
+            _n, _a, _b = _avan_paket(_trf_gecerli)
+            r.kontrol("[avan paketi] normalde iki kitap var, eksik notu yok",
+                      sum(x.endswith(".xlsx") for x in _a) == 2
+                      and "KITAP" not in _n and not _b, f"→ {_n} {_a}")
+            for _boz, _ad in (("avan_xlsx", "Avan çalışma kitabı"),
+                              ("trafik_xlsx", "Trafik çalışma kitabı")):
+                _n, _a, _b = _avan_paket(_trf_gecerli, _boz)
+                r.kontrol(f"[avan paketi] {_ad} üretilemezse başlıkta KITAP notu",
+                          "KITAP" in _n, f"→ {_n}")
+                r.kontrol(f"[avan paketi] {_ad} üretilemezse ZIP'te sebepli bildirim",
+                          _ad in _b and "şablon bulunamadı" in _b
+                          and "TAMAMI DEĞİLDİR" in _b, f"→ {_b[:120]!r}")
+                r.kontrol(f"[avan paketi] {_ad} bozukken paket yine çıkıyor",
+                          any(x.endswith(".dxf") for x in _a))
+            if _trf_hatali is not None:
+                _n, _a, _b = _avan_paket(_trf_hatali)
+                r.kontrol("[avan paketi] trafik hesabı hata verince kitabın yokluğu bildiriliyor",
+                          "KITAP" in _n and "trafik hesabı yapılamadı" in _b, f"→ {_n} {_b[:120]!r}")
+
         r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",
                   _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]["Q97"].value == 30,
                   "→ şablon değişmiş;  doğrulama testleri dayanağını kaybeder")

@@ -436,6 +436,10 @@ function sayiOku(x){
 
 
 /* ---------------------------------------------------------- indir */
+/*  Paket bir çalışma kitabını içeremediğinde gösterilen uyarı ( KITAP notu ).
+    Avan ve uygulama paketleri AYNI metni kullanır.                          */
+const M_KITAP_EKSIK = 'bazı çalışma kitapları üretilemedi — paket EKSİK. '
+  + 'Sebebi ZIP içindeki "URETILEMEYEN …" dosyasında yazıyor.';
 async function indir(uc){
   durum('Dosya hazırlanıyor…');
   //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI ve
@@ -472,6 +476,13 @@ async function indir(uc){
     const b = await r.blob(), u = URL.createObjectURL(b);
     const a = document.createElement('a'); a.href=u; a.download=ad; document.body.appendChild(a); a.click();
     a.remove(); setTimeout(()=>URL.revokeObjectURL(u),3000);
+    //  Paket eksikse ( sunucunun KITAP notu ) kullanıcı ZIP'i açmadan uyarılır.
+    const notlar = (r.headers.get('X-Avan-Not')||'').split(',');
+    if(notlar.includes('KITAP')){
+      const uy = 'DİKKAT: ' + M_KITAP_EKSIK;
+      durum('İndirildi: '+ad+'  '+uy, true); alert(uy);
+      return;
+    }
     durum('İndirildi: '+ad);
   }catch(e){ durum('İndirme başarısız: '+e.message, true); }
 }

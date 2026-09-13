@@ -736,6 +736,7 @@ async function indirProjeDwg(){
     if(m) ad = decodeURIComponent(m[1]);
     const notlar = (r.headers.get('X-Avan-Not')||'').split(',');
     const sadeceDxf = notlar.includes('DXF'), tasti = notlar.includes('TASMA');
+    const kitapEksik = notlar.includes('KITAP');
     const b = await r.blob(), u = URL.createObjectURL(b);
     const a = document.createElement('a'); a.href=u; a.download=ad;
     document.body.appendChild(a); a.click(); a.remove();
@@ -747,9 +748,15 @@ async function indirProjeDwg(){
     const bicim = sadeceDxf
       ? '  —  ZIP içinde DXF var; AutoCAD birebir açar (DWG isterseniz açıp Farklı Kaydet demeniz yeterli).'
       : '  —  ZIP içinde hem DWG hem DXF var.';
-    if(tasti){
-      const u = 'DİKKAT: pafta sayısı proje formatının çerçevesine sığmadı, '
-              + 'alta taşan sayfalar var. Çizimi baskıya göndermeden kontrol edin.';
+    /*  EKSİK KİTAP SESSİZ KALMAZ.  Sunucu bir çalışma kitabını üretemezse
+        paketi yine verir ama başlıkta KITAP notu gönderir ve ZIP'e
+        URETILEMEYEN DOSYALAR.txt koyar;  kullanıcı ZIP'i açmadan uyarılır. */
+    const uyarilar = [];
+    if(tasti) uyarilar.push('pafta sayısı proje formatının çerçevesine sığmadı, '
+              + 'alta taşan sayfalar var. Çizimi baskıya göndermeden kontrol edin.');
+    if(kitapEksik) uyarilar.push(M_KITAP_EKSIK);
+    if(uyarilar.length){
+      const u = 'DİKKAT: ' + uyarilar.join('  —  ');
       durum('İndirildi: '+ad+bicim+'  '+u, true); alert(u);
     }else{
       durum('İndirildi: '+ad+bicim);

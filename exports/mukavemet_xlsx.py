@@ -605,10 +605,12 @@ KANAL_TABLO_SATIRI = {
 #  β alt kesilme açısıdır ( alt kesilmesiz kanalda 0 ).  İkisi aynı sütunda
 #  tutulamaz — altı kesik V'de F = γ, altı kesik yarım dairede F = β.
 KANAL_F_BASLIK = 46
-KANAL_F_SUTUN = {"gama": "H", "beta": "I", "yarim_daire": "J"}
-#  VLOOKUP( kanal şekli , TABLOLAR!$D$47:$J$52 , sütun , 0 )  için sütun sırası
-KANAL_F_ARALIK = "TABLOLAR!$D$47:$J$52"
-KANAL_F_INDIS = {"gama": 5, "beta": 6, "yarim_daire": 7}
+KANAL_F_SUTUN = {"gama": "H", "beta": "I", "yarim_daire": "J", "gecis": "K"}
+#  VLOOKUP( kanal şekli , TABLOLAR!$D$47:$K$52 , sütun , 0 )  için sütun sırası
+#  ( K = halatın tahrik kasnağı üzerinden geçiş sayısı:  tek sarım 1, çift 2 —
+#    sarılma açısının fiziksel aralığını kitapta da denetlemek için. )
+KANAL_F_ARALIK = "TABLOLAR!$D$47:$K$52"
+KANAL_F_INDIS = {"gama": 5, "beta": 6, "yarim_daire": 7, "gecis": 8}
 
 
 def _kanal_tablosu(wb, O):
@@ -619,6 +621,7 @@ def _kanal_tablosu(wb, O):
     tb[f"{KANAL_F_SUTUN['gama']}{KANAL_F_BASLIK}"] = "γ ( f )"
     tb[f"{KANAL_F_SUTUN['beta']}{KANAL_F_BASLIK}"] = "β ( f )"
     tb[f"{KANAL_F_SUTUN['yarim_daire']}{KANAL_F_BASLIK}"] = "Yarım daire"
+    tb[f"{KANAL_F_SUTUN['gecis']}{KANAL_F_BASLIK}"] = "Geçiş"
     for ad, satir in KANAL_TABLO_SATIRI.items():
         #  Çizelge 2'de belirleyici açı:  V ve altı kesik V'de γ, altı kesik
         #  yarım dairede β, alt kesilmesiz yarım dairede yok.
@@ -633,6 +636,7 @@ def _kanal_tablosu(wb, O):
         tb[f"{KANAL_F_SUTUN['beta']}{satir}"] = MT.kanal_beta(ad, O["kanal_beta"])
         tb[f"{KANAL_F_SUTUN['yarim_daire']}{satir}"] = (
             1 if MT.kanal_yarim_daire_mi(ad) else 0)
+        tb[f"{KANAL_F_SUTUN['gecis']}{satir}"] = MT.kanal_gecis_sayisi(ad) or 1
 
 
 def _surtunme_carpani(wb):
@@ -811,25 +815,32 @@ def _koruma_iletkeni(wb):
         ws[f"AB{r0 + j}"] = "mm²"
 
 
-def _elektrik_degerleri(g):
-    """( S1 , S2 , L1 , L2 )  —  avan motorunun GERÇEKTEN kullandığı değerler.
+#  Kitabın elektrik sayfasındaki HÜKÜM hücreleri  ( =IF(…,"UYGUNDUR.",…) ).
+#  AH65 ve AC101 RAPOR!P31 · P32'ye de akar.
+ELEKTRIK_HUKUM_HUCRELERI = ("AH42", "AH49", "AS53", "AB60", "AH65",
+                            "AH90", "AT94", "AC101")
 
-    Motor çağrılamazsa ( köprü için gereken alanlar eksikse ) girilen
-    değerlere düşülür:  kitap yine üretilir, yalnız denetimden geçmemiş
-    olur.  Sessiz kalmaz — ayrışma zaten ancak aralık dışı bir girdide
-    oluşur ve o durumda motor da hesap yapamıyordur.
+
+def _elektrik_degerleri(g):
+    """( S1 , S2 , L1 , L2 , sebep )  —  avan motorunun GERÇEKTEN kullandığı değerler.
+
+    ``sebep`` hesap yapılabildiyse None'dır.  Motor elektrik hesabını
+    YAPAMAZSA ( kuyu genişliği yok, sıfır bir kesit … ) girilen değerler
+    döner ve sebep yazılır:  pafta o durumda elektriği HESAP EKSİK sayar,
+    kitap da hüküm vermemelidir ( bkz. _elektrik_sayfasi ).
     """
     ham = (g.get("kolon_kesit"), g.get("makine_kesit"),
            g.get("kolon_uzunluk"), g.get("makine_uzunluk"))
     try:
         av = AV_HESAP.hesapla(UYG_GIRDI.kopru(g))
-        oz = ((av.get("asansorler") or [{}])[0].get("ozet")) or {}
-    except Exception:                                         # noqa: BLE001
-        return ham
-    if not oz:
-        return ham
+        a = (av.get("asansorler") or [{}])[0]
+    except Exception as e:                                    # noqa: BLE001
+        return ham + (f"elektrik hesabı çalıştırılamadı ( {e} )",)
+    oz = a.get("ozet") or {}
+    if not a.get("aktif") or not oz:
+        return ham + (str(a.get("uyari") or "girdiler eksik").strip(" !"),)
     return (oz.get("S1", ham[0]), oz.get("S2", ham[1]),
-            oz.get("L1", ham[2]), oz.get("L2", ham[3]))
+            oz.get("L1", ham[2]), oz.get("L2", ham[3]), None)
 
 
 def _elektrik_sayfasi(wb, g):
@@ -851,7 +862,7 @@ def _elektrik_sayfasi(wb, g):
     #  29,85 m ile, teslim edilen kitap 600 m ile ε hesaplıyordu — aynı
     #  projenin iki belgesi farklı gerilim düşümü veriyordu.  Dördü de aynı
     #  yoldan geçer, bu yüzden dördü de motordan okunur.
-    S1, S2, L1, L2 = _elektrik_degerleri(g)
+    S1, S2, L1, L2, sebep = _elektrik_degerleri(g)
     for hucre, deger in (("W27", L2), ("W28", O["U"]), ("W29", O["eps_max"]),
                          ("W32", O["kappa"]), ("W33", S1), ("W34", S2),
                          ("W35", O["motor_elektrik_verimi"]),
@@ -876,6 +887,16 @@ def _elektrik_sayfasi(wb, g):
             ws[hucre] = iz
             ws[ad_hucre] = (f"{etiket} seçilen {kesit} mm² {tip} kablo"
                             + ("" if kesin else "  ( kesit tablo dışı — alt sınır )"))
+
+    #  ELEKTRİK HESABI YAPILAMADIYSA KİTAP DA HÜKÜM VERMEZ.
+    #  Uygulama hesabı bu durumda elektriği "HESAP EKSİK" sayar ve paftaya
+    #  elektrik bölümü basmaz;  kitabın elektrik sayfası ise ham girdilerle
+    #  hesaplamayı sürdürüp hiçbir işaret olmadan "UYGUNDUR." yazıyordu —
+    #  paftanın reddettiği bir hesabı teslim dosyası onaylıyordu.
+    if sebep:
+        for h in ELEKTRIK_HUKUM_HUCRELERI:
+            ws[h] = "HESAP EKSİK"
+        ws["A2"] = f"HESAP EKSİK — elektrik hesabı yapılamadı:  {sebep}"
 
 
 def _liste_tamamla(wb):
@@ -1239,32 +1260,31 @@ def _standarda_uydur(wb, g):
         _es = ws[_o].value
         if isinstance(_es, str) and _es.startswith("=") and "$S$184" not in _es:
             ws[_o] = f'=IF($S$184="","",{_es[1:]})'
+    #  KİTAP DA GEÇERSİZ GİRDİYE HÜKÜM VERMEZ.  Motor iki birleşimi girdide
+    #  reddeder ( MG.dogrula ):  kanalın sarım sayısına göre imkânsız bir
+    #  sarılma açısı ve sertleştirilmemiş alt kesilmesiz V kanal ( TS EN 81-50
+    #  m.5.11.2.3.1.2 ).  Kitap ise bunları hiç denetlemiyordu:  tek sarım ·
+    #  300° girildiğinde pafta "UYGUN DEĞİLDİR" derken kitap ve RAPOR üç
+    #  kontrolde "UYGUNDUR." yazıyordu.  Denetim FORMÜLE yazılır — kitapta açı
+    #  ya da kanal sonradan elle değiştirilirse de işlesin.  Kanal türü ve
+    #  geçiş sayısı kanal tablosundan okunur ( bkz. _kanal_tablosu ).
+    #  Metinler kısa tutulur:  Excel formül içindeki metni 255 karakterle sınırlar.
+    _anah = "'Veri Girişi'!$F$105"
+
+    def _k(ne):
+        return f"VLOOKUP({_anah},{KANAL_F_ARALIK},{KANAL_F_INDIS[ne]},0)"
+
+    _kanal_hatali = (f"AND({_k('yarim_daire')}=0,{_k('beta')}=0,"
+                     f"'Veri Girişi'!$F$106=\"Sertleştirilmemiş\")")
+    _aci_hatali = f"IF({_k('gecis')}>1,$S$184<=180,$S$184>180)"
     for _z in ("Z242", "Z257", "Z271", "Z285"):
         _es = ws[_z].value
         if isinstance(_es, str) and _es.startswith("=") and "$S$184" not in _es:
-            ws[_z] = f'=IF($S$184="","HESAP EKSİK",{_es[1:]})'
-
-    #  ÇİFT SARIMDA BLOKE KARARI KİTAPTA DA VERİLMEZ
-    #  Z285 kitabın bloke hükmüdür:  =IF(O285<=K285,"UYGUNDUR.","UYGUN
-    #  DEĞİLDİR.").  O285 sarılma açısını 'Veri Girişi'!$AA$184'ten okur ve o
-    #  açı TEK SARIMA göredir.  TS EN 81-50 m.5.11.2.1 blokede eşitsizliği
-    #  TERS yazar ( T1/T2 ≥ e^(f·α) ), bu yüzden küçük α burada EMNİYETSİZ
-    #  taraftır ve hüküm verilemez  ( bkz. mukavemet.CIFT_SARIM_BLOKE ).
-    #  Motor bu kontrolü HESAP EKSİK sayar;  teslim edilen kitap "UYGUNDUR."
-    #  demeye devam ederse pafta ile kitap ayrışır — ofisin masasındaki
-    #  dosya paftanın söylemediğini söylerdi.
-    #  T1 · T2 · oran hücrelerine DOKUNULMAZ:  onlar gerçektir ve motorla
-    #  aynı sayıyı verir;  değişen yalnız HÜKÜMDÜR.
-    #  ( α 180°'yi aşıyorsa çift sarım için beyan edilmiş demektir ve hüküm
-    #    verilebilir;  kalkan yalnız açı beyan edilmemişken devrede. )
-    if (MT.kanal_gecis_sayisi(g.get("kanal_sekli")) or 1) > 1 and _alfa_var and _alfa <= 180:
-        ws["Z285"] = "HESAP EKSİK"
-        ws["A286"] = (
-            "ÇİFT SARIM:  girilen α 180°'yi aşmıyor — bu açı tek sarıma aittir.  "
-            "TS EN 81-50 m.5.11.2.1 blokede  T1/T2 ≥ e^(f·α)  ister;  küçük α bu "
-            "kontrolü GEVŞETİR, dolayısıyla hüküm verilemez.  Gerçek sarılma açısı "
-            "saptırma düzeninden belirlenip m.5.11.2.2.3 elle denetlenmelidir.  "
-            "( Yükleme ve frenleme kontrolleri emniyetli taraftadır, geçerlidir. )")
+            ws[_z] = (f'=IF($S$184="","HESAP EKSİK",'
+                      f'IF({_kanal_hatali},"UYGUN DEĞİLDİR — alt kesilmesiz V '
+                      f'kanal sertleştirilmeli (m.5.11.2.3.1.2)",'
+                      f'IF({_aci_hatali},"UYGUN DEĞİLDİR — α kanalın sarım '
+                      f'sayısına göre fiziksel değil",{_es[1:]})))')
 
     #  ㊿  T75/B RAYI KİTABA EKLENİR
     #  Motorun kataloğu genişledi;  teslim edilen kitap onu tanımazsa
@@ -1324,8 +1344,11 @@ def _standarda_uydur(wb, g):
 
     #  ⑲  Mil kuvveti ve moment askı oranına göre indirgenir
     #  2:1 palangada tahrik kasnağının gördüğü kuvvet Gmax değil Gmax/i'dir.
-    ws["AQ7"] = "=(AQ11-AQ13)/'Veri Girişi'!B100"
-    ws["AQ21"] = "=(AQ9/'Veri Girişi'!B100)*(AQ10/2000)"
+    #  Pm de M ile AYNI yükten türer ( Gmax ):  kitap Pm'yi F1 − Ga ile
+    #  kuruyordu — halatın tamamı kabin tarafında, yön · zincir · kablo yok.
+    ws["AQ7"] = "=AQ9/'Veri Girişi'!B100"
+    ws["AQ21"] = "=AQ7*(AQ10/2000)"
+    ws["AH7"], ws["AI7"], ws["AJ7"] = "Gmax", "/", "i"
 
     #  ㉝  DENGESİZ ( ARTAN ) YÜK  Gmax  —  bkz. mukavemet._motor
     #  Kitap Gmax = F1 + Gs − Ga yazar, yani ( 1−q )·Q + Gh.  Gh KABİN

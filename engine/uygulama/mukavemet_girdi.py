@@ -743,6 +743,50 @@ def dogrula(g):
             hata.append(f"{ALAN[anahtar][2]}: {alt}° ile {ust}° arasında "
                         f"olmalıdır ( {d} girildi ).")
 
+    #  ------------------------------------------------------------------
+    #  SARILMA AÇISI KANALIN SARIM SAYISINA GÖRE FİZİKSEL OLMALI
+    #  ------------------------------------------------------------------
+    #  Tek sarımda halat tahrik kasnağını en çok yarım tur sarar ( ≤ 180° ).
+    #  Çift sarımda iki kez geçer ve toplam açı yarım turu AŞAR ( > 180° );
+    #  180° ve altı bir değer tek sarıma aittir — büyük ihtimalle tek geçişin
+    #  açısı girilmiştir.  Bu kontrol eskiden yalnız motorun içindeydi:  motor
+    #  bölümü "uygun değil" sayıyor ama altındaki üç yük durumuna imkânsız
+    #  açıyla "UYGUN" basıyordu;  teslim kitabı ise hiç denetlemiyor, RAPOR'a
+    #  üç kez "UYGUNDUR." yazıyordu ( tek sarım · 300° ).  Açı kanal şekline
+    #  bağlı olduğundan alanın kendi aralığıyla ( 1–360° ) denetlenemez;
+    #  burada, iki alan birlikte görülürken reddedilir.
+    _aci, _kanal = g.get("sarilma_acisi"), g.get("kanal_sekli")
+    if _sayi(_aci) and 1 <= _aci <= 360 and MT.kanal_turu(_kanal) is not None:
+        if (MT.kanal_gecis_sayisi(_kanal) or 1) > 1:
+            if _aci <= 180:
+                hata.append(
+                    f"Sarılma açısı α ({_aci:g}°) çift sarımlı kanalda 180°'yi "
+                    "aşmalıdır. Çift sarımda halat tahrik kasnağının üzerinden "
+                    "iki kez geçer; 180° ve altı bir açı tek sarıma aittir. "
+                    "İki geçişin TOPLAM sarılma açısını girin.")
+        elif _aci > 180:
+            hata.append(
+                f"Sarılma açısı α ({_aci:g}°) tek sarımlı kanalda 180°'yi "
+                "aşamaz — halat tahrik kasnağını en çok yarım tur sarar. "
+                "Çift sarım kullanılıyorsa kanal şeklini ona göre seçin.")
+
+    #  ------------------------------------------------------------------
+    #  SERTLEŞTİRİLMEMİŞ V KANALIN ALT KESİLMESİ OLMALIDIR
+    #  ------------------------------------------------------------------
+    #  TS EN 81-50 m.5.11.2.3.1.2:  "Where the groove has not been submitted
+    #  to an additional hardening process, in order to limit the
+    #  deterioration of traction due to wear, an undercut is necessary."
+    #  Normatif gövdededir, not değildir.  Bu birleşim eskiden yalnız bir not
+    #  alıyor ve sayısal kontroller geçerse tahrik bölümü "UYGUNDUR" diyordu
+    #  ( 576 senaryonun 142'sinde ).  Seçim SESSİZCE "sertleştirilmiş"e
+    #  çevrilmez — o, gerçek kasnağın özelliğini değiştirmek olurdu.
+    if MT.kanal_turu(_kanal) == "V" and g.get("kanal_isleme") == "Sertleştirilmemiş":
+        hata.append(
+            "Alt kesilmesiz V kanal sertleştirilmemiş olamaz — TS EN 81-50 "
+            "m.5.11.2.3.1.2 sertleştirilmemiş V kanalda aşınmadan doğan tahrik "
+            "kaybını sınırlamak için ALT KESİLME ister. Kanal ya "
+            "sertleştirilmiş olmalı ya da 'Altı Kesik V Kanal' seçilmelidir.")
+
     #  OPSİYONEL ALANLARIN POZİTİFLİK VE FİZİKSEL SINIRLARI
     #  Boş bırakılabilirler;  ama girilmişse pozitif ve fiziksel olmalıdır.
     #  paten_balata_boyu = 0 girildiğinde motor bunu sessizce türetilene

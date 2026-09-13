@@ -96,7 +96,12 @@ def senaryolar():
 
     #  Kanal şekli / işlemesi  →  Nequiv(t) ve sürtünme faktörü
     for k in MT.KANAL_SEKILLERI:
-        E(f"kanal {k}", kanal_sekli=k)
+        #  Düz V kanal sertleştirilmemiş olamaz ( TS EN 81-50 m.5.11.2.3.1.2 ) —
+        #  girdide reddedilir;  o kanal sertleştirilmiş işlemeyle sınanır.
+        if MT.kanal_turu(k) == "V":
+            E(f"kanal {k}", kanal_sekli=k, kanal_isleme="Sertleştirilmiş")
+        else:
+            E(f"kanal {k}", kanal_sekli=k)
     for k in MT.KANAL_ISLEME_SEKILLERI:
         E(f"kanal işleme {k}", kanal_isleme=k)
 
@@ -404,20 +409,52 @@ def calistir():
     for _ofis in (None, _OFIS_DEGISIK):
         for _k in MT.KANAL_SEKILLERI:
             for _i in MT.KANAL_ISLEME_SEKILLERI:
-                _g = {"kanal_sekli": _k, "kanal_isleme": _i, "sarilma_acisi": 180}
+                #  Sertleştirilmemiş düz V standart dışıdır ve motor onu reddeder;
+                #  f karşılaştırması yapılamaz — aşağıda ayrı sınanır.
+                if MT.kanal_turu(_k) == "V" and _i == "Sertleştirilmemiş":
+                    continue
+                #  Açı kanalın sarım sayısına uymalı:  tek sarımda ≤ 180°,
+                #  çift sarımda > 180° ( aykırısı girdide reddedilir ).
+                _aci = 330 if (MT.kanal_gecis_sayisi(_k) or 1) > 1 else 180
+                _g = {"kanal_sekli": _k, "kanal_isleme": _i, "sarilma_acisi": _aci}
                 if _ofis:
                     _g["_ofis"] = dict(_ofis)
                 _fsen.append((f"f{len(_fsen):02d}", _g))
+    #  GEÇERSİZ GİRDİDE KİTAP DA HÜKÜM VERMEZ.  Motor bu üç girdiyi reddeder;
+    #  kitap onları hiç denetlemiyor, tek sarım · 300°'de RAPOR'a üç kez
+    #  "UYGUNDUR." yazıyordu.  Kitap motordan bağımsız çağrıldığında ( elle
+    #  değiştirilmiş hücre ) da hüküm hücreleri "UYGUN DEĞİLDİR" demeli.
+    _gecersiz = (
+        ("g_tek300", {"sarilma_acisi": 300, "kanal_isleme": "Sertleştirilmiş"},
+         "sarım sayısına"),
+        ("g_cift180", {"kanal_sekli": "Yarım Daire Kanal (Çift Sarım)",
+                       "sarilma_acisi": 180}, "sarım sayısına"),
+        ("g_Vsoft", {"kanal_sekli": "V Kanal", "kanal_isleme": "Sertleştirilmemiş",
+                     "sarilma_acisi": 180}, "alt kesilmesiz V"))
     try:
-        for _ad, _g in _fsen:
+        for _ad, _g in list(_fsen) + [(a, g) for a, g, _ in _gecersiz]:
             with open(os.path.join(_fg, _ad + ".xlsx"), "wb") as _f:
                 _f.write(MX.mukavemet_xlsx(_g))
     except FileNotFoundError:
         _fsen = []
         r.atla("mukavemet şablonu yok — kanal f denetimi atlandı")
     if _fsen:
-        yeniden_hesapla([os.path.join(_fg, a + ".xlsx") for a, _ in _fsen],
+        yeniden_hesapla([os.path.join(_fg, a + ".xlsx") for a, _ in _fsen]
+                        + [os.path.join(_fg, a + ".xlsx") for a, _g, _p in _gecersiz],
                         os.path.join(_fk, "out"))
+        for _ad, _g, _parca in _gecersiz:
+            r.kontrol(f"[geçersiz girdi] {_ad} motorda reddediliyor",
+                      not MK.hesapla(_g).get("aktif"))
+            _gyol = os.path.join(_fk, "out", _ad + ".xlsx")
+            if not os.path.isfile(_gyol):
+                r.kontrol(f"[geçersiz girdi] {_ad} kitabı hesaplandı", False)
+                continue
+            _gws = openpyxl.load_workbook(_gyol, data_only=True)[SAYFA]
+            for _z in ("Z242", "Z257", "Z271", "Z285"):
+                _v = str(_gws[_z].value or "")
+                r.kontrol(f"[geçersiz girdi] {_ad} · {_z} hüküm vermiyor",
+                          _v.startswith("UYGUN DEĞİLDİR —") and _parca in _v,
+                          f"→ {_v!r}")
         r.esit("[kanal f] her birleşim ayrı kitap olarak yeniden hesaplandı",
                len([a for a, _ in _fsen
                     if os.path.isfile(os.path.join(_fk, "out", a + ".xlsx"))]),
@@ -438,7 +475,13 @@ def calistir():
             #  değiştirilirse sınır o satırdan okunur.  Motor yalnız seçili
             #  işlemeninkini yazdığı için öbürü ayrı bir hesapla kıyaslanır.
             _obur = [x for x in MT.KANAL_ISLEME_SEKILLERI if x != _g["kanal_isleme"]][0]
-            _ho = MK.hesapla(dict(_g, kanal_isleme=_obur))["_h"]
+            _gobur = MK.hesapla(dict(_g, kanal_isleme=_obur))
+            if not _gobur.get("aktif"):
+                #  Düz V'nin öbür işlemesi ( sertleştirilmemiş ) standart dışıdır
+                #  ve reddedilir:  kıyaslanacak motor sonucu yoktur;  kitap o
+                #  birleşimde zaten hüküm vermez ( bkz. [geçersiz girdi] ).
+                continue
+            _ho = _gobur["_h"]
             for _h in (("AJ198", "AL202") if _obur == "Sertleştirilmiş"
                        else ("AU206", "AV211")):
                 r.kontrol(f"[kanal f] {_et} · öbür işleme {_h}",

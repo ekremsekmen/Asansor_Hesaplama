@@ -655,7 +655,27 @@ def calistir():
         pg.fill("#m_guvenlik_devreye_kuvvet", "200")
         #  Tahrik için iki bileşen bilgisi daha:  sertleştirilmiş kanal
         #  ( f = μ / sin(γ/2) ) ve denge zinciri.
+        #  STANDART DIŞI KANAL SEÇTİRİLMEZ  ( TS EN 81-50 m.5.11.2.3.1.2 ):
+        #  sertleştirilmemiş V kanalın alt kesilmesi olmalıdır.  İki liste
+        #  birbirini görmüyordu;  artık karşı listedeki uyumsuz seçenek kapalı.
+        _v_kapali = 'document.querySelector(\'#m_kanal_sekli option[value="V Kanal"]\').disabled'
+        _y_kapali = ('document.querySelector(\'#m_kanal_isleme option'
+                     '[value="Sertleştirilmemiş"]\').disabled')
+        r.kontrol("işleme sertleştirilmemişken düz V kanal seçtirilmiyor",
+                  pg.evaluate(_v_kapali) is True)
         pg.select_option("#m_kanal_isleme", "Sertleştirilmiş")
+        r.kontrol("işleme sertleştirilmiş olunca düz V kanal açılıyor",
+                  pg.evaluate(_v_kapali) is False)
+        pg.select_option("#m_kanal_sekli", "V Kanal")
+        r.kontrol("düz V kanal seçiliyken sertleştirilmemiş seçtirilmiyor",
+                  pg.evaluate(_y_kapali) is True)
+        r.kontrol("kapalı seçeneğin üstünde sebep yazıyor",
+                  "5.11.2.3.1.2" in (pg.evaluate(
+                      'document.querySelector(\'#m_kanal_isleme option'
+                      '[value="Sertleştirilmemiş"]\').title') or ""))
+        pg.select_option("#m_kanal_sekli", "Altı Kesik V Kanal")
+        r.kontrol("altı kesik V'de sertleştirilmemiş yine seçilebiliyor",
+                  pg.evaluate(_y_kapali) is False)
         pg.select_option("#m_denge_zinciri", "Var")
         #  Sarılma açısı ZORUNLU girdidir ve varsayılanı yoktur;  girilmezse
         #  tahrik sınırları hesaplanmaz.  Formda gerçekten doldurulabildiği

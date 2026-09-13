@@ -112,6 +112,7 @@ async function mukavemetKur(){
   if($('m_adet')) $('m_adet').value = String(MUK_ADET);
   mMakineDairesiKutulari();
   mIkiliTazele();
+  mKanalUyumu();
   mAsansorSekmeleriTazele();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
@@ -267,6 +268,25 @@ function mIkiliSec(id, deger){
   e.checked = !!deger;
   e.dispatchEvent(new Event('change', {bubbles:true}));
   mIkiliTazele();
+}
+
+/*  SERTLEŞTİRİLMEMİŞ DÜZ V KANAL SEÇTİRİLMEZ  ( TS EN 81-50 m.5.11.2.3.1.2 ).
+    Sertleştirilmemiş V kanalın ALT KESİLMESİ olmalıdır.  Kanal şekli ile
+    kanal işlemesi iki ayrı listedir ve birbirini görmüyordu:  kullanıcı
+    ikisini ayrı ayrı değiştirip standart dışı birleşimi kurabiliyordu.
+    Karşı listedeki uyumsuz seçenek KAPATILIR ve sebebi üstüne yazılır.
+    Mevcut seçim SESSİZCE DEĞİŞTİRİLMEZ — o, gerçek kasnağın özelliğini
+    değiştirmek olurdu;  eski bir dosyadan böyle gelirse motor açık hata verir. */
+const M_KANAL_NEDEN = 'TS EN 81-50 m.5.11.2.3.1.2 — sertleştirilmemiş V kanalın alt kesilmesi olmalıdır';
+function mKanalUyumu(){
+  const k = $(M_ID('kanal_sekli')), i = $(M_ID('kanal_isleme'));
+  if(!k || !i) return;
+  const kapat = (o, kosul) => {
+    o.disabled = !!kosul;
+    o.title = kosul ? M_KANAL_NEDEN : '';
+  };
+  for(const o of i.options) kapat(o, k.value === 'V Kanal' && o.value === 'Sertleştirilmemiş');
+  for(const o of k.options) kapat(o, i.value === 'Sertleştirilmemiş' && o.value === 'V Kanal');
 }
 
 /*  Checkbox nereden değişirse değişsin ( düğme · geri yükleme · test )
@@ -467,6 +487,7 @@ function mFormaYaz(harita, sec){
     if(harita[f.anahtar] === undefined) continue;
     mAlanYaz(f, harita[f.anahtar]);
   }
+  mKanalUyumu();
 }
 
 function mukavemetGirdi(){
@@ -521,6 +542,7 @@ function mukavemetPlanla(hedef){
   if(hedef && hedef.id === M_ID('agirlik_malzemesi')) mMalzemeDerinligi();
   mMakineDairesiKutulari();
   mIkiliTazele();
+  mKanalUyumu();
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);

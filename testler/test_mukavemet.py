@@ -495,6 +495,14 @@ def _sapmalar(r):
     for _sk in _MTx.KANAL_SEKILLERI:
         for _is in ("Sertleştirilmemiş", "Sertleştirilmiş"):
             _x = MK.hesapla({"kanal_sekli": _sk, "kanal_isleme": _is})
+            #  Sertleştirilmemiş DÜZ V kanal girdide reddedilir
+            #  ( TS EN 81-50 m.5.11.2.3.1.2 ) — onun f'i sınanmaz, reddi sınanır.
+            if _MTx.kanal_turu(_sk) == "V" and _is == "Sertleştirilmemiş":
+                r.kontrol(f"f yükleme  {_sk[:26]} · {_is[:14]}  girdide reddediliyor",
+                          not _x.get("aktif")
+                          and any("m.5.11.2.3.1.2" in h for h in _x.get("hata") or []),
+                          f"→ {_x.get('hata')}")
+                continue
             _h2 = _x["_h"]
             _fm = _h2.get("AU206") if _h2.get("AU206") is not None else _h2.get("AJ198")
             r.kontrol(f"f yükleme  {_sk[:26]} · {_is[:14]}",
@@ -503,17 +511,20 @@ def _sapmalar(r):
     #  Kanal şekli f'yi GERÇEKTEN değiştirmeli  ( eskiden değiştirmiyordu )
     _fset = set()
     for _sk in _MTx.KANAL_SEKILLERI:
-        _h2 = MK.hesapla({"kanal_sekli": _sk})["_h"]
+        _h2 = MK.hesapla({"kanal_sekli": _sk, "kanal_isleme": "Sertleştirilmiş"})["_h"]
         _fset.add(round(_h2.get("AU206") or _h2.get("AJ198"), 6))
     r.kontrol("kanal şekli sürtünme çarpanını değiştiriyor", len(_fset) > 1,
               f"→ {_fset}")
-    #  Sertleştirilmemiş + alt kesilmesiz V kanal:  standart dışı, uyarı çıkmalı
-    _b6 = [b for b in MK.hesapla({"kanal_sekli": "V Kanal",
-                                  "kanal_isleme": "Sertleştirilmemiş"})["bolumler"]
-           if b["baslik"].startswith("6")][0]
-    r.kontrol("alt kesilmesiz sertleştirilmemiş kanal UYARI veriyor",
-              any("STANDART DIŞI" in x for x in (_b6.get("notlar") or [])),
-              f"→ {_b6.get('notlar')}")
+    #  Sertleştirilmemiş + alt kesilmesiz V kanal:  standart dışı.  Eskiden
+    #  yalnız not düşülüyor ve sayısal kontroller geçerse bölüm "UYGUNDUR"
+    #  diyordu;  artık girdide reddedilir ve seçim sessizce değiştirilmez.
+    _v6 = MK.hesapla({"kanal_sekli": "V Kanal", "kanal_isleme": "Sertleştirilmemiş"})
+    r.kontrol("alt kesilmesiz sertleştirilmemiş kanal girdide REDDEDİLİYOR",
+              not _v6.get("aktif")
+              and any("m.5.11.2.3.1.2" in h for h in _v6.get("hata") or []),
+              f"→ {_v6.get('hata')}")
+    r.esit("ret sırasında işleme seçimi değiştirilmiyor",
+           _v6["girdi"]["kanal_isleme"], "Sertleştirilmemiş")
 
     #  ⑨  motor verimi makine tipine bağlı  ( ofis standardı, TEK KAYNAK )
     from engine.ortak import ofis as _OF
@@ -731,13 +742,17 @@ def _denetim_bulgulari(r):
               bool(_MG.dogrula(_MG.tamamla(
                   dict(_MG.varsayilanlar(), sarilma_acisi=400)))),
               "→ 400° kabul edildi")
-    _b6 = [x for x in MK.hesapla({"sarilma_acisi": 200})["bolumler"]
+    #  Tek sarımda 180°'yi aşan açı artık GİRDİDE reddedilir ( kanal şekli
+    #  ile birlikte ):  eskiden motor bölümü "uygun değil" sayıp üç yük
+    #  durumuna "UYGUN" basıyor, teslim kitabı hiç denetlemiyordu.
+    _v6b = MK.hesapla({"sarilma_acisi": 200})
+    r.kontrol("B6  tek sarımda α > 180° girdide reddediliyor",
+              not _v6b.get("aktif")
+              and any("tek sarımlı kanalda 180°'yi aşamaz" in h
+                      for h in _v6b.get("hata") or []),
+              f"→ {_v6b.get('hata')}")
+    _b6 = [x for x in MK.hesapla({"sarilma_acisi": 180})["bolumler"]
            if x["baslik"].startswith("6 ")][0]
-    _k6 = [a for a in _b6["adimlar"]
-           if a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
-    r.kontrol("B6  tek sarımda α > 180° bölümde reddediliyor",
-              _k6 and _k6[0]["deger"] == "UYGUN DEĞİL",
-              f"→ {_k6[0]['deger'] if _k6 else 'kontrol satırı yok'}")
     r.kontrol("B6  bölüm 6'da α aralık kontrolü var",
               any("tek sarımlı" in str(a.get("aciklama", ""))
                   for a in _b6["adimlar"]),
@@ -752,8 +767,11 @@ def _denetim_bulgulari(r):
     r.esit("B7  altı kesik V γ = 45° → 6,5  ( V satırını izliyor )", _n45, 6.5)
     r.esit("B7  altı kesik V'de β Nequiv'i DEĞİŞTİRMEZ",
            MK.hesapla({"_ofis": {"kanal_beta": 100}})["_h"]["AH104"], 12.0)
-    _sb = MK.hesapla({"kanal_sekli": "V Kanal"})["_h"]["AH104"]
-    _sb45 = MK.hesapla({"kanal_sekli": "V Kanal",
+    #  ( Düz V kanal sertleştirilmemiş olamaz — m.5.11.2.3.1.2;  Nequiv(t)
+    #    kanal işlemesinden bağımsızdır, sertleştirilmiş seçilir. )
+    _sb = MK.hesapla({"kanal_sekli": "V Kanal",
+                      "kanal_isleme": "Sertleştirilmiş"})["_h"]["AH104"]
+    _sb45 = MK.hesapla({"kanal_sekli": "V Kanal", "kanal_isleme": "Sertleştirilmiş",
                         "_ofis": {"kanal_gama_v": 45}})["_h"]["AH104"]
     r.esit("B7  V kanal γ = 38° → 12", _sb, 12.0)
     r.esit("B7  V kanal γ = 45° → 6,5  ( ofis sabiti izleniyor )", _sb45, 6.5)
@@ -766,7 +784,7 @@ def _denetim_bulgulari(r):
     #  Paftaya basılan γ, hesabın kullandığı γ ile aynı mı
     for _sekil, _bek in (("V Kanal", 38), ("Yarım Daire Kanal", 25),
                          ("Altı Kesik V Kanal", 38)):
-        _s7 = MK.hesapla({"kanal_sekli": _sekil})
+        _s7 = MK.hesapla({"kanal_sekli": _sekil, "kanal_isleme": "Sertleştirilmiş"})
         _b4x = [x for x in _s7["bolumler"] if x["baslik"].startswith("4 ")][0]
         _gam = [a["deger"] for a in _b4x["adimlar"] if a.get("sembol") == "γ"]
         r.esit(f"B7  '{_sekil}' paftada γ = hesabın γ'sı", _gam, [_bek])
