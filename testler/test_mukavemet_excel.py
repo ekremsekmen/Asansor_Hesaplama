@@ -440,8 +440,33 @@ def calistir():
                 ("d_var", dict(_KUCUK, kasnak_belgesi="Var")),
                 ("d_var40", {"tahrik_kasnak_capi": 320, "halat_capi": 8,
                              "kasnak_belgesi": "Var"}))
+    #  TAHRİK HÜCRELERİ TESLİM KİTABINDA MOTORLA AYNI.  Bu hücreler kaynak
+    #  kitaptan BİLEREK ayrışır ( AYRILAN ) ve yukarıdaki ana döngü onları
+    #  atlar;  teslim kitabının onları motorla aynı kurduğunu hiçbir şey
+    #  görmüyordu.  Görünmeyen üç ayrışma buradan çıktı:  denge zinciri
+    #  kitapta tahrike girmiyordu, bloke halat kütlesi katalogdan değil
+    #  tablodan okunuyordu, 1. gezici kablo 24 × 0,75'e çiviliydi — ve
+    #  sürtünme iki kez r'ye bölünüyordu.  q ≠ 0,50'de Gmax da ayrışıyordu.
+    _TAHRIK_H = ("AF235", "AJ240", "K242", "AF250", "AJ255", "K257",
+                 "AH264", "AF269", "K271", "AH278", "AF283", "K285", "AQ9")
+    _tahrik = (
+        ("t_11", {"aski_orani": 1, "sarilma_acisi": 150, "kanal_sekli": "V Kanal",
+                  "kanal_isleme": "Sertleştirilmiş"}),
+        ("t_zincir", {"aski_orani": 2, "sarilma_acisi": 180, "denge_zinciri": "Var"}),
+        ("t_katalog", {"aski_orani": 2, "sarilma_acisi": 180, "denge_zinciri": "Var",
+                       "halat_birim_kutle": 0.21,
+                       "_ofis": {"denge_zinciri_orani": 70, "q_denge": 0.45}}),
+        ("t_kablo", {"aski_orani": 2, "sarilma_acisi": 180, "kablo_birim_kutle": 0.44}),
+        ("t_kablotip", {"aski_orani": 1, "sarilma_acisi": 170, "kablo_tipi_1": "12 x 1,00",
+                        "kat_kapisi_tipi": "Manuel Sağ"}),
+        ("t_fr0", {"aski_orani": 2, "sarilma_acisi": 180,
+                   "_ofis": {"kuyu_surtunme_kabin": 0, "kuyu_surtunme_agirlik": 0}}),
+        ("t_fr3", {"aski_orani": 2, "sarilma_acisi": 170,
+                   "_ofis": {"kuyu_surtunme_kabin": 3, "kuyu_surtunme_agirlik": 2.5}}),
+    )
     try:
-        for _ad, _g in list(_fsen) + [(a, g) for a, g, _ in _gecersiz] + list(_belgeli):
+        for _ad, _g in (list(_fsen) + [(a, g) for a, g, _ in _gecersiz] + list(_belgeli)
+                        + list(_tahrik)):
             with open(os.path.join(_fg, _ad + ".xlsx"), "wb") as _f:
                 _f.write(MX.mukavemet_xlsx(_g))
     except FileNotFoundError:
@@ -450,8 +475,20 @@ def calistir():
     if _fsen:
         yeniden_hesapla([os.path.join(_fg, a + ".xlsx") for a, _ in _fsen]
                         + [os.path.join(_fg, a + ".xlsx") for a, _g, _p in _gecersiz]
-                        + [os.path.join(_fg, a + ".xlsx") for a, _g in _belgeli],
+                        + [os.path.join(_fg, a + ".xlsx") for a, _g in _belgeli]
+                        + [os.path.join(_fg, a + ".xlsx") for a, _g in _tahrik],
                         os.path.join(_fk, "out"))
+        for _ad, _g in _tahrik:
+            _s = MK.hesapla(_g)
+            _tyol = os.path.join(_fk, "out", _ad + ".xlsx")
+            if not r.kontrol(f"[tahrik] {_ad} kitabı hesaplandı",
+                             _s.get("aktif") and os.path.isfile(_tyol), f"→ {_s.get('hata')}"):
+                continue
+            _tws = openpyxl.load_workbook(_tyol, data_only=True)[SAYFA]
+            for _h in _TAHRIK_H:
+                r.kontrol(f"[tahrik] {_ad} · {_h} teslim kitabında motorla aynı",
+                          _esit(_s["_h"][_h], _tws[_h].value),
+                          f"→ motor {_s['_h'][_h]!r}, kitap {_tws[_h].value!r}")
         for _ad, _g in _belgeli:
             _s = MK.hesapla(_g)
             _b4 = next(b for b in _s["bolumler"] if b["kimlik"] == "aski_halatlari")

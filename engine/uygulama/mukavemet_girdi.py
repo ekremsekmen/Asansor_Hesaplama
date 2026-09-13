@@ -176,6 +176,15 @@ ALANLAR = (
     #  2. kablo tipi GİRDİ DEĞİLDİR:  kaynak kitapta kat kapısı tipinden
     #  HLOOKUP ile türetilir ( 'Veri Girişi'!B108 ).  Sorulmaz, hesaplanır.
     ("kablo_tipi_2",      "B108", "2. bükülgen kablo tipi",            "—",    "hesap", None, None),
+    #  GEZİCİ KABLONUN İMALATÇI AĞIRLIĞI.  Program iki kabloyu tablodan alır
+    #  ( 1. tip + kat kapısından türeyen 2. tip ) ve tablo dört kablo tanır;
+    #  tek kablolu ya da farklı kesitli bir tesis girilemiyordu ( ELEport
+    #  örneği:  tek kablo 0,44 kg/m — tablo 2 × 0,642 = 1,284 kg/m verir ).
+    #  MTrav motor gücüne, P'ye ( ray · kuyu tabanı ) ve tahrike girer.
+    #  TOPLAMDIR:  bütün gezici kabloların metre ağırlıkları toplanıp yazılır.
+    #  Boş bırakılırsa tablo kullanılır.
+    ("kablo_birim_kutle", "",     "Gezici kabloların toplam 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+     "kg/m", "sayi", None, None),
     #  "halat_arasi" ( Ra ) da KALDIRILDI — o da yalnız α'nın payındaydı
     #  ( A = Ra − 2·R1 ).  Arka ağırlıkta kuyu derinliği − ray-kapı arası −
     #  ağırlık ray-duvar'dan türetiliyordu;  o üç ölçü kendi hesaplarında
@@ -407,7 +416,7 @@ OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi",
                      "halat_birim_kutle", "halat_kopma_kN",
                      "reg_halat_birim_kutle", "reg_halat_kopma_kN",
                      "raya_binen_yuk",
-                     "saptirma_kasnak_min_capi")
+                     "saptirma_kasnak_min_capi", "kablo_birim_kutle")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
 #  hesaba katılacak azami sürtünme katsayısı.
@@ -488,7 +497,7 @@ GRUPLAR = (
       "sarilma_acisi",
       "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
       "kasnak_tek_yon", "kasnak_ters_yon",
-      "acil_frenleme_a", "kablo_tipi_1")),
+      "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle")),
     ("Hız regülatörü",
      ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
       "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
@@ -823,6 +832,7 @@ def dogrula(g):
     #  güvenlik katsayısı 1000 kat büyür ve HER tasarım "UYGUN" görünürdü.
     #  Üst sınır o hatayı yakalar.
     for _ad, _alt, _ust in (("halat_birim_kutle", 0.02, 5.0),
+                            ("kablo_birim_kutle", 0.05, 20.0),
                             ("halat_kopma_kN", 5.0, 2000.0),
                             ("reg_halat_birim_kutle", 0.02, 5.0),
                             ("reg_halat_kopma_kN", 5.0, 2000.0),

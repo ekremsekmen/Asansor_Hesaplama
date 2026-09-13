@@ -884,6 +884,22 @@ EXCEL_FARKLARI = (
      "hükümleri HESAP EKSİK olur;  kitapta da O242 … O285 boş, Z242 … Z285 "
      "'HESAP EKSİK' yazar.",
      ("S184", "AA184", "O242", "O257", "O271", "O285")),
+
+    ("Kuyu sürtünmesi iki kez askı oranına bölünüyordu",
+     "TS EN 81-50 m.5.11.2.2 · Ek D",
+     "Askı Tipleri!P128 · P129 · Q128 · Q129 sürtünmeyi, o taraftaki "
+     "sürtünmesiz HALAT kuvvetinin ( zaten / r ile halata çevrilmiş ) %2'si ve "
+     "%1,5'i olarak kurar;  11!X250 · V255 · X264 · X269 onu formülün "
+     "gereği olarak BİR KEZ DAHA r'ye böler.  2:1 askıda sürtünme yarıya "
+     "iner.  Oranlar da hücreye çivilidir ve paftada görünmez.",
+     "Standart FRcar / FRcwt'yi KUYUDAKİ sürtünme kuvveti diye tanımlar:  "
+     "yüzde, o taraftaki gövdenin ağırlık kuvvetine uygulanır — kabin "
+     "( P + Q + MCR + MTrav )·( gn ± a ), karşı ağırlık ( Mcwt + MCR )·( gn ∓ a ) "
+     "— ve formüle FR / r girer.  ELEport ve new block da böyle kurar;  ELEport "
+     "örneğinde fren alt T1 8.987,79 N ( ELEport 8.987,82 ).  Yüzdeler ofis "
+     "sabitidir ( varsayılan %2 · %1,5 ), paftada kaynağıyla basılır;  asgari "
+     "sürtünme sağlanamıyorsa 0 yazılır ( m.5.11.2.2 ).",
+     ("AF250", "AJ255", "K257", "AH264", "AF269", "K271")),
 )
 
 #  Testlerin okuduğu düz küme
@@ -944,8 +960,8 @@ SABIT = {
     "Fs_ust":          0.6,       # eşik kuvveti  Q ≥ 2500 kg
     "Fs_sinir":        2500,      # [kg]
     "tampon_katsayi":  4,         # F = 4·gn·(P+Q)                       (11!R621)
-    "FRcar_katsayi":   0.02,      # kabin sürtünme direnci        (Askı Tipleri!P128)
-    "FRcwt_katsayi":   0.015,     # ağırlık sürtünme direnci      (Askı Tipleri!P129)
+    #  ( Kuyu sürtünmesi yüzdeleri buradan OFİS SABİTLERİNE taşındı —
+    #    kuyu_surtunme_kabin · kuyu_surtunme_agirlik;  bkz. _tahrik. )
     "ray_kaide_payi":  200,       # ray boyu:  kaide yüksekliği − 200 mm (11!AH291)
     "ray_kuyu_payi":   300,       # ray boyu:  kuyu dibi − 300 mm
 }
@@ -1001,6 +1017,22 @@ SIGINMA = {
 def _pozitif(x):
     """Pozitif bir sayı mı  ( bool tuzağı dâhil )."""
     return isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
+
+
+def _gezici_kablo(g):
+    """Gezici kabloların toplam 1 m ağırlığı  —  İMALATÇI DEĞERİ TABLOYU EZER.
+
+    Döner:  ( mt kg/m , kaynak )
+    Tablo iki kablo tanır ( 1. tip + kat kapısından türeyen 2. tip ) ve dört
+    kesit bilir;  tek kablolu ya da başka kesitli bir tesis girilemiyordu.
+    Motor gücü, P ( ray · kuyu tabanı ) ve tahrik AYNI sayıyı kullanır.
+    """
+    elle = g.get("kablo_birim_kutle")
+    if _pozitif(elle):
+        return float(elle), "GİRİŞ — imalatçı kataloğu"
+    return (sum(MT.kablo_agirligi(g.get(k)) or 0.0
+                for k in ("kablo_tipi_1", "kablo_tipi_2")),
+            f"tablo  ( {g.get('kablo_tipi_1')} + {g.get('kablo_tipi_2')} )")
 
 
 def _halat_verisi(g, cap="halat_capi", kutle="halat_birim_kutle",
@@ -1110,8 +1142,7 @@ def _motor(g, o):
     lam = ((O["denge_zinciri_orani"] or 0) / 100.0
            if str(g.get("denge_zinciri") or "").strip() == "Var" else 0.0)
     MCR = lam * MSR                                  # zincirin dengelediği
-    mt = sum(MT.kablo_agirligi(g.get(k)) or 0.0
-             for k in ("kablo_tipi_1", "kablo_tipi_2"))
+    mt, mt_kaynak = _gezici_kablo(g)
     MTrav = 0.5 * H * mt                             # gezici kablo dengesizliği
     #  İKİ HAREKET YÖNÜ DE HESAPLANIR.  Motoru zorlayan yalnız "dolu kabin
     #  yukarı" değildir;  BOŞ KABİN AŞAĞI inerken motor karşı ağırlığı
@@ -1272,6 +1303,7 @@ def _motor(g, o):
              if lam else "zincir yok", 2),
         hesap("MCR = λ × MSR", f"{tr(lam)} × {tr(MSR)}", MCR, "kg",
               "zincirin dengelediği kütle"),
+        veri("mt", "Gezici kabloların 1 m ağırlığı", mt, "kg/m", mt_kaynak, 3),
         hesap("MTrav = 0,5 × H × mt",
               f"0,5 × {tr(H)} × {tr(mt)}", MTrav, "kg",
               "gezici kablo dengesizliği"),
@@ -1968,8 +2000,7 @@ def _terimler(g, o, durum):
     nh, gh, H = o["nh"], o["gh"], g["seyir_mesafesi"]
     Mcwt = g["karsi_agirlik"]
     a_in = g["acil_frenleme_a"]
-    w_kablo = ((MT.kablo_agirligi(g["kablo_tipi_1"]) or 0)
-               + (MT.kablo_agirligi(g["kablo_tipi_2"]) or 0))
+    w_kablo, _ = _gezici_kablo(g)
     ycar = ycwt = H / 2.0        # Askı Tipleri!*131 · *132
 
     #  ASKI KASNAKLARININ ATALETİ  —  yalnız askı oranı > 1 iken  ( koşul III )
@@ -2337,6 +2368,21 @@ def _tahrik(g, o):
                  O["kasnak_adet_agirlik"], "adet", "OFİS KABULÜ", 0),
         ]
 
+    #  ── KUYU SÜRTÜNMESİ  ( m.5.11.2.2 · yalnız acil frenlemede ) ──────
+    #  Paftada GÖRÜNÜR:  frenleme hükmü bu kabule bağlıdır ( 5.760
+    #  senaryonun 399'unda sürtünme 0 alınınca hüküm döner ) ve standart onu
+    #  "asgari sürtünme sağlanamıyorsa silinmelidir" koşuluna bağlar.
+    _fr_kaynak = ("KABUL  ·  EN 81-50 m.5.11.2.2 — asgari sürtünme "
+                  "sağlanamıyorsa 0 alınır")
+    b["adimlar"] += [
+        metin("Kuyudaki sürtünme  ( m.5.11.2.2 · yalnız acil frenlemede ) :",
+              vurgu=True),
+        veri("FRcar", "Kabin tarafı sürtünmesi  ( P + Q + MCR + MTrav kuvvetinin )",
+             O["kuyu_surtunme_kabin"], "%", _fr_kaynak, 1),
+        veri("FRcwt", "Ağırlık tarafı sürtünmesi  ( Mcwt + MCR kuvvetinin )",
+             O["kuyu_surtunme_agirlik"], "%", _fr_kaynak, 1),
+    ]
+
     #  Her yük durumunun Excel'deki T1 · T2 · oran · sınır hücreleri
     DURUM_HUCRE = {
         "yukleme":  ("AF235", "AJ240", "K242", "O242"),
@@ -2351,20 +2397,27 @@ def _tahrik(g, o):
         isl = ISLEM[durum]
         kont_mesaj = ""          # kontrol satırının "UYGUN / UYGUN DEĞİL"i
         sinir_kaynak = "EN 81-50 m.5.11.3"
-        #  SÜRTÜNME DİRENCİ, KENDİ TARAFININ KUVVETİNDEN TÜREMELİDİR.
-        #  FRcar kabin tarafındaki, FRcwt ağırlık tarafındaki dirençtir;
-        #  ikisi de o taraftaki sürtünmesiz halat kuvvetinin bir yüzdesidir
-        #  ( ELEport da öyle yazar:  FRcar = (Q+P)·(gn+a)·%2 ).  Eskiden bunun
-        #  için AYRI bir işaret tablosu vardı ( FR_ISARET ) ve T1/T2'nin
-        #  kendi işaretlerinden farklı yönde kuvvet üretiyordu;  artık aynı
-        #  işlemle, yalnız sürtünmesiz hâlden ( FR = 0 ) türetilir.
-        #  a = 0 olan durumlarda ( yükleme · bloke ) sürtünme hesaba
-        #  katılmaz:  m.5.11.2.2 sürtünmeyi yalnız frenlemede tanımlar ve
-        #  "en az bir sürtünme kuvveti garanti edilemiyorsa silinmelidir"
-        #  der — statik durumlarda garanti edilemez.
+        #  SÜRTÜNME, KUYUDAKİ KUVVETTİR  ( m.5.11.2.2:  "FRcar is the
+        #  frictional force IN THE WELL" ).  Formül onu FR / r olarak halata
+        #  çevirir;  bu yüzden yüzde, o taraftaki GÖVDENİN kuyudaki ağırlık
+        #  kuvvetine uygulanır — halat kuvvetine değil:
+        #      FRcar = %k · ( P + Q + MCRcar + MTrav ) · ( gn ± a )
+        #      FRcwt = %k · ( Mcwt + MCRcwt )          · ( gn ∓ a )
+        #  ELEport ( FRcar = (Q+P)·(gn+a)·%2 ) ve new block ( FR_car =
+        #  F_car·FL_p ) böyle kurar.  Eskiden yüzde, ZATEN /r ile halata
+        #  çevrilmiş sürtünmesiz T1 / T2'den alınıyor ve formülde BİR KEZ DAHA
+        #  /r'ye bölünüyordu:  2:1 askıda sürtünme yarıya iniyordu.  ELEport
+        #  örneğinde fren alt T1 9.071 N yerine şimdi 8.987,79 N ( ELEport
+        #  8.987,82 ).
+        #  a = 0 olan durumlarda ( yükleme · bloke ) sürtünme alınmaz — Ek D
+        #  de o iki durumu "no friction considered" diye kurar.
         if durum in ("fren_alt", "fren_ust"):
-            FRcar = S["FRcar_katsayi"] * _T1(t, 0.0, isl)
-            FRcwt = S["FRcwt_katsayi"] * _T2(t, 0.0, isl)
+            FRcar = (O["kuyu_surtunme_kabin"] / 100.0
+                     * (t["P"] + t["Q"] + t["MCRcar"] + t["MTrav"])
+                     * (t["gn"] + isl * t["a"]))
+            FRcwt = (O["kuyu_surtunme_agirlik"] / 100.0
+                     * (t["Mcwt"] + t["MCRcwt"])
+                     * (t["gn"] - isl * t["a"]))
         else:
             FRcar = FRcwt = 0.0
         T1 = _T1(t, FRcar, isl)
@@ -2437,8 +2490,22 @@ def _tahrik(g, o):
         _kay(o, **{h1: T1, h2: T2, h3: oran})
         if sinir is not None:
             _kay(o, **{h4: sinir})
+        _fren = durum in ("fren_alt", "fren_ust")
+        _car_isr, _cwt_isr = ("+", "−") if isl > 0 else ("−", "+")
         b["adimlar"] += [
             metin(baslik + " :", vurgu=True),
+        ] + ([
+            hesap(f"FRcar = %FRcar × ( P + Q + MCR + MTrav ) × ( gn {_car_isr} a )",
+                  f"{tr(O['kuyu_surtunme_kabin'])} % × "
+                  f"{tr(t['P'] + t['Q'] + t['MCRcar'] + t['MTrav'])} × "
+                  f"( {tr(t['gn'])} {_car_isr} {tr(t['a'])} )", FRcar, "N",
+                  "kuyudaki sürtünme  ·  formüle FRcar / r girer"),
+            hesap(f"FRcwt = %FRcwt × ( Mcwt + MCR ) × ( gn {_cwt_isr} a )",
+                  f"{tr(O['kuyu_surtunme_agirlik'])} % × "
+                  f"{tr(t['Mcwt'] + t['MCRcwt'])} × "
+                  f"( {tr(t['gn'])} {_cwt_isr} {tr(t['a'])} )", FRcwt, "N",
+                  "kuyudaki sürtünme  ·  formüle FRcwt / r girer"),
+        ] if _fren else []) + [
             hesap("T1  ( kabin tarafı )", "EN 81-50 m.5.11.2", T1, "N"),
             hesap("T2  ( karşı ağırlık tarafı )", "EN 81-50 m.5.11.2", T2, "N"),
             hesap("T1 / T2" if durum == "bloke" else "T1 / T2   ( büyük / küçük )",

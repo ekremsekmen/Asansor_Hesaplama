@@ -270,7 +270,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 48)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 49)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
         #    · TS EN 81-20 / 81-50 maddesi
@@ -893,6 +893,54 @@ def _denetim_bulgulari(r):
            _dd(_k_40, "Dt / dh")["metin"], "UYGUN")
     r.kontrol("B9c2 geçersiz belge seçimi reddediliyor",
               not MK.hesapla({"kasnak_belgesi": "Belki"})["aktif"])
+
+    #  ── B9c3  KUYU SÜRTÜNMESİ KUYUDAKİ KUVVETTİR  ( m.5.11.2.2 )
+    #  Yüzde o taraftaki gövdenin ağırlık kuvvetine uygulanır ve formüle bir
+    #  kez / r ile girer.  Eskiden ZATEN /r'li halat kuvvetinden alınıp bir kez
+    #  daha /r yapılıyordu ( 2:1'de yarıya iniyordu ).  Oran ofis sabitidir ve
+    #  paftada KABUL diye görünür.
+    _s3 = MK.hesapla({"aski_orani": 2, "sarilma_acisi": 180})
+    _b6 = next(b for b in _s3["bolumler"] if b["kimlik"] == "tahrik_yetenegi")
+    _fr = [a for a in _b6["adimlar"] if a.get("sembol") in ("FRcar", "FRcwt")]
+    r.kontrol("B9c3 paftada kabin ve ağırlık sürtünme oranı KABUL diye yazılı",
+              len(_fr) == 2 and all("KABUL" in str(a.get("kaynak")) and "m.5.11.2.2"
+                                    in str(a.get("kaynak")) for a in _fr),
+              f"→ {[(a.get('sembol'), a.get('kaynak')) for a in _fr]}")
+    r.esit("B9c3 varsayılan oranlar  %2 · %1,5",
+           [a.get("deger") for a in _fr], [2, 1.5])
+    _frs = [a for a in _b6["adimlar"] if str(a.get("formul") or "").startswith("FRcar =")]
+    _gg = _s3["girdi"]
+    _bek_fr = 0.02 * (_gg["kabin_agirligi"] + _gg["beyan_yuku"]) * (9.81 + _gg["acil_frenleme_a"])
+    r.kontrol("B9c3 fren alt FRcar = %2 × ( P + Q ) × ( gn + a )  ( halat kuvvetinden DEĞİL )",
+              bool(_frs) and _yakin(_frs[0]["deger"], _bek_fr),
+              f"→ {_frs[0]['deger'] if _frs else None!r} · beklenen {_bek_fr!r}")
+    r.kontrol("B9c3 yükleme ve blokede sürtünme satırı yok",
+              len(_frs) == 2, f"→ {len(_frs)} FRcar satırı")
+    _s0 = MK.hesapla({"aski_orani": 2, "sarilma_acisi": 180,
+                      "_ofis": {"kuyu_surtunme_kabin": 0, "kuyu_surtunme_agirlik": 0}})
+    r.kontrol("B9c3 ofis sürtünmeyi 0 yapınca frenleme oranı büyüyor, statikler değişmiyor",
+              _s0["_h"]["K257"] > _s3["_h"]["K257"] and _s0["_h"]["K271"] > _s3["_h"]["K271"]
+              and _yakin(_s0["_h"]["K242"], _s3["_h"]["K242"])
+              and _yakin(_s0["_h"]["K285"], _s3["_h"]["K285"]))
+
+    #  ── B9c4  GEZİCİ KABLONUN İMALATÇI AĞIRLIĞI tabloyu ezer
+    _kt = MK.hesapla({"aski_orani": 2, "sarilma_acisi": 180})
+    _ke = MK.hesapla({"aski_orani": 2, "sarilma_acisi": 180, "kablo_birim_kutle": 0.44})
+    _mt = lambda s: next(a for a in s["bolumler"][0]["adimlar"] if a.get("sembol") == "mt")
+    r.kontrol("B9c4 boşken tablo kullanılıyor ve kaynağı yazılı",
+              "tablo" in str(_mt(_kt).get("kaynak")) and _mt(_kt)["deger"] > 1.0,
+              f"→ {_mt(_kt).get('deger')!r} · {_mt(_kt).get('kaynak')!r}")
+    r.kontrol("B9c4 girilince imalatçı değeri kullanılıyor",
+              _mt(_ke)["deger"] == 0.44 and "imalatçı" in str(_mt(_ke).get("kaynak")))
+    _H = _ke["girdi"]["seyir_mesafesi"]
+    r.kontrol("B9c4 aynı değer motora, P'ye ve tahrike giriyor",
+              _yakin(_ke["ozet"]["N_hesap"] - _kt["ozet"]["N_hesap"],
+                     0.5 * _H * (0.44 - _mt(_kt)["deger"]) * _ke["girdi"]["beyan_hizi"]
+                     / (MK.US.verim(MK.US.sabitler(None), _ke["girdi"]["makine_tipi"]) * 102))
+              and _ke["_h"]["AH264"] < _kt["_h"]["AH264"])
+    r.kontrol("B9c4 fiziksel olmayan kablo ağırlığı reddediliyor",
+              not MK.hesapla({"kablo_birim_kutle": 50})["aktif"]
+              and not MK.hesapla({"kablo_birim_kutle": 0.01})["aktif"])
 
     #  ── B9d  Denge zinciri TAHRİK hesabına da girer  ( EN 81-50 m.5.11.2 )
     #  MCRcar / MCRcwt terimleri _T1 / _T2'de vardı ama hiç atanmıyordu.

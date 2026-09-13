@@ -79,11 +79,11 @@ ELEPORT_BEKLENEN = (
     ("yükleme  e^(fα)",      "O242",     2.62, 0.5,  "ELEport 2 haneye yuvarlıyor"),
     ("fren  e^(fα)",         "O271",     2.08, 0.5,  "ELEport 2 haneye yuvarlıyor"),
     ("bloke  e^(fα)",        "O285",     6.89, 0.5,  "ELEport 2 haneye yuvarlıyor"),
-    #  FRENLEME DİNAMİKTİR:  kasnak ataleti ve kuyu sürtünmesi girer ve iki
-    #  programın kabulleri farklıdır ( ELEport J'yi kendi dört yaklaşımıyla
-    #  kurar, biz döküm disk modelimizle ).  %2 bunun payıdır.
-    ("fren alt  T1",         "AF250", 8987.82, 2.0,  "kasnak ataleti modeli farklı"),
-    ("fren alt  T2",         "AJ255", 6514.24, 2.0,  "kasnak ataleti modeli farklı"),
+    #  FRENLEME:  sürtünme ELEport ile aynı yapıda ( kuyudaki kuvvet, / r );
+    #  kalan küçük fark ağırlık tarafı oranıdır ( bizde %1,5, ELEport %2 ) —
+    #  aşağıda ELEport'un kendi oranı ve kablosuyla birebir denetlenir.
+    ("fren alt  T1",         "AF250", 8987.82, 0.01, "sürtünme yapısı ELEport ile aynı"),
+    ("fren alt  T2",         "AJ255", 6514.24, 0.6,  "ağırlık sürtünmesi %1,5 ↔ %2"),
     ("bloke  T1/T2",         "K285",    13.47, 2.0,  "halat kütlesi dağılımı kabulü"),
 )
 
@@ -127,6 +127,20 @@ def _eleport(r):
               _hb(s_b)["sonuc"]["uygun"] is True
               and abs(s_b["ozet"]["Sf"] - 23.54) / 23.54 * 100 <= 0.5,
               f"→ {_hb(s_b)['sonuc']['metin']} · Sf {s_b['ozet']['Sf']:.2f}")
+
+    #  ── ELEPORT'UN KENDİ İKİ KABULÜYLE BİREBİR ────────────────────────
+    #  Kalan iki fark GİRDİDİR, bağıntı değil:  ELEport tek gezici kablo
+    #  ( 0,44 kg/m ) ve ağırlık tarafında %2 sürtünme kullanır.  İkisi
+    #  verilince frenleme ve bloke kuvvetlerinin altısı da yuvarlama içinde
+    #  tutmalı — kasnak ataleti, halat dağılımı, zincir ve sürtünme dâhil.
+    s_e = MK.hesapla(dict(ELEPORT, kablo_birim_kutle=0.44,
+                          _ofis=dict(ELEPORT["_ofis"], kuyu_surtunme_agirlik=2)))
+    for _ad, _h, _bek in (("fren alt T1", "AF250", 8987.82), ("fren alt T2", "AJ255", 6514.24),
+                          ("fren üst kabin", "AH264", 4641.92), ("fren üst ağırlık", "AF269", 6963.68),
+                          ("bloke T1", "AH278", 4802.29), ("bloke T2", "AF283", 356.5)):
+        _v = s_e["_h"][_h]
+        r.kontrol(f"ELEport · kendi kablosu ve %2 ile {_ad} birebir  ( ≤ 0,05 N )",
+                  abs(_v - _bek) <= 0.05, f"→ bizim {_v:.3f} · ELEport {_bek}")
 
     #  ── T1/T2 ETİKETİ:  AYNI SAYI, BAŞKA AD ───────────────────────────
     #  EN 81-50 m.5.11.2.1 T1 ve T2'yi "kasnağın İKİ YANINDAKİ kuvvetler"

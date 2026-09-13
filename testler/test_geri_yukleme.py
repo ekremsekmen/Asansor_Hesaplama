@@ -413,7 +413,9 @@ def calistir():
            #  yazılıp geri okunur ( bkz. mukavemet_xlsx.EK_GIRDI_HUCRELERI ).
            "sarilma_acisi": 165,
            #  D/d < 40 için onaylanmış kuruluş belgesi  ( m.5.5.2.1 sapması )
-           "kasnak_belgesi": "Var"}
+           "kasnak_belgesi": "Var",
+           #  Gezici kabloların imalatçı ağırlığı  ( boşsa tablo )
+           "kablo_birim_kutle": 0.44}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

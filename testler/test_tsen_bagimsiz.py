@@ -121,12 +121,19 @@ class BagimsizDenetim(unittest.TestCase):
     #  ağırlık tarafında "·1·" yazar.  Ofis sabitleri bu iki sayıyı
     #  varsayılan olarak taşır ( kasnak_adet_kabin · kasnak_adet_agirlik ).
     #
+    #  SÜRTÜNME KUYUDAKİ KUVVETTİR  ( m.5.11.2.2:  "FRcar is the frictional
+    #  force in the well" ).  Ek D sayı vermez;  yüzde ofis sabitidir ve o
+    #  taraftaki GÖVDENİN ağırlık kuvvetine uygulanır, formüle "/2" ile girer:
+    #      a)  FRcar = %k·(P+Q)·(gn+a)          FRcwt = %k·Mcwt·(gn−a)
+    #      b)  FRcar = %k·(P+MTrav)·(gn−a)      FRcwt = %k·Mcwt·(gn+a)
+    #  ( Eskiden motor yüzdeyi ZATEN /2'li halat kuvvetinden alıp bir kez daha
+    #    /2 yapıyordu ve bu test o yanlışı "standart" diye sabitliyordu. )
+    #
     #  NOT 1 gereği b'de etiketler yer değiştirir;  oran max/min alındığı
-    #  için bu karşılaştırmayı etkilemez.  Kasnak ataletleri ( mPcar, mPcwt )
-    #  motorda modellenmediği için sıfırdır.
+    #  için bu karşılaştırmayı etkilemez.
     #  ------------------------------------------------------------------
-    def _ekD(self, durum):
-        s = M.hesapla()
+    def _ekD(self, durum, ofis=None):
+        s = M.hesapla({"_ofis": ofis} if ofis else None)
         g = s["girdi"]
         o = {"ofis": U.sabitler(g.get("_ofis"))}
         M._motor(g, o)
@@ -135,25 +142,22 @@ class BagimsizDenetim(unittest.TestCase):
         for sifir in ("MComp", "iPDT", "mPTD", "mDP", "MCRcar", "MCRcwt"):
             self.assertEqual(t[sifir], 0.0, f"{sifir} Ek D örneğinde yoktur")
         gn, a = t["gn"], t["a"]
-        #  Sürtünme kuvveti motorun kendi kuralıdır ( o taraftaki
-        #  sürtünmesiz kuvvetin yüzdesi );  burada denetlenen İŞARETİN YERİ.
-        fr_car = M.SABIT["FRcar_katsayi"]
-        fr_cwt = M.SABIT["FRcwt_katsayi"]
+        k_car = o["ofis"]["kuyu_surtunme_kabin"] / 100
+        k_cwt = o["ofis"]["kuyu_surtunme_agirlik"] / 100
         #  Ek D'nin kasnak atalet terimleri  ( r = 2 olduğu için "/2" )
         kas_car = t["mPcar"] * t["iPcar"] * a / 2
         kas_cwt = t["mPcwt"] * t["iPcwt"] * a / 2
         if durum == "fren_alt":
-            ham1 = (t["P"] + t["Q"]) / 2 * (gn + a) + t["MSRcar"] * (gn + 2 * a)
-            ham2 = t["Mcwt"] / 2 * (gn - a)
-            #  Sürtünme, o taraftaki SÜRTÜNMESİZ kuvvetin yüzdesidir —
-            #  kasnak atalet terimi de o kuvvetin içindedir.
-            T1 = (ham1 + kas_car) * (1 - fr_car / 2)
-            T2 = (ham2 - kas_cwt) * (1 + fr_cwt / 2)
+            FRcar = k_car * (t["P"] + t["Q"]) * (gn + a)
+            FRcwt = k_cwt * t["Mcwt"] * (gn - a)
+            T1 = (t["P"] + t["Q"]) / 2 * (gn + a) + t["MSRcar"] * (gn + 2 * a) + kas_car - FRcar / 2
+            T2 = t["Mcwt"] / 2 * (gn - a) - kas_cwt + FRcwt / 2
         else:
-            ham1 = t["Mcwt"] / 2 * (gn + a) + t["MSRcwt"] * (gn + 2 * a)
-            ham2 = (t["P"] + t["MTrav"]) / 2 * (gn - a) + t["MSRcar"] * (gn - 2 * a)
-            T1 = (ham1 + kas_cwt) * (1 - fr_cwt / 2)
-            T2 = (ham2 - kas_car) * (1 + fr_car / 2)
+            FRcar = k_car * (t["P"] + t["MTrav"]) * (gn - a)
+            FRcwt = k_cwt * t["Mcwt"] * (gn + a)
+            T1 = t["Mcwt"] / 2 * (gn + a) + t["MSRcwt"] * (gn + 2 * a) + kas_cwt - FRcwt / 2
+            T2 = ((t["P"] + t["MTrav"]) / 2 * (gn - a) + t["MSRcar"] * (gn - 2 * a)
+                  - kas_car + FRcar / 2)
         hucre = "K257" if durum == "fren_alt" else "K271"
         return s["_h"][hucre], max(T1, T2) / min(T1, T2)
 
@@ -164,6 +168,22 @@ class BagimsizDenetim(unittest.TestCase):
     def test_fren_ust_ek_D_ile_ayni(self):
         motor, ek_d = self._ekD("fren_ust")
         self.assertAlmostEqual(motor, ek_d, places=6)
+
+    def test_kuyu_surtunmesi_ofis_sabitiyle_degisir(self):
+        """Sürtünme 0 da, farklı bir yüzde de Ek D bağıntısıyla aynı sonucu verir."""
+        for ofis in ({"kuyu_surtunme_kabin": 0, "kuyu_surtunme_agirlik": 0},
+                     {"kuyu_surtunme_kabin": 3, "kuyu_surtunme_agirlik": 2.5}):
+            for durum in ("fren_alt", "fren_ust"):
+                motor, ek_d = self._ekD(durum, ofis)
+                self.assertAlmostEqual(motor, ek_d, places=6, msg=f"{ofis} · {durum}")
+
+    def test_surtunme_frenlemede_lehe_calisir(self):
+        """Sürtünme kaldırılınca frenleme oranı BÜYÜR — kabul lehe çalışan terimdir."""
+        for durum in ("fren_alt", "fren_ust"):
+            varsayilan, _ = self._ekD(durum)
+            sifir, _ = self._ekD(durum, {"kuyu_surtunme_kabin": 0,
+                                         "kuyu_surtunme_agirlik": 0})
+            self.assertGreater(sifir, varsayilan, durum)
 
     def test_frenlemede_kabin_tarafi_agirlasir(self):
         """Yüklü kabin aşağı yavaşlarken kabin tarafı halat DAHA ÇOK gerilir."""

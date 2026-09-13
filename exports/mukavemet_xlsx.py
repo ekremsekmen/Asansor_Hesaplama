@@ -434,6 +434,9 @@ EK_GIRDI_HUCRELERI = (
     #  D/d < 40 BELGESİ.  Kitabın Dt/dh hükmü ( 11!Z97 ) bu hücreye bakar;
     #  projeci Excel'de Yok / Var'ı değiştirirse hüküm de değişir.
     ("kasnak_belgesi",        268, "Dt/dh < 40 için onaylanmış kuruluş belgesi", "Yok / Var"),
+    #  Gezici kabloların imalatçı ağırlığı ( boşsa tablo ).  MTrav'ın geçtiği
+    #  bütün formüller ( Gmax · P · tahrik ) bu hücreye bakar.
+    ("kablo_birim_kutle",     269, "Gezici kabloların toplam 1 m ağırlığı  ( imalatçı )", "kg/m"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -448,8 +451,8 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  ÜST ÜSTE bindi:  teslim kopyasında xs'in etiketi ofis başlığıyla
 #  eziliyordu.  Aşağıdaki iki sayı bu yüzden listenin sonuna göre ayarlanır;
 #  _ek_satir_cakismasi() ikisinin bir daha çakışmamasını denetler.
-OFIS_BASLIK = 269
-OFIS_BAS = 271
+OFIS_BASLIK = 271
+OFIS_BAS = 273
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
@@ -1278,15 +1281,19 @@ def _standarda_uydur(wb, g):
     ws["BB261"] = _terim(O["kasnak_adet_kabin"], "-")    # fren_ust T1  ( − )
     ws["AQ266"] = _terim(O["kasnak_adet_agirlik"], "")   # fren_ust T2  ( + )
 
+    #  KUYU SÜRTÜNMESİ  —  m.5.11.2.2  ( bkz. mukavemet._tahrik )
+    #  FR KUYUDAKİ kuvvettir:  yüzde, o taraftaki gövdenin ağırlık kuvvetine
+    #  uygulanır.  D250 · D255 · D264 · D269 o gövde teriminin /r'li hâlidir
+    #  ( ( P + Q + MCR + MTrav )·( gn ± a ) / r ),  r ile çarpılınca kuyudaki
+    #  kuvvet olur.  11!X250 · V255 · X264 · X269 onu formülün gereği olarak
+    #  r'ye böler — bir kez.  Yüzdeler projenin ofis sabitinden gelir.
     at = wb["Askı Tipleri"]
-    at["P128"] = ("=%s*('%s'!D250+'%s'!I250+'%s'!L250+'%s'!P250+'%s'!S250"
-                  "+'%s'!V250)" % ((MK.SABIT["FRcar_katsayi"],) + (HESAP,) * 6))
-    at["P129"] = ("=%s*('%s'!D255+'%s'!I255+'%s'!L255-'%s'!P255-'%s'!S255"
-                  "+'%s'!AQ252)" % ((MK.SABIT["FRcwt_katsayi"],) + (HESAP,) * 6))
-    at["Q128"] = ("=%s*('%s'!D264+'%s'!I264+'%s'!L264-'%s'!P264-'%s'!S264"
-                  "+'%s'!V264)" % ((MK.SABIT["FRcar_katsayi"],) + (HESAP,) * 6))
-    at["Q129"] = ("=%s*('%s'!D269+'%s'!I269+'%s'!L269+'%s'!P269+'%s'!S269"
-                  "+'%s'!V269)" % ((MK.SABIT["FRcwt_katsayi"],) + (HESAP,) * 6))
+    _k_car = _sayi_metni(O["kuyu_surtunme_kabin"] / 100.0)
+    _k_cwt = _sayi_metni(O["kuyu_surtunme_agirlik"] / 100.0)
+    at["P128"] = f"={_k_car}*'{HESAP}'!D250*'{HESAP}'!D248"
+    at["P129"] = f"={_k_cwt}*'{HESAP}'!D255*'{HESAP}'!D253"
+    at["Q128"] = f"={_k_car}*'{HESAP}'!D264*'{HESAP}'!D262"
+    at["Q129"] = f"={_k_cwt}*'{HESAP}'!D269*'{HESAP}'!D267"
 
     #  ⑤  ω ray çeliğine bağlı  —  EN 81-50 m.5.10.3
     ws["AD354"] = _omega_formulu("AV355", "'Veri Girişi'!B131")
@@ -1561,8 +1568,12 @@ def _standarda_uydur(wb, g):
     #      Gmax = ( Q + P − Ga ) + Gs + i·H·gh·ns·( 1 − λ ) + 0,5·H·mt
     _lam = (f"IF('Veri Girişi'!B{_ek_satir('denge_zinciri')}=\"Var\","
             f"{float(O['denge_zinciri_orani']) / 100.0!r},0)")
-    _mt = ("(IFERROR(VLOOKUP('Veri Girişi'!B107,TABLOLAR!$D$61:$G$64,4,0),0)"
-           "+IFERROR(VLOOKUP('Veri Girişi'!B108,TABLOLAR!$D$61:$G$64,4,0),0))")
+    #  Gezici kablo:  imalatçı ağırlığı girilmişse o, yoksa iki kablo tablodan
+    #  ( bkz. mukavemet._gezici_kablo ).
+    _kablo_ek = f"'Veri Girişi'!$B${_ek_satir('kablo_birim_kutle')}"
+    _mt = (f"IF(N({_kablo_ek})>0,{_kablo_ek},"
+           "(IFERROR(VLOOKUP('Veri Girişi'!$B$107,TABLOLAR!$D$61:$G$64,4,0),0)"
+           "+IFERROR(VLOOKUP('Veri Girişi'!$B$108,TABLOLAR!$D$61:$G$64,4,0),0)))")
     #  ㊹  DENGESİZLİK İKİ HAREKET YÖNÜNDEN DE OKUNUR
     #  ( AQ14 = Q · AQ15 = P · AQ13 = Ga ).  Kitap yalnız dolu kabinin
     #  yukarı çıkışını yazıyordu;  boş kabin aşağı inerken motor karşı
@@ -1611,6 +1622,29 @@ def _standarda_uydur(wb, g):
     #  m.5.2.1.8.6:  F = 4·gn·( P + q·Q ).  q da ofis sabitinden gelir;
     #  kitap buraya 0,5'i çivilemişti ve q değiştiğinde motorla ayrışıyordu.
     ws["AA627"] = f"={_pstd}+('Veri Girişi'!C59*{float(O['q_denge'])!r})"
+
+    #  TAHRİK TERİMLERİ MOTORLA AYNI  —  m.5.11.2.2  ( bkz. mukavemet._terimler )
+    #  Motor denge zincirini, imalatçı halat ağırlığını ve gezici kabloyu
+    #  tahrike katıyordu;  teslim kitabının 'Askı Tipleri' sayfası katmıyordu:
+    #      MCRcar · MCRcwt ( 123 · 124 )  hep 0 — zincir yok sayılıyor
+    #      MSRcwt bloke ( O120 )          halat ağırlığı TABLODAN, katalogdan değil
+    #      MTrav ( 125 )                   1. kablo 24 × 0,75'e çivili ( G62 )
+    #  Zincirli bir projede boş kabin üstte frenleme oranı pafta 1,489, kitap
+    #  1,607 çıkıyordu ( ELEport girdileri ).  Bu hücreler kaynak kitaptan
+    #  bilerek ayrışan hücreler arasında olduğu için hiçbir karşılaştırma
+    #  onları görmüyordu.
+    #  Zincir halatın TERSİ dağılır:  kabin en altta zincir karşı ağırlık
+    #  tarafında uzun, en üstte kabin tarafında uzun;  toplamı hep MCR.
+    _mu = (f"({_lam}*'Veri Girişi'!$B$100*'{HESAP}'!$AQ$18"
+           "*'Veri Girişi'!$B$98)")
+    for _s, _kabin_uzun in (("M", False), ("P", False), ("O", True), ("Q", True)):
+        _uzun = f"=(0.5*{_s}130+{_s}131)*{_mu}"
+        _kisa = f"=(0.5*{_s}130-{_s}131)*{_mu}"
+        at[f"{_s}123"] = _uzun if _kabin_uzun else _kisa
+        at[f"{_s}124"] = _kisa if _kabin_uzun else _uzun
+    at["O120"] = f"=(0.5*O130+O132)*'Veri Girişi'!$B$98*'{HESAP}'!$AQ$18"
+    for _s in ("O", "Q"):
+        at[f"{_s}125"] = f"=(0.25*$L$130+0.5*{_s}131)*{_mt}"
     #  xp DE ORTAK AĞIRLIK MERKEZİDİR  ( m.5.7.2.3.2:  "...shall be the mass
     #  centre of gravity OF THEM" ).  Kapı momenti değişmez, yalnız TOPLAM
     #  kütleye bölünür:
@@ -1748,6 +1782,10 @@ def _standarda_uydur(wb, g):
     #  karşı ağırlık kullanır.  Formül projenin q'suyla yazılır — sayı değil
     #  FORMÜL, kitap kendi kendini hesaplamaya devam etsin diye.
     vg["C80"] = f"=C75+(C59*{repr(float(O['q_denge']))})"
+    #  Motor bölümünün kendi karşı ağırlık hücresi ( 11!AQ13 ) de "AQ15 +
+    #  0,5·AQ14" diye çiviliydi ve C80'i okumuyordu:  q = 0,45'te kitabın
+    #  Gmax'ı ( AQ9 ) ve kasnak statik yükü motordan 40 kg ayrışıyordu.
+    ws["AQ13"] = "='Veri Girişi'!C80"
 
     #  ㉒  KARŞI AĞIRLIK GÜVENLİK TERTİBATININ TABAN TEPKİSİ
     #  Kitapta karşı ağırlık güvenlik tertibatı diye bir girdi yoktur;  bu

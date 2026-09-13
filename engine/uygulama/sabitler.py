@@ -108,6 +108,20 @@ VARSAYILAN = {
     "kasnak_adet_kabin":    2,  # r > 1 iken kabin tarafındaki kasnak sayısı
     "kasnak_adet_agirlik":  1,  # r > 1 iken ağırlık tarafındaki kasnak sayısı
 
+    # ── ②c KUYU SÜRTÜNMESİ  ( TS EN 81-50 m.5.11.2.2 · Ek D ) ───────────
+    #  Acil frenlemede kabinin ve karşı ağırlığın kılavuzlarda ve kasnak
+    #  yataklarında gördüğü sürtünme.  Standart FRcar / FRcwt'yi "KUYUDAKİ
+    #  sürtünme kuvveti" diye tanımlar, formüle FR / r olarak sokar ve "asgari
+    #  bir sürtünme kuvveti sağlanamıyorsa silinmelidir" der — sayı vermez.
+    #  Yüzde, o taraftaki GÖVDENİN frenleme sırasındaki ağırlık kuvvetine
+    #  uygulanır:  kabin ( P + Q + MCR + MTrav )·( gn ± a ) ,  karşı ağırlık
+    #  ( Mcwt + MCR )·( gn ∓ a ).  ELEport ve new block da böyle kurar.
+    #  %2 / %1,5 new block'un ve kaynak kitabın değeridir;  ELEport ağırlık
+    #  tarafında %2 alır.  Frenlemede sürtünme LEHE çalıştığı için küçük değer
+    #  emniyetli taraftır.  Asgari sürtünme sağlanamıyorsa 0 yazılır.
+    "kuyu_surtunme_kabin":   2,    # %
+    "kuyu_surtunme_agirlik": 1.5,  # %
+
     # ── ③ SIĞINMA PAYLARI  ( kabin / kuyu geometrisi ) ───────────────
     #  Bunlar kabin imalatına bağlı ofis kabulleridir;  TS EN 81-20 sayısı
     #  DEĞİLDİR.  Standardın asgari açıklıkları ( 100 · 500 · 300 mm ve
@@ -158,6 +172,7 @@ ARALIK = {
     "kasnak_yogunluk": (1000, 20000), "kasnak_gobek_pay": (0, 500),
     "kasnak_kanal_payi": (0, 500), "kasnak_gobek_orani": (0, 1),
     "kasnak_adet_kabin": (0, 10), "kasnak_adet_agirlik": (0, 10),
+    "kuyu_surtunme_kabin": (0, 10), "kuyu_surtunme_agirlik": (0, 10),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
     "paten_payi": (0, 5000), "tavan_payi": (0, 5000),
     "revizyon_payi": (0, 5000), "etek_payi": (0, 5000),
@@ -192,6 +207,10 @@ GRUPLAR = (
      "olarak modelleyen OFİS KABULÜDÜR",
      ("kasnak_yogunluk", "kasnak_gobek_pay", "kasnak_kanal_payi",
       "kasnak_gobek_orani", "kasnak_adet_kabin", "kasnak_adet_agirlik")),
+    ("②c KUYU SÜRTÜNMESİ",
+     "acil frenlemede kılavuz ve kasnak yatağı sürtünmesi — TS EN 81-50 "
+     "m.5.11.2.2 sayı vermez;  asgari sürtünme sağlanamıyorsa 0 yazılır",
+     ("kuyu_surtunme_kabin", "kuyu_surtunme_agirlik")),
     ("③ SIĞINMA PAYLARI",
      "kabin gövde ve kuyu geometrisi — kabin imalatına bağlıdır, "
      "TS EN 81-20 sayısı değildir",
@@ -225,6 +244,11 @@ ETIKET = {
                           "TS EN 81-50 Ek D'nin 2:1 örneği  mPcar·2·a/2  yazar"),
     "kasnak_adet_agirlik": ("Ağırlık tarafındaki kasnak sayısı iPcwt (adet)",
                             "Ek D'nin aynı örneği  mPcwt·1·a/2  yazar"),
+    #  ── kuyu sürtünmesi  ( TS EN 81-50 m.5.11.2.2 )
+    "kuyu_surtunme_kabin": ("Kabin tarafı kuyu sürtünmesi FRcar (%)",
+                            "( P + Q + MCR + MTrav )·( gn ± a ) kuvvetinin yüzdesi"),
+    "kuyu_surtunme_agirlik": ("Ağırlık tarafı kuyu sürtünmesi FRcwt (%)",
+                              "( Mcwt + MCR )·( gn ∓ a ) kuvvetinin yüzdesi"),
     "k3_yardimci": ("Yardımcı donanım darbe katsayısı k3",
                     "TS EN 81-20 Çizelge 14 k3'e SAYI VERMEZ — "
                     "'imalatçı tarafından, gerçek tesise göre belirlenir'"),
