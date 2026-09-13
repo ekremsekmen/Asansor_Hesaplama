@@ -411,7 +411,9 @@ def calistir():
            #  α — sarılma açısı.  Kitap onu geometriden türetir ve kendi
            #  girdi sayfasında karşılığı yoktur;  beyan edilen açı ek blokta
            #  yazılıp geri okunur ( bkz. mukavemet_xlsx.EK_GIRDI_HUCRELERI ).
-           "sarilma_acisi": 165}
+           "sarilma_acisi": 165,
+           #  D/d < 40 için onaylanmış kuruluş belgesi  ( m.5.5.2.1 sapması )
+           "kasnak_belgesi": "Var"}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

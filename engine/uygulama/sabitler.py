@@ -16,8 +16,11 @@ pafta her değeri KAYNAĞIYLA birlikte basar.  Ayrışırlarsa bilerek ayrışı
 FABRİKA AYARI ortaktır:  engine/ortak/ofis.py.  İki proje de oradan başlar;
 sonrası her projenin kendi kararıdır.
 """
+from engine.avan import hesap as _AVAN
 from engine.ortak import ofis as OFIS
 from engine.uygulama import mukavemet_tablolari as MT
+
+_AVAN_VARSAYILAN = {**_AVAN.SABIT_B_VARSAYILAN, **_AVAN.OFIS_VARSAYILAN}
 
 #  Fiziksel dönüşümler ve STANDARDIN dayattığı sayılar buraya GİRMEZ:
 #  gn · 102 · 1,34 · k3 = 1,2 ( EN 81-20 Çiz.14 ) · Dt/dh ≥ 40
@@ -119,33 +122,22 @@ VARSAYILAN = {
     "ray_alt_payi":       270,
     "regulator_payi":     300,
 
-    # ── ④ AYDINLATMA ─────────────────────────────────────────────────
-    "kabin_armatur_W":     5,
-    "kabin_armatur_lm":  300,
-    "kabin_ustu_armatur":  1,
-    "kuyu_armatur_W":     40,
-    "kuyu_armatur_lm":  2100,
-    "kuyu_Dmax":           7,
-    "ayd_sutun":           2,
-
-    # ── ⑤ KURULU GÜÇ VE GERİLİM DÜŞÜMÜ ───────────────────────────────
-    "U":                 380,
-    "kappa":              56,
-    "eps_max":             3,
-    "cosfi":            0.90,
-    "motor_elektrik_verimi": 0.85,
-    "priz_adedi":          3,
-    "priz_gucu":         300,
-    "kablo_tipi":  "NHXMH FE180",
-    "sigorta_katsayisi": 1.25,
-
-    # ── ⑥ TOPRAKLAMA ─────────────────────────────────────────────────
-    "beta":              150,
-    "cubuk_sayisi":        4,
-    "goz_araligi":        20,
-    "lc":                1.5,
-    "UL":                 50,
-    "IDn":              0.30,
+    #  ④ ⑤ ⑥ ELEKTRİK VARSAYILANLARI AVAN MOTORUNDAN OKUNUR.
+    #  Bu hesaplar avan motorunda koşar ve köprü oraya yalnız DEĞİŞTİRİLEN
+    #  değeri geçirir ( bkz. girdi._avan_sabitleri );  boş bırakılan alanı
+    #  motor KENDİ varsayılanıyla hesaplar.  Burada ayrı bir sayı yazmak,
+    #  ekranda ve teslim kitabında motorun kullanmadığı bir değeri göstermek
+    #  demekti:  κ burada 56 kalmıştı, pafta 44,4 ile hesaplıyordu ve teslim
+    #  kitabı 56 ile — aynı projede ε %0,97 ile %0,77.
+    **{k: _AVAN_VARSAYILAN[k] for k in (
+        # ── ④ AYDINLATMA
+        "kabin_armatur_W", "kabin_armatur_lm", "kabin_ustu_armatur",
+        "kuyu_armatur_W", "kuyu_armatur_lm", "kuyu_Dmax", "ayd_sutun",
+        # ── ⑤ KURULU GÜÇ VE GERİLİM DÜŞÜMÜ
+        "U", "kappa", "eps_max", "cosfi", "motor_elektrik_verimi",
+        "priz_adedi", "priz_gucu", "kablo_tipi", "sigorta_katsayisi",
+        # ── ⑥ TOPRAKLAMA
+        "beta", "cubuk_sayisi", "goz_araligi", "lc", "UL", "IDn")},
 }
 
 #  Metin alanları — sayı denetimine girmez
@@ -278,7 +270,8 @@ ETIKET = {
     "kuyu_Dmax": ("Armatürler arası azami aralık (m)", "0 = kontrol kapalı"),
     "ayd_sutun": ("Aydınlatma tablosu sütunu", "tavan .80 / duvar .50 / zemin .10"),
     "U": ("Şebeke gerilimi (V)", "fazlar arası"),
-    "kappa": ("İletken iletkenliği κ (m/Ω·mm²)", "bakır = 56"),
+    "kappa": ("İletken iletkenliği κ (m/Ω·mm²)",
+              "bakır, normal çalışma = 44,4  ( TS HD 60364-5-52 EK-G )"),
     "eps_max": ("İzin verilen gerilim düşümü (%)", ""),
     "cosfi": ("Güç katsayısı cosφ", ""),
     "motor_elektrik_verimi": ("Motorun elektrik verimi ηm",

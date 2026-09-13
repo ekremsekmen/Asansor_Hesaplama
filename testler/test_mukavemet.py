@@ -856,6 +856,44 @@ def _denetim_bulgulari(r):
               f"→ {_d_bos['ozet']['Sf']!r} · {_d_320['ozet']['Sf']!r} · "
               f"{_d_200['ozet']['Sf']!r}")
 
+    #  ── B9c2  D/d < 40 ONAYLANMIŞ KURULUŞ BELGESİYLE kabul edilir
+    #  m.5.5.2.1'in 40'ı uyumlaştırılmış standart şartıdır;  2014/33/AB Ek-I
+    #  1.3 sayısal oran vermez.  Belge oran sınırını kaldırır, Sf'yi DEĞİL.
+    _kc = {"tahrik_kasnak_capi": 240, "halat_capi": 6.5,
+           "saptirma_kasnak_capi": 240, "kasnak_tek_yon": 2}
+    _dd = lambda s, ad: [a for a in _b4(s)["adimlar"]
+                         if str(a.get("aciklama") or "").startswith(ad + " =")][0]
+    _k_yok = MK.hesapla(dict(_kc))
+    _k_var = MK.hesapla(dict(_kc, kasnak_belgesi="Var"))
+    r.esit("B9c2 belge varsayılanı Yok", _k_yok["girdi"]["kasnak_belgesi"], "Yok")
+    r.kontrol("B9c2 belgesiz 240 / 6,5 oranı reddediliyor",
+              _dd(_k_yok, "Dt / dh")["metin"] == "UYGUN DEĞİL"
+              and "Dt/dh = 36,92" in _b4(_k_yok)["sonuc"]["metin"],
+              f"→ {_b4(_k_yok)['sonuc']['metin']}")
+    for _ad in ("Dt / dh", "Ds / dh"):
+        r.esit(f"B9c2 belgeyle {_ad} kabul ediliyor",
+               _dd(_k_var, _ad)["metin"], MK.BELGEYLE_UYGUN)
+    r.kontrol("B9c2 belgeli pafta belgeye dayandığını yazıyor",
+              any(a.get("aciklama") == "Dt/dh < 40 için onaylanmış kuruluş belgesi"
+                  and "m.5.5.2.1" in str(a.get("kaynak")) for a in _b4(_k_var)["adimlar"])
+              and "belge" in _b4(_k_var)["sonuc"]["baslik"])
+    r.kontrol("B9c2 belge Sf'yi DEĞİŞTİRMİYOR",
+              _yakin(_k_yok["ozet"]["Sf"], _k_var["ozet"]["Sf"]),
+              f"→ {_k_yok['ozet']['Sf']!r} · {_k_var['ozet']['Sf']!r}")
+    #  Belge Sf kontrolünü ezmemeli:  halat yetmiyorsa bölüm yine düşer.
+    _k_az = MK.hesapla(dict(_kc, kasnak_belgesi="Var", halat_adedi=2))
+    r.kontrol("B9c2 belgeli ama S < Sf ise bölüm yine UYGUN DEĞİL",
+              _b4(_k_az)["sonuc"]["uygun"] is False
+              and "halat çapını / adedini artırın" in _b4(_k_az)["sonuc"]["metin"]
+              and "kasnağı çapını" not in _b4(_k_az)["sonuc"]["metin"],
+              f"→ {_b4(_k_az)['sonuc']['metin']}")
+    _k_40 = MK.hesapla({"tahrik_kasnak_capi": 320, "halat_capi": 8,
+                        "kasnak_belgesi": "Var"})
+    r.esit("B9c2 oran ≥ 40 iken belge hükmü değiştirmiyor",
+           _dd(_k_40, "Dt / dh")["metin"], "UYGUN")
+    r.kontrol("B9c2 geçersiz belge seçimi reddediliyor",
+              not MK.hesapla({"kasnak_belgesi": "Belki"})["aktif"])
+
     #  ── B9d  Denge zinciri TAHRİK hesabına da girer  ( EN 81-50 m.5.11.2 )
     #  MCRcar / MCRcwt terimleri _T1 / _T2'de vardı ama hiç atanmıyordu.
     #  Zincirin dağılımı HALATIN TAM TERSİDİR ve toplamı her konumda sabittir.

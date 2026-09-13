@@ -225,7 +225,9 @@ EXCEL_FARKLARI = (
      "TS EN 81-20 m.5.5.2.1",
      "Başlık '≥ 40' yazar ama kontrolü 30 ile yapar. 30, aynı standardın "
      "m.5.5.6.2 c) dengeleme gergi kasnağı ve m.5.6.2.2.1.3 regülatör eşiğidir.",
-     "Standardın istediği 40 uygulanır.",
+     "Standardın istediği 40 uygulanır.  Proje onaylanmış kuruluş belgesi "
+     "beyan ediyorsa ( ek girdi bloğu:  'Dt/dh < 40 için onaylanmış kuruluş "
+     "belgesi' = Var ) 40'ın altı belgeyle kabul edilir;  Sf aynen aranır.",
      ()),
     ("Kapı konumu xi ham mesafe olarak yazılıyordu",
      "TS EN 81-50 Ek C.1.2 / C.2.3.1",
@@ -1566,6 +1568,14 @@ def _kabin_alani(g, o):
 # =====================================================================
 #  4 -  ASKI HALATLARI                           ( TS EN 81-50 m.5.12 )
 # =====================================================================
+#  D/d < 40 BELGEYLE KABUL EDİLDİĞİNDE basılan hüküm.  Pafta satırı kısa
+#  olanı, teslim kitabının hüküm hücresi ( 11!Z97 ) uzun olanı yazar;  ikisi
+#  de "UYGUN" ile başlar ki ne pafta ne kitap bunu ret sanmasın.
+BELGEYLE_UYGUN = "BELGEYLE UYGUN"
+BELGEYLE_UYGUN_KITAP = ("UYGUNDUR — onaylanmış kuruluş belgesiyle  "
+                        "( TS EN 81-20 m.5.5.2.1 sapması )")
+
+
 def _aski_halatlari(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Dt, dh, nh, r = o["Dt"], o["dh"], o["nh"], o["r"]
@@ -1577,7 +1587,12 @@ def _aski_halatlari(g, o):
     Ds_verildi = _pozitif(Ds)
     Ds = float(Ds) if Ds_verildi else Dp
     oran = Dt / dh
-    oran_uygun = oran >= S["Dt_dh_asgari"]
+    #  40 SINIRI BELGEYLE AŞILABİLİR  ( bkz. MG.ALANLAR · kasnak_belgesi ).
+    #  Standart oranı ayrı tutulur ki pafta sınırın mı sağlandığını yoksa
+    #  belgeye mi dayanıldığını ayırt edebilsin.  Sf'ye dokunulmaz.
+    belge = g.get("kasnak_belgesi") == "Var"
+    oran_std = oran >= S["Dt_dh_asgari"]
+    oran_uygun = oran_std or belge
 
     Nps, Npr = g["kasnak_tek_yon"], g["kasnak_ters_yon"]
     #  SAPTIRMA KASNAĞI DA m.5.5.2.1 KAPSAMINDADIR.
@@ -1588,7 +1603,14 @@ def _aski_halatlari(g, o):
     #  Kasnak yoksa ( Nps = Npr = 0 ) ortada denetlenecek kasnak da yoktur.
     kasnak_var = (Nps or 0) + (Npr or 0) > 0
     oran_p = Ds / dh
-    oran_p_uygun = (not kasnak_var) or oran_p >= S["Dt_dh_asgari"]
+    oran_p_std = oran_p >= S["Dt_dh_asgari"]
+    oran_p_uygun = (not kasnak_var) or oran_p_std or belge
+
+    def _dd_kontrol(ad, deger, std):
+        if std or not belge:
+            return kontrol(f"{ad} = {tr(deger)}  ≥  {S['Dt_dh_asgari']}", std)
+        return kontrol(f"{ad} = {tr(deger)}  <  {S['Dt_dh_asgari']}  —  "
+                       "onaylanmış kuruluş belgesiyle", True, BELGEYLE_UYGUN)
     #  Nequiv(t) OFİS AÇILARINDAN HESAPLANIR  ( EN 81-50 Çizelge 2 ).
     #  Kitap bunu kanalın ADINA bağlı sabit bir tablodan okuyordu:  ofis
     #  sabiti γ = 45° yapılsa bile Nequiv(t) 12 kalıyor, pafta γ = 38° yazmayı
@@ -1628,13 +1650,17 @@ def _aski_halatlari(g, o):
         veri("nh", "Askı halatı adedi", nh, "adet", "GİRİŞ", 0),
         kontrol(f"Askı halatı adedi nh = {tr(nh)} ≥ 2  ( TS EN 81-20 m.5.5.1.3 )", nh_uygun),
         metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
+    ] + ([
+        veri("", "Dt/dh < 40 için onaylanmış kuruluş belgesi", "Var", "",
+             "GİRİŞ  ·  m.5.5.2.1'den sapma  ·  2014/33/AB Ek-I 1.3"),
+    ] if belge else []) + [
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
-        kontrol(f"Dt / dh = {tr(oran)}  ≥  {S['Dt_dh_asgari']}", oran_uygun),
+        _dd_kontrol("Dt / dh", oran, oran_std),
     ] + ([
         veri("Ds", "Kasnakların EN KÜÇÜK çapı", Ds, "mm",
              "GİRİŞ" if Ds_verildi else "girilmedi — ortalama çap kullanıldı", 0),
         hesap("Ds / dh", f"{trn(Ds, 0)} / {tr(dh)}", oran_p, ""),
-        kontrol(f"Ds / dh = {tr(oran_p)}  ≥  {S['Dt_dh_asgari']}", oran_p_uygun),
+        _dd_kontrol("Ds / dh", oran_p, oran_p_std),
     ] if kasnak_var else [
         metin("Tahrik kasnağı dışında kasnak yok  ( Nps = Npr = 0 ) — "
               "saptırma kasnağı oranı denetlenmedi."),
@@ -1678,7 +1704,7 @@ def _aski_halatlari(g, o):
               Sger, ""),
         kontrol(f"S = {tr(Sger)}  ≥  max( Sf ; Smin ) = {tr(sinir)}", s_uygun),
     ]
-    _esik = trn(S["Dt_dh_asgari"], 0)
+    _esik = trn(S["Dt_dh_asgari"], 0) + ("  ( ya da belge )" if belge else "")
     b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {_esik}"
                              + (f"   ·   Ds/dh ≥ {_esik}" if kasnak_var else "")
                              + "   ·   S ≥ max( Sf ; Smin )"),
@@ -1732,7 +1758,12 @@ def _aski_halatlari(g, o):
         "çapının askı halatı anma çapına oranı, halatın kol sayısından bağımsız "
         "olarak EN AZ 40 olmalıdır. Kaynak Excel bu kontrolü 30 ile yapar; 30 "
         "aynı standardın dengeleme halatı gergi kasnağı ( m.5.5.6.2 ) ve "
-        "regülatör ( m.5.6.2.2.1.3 ) eşiğidir, askı halatının değil."]
+        "regülatör ( m.5.6.2.2.1.3 ) eşiğidir, askı halatının değil.",
+        "40 sınırı uyumlaştırılmış standart şartıdır; Asansör Yönetmeliği "
+        "( 2014/33/AB ) Ek-I 1.3 sayısal oran vermez. Küçük kasnaklı makineler "
+        "sapmayı onaylanmış kuruluş belgesiyle kanıtlar — belge beyan edilirse "
+        "40'ın altı hata sayılmaz. Halat güvenlik katsayısı Sf yine EN 81-50 "
+        "m.5.12'ye göre aranır; küçük kasnak Sf'yi zaten büyütür."]
     return b
 
 

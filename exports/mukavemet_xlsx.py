@@ -431,6 +431,9 @@ EK_GIRDI_HUCRELERI = (
     #  ve kendi girdi sayfasında karşılığı yoktur;  beyan edilen açı hem
     #  hesaba hem geri okumaya girsin diye ek girdi bloğuna yazılır.
     ("sarilma_acisi",         267, "α — halat sarılma açısı  ( beyan )", "°"),
+    #  D/d < 40 BELGESİ.  Kitabın Dt/dh hükmü ( 11!Z97 ) bu hücreye bakar;
+    #  projeci Excel'de Yok / Var'ı değiştirirse hüküm de değişir.
+    ("kasnak_belgesi",        268, "Dt/dh < 40 için onaylanmış kuruluş belgesi", "Yok / Var"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -458,7 +461,8 @@ EK_ONAY_ALANLARI = ("mk_yok",)
 #  Metin olarak yazılıp okunan ek girdiler ( sayıya çevrilmemeli )
 EK_METIN_ALANLARI = ("agirlik_guvenlik_tertibati", "paten_tipi",
                      "siginma_tipi_ust", "siginma_tipi_dip", "denge_zinciri",
-                     "asansor_adi", "tampon_tipi", "makine_raya_biniyor")
+                     "asansor_adi", "tampon_tipi", "makine_raya_biniyor",
+                     "kasnak_belgesi")
 _EVET = ("evet", "e", "var", "true", "1", "x", "✓")
 
 
@@ -821,6 +825,32 @@ ELEKTRIK_HUKUM_HUCRELERI = ("AH42", "AH49", "AS53", "AB60", "AH65",
                             "AH90", "AT94", "AC101")
 
 
+def _elektrik_hesabi(g):
+    """Paftanın elektrik bölümlerini üreten avan hesabı  —  AYNI çağrı.
+
+    Döner:  { oz , S , mk , sebep }
+        oz     asansörün elektrik özeti ( P_kurulu · n_kuyu · ε … )
+        S      motorun GERÇEKTEN kullandığı sabitler ( κ · U · armatürler … )
+        mk     makine dairesi aydınlatması sonucu
+        sebep  hesap yapılamadıysa metin, yapıldıysa None
+    Kitaba yazılan her elektrik sayısı buradan okunur:  uygulama ofis
+    sabitleri ekranda ayrı durur ama köprü avan motoruna yalnız DEĞİŞTİRİLEN
+    değeri geçirir;  sayıyı ofis tablosundan okumak paftanın kullanmadığı bir
+    değeri kitaba yazmak olabiliyordu ( κ 56 ↔ 44,4 ).
+    """
+    try:
+        av = AV_HESAP.hesapla(UYG_GIRDI.kopru(g))
+        a = (av.get("asansorler") or [{}])[0]
+    except Exception as e:                                    # noqa: BLE001
+        return {"oz": {}, "S": {}, "mk": {},
+                "sebep": f"elektrik hesabı çalıştırılamadı ( {e} )"}
+    oz = a.get("ozet") or {}
+    sebep = (None if (a.get("aktif") and oz)
+             else str(a.get("uyari") or "girdiler eksik").strip(" !"))
+    return {"oz": oz, "S": av.get("sabitler") or {},
+            "mk": av.get("makine_dairesi") or {}, "sebep": sebep}
+
+
 def _elektrik_degerleri(g):
     """( S1 , S2 , L1 , L2 , sebep )  —  avan motorunun GERÇEKTEN kullandığı değerler.
 
@@ -831,14 +861,10 @@ def _elektrik_degerleri(g):
     """
     ham = (g.get("kolon_kesit"), g.get("makine_kesit"),
            g.get("kolon_uzunluk"), g.get("makine_uzunluk"))
-    try:
-        av = AV_HESAP.hesapla(UYG_GIRDI.kopru(g))
-        a = (av.get("asansorler") or [{}])[0]
-    except Exception as e:                                    # noqa: BLE001
-        return ham + (f"elektrik hesabı çalıştırılamadı ( {e} )",)
-    oz = a.get("ozet") or {}
-    if not a.get("aktif") or not oz:
-        return ham + (str(a.get("uyari") or "girdiler eksik").strip(" !"),)
+    e = _elektrik_hesabi(g)
+    if e["sebep"]:
+        return ham + (e["sebep"],)
+    oz = e["oz"]
     return (oz.get("S1", ham[0]), oz.get("S2", ham[1]),
             oz.get("L1", ham[2]), oz.get("L2", ham[3]), None)
 
@@ -853,7 +879,6 @@ def _elektrik_sayfasi(wb, g):
     if ELEKTRIK not in wb.sheetnames:
         return
     ws = wb[ELEKTRIK]
-    O = US.sabitler(g.get("_ofis"))
     #  MOTORUN KULLANDIĞI DEĞER YAZILIR, GİRİLEN DEĞİL.
     #  Avan motoru L1 · L2 · S1 · S2'yi kendi aralıklarına göre DENETLER ve
     #  aralık dışındakini REDDEDİP varsayılana döner ( bkz. engine/avan/
@@ -863,12 +888,24 @@ def _elektrik_sayfasi(wb, g):
     #  projenin iki belgesi farklı gerilim düşümü veriyordu.  Dördü de aynı
     #  yoldan geçer, bu yüzden dördü de motordan okunur.
     S1, S2, L1, L2, sebep = _elektrik_degerleri(g)
+    e = _elektrik_hesabi(g)
+    #  SABİTLER DE MOTORDAN.  Hesap yapılamadıysa motorun sabiti yoktur;  o
+    #  zaman ofis tablosu yazılır ve kitabın hükmü zaten HESAP EKSİK olur.
+    O = e["S"] or US.sabitler(g.get("_ofis"))
     for hucre, deger in (("W27", L2), ("W28", O["U"]), ("W29", O["eps_max"]),
                          ("W32", O["kappa"]), ("W33", S1), ("W34", S2),
                          ("W35", O["motor_elektrik_verimi"]),
                          ("X58", O["cosfi"]), ("X63", O["cosfi"])):
         if deger is not None:
             ws[hucre] = deger
+    #  Aydınlatma hattının κ'sı ( W82 ) hücreye 56 diye ayrıca yazılıydı;
+    #  aynı iletken, aynı sayı.
+    ws["W82"] = "=W32"
+    if not sebep:
+        _verim_tablosu(ws)
+        _yukleme_cetveli(ws, e["oz"], O)
+        _kuyu_aydinlatmasi(ws, O)
+        _makine_dairesi_aydinlatmasi(ws, O, e["mk"])
     #  L1 boş bırakılmışsa kitabın kendi formülü kalsın:  o da kuyu boyundan
     #  türetir.  Girilmişse programın kullandığı değer yazılır.
     if L1 is not None:
@@ -897,6 +934,166 @@ def _elektrik_sayfasi(wb, g):
         for h in ELEKTRIK_HUKUM_HUCRELERI:
             ws[h] = "HESAP EKSİK"
         ws["A2"] = f"HESAP EKSİK — elektrik hesabı yapılamadı:  {sebep}"
+
+
+# ---------------------------------------------------------------------
+#  ELEKTRİK SAYFASININ PAFTAYLA EŞLENEN BLOKLARI
+# ---------------------------------------------------------------------
+#  Kitap bu blokları KENDİ yöntemiyle hesaplıyordu ve pafta ile ayrışıyordu:
+#      yükleme cetveli   4 priz · kuyu 9 × 12 W · kabin 1 × 40 W · makine
+#                        dairesi 3 × 40 W  ( makine dairesiz projede bile )
+#      kuyu aydınlatması kuyu derinliğiyle, ( genişlik − 1 m ) yüksekliğiyle,
+#                        tablonun başka sütunuyla ve 1.200 lm lambayla
+#  Pafta ( avan motoru ) kuyu 8 × 40 W · kabin 4 × 5 W + 1 × 5 W · 3 priz
+#  diyordu;  aynı projede kurulu güç, akım ve ε iki belgede farklı çıkıyordu.
+#  Bloklar artık paftanın bağıntısıyla ve motorun sabitleriyle kurulur;
+#  hücreler FORMÜL kalır ki kitap kendi kendini hesaplamaya devam etsin.
+
+#  Aydınlatma verim tablosu ( TABLOLAR T2 ):  kitapta D111:BG121.  Motorun
+#  tablosu k = 0,6'dan başlar ve k bu değerin altına düşerse 0,6 satırı okunur.
+AYD_TABLO_ILK_SATIR = 112
+AYD_TABLO_SUTUNLARI = ("N", "S", "X", "AC", "AH", "AM", "AR", "AW", "BB", "BG")
+MK_AYD_SATIRLARI = range(175, 212)
+
+
+def _sayi_metni(x):
+    """Formüle gömülecek sayı  —  üstel gösterim YOK ( Excel kabul etmez )."""
+    return f"{float(x):.12f}".rstrip("0").rstrip(".") or "0"
+
+
+def _ek_hucre(anahtar):
+    """Ek girdi bloğundaki bir alanın mutlak hücre başvurusu."""
+    satir = next(s for a, s, *_x in EK_GIRDI_HUCRELERI if a == anahtar)
+    return f"'{GIRDI_SAYFASI}'!$B${satir}"
+
+
+def _verim_tablosu(ws):
+    """Kitabın verim tablosunu motorun tablosuyla aynı yapar.
+
+    Varsayılan sütun ( tavan .80 · duvar .50 · zemin .10 ) iki tabloda da
+    aynıydı;  son sütunlarda sıra ve birkaç değer farklıydı ( 2,5 satırında
+    0,30 ↔ 0,34 ).  Ofis başka bir sütun seçerse kitap başka sayı okurdu.
+    """
+    for i, k in enumerate(AV_TAB.AYD_K_SATIRLARI):
+        r = AYD_TABLO_ILK_SATIR + i
+        ws[f"D{r}"] = k
+        for j, harf in enumerate(AYD_TABLO_SUTUNLARI):
+            ws[f"{harf}{r}"] = AV_TAB.AYD_VERIM[i][j]
+
+
+def _ayd_verim_formulu(k_hucre, S):
+    """η = TABLOLAR T2  —  k bir ALT satıra yuvarlanır, en az 0,6 satırı."""
+    from openpyxl.utils import column_index_from_string as _ci
+    sutun = int(S.get("ayd_sutun") or 2)
+    harf = AYD_TABLO_SUTUNLARI[max(1, min(sutun, len(AYD_TABLO_SUTUNLARI))) - 1]
+    son = AYD_TABLO_ILK_SATIR + len(AV_TAB.AYD_K_SATIRLARI) - 1
+    return (f"=VLOOKUP(MAX({k_hucre},{_sayi_metni(AV_TAB.AYD_K_SATIRLARI[0])}),"
+            f"$D${AYD_TABLO_ILK_SATIR}:${AYD_TABLO_SUTUNLARI[-1]}${son},"
+            f"{_ci(harf) - _ci('D') + 1},1)")
+
+
+def _yansitma(ws, satir, S):
+    """Ty · Dy · Zy satırları seçilen tablo sütununun katsayılarını yazar."""
+    m = re.findall(r"(\d+,\d+)", AV_TAB.AYD_SUTUN_ACIKLAMA.get(int(S.get("ayd_sutun") or 2), ""))
+    for j, ad in enumerate(("Tavanın", "Duvarın", "Zeminin")):
+        ws[f"D{satir + j}"] = f"{ad} yansıtma katsayısı  ( Tablo 2 )"
+        if j < len(m):
+            ws[f"AG{satir + j}"] = float(m[j].replace(",", "."))
+
+
+def _yukleme_cetveli(ws, oz, S):
+    """TAS yükleme cetveli  —  paftanın kurulu güç cetveliyle aynı dört kalem."""
+    w_kabin = _sayi_metni(S["kabin_armatur_W"])
+    #  1  motor ( şebekeden çekilen — AT7 = W36 × 1000, kitapta zaten doğru )
+    if oz.get("sigorta_A"):
+        ws["X7"] = oz["sigorta_A"]
+    #  4  priz:  pafta TOPLAM adedi tek kalemde verir
+    ws["R8"], ws["AK8"] = 4, S["priz_adedi"]
+    ws["AT8"] = f"=AK8*{_sayi_metni(S['priz_gucu'])}"
+    ws["AY8"] = "PRİZ  ( toplam )"
+    #  2  kuyu aydınlatması:  adet aşağıdaki kuyu bloğundan
+    ws["R11"], ws["AA11"], ws["AT11"] = 2, "=M170", "=AA11*R170"
+    ws["AY11"] = "KUYU AYDINLATMASI"
+    #  3  kabin + kabin üstü:  kitapta kabin aydınlatma hesabı yoktur, adet
+    #     paftanın hesabından gelir
+    ws["R13"] = 3
+    ws["AA13"] = (oz.get("n_kabin") or 0) + S["kabin_ustu_armatur"]
+    ws["AT13"] = f"=AA13*{w_kabin}"
+    ws["AY13"] = "KABİN + KABİN ÜSTÜ AYDINLATMASI"
+    #  Paftanın cetvelinde OLMAYAN üç satır boşaltılır:  ayrı kuyu dibi ve
+    #  kabin üstü prizi ( toplam 4. kalemdedir ) ve makine dairesi
+    #  aydınlatması ( kurulu güce katılmaz ).
+    #  ( R · U · X 8-10. satırlarda BİRLEŞİKTİR — priz grubunun ortak linye,
+    #    tip ve sigortası;  birleşik hücreye yazılamaz, atlanır. )
+    from openpyxl.cell.cell import MergedCell
+    for r in (9, 10, 12):
+        for c in ("R", "U", "X", "AA", "AF", "AK", "AP", "AT", "AY"):
+            if not isinstance(ws[f"{c}{r}"], MergedCell):
+                ws[f"{c}{r}"] = None
+
+
+def _kuyu_aydinlatmasi(ws, S):
+    """Kuyu aydınlatması  —  paftanın lümen yöntemi, aynı sabitlerle.
+
+        k = a·b / ( h·(a+b) )     a = kuyu yüksekliği · b = kuyu genişliği
+        T = E·a·b·d / η            Z = T / ØL
+        n = MAX( ROUNDUP(Z) + 2 ;  ROUNDUP( (H − 1) / Dmax ) + 1 )
+    """
+    ws["A135"], ws["D135"] = "b", "Kuyu genişliği"
+    ws["AG135"] = f"={_ek_hucre('kuyu_genisligi')}/1000"
+    ws["A136"], ws["D136"] = "h", "Armatür ile çalışma düzlemi arasındaki yükseklik"
+    ws["AG136"] = S["h_armatur"]
+    ws["A137"], ws["D137"] = "nek", "Kuyu dibi + kuyu üstü ek armatür"
+    ws["AG137"], ws["AL137"] = S["kuyu_ek_armatur"], "Adet"
+    ws["A139"], ws["D139"] = "Dmax", "Armatürler arası azami aralık  ( 0 = kontrol kapalı )"
+    ws["AG139"] = S["kuyu_Dmax"]
+    ws["AG140"], ws["AG142"] = S["E_kuyu"], S["kirlenme_faktoru"]
+    ws["AG143"] = _ayd_verim_formulu("AG157", S)
+    ws["AG144"] = "=M170"
+    ws["AG146"] = S["kuyu_armatur_lm"]
+    _yansitma(ws, 147, S)
+    ws["G153"], ws["R153"] = "b", "=AG135"
+    ws["C158"], ws["O158"], ws["X158"] = "h x (H + b)", "=AG136", "=AG135"
+    ws["A165"] = ("Minimum lamba sayısı  ( n = MAX( ROUNDUP( Z ) + nek ;  "
+                  "ROUNDUP( ( H − 1 ) / Dmax ) + 1 ) ) :")
+    ws["M170"] = ("=MAX(ROUNDUP(T167,0)+AG137,"
+                  "IF(AG139>0,ROUNDUP((AG138-1)/AG139,0)+1,0))")
+    ws["R170"], ws["U170"] = S["kuyu_armatur_W"], "W armatür kullanılmalıdır."
+
+
+def _makine_dairesi_aydinlatmasi(ws, S, mk):
+    """Makine dairesi aydınlatması  —  yalnız paftada da hesaplanıyorsa.
+
+    Makine dairesiz projede kitap bu bölümü şablonun 2,5 × 1,6 m'lik örnek
+    dairesiyle hesaplamayı sürdürüyordu;  pafta ise "uygulanmaz" diyor.
+    """
+    from openpyxl.cell.cell import MergedCell
+    if not mk.get("aktif"):
+        for r in MK_AYD_SATIRLARI:
+            for c in ws[r]:
+                if not isinstance(c, MergedCell) and c.value is not None:
+                    c.value = None
+        ws[f"A{MK_AYD_SATIRLARI[0]}"] = str(
+            mk.get("uyari") or "Makine dairesiz ( MRL ) sistem — bu hesap uygulanmaz."
+        ).strip(" !")
+        return
+    ws["A176"], ws["D176"] = "a", "Makine dairesi uzunluğu"
+    ws["AG176"] = f"={_ek_hucre('mk_uzunluk')}/1000"
+    ws["A177"], ws["D177"] = "b", "Makine dairesi genişliği"
+    ws["AG177"] = f"={_ek_hucre('mk_genislik')}/1000"
+    ws["A178"], ws["D178"] = "h", "Armatür ile çalışma düzlemi arasındaki yükseklik"
+    ws["AG178"] = S["h_armatur"]
+    for r in (179, 180):
+        for c in ("A", "C", "D", "AG", "AL"):
+            if not isinstance(ws[f"{c}{r}"], MergedCell):
+                ws[f"{c}{r}"] = None
+    ws["AG181"], ws["AG183"] = S["E_makine_dairesi"], S["kirlenme_faktoru"]
+    ws["AG184"] = _ayd_verim_formulu("AG198", S)
+    ws["AG187"] = S["kuyu_armatur_lm"]
+    _yansitma(ws, 188, S)
+    ws["A192"] = "Makine Dairesi Alanı:"
+    ws["C199"], ws["O199"] = "h x (a + b)", "=AG178"
+    ws["R211"], ws["U211"] = S["kuyu_armatur_W"], "W armatür kullanılmalıdır."
 
 
 def _liste_tamamla(wb):
@@ -974,6 +1171,12 @@ def _standarda_uydur(wb, g):
 
     #  ①  Tahrik kasnağı / halat oranı eşiği  —  EN 81-20 m.5.5.2.1
     ws["Q97"] = MK.SABIT["Dt_dh_asgari"]
+    #  Belge beyan edilmişse 40'ın altı belgeyle kabul edilir — motorla aynı
+    #  kural ( bkz. mukavemet._aski_halatlari ).  Beyan boşsa ( usta kopya )
+    #  hüküm kitabın özgün davranışıdır.
+    _belge = next(s for a, s, *_x in EK_GIRDI_HUCRELERI if a == "kasnak_belgesi")
+    ws["Z97"] = (f'=IF(N97>=Q97,"UYGUNDUR.",IF(\'{GIRDI}\'!$B${_belge}="Var",'
+                 f'"{MK.BELGEYLE_UYGUN_KITAP}","UYGUN DEĞİLDİR."))')
 
     #  ③  Durum 2'de xQ = xc  —  EN 81-50 Ek C.2.1.1
     ws["AO312"] = "=AH293"

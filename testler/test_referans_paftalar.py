@@ -115,6 +115,19 @@ def _eleport(r):
               abs(s["ozet"]["S_gercek"] - 25.36) / 25.36 * 100 <= 1.0,
               f"→ bizim {s['ozet']['S_gercek']:.2f} · ELEport 25,36")
 
+    #  ── Dt/dh = 36,92 < 40  —  BELGE YOLU ────────────────────────────
+    #  ELEport bu kontrolü "halat sertifikalı" diye atlar ve Sf'yi 12'ye
+    #  indirir.  Biz belgesiz projede reddederiz;  belge beyan edilince
+    #  oran kabul edilir ama Sf = 23,54 aynen aranır ( 7 halat S = 25,1 ).
+    _hb = lambda x: next(b for b in x["bolumler"] if b["kimlik"] == "aski_halatlari")
+    r.kontrol("ELEport · belgesiz 240 / 6,5 halat bölümü UYGUN DEĞİL",
+              _hb(s)["sonuc"]["uygun"] is False, f"→ {_hb(s)['sonuc']['metin']}")
+    s_b = MK.hesapla(dict(ELEPORT, kasnak_belgesi="Var"))
+    r.kontrol("ELEport · belgeyle halat bölümü UYGUN, Sf yine 23,54",
+              _hb(s_b)["sonuc"]["uygun"] is True
+              and abs(s_b["ozet"]["Sf"] - 23.54) / 23.54 * 100 <= 0.5,
+              f"→ {_hb(s_b)['sonuc']['metin']} · Sf {s_b['ozet']['Sf']:.2f}")
+
     #  ── T1/T2 ETİKETİ:  AYNI SAYI, BAŞKA AD ───────────────────────────
     #  EN 81-50 m.5.11.2.1 T1 ve T2'yi "kasnağın İKİ YANINDAKİ kuvvetler"
     #  diye tanımlar, hangisinin T1 olduğunu söylemez.  ELEport BÜYÜK olana

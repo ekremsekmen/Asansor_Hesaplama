@@ -943,6 +943,114 @@ def calistir():
               _ad20.endswith(".txt") and "TAMAMI DEĞİLDİR" in _ic20.decode("utf-8")
               and "1 - A" in _ic20.decode("utf-8"))
 
+    # ---------------------------------------------------------------------
+    #  ㉑  TESLİM KİTABININ ELEKTRİK SAYFASI PAFTAYLA AYNI SAYIYI VERİR
+    # ---------------------------------------------------------------------
+    #  Kitap bu sayfayı kendi yöntemiyle hesaplıyordu:  κ = 56 ( pafta 44,4 ),
+    #  kendi yükleme cetveli ( 4 priz · kuyu 9 × 12 W · kabin 1 × 40 W ·
+    #  makine dairesiz projede bile makine dairesi 3 × 40 W ) ve başka bir
+    #  kuyu aydınlatma bağıntısı.  Aynı projede ε pafta %0,97, kitap %0,77.
+    #  Kitaplar LibreOffice ile YENİDEN HESAPLANIR ve paftanın sayılarıyla
+    #  karşılaştırılır — formüllerin gerçekten aynı sonucu verdiği görülür.
+    r.esit("㉑ uygulama ofisinin κ varsayılanı motorunkiyle aynı",
+           US.VARSAYILAN["kappa"], AV.OFIS_VARSAYILAN["kappa"])
+    _avv21 = {**AV.SABIT_B_VARSAYILAN, **AV.OFIS_VARSAYILAN}
+    r.esit("㉑ uygulama ofisinin BÜTÜN elektrik varsayılanları motorunkiyle aynı",
+           {k: v for k, v in US.VARSAYILAN.items()
+            if k in _avv21 and v != _avv21[k]}, {})
+    import shutil as _sh21
+    import openpyxl as _op21
+    from exports import mukavemet_xlsx as _MX21
+    from testler.ortak import (hata_hucresi_ara as _hh21, soffice_yolu as _so21,
+                               yeniden_hesapla as _yh21)
+    _SEN21 = {
+        "mrl": {},
+        "daireli": {"mk_yok": False, "mk_uzunluk": 2500, "mk_genislik": 1600},
+        "ofis": {"mk_yok": False, "mk_uzunluk": 3100, "mk_genislik": 2200,
+                 "_ofis": {"kappa": 56, "kuyu_armatur_W": 36, "kuyu_armatur_lm": 3000,
+                           "ayd_sutun": 9, "priz_adedi": 5, "kabin_ustu_armatur": 2,
+                           "kuyu_Dmax": 3, "cosfi": 0.8}},
+        "dmax0": {"_ofis": {"kuyu_Dmax": 0, "ayd_sutun": 4}},
+        #  PAFTANIN REDDETTİĞİ proje:  kitap da reddetmeli
+        "yetersiz": {"motor_gucu": 15, "kolon_kesit": 2.5, "kolon_uzunluk": 90},
+    }
+    if not _so21():
+        r.atla("㉑ LibreOffice yok — kitap / pafta elektrik karşılaştırması atlandı")
+    else:
+        _k21 = os.path.join(KOK, "tmp", "test_elektrik_kitap")
+        _sh21.rmtree(_k21, ignore_errors=True)
+        os.makedirs(_k21, exist_ok=True)
+        _dosya21 = {}
+        for _ad, _ek in _SEN21.items():
+            _s21 = UY.hesapla(dict(TAM, sarilma_acisi=180, **_ek))
+            if not r.kontrol(f"㉑ [{_ad}] senaryo hesaplanıyor", _s21["aktif"],
+                             f"→ {_s21.get('hata')}"):
+                continue
+            _y = os.path.join(_k21, _ad + ".xlsx")
+            with open(_y, "wb") as _f:
+                _f.write(_MX21.mukavemet_xlsx(_s21["girdi"]))
+            _dosya21[_ad] = (_y, _s21)
+        _yh21([y for y, _s in _dosya21.values()], os.path.join(_k21, "out"))
+        _yak21 = lambda a, b: (isinstance(a, (int, float)) and isinstance(b, (int, float))
+                              and abs(a - b) <= 1e-6 * max(1.0, abs(b)))
+        for _ad, (_y, _s21) in _dosya21.items():
+            _q = os.path.join(_k21, "out", _ad + ".xlsx")
+            if not r.kontrol(f"㉑ [{_ad}] kitap yeniden hesaplandı", os.path.isfile(_q)):
+                continue
+            _w = _op21.load_workbook(_q, data_only=True)[_MX21.ELEKTRIK]
+            #  Paftanın sayıları:  uygulama sonucundaki elektrik bölümleri ve
+            #  özet.  Ara değerler bölüm satırlarından değil avan özetinden
+            #  okunur — pafta o özetten basılır.
+            _e = _MX21._elektrik_hesabi(_s21["girdi"])
+            _oz, _mk = _e["oz"], _e["mk"]
+            r.esit(f"㉑ [{_ad}] pafta özeti ile kitabın kaynağı aynı hesap",
+                   (_oz["P_kurulu"], _oz["eps"], _oz["I"]),
+                   (_s21["ozet"]["P_kurulu"], _s21["ozet"]["eps"], _s21["ozet"]["I"]))
+            for _h, _ne, _bek in (
+                    ("AT14", "kurulu güç", _oz["P_kurulu"]),
+                    ("AE39", "ε1 kolon hattı", _oz["eps1"]),
+                    ("AE46", "ε2 makine besleme", _oz["eps2"]),
+                    ("Y53", "ε toplam", _oz["eps"]),
+                    ("AE57", "I kolon hattı", _oz["I"]),
+                    ("AE62", "I2 makine besleme", _oz["I_motor"]),
+                    ("AT8", "priz gücü", _oz["g_priz"]),
+                    ("AT11", "kuyu aydınlatma gücü", _oz["g_kuyu"]),
+                    ("AT13", "kabin aydınlatma gücü", _oz["g_kabin"]),
+                    ("AG157", "kuyu k", _oz["k_kuyu"]),
+                    ("AG143", "kuyu η", _oz["eta_kuyu"]),
+                    ("AG162", "kuyu ışık akısı T", _oz["T_kuyu"]),
+                    ("M170", "kuyu armatür adedi", _oz["n_kuyu"]),
+                    ("W32", "κ", _e["S"]["kappa"])):
+                r.kontrol(f"㉑ [{_ad}] {_h} {_ne} paftayla aynı",
+                          _yak21(_w[_h].value, _bek),
+                          f"→ kitap {_w[_h].value!r}, pafta {_bek!r}")
+            if _mk.get("aktif"):
+                for _h, _ne, _bek in (("AG198", "makine dairesi k", _mk["k"]),
+                                      ("AG184", "makine dairesi η", _mk["eta"]),
+                                      ("M211", "makine dairesi armatür adedi", _mk["n"])):
+                    r.kontrol(f"㉑ [{_ad}] {_h} {_ne} paftayla aynı",
+                              _yak21(_w[_h].value, _bek),
+                              f"→ kitap {_w[_h].value!r}, pafta {_bek!r}")
+            else:
+                r.kontrol(f"㉑ [{_ad}] makine dairesiz projede kitap o bölümü hesaplamıyor",
+                          "uygulanmaz" in str(_w["A175"].value)
+                          and _w["M211"].value in (None, "")
+                          and _w["AT12"].value in (None, "", 0),
+                          f"→ {_w['A175'].value!r} · M211 {_w['M211'].value!r}")
+            #  HÜKÜMLER:  pafta ε / I / I2 uygun değilse kitap da öyle demeli
+            _hk = {h: str(_w[h].value or "") for h in ("AS53", "AB60", "AH65")}
+            for _h, _uy in (("AS53", _oz["eps_uygun"]), ("AB60", _oz["akim_uygun"]),
+                            ("AH65", _oz["akim2_uygun"])):
+                r.kontrol(f"㉑ [{_ad}] {_h} hükmü paftayla aynı",
+                          _hk[_h].startswith("UYGUNDUR") == bool(_uy),
+                          f"→ kitap {_hk[_h]!r}, pafta {_uy!r}")
+            r.esit(f"㉑ [{_ad}] elektrik sayfasında hata hücresi yok",
+                   [x for x in _hh21(_q) if x.startswith(_MX21.ELEKTRIK)], [])
+        r.kontrol("㉑ yetersiz senaryo gerçekten reddediliyor  ( sınanan şey boş değil )",
+                  "yetersiz" in _dosya21
+                  and not _MX21._elektrik_hesabi(_dosya21["yetersiz"][1]["girdi"])["oz"]["eps_uygun"])
+        _sh21.rmtree(_k21, ignore_errors=True)
+
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı
     #  notları "kesin seçim UYGULAMA PROJESİNDE yapılır" der;  avan paftasında

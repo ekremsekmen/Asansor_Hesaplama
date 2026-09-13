@@ -431,8 +431,17 @@ def calistir():
                        "sarilma_acisi": 180}, "sarım sayısına"),
         ("g_Vsoft", {"kanal_sekli": "V Kanal", "kanal_isleme": "Sertleştirilmemiş",
                      "sarilma_acisi": 180}, "alt kesilmesiz V"))
+    #  D/d < 40 BELGESİ.  Kitabın Dt/dh hükmü ( Z97 ) motorla aynı kuralı
+    #  izlemeli:  belgesiz 240 / 6,5 ret, belgeli kabul, oran ≥ 40 iken belge
+    #  hükmü değiştirmez.  Sf ( T125 ) belgeden etkilenmemeli.
+    _KUCUK = {"tahrik_kasnak_capi": 240, "halat_capi": 6.5,
+              "saptirma_kasnak_capi": 240, "kasnak_tek_yon": 2}
+    _belgeli = (("d_yok", dict(_KUCUK, kasnak_belgesi="Yok")),
+                ("d_var", dict(_KUCUK, kasnak_belgesi="Var")),
+                ("d_var40", {"tahrik_kasnak_capi": 320, "halat_capi": 8,
+                             "kasnak_belgesi": "Var"}))
     try:
-        for _ad, _g in list(_fsen) + [(a, g) for a, g, _ in _gecersiz]:
+        for _ad, _g in list(_fsen) + [(a, g) for a, g, _ in _gecersiz] + list(_belgeli):
             with open(os.path.join(_fg, _ad + ".xlsx"), "wb") as _f:
                 _f.write(MX.mukavemet_xlsx(_g))
     except FileNotFoundError:
@@ -440,8 +449,34 @@ def calistir():
         r.atla("mukavemet şablonu yok — kanal f denetimi atlandı")
     if _fsen:
         yeniden_hesapla([os.path.join(_fg, a + ".xlsx") for a, _ in _fsen]
-                        + [os.path.join(_fg, a + ".xlsx") for a, _g, _p in _gecersiz],
+                        + [os.path.join(_fg, a + ".xlsx") for a, _g, _p in _gecersiz]
+                        + [os.path.join(_fg, a + ".xlsx") for a, _g in _belgeli],
                         os.path.join(_fk, "out"))
+        for _ad, _g in _belgeli:
+            _s = MK.hesapla(_g)
+            _b4 = next(b for b in _s["bolumler"] if b["kimlik"] == "aski_halatlari")
+            _dd = [a for a in _b4["adimlar"] if str(a.get("aciklama") or "").startswith("Dt / dh =")]
+            _motor_uygun = bool(_dd) and not str(_dd[0].get("metin")).startswith("UYGUN DEĞİL")
+            _byol = os.path.join(_fk, "out", _ad + ".xlsx")
+            if not os.path.isfile(_byol):
+                r.kontrol(f"[D/d belgesi] {_ad} kitabı hesaplandı", False)
+                continue
+            _bws = openpyxl.load_workbook(_byol, data_only=True)[SAYFA]
+            _z = str(_bws["Z97"].value or "")
+            r.kontrol(f"[D/d belgesi] {_ad} · Z97 motorla aynı hükmü veriyor",
+                      _z.startswith("UYGUNDUR") == _motor_uygun,
+                      f"→ kitap {_z!r}, motor {_dd[0].get('metin') if _dd else None!r}")
+            r.kontrol(f"[D/d belgesi] {_ad} · Sf ( T125 ) motorla aynı",
+                      _esit(_s["ozet"]["Sf"], _bws["T125"].value),
+                      f"→ motor {_s['ozet']['Sf']!r}, kitap {_bws['T125'].value!r}")
+        _z_var = str(openpyxl.load_workbook(os.path.join(_fk, "out", "d_var.xlsx"),
+                                            data_only=True)[SAYFA]["Z97"].value or "")
+        r.esit("[D/d belgesi] belgeli kitap sapmayı adıyla yazıyor",
+               _z_var, MK.BELGEYLE_UYGUN_KITAP)
+        r.kontrol("[D/d belgesi] belgesiz 240 / 6,5 kitapta da reddediliyor",
+                  str(openpyxl.load_workbook(os.path.join(_fk, "out", "d_yok.xlsx"),
+                                             data_only=True)[SAYFA]["Z97"].value
+                      ).startswith("UYGUN DEĞİL"))
         for _ad, _g, _parca in _gecersiz:
             r.kontrol(f"[geçersiz girdi] {_ad} motorda reddediliyor",
                       not MK.hesapla(_g).get("aktif"))

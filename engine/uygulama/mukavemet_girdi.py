@@ -150,6 +150,15 @@ ALANLAR = (
      "kN", "sayi", None, None),
     ("halat_capi",        "B99",  "Askı halatı çapı",                  "mm",   "secim",
      MT.HALAT_CAPLARI, 6.5),
+    #  D/d ≥ 40 — BELGEYLE AŞILABİLEN SINIR.  TS EN 81-20 m.5.5.2.1'in 40'ı
+    #  uyumlaştırılmış standart şartıdır;  Asansör Yönetmeliği ( 2014/33/AB )
+    #  Ek-I 1.3 askı elemanları için sayısal oran vermez.  240 mm kasnak ile
+    #  6,5 mm halat gibi birleşimler bu sapmayı onaylanmış kuruluş belgesiyle
+    #  kanıtlar.  "Var" seçilirse 40'ın altı hata sayılmaz;  Sf ( EN 81-50
+    #  m.5.12 ) yine aynen aranır — küçük kasnağın bedelini zaten o öder.
+    #  ELEport aynı yerde Sf'yi de 12'ye indirir;  bu bilerek alınmadı.
+    ("kasnak_belgesi",    "",     "Dt/dh < 40 için onaylanmış kuruluş belgesi",
+     "—",    "secim", ("Yok", "Var"), "Yok"),
     ("kanal_sekli",       "F105", "Kasnak kanal şekli",                "—",    "secim",
      MT.KANAL_SEKILLERI, "Altı Kesik V Kanal"),
     ("kanal_isleme",      "F106", "Kanal işleme şekli",                "—",    "secim",
@@ -475,7 +484,7 @@ GRUPLAR = (
       "yan_yatak_boyu", "makine_tipi", "makine_tst",
       "makine_raya_biniyor", "raya_binen_yuk")),
     ("Askı halatları",
-     ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
+     ("halat_adedi", "halat_capi", "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
       "sarilma_acisi",
       "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
       "kasnak_tek_yon", "kasnak_ters_yon",
