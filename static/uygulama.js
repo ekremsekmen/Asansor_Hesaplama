@@ -583,7 +583,9 @@ function cizMukavemet(r){
      + (o.P_kurulu!=null ? kutu('Asansörün kurulu gücü', trn(o.P_kurulu,0), 'W') : '')
      + (o.eps!=null ? kutu('ε — Gerilim düşümü', tr(o.eps,3), '%', o.eps_uygun?'ok':'hata') : '')
      + (o.Re!=null ? kutu('Re — Topraklama', tr(o.Re,3), 'Ω', o.topraklama_uygun?'ok':'hata') : '')
-     + kutu('Sonuç', o.tumu_uygun?'UYGUN':'UYGUN DEĞİL', '', o.tumu_uygun?'ok':'hata')
+     /* hüküm MOTORDAN gelir ( mukavemet.genel_hukum ) — burada yeniden
+        kurulursa PDF ile ayrışır */
+     + kutu('Sonuç', o.genel_sonuc_kisa || (o.tumu_uygun?'UYGUN':'UYGUN DEĞİL'), '', o.tumu_uygun?'ok':'hata')
      + '</div>';
 
   /* bölüm sonuçları — hangi bölüm takıldı, bir bakışta görünsün */
@@ -888,7 +890,7 @@ function mProjeOzetiCiz(c){
     const sinif = a.aktif === false ? 'hata'
                 : (a.tumu_uygun === true ? 'ok' : (a.tumu_uygun === false ? 'hata' : ''));
     const metin = a.aktif === false ? 'HESAP YAPILAMADI'
-                : (a.tumu_uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR');
+                : (a.genel_sonuc || (a.tumu_uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR'));
     h += `<tr class="m-gidilir" onclick="mAsansorSec(${a.no - 1})"
               title="${kacis(a.tanim || '')} sekmesine git">
             <td class="etiket">${a.no}</td><td>${kacis(a.tanim || '')}</td>

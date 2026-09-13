@@ -99,8 +99,10 @@ def hesapla(veriler=None):
                      #  anlamsızdır — burada trafik hesabı yoktur.
                      if "TRAFİK" not in u.upper()]
     else:
-        uyarilar.append("⚠ ELEKTRİK HESAPLARI YAPILAMADI: "
-                        + str(asansor.get("uyari") or "girdiler eksik"))
+        # Zorunlu hesap eksikliği genel uygunluğu da engeller.
+        # Uyarı aşağıda eksik listesinden tek kez üretilir.
+        eksik.append("ELEKTRİK HESAPLARI YAPILAMADI: "
+                     + str(asansor.get("uyari") or "girdiler eksik"))
 
     #  Bölüm numaraları uygulama projesinin kendi sırasına göre yeniden
     #  yazılır;  avandan gelen "3 - ..." başlığı burada 11. sıradadır.
@@ -170,6 +172,10 @@ def hesapla(veriler=None):
         "tumu_uygun": all(uygunlar),
         "engelleyici": engelleyici, "eksik_hesap": eksik,
     })
+    #  HÜKÜM MOTORDAN ÇIKAR ( bkz. E_MUK.genel_hukum ):  "uygun değil" >
+    #  "hesap eksik" > "uygundur".  Ekran ve PDF bunu yalnız basar.
+    _hukum = E_MUK.genel_hukum(bolumler, all(uygunlar), eksik)
+    ozet["genel_sonuc"], ozet["genel_sonuc_kisa"] = _hukum
     return {
         "aktif": True,
         "baslik": "ASANSÖR UYGULAMA PROJESİ HESAPLARI",
@@ -272,6 +278,8 @@ def hesapla_coklu(asansorler=None, ortak=None):
             "asansorler": [{"no": s["no"], "tanim": s["tanim"],
                             "aktif": bool(s.get("aktif")),
                             "tumu_uygun": (s.get("ozet") or {}).get("tumu_uygun"),
+                            "eksik_hesap": (s.get("ozet") or {}).get("eksik_hesap", []),
+                            "genel_sonuc": (s.get("ozet") or {}).get("genel_sonuc"),
                             "N_hesap": (s.get("ozet") or {}).get("N_hesap")}
                            for s in sonuclar],
         },

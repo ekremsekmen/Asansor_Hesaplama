@@ -657,6 +657,18 @@ def calistir():
         #  ( f = μ / sin(γ/2) ) ve denge zinciri.
         pg.select_option("#m_kanal_isleme", "Sertleştirilmiş")
         pg.select_option("#m_denge_zinciri", "Var")
+        #  Sarılma açısı ZORUNLU girdidir ve varsayılanı yoktur;  girilmezse
+        #  tahrik sınırları hesaplanmaz.  Formda gerçekten doldurulabildiği
+        #  de böylece sınanır.
+        r.kontrol("sarılma açısı alanı formda ve boş başlıyor",
+                  pg.is_visible("#m_sarilma_acisi")
+                  and pg.input_value("#m_sarilma_acisi") == "",
+                  f"→ görünür {pg.is_visible('#m_sarilma_acisi')}")
+        r.kontrol("kaldırılan C · D · halat arası alanları formda yok",
+                  not any(pg.query_selector(x) for x in
+                          ("#m_sap_kasnak_yuk", "#m_makine_yatak_yuk",
+                           "#m_halat_arasi_yan")))
+        pg.fill("#m_sarilma_acisi", "180")
         pg.wait_for_timeout(1500)
         r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · "
                   "sertleştirilmiş kanal · denge zinciri girilince "

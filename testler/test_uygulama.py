@@ -273,9 +273,11 @@ def calistir():
     #  TAHRİK YETENEĞİ için kanalın sertleştirilmiş olması ve denge zinciri
     #  de gerekir;  ivme işaretleri Ek D'ye göre düzeltilince ( sapma ㊳ )
     #  kitabın çıplak örneği tahrikten kalıyor.
+    #  Temiz proje sarılma açısını da BEYAN eder ( zorunlu girdi ).
     _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280,
                   motor_gucu=7.5, guvenlik_devreye_kuvvet=200,
-                  kanal_isleme="Sertleştirilmiş", denge_zinciri="Var")
+                  kanal_isleme="Sertleştirilmiş", denge_zinciri="Var",
+                  sarilma_acisi=180)
     _t = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)))
     r.kontrol("② temiz proje uygun", _t["ozet"]["tumu_uygun"] is True)
     #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil
@@ -523,6 +525,351 @@ def calistir():
     r.kontrol("⑪ ω varken mesaj 'denetlenemedi' demiyor",
               "denetlenemedi" not in str(_b11b["sonuc"]["metin"]),
               f"→ {_b11b['sonuc']['metin'][:90]}")
+
+    #  ⑫  ÇİFT SARIM:  BLOKE KARARA BAĞLANMAZ, KALANI HESAPLANIR
+    #  TS EN 81-50 m.5.11.2.1 iki eşitsizlik verir ve YÖNLERİ TERSTİR:
+    #      yükleme · frenleme :  T1/T2 ≤ e^(f·α)      → küçük α emniyetli
+    #      bloke               :  T1/T2 ≥ e^(f·α)      → küçük α EMNİYETSİZ
+    #  α tek sarıma göre hesaplandığı için çift sarımda blokede hüküm
+    #  verilemez.  Bir ara sürüm bölümün TAMAMINI hesaplamayı bırakmıştı:
+    #  _h hücrelerinin hiçbiri yazılmıyor, TEST 9 çöküyor ve emniyetli
+    #  taraftaki üç sonuç da kayboluyordu.  İkisi birden denetlenir.
+    _CS = "Yarım Daire Kanal (Çift Sarım)"
+    #  Kalkan, çift sarımda 180°'yi AŞMAYAN ( tek sarıma ait ) bir açıyla
+    #  devreye girer;  açı hiç girilmemişse bambaşka bir yol ( ALFA_YOK ) çalışır.
+    _s12 = MK.hesapla({"kanal_sekli": _CS, "sarilma_acisi": 180})
+    _b12 = next(x for x in _s12["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+    _k12 = [a for a in _b12["adimlar"] if isinstance(a, dict)
+            and a.get("tip") == "metin"
+            and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+    r.esit("⑫ bölüm yine dört yük durumunu + α kontrolünü basıyor", len(_k12), 5)
+    r.kontrol("⑫ bloke satırı HESAP EKSİK diyor",
+              _k12[-1]["deger"] == "HESAP EKSİK", f"→ {_k12[-1]['deger']!r}")
+    r.kontrol("⑫ bloke satırı 'UYGUNDUR' demiyor",
+              "UYGUN" not in str(_k12[-1].get("aciklama") or ""))
+    r.kontrol("⑫ diğer üç durum hüküm veriyor",
+              all(a["deger"] in ("UYGUN", "UYGUN DEĞİL") for a in _k12[:-1]),
+              f"→ {[a['deger'] for a in _k12]}")
+    r.kontrol("⑫ bölüm eksik_hesap işaretli",
+              "çift sarım" in str(_b12.get("eksik_hesap") or ""),
+              f"→ {_b12.get('eksik_hesap')!r}")
+    #  Sınır sayısı paftada kalır ama ÖLÇÜT SANILMAMALI:  "HESAP EKSİK"
+    #  yazan satırın üstünde e^(f·α) = 1,82 ≤ T1/T2 = 15,97 duruyor.
+    _sin12 = [a for a in _b12["adimlar"] if isinstance(a, dict)
+              and a.get("formul") == "e^(f·α)"]
+    r.esit("⑫ dört sınır satırı da basılıyor", len(_sin12), 4)
+    r.kontrol("⑫ bloke sınırı 'karara dayanak değildir' diye işaretli",
+              "dayanak DEĞİLDİR" in str(_sin12[-1].get("kaynak") or ""),
+              f"→ {_sin12[-1].get('kaynak')!r}")
+    r.kontrol("⑫ emniyetli üç sınır işaretlenmiyor",
+              all("m.5.11.3" in str(a.get("kaynak") or "") for a in _sin12[:-1]),
+              f"→ {[a.get('kaynak') for a in _sin12[:-1]]}")
+    r.kontrol("⑫ sebep paftadaki notta yazılı",
+              any("m.5.11.2.1" in x for x in (_b12.get("notlar") or [])),
+              f"→ {_b12.get('notlar')}")
+    #  ASIL REGRESYON:  hücreler yazılmaya devam ETMELİ.
+    _tahrik_hucre = ("S184", "AA184", "AE216", "AF235", "AJ240",
+                     "AH278", "AF283", "K285", "O285")
+    _bos = [h for h in _tahrik_hucre if _s12["_h"].get(h) is None]
+    r.esit("⑫ tahrik bölümünün Excel hücreleri yazılıyor", _bos, [])
+    #  Tek sarım hiç etkilenmemeli
+    _s12t = MK.hesapla({"kanal_sekli": "Yarım Daire Kanal", "sarilma_acisi": 180})
+    _b12t = next(x for x in _s12t["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+    r.kontrol("⑫ tek sarımda bloke hükmü veriliyor",
+              not _b12t.get("eksik_hesap"), f"→ {_b12t.get('eksik_hesap')!r}")
+    #  Teslim edilen kitap da hüküm vermemeli — pafta ile ayrışmasın
+    import openpyxl as _oxl
+    _wb12 = _oxl.load_workbook(io.BytesIO(_MX4.mukavemet_xlsx({"kanal_sekli": _CS, "sarilma_acisi": 180})))
+    _ws12 = _wb12["11-Muk. Hesapları"]
+    r.esit("⑫ teslim kitabında da bloke hükmü verilmiyor",
+           _ws12["Z285"].value, "HESAP EKSİK")
+    r.kontrol("⑫ kitapta sebep yazılı",
+              "5.11.2.1" in str(_ws12["A286"].value or ""),
+              f"→ {str(_ws12['A286'].value)[:60]!r}")
+    r.kontrol("⑫ T1 · T2 · oran hücrelerine dokunulmuyor",
+              str(_ws12["K285"].value or "").startswith("="),
+              f"→ {_ws12['K285'].value!r}")
+    #  Tek sarımda kitabın kendi hükmü korunur
+    _ws12t = _oxl.load_workbook(io.BytesIO(
+        _MX4.mukavemet_xlsx({"sarilma_acisi": 180})))["11-Muk. Hesapları"]
+    r.kontrol("⑫ tek sarımda kitabın hükmü korunuyor",
+              str(_ws12t["Z285"].value or "").startswith("=IF("),
+              f"→ {_ws12t['Z285'].value!r}")
+
+    #  ⑬  GENEL HÜKÜM:  "UYGUN DEĞİL"  >  "HESAP EKSİK"  >  "UYGUNDUR"
+    #  Eksik önce gelirse, dört bölümü çakılan bir proje ekranda yalnız
+    #  "HESAP EKSİK" der ve okuyan tasarımın tutmadığını göremez.  Hüküm
+    #  MOTORDA üretilir;  PDF ve ekran onu yalnız basar ( iki kopya hâlinde
+    #  tutulduğunda zaten bir kez ayrışmıştı ).
+    _S = lambda u: {"sonuc": {"uygun": u}}                      # noqa: E731
+    _E = lambda u: {"sonuc": {"uygun": u}, "eksik_hesap": "x"}  # noqa: E731
+    for _ad, _bol, _tu, _eks, _bek in (
+            ("kalan varken eksik onu örtmez", [_S(True), _S(False)], False, ["e"],
+             "UYGUN DEĞİLDİR."),
+            ("yalnız eksik varsa HESAP EKSİK", [_S(True), _E(False)], False, ["e"],
+             "HESAP EKSİK"),
+            ("hiçbiri yoksa UYGUNDUR", [_S(True), _S(True)], True, [], "UYGUNDUR."),
+            ("engelleyici varsa UYGUN DEĞİL", [_S(True)], False, [],
+             "UYGUN DEĞİLDİR.")):
+        r.esit(f"⑬ {_ad}", MK.genel_hukum(_bol, _tu, _eks)[0], _bek)
+    #  GERÇEK PROJEDE:  varsayılan girdide hem kalan bölüm hem eksik vardır.
+    _s13 = UY.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **TAM)))
+    _o13 = _s13["ozet"]
+    _kalan13 = [b["baslik"][:34] for b in _s13["bolumler"]
+                if (b.get("sonuc") or {}).get("uygun") is False
+                and not b.get("eksik_hesap")]
+    r.kontrol("⑬ senaryoda hem kalan bölüm hem eksik var",
+              bool(_kalan13) and bool(_o13.get("eksik_hesap")),
+              f"→ kalan {_kalan13} / eksik {_o13.get('eksik_hesap')}")
+    r.esit("⑬ hüküm kalan bölümü söylüyor, eksiği değil",
+           _o13.get("genel_sonuc"), "UYGUN DEĞİLDİR.")
+    r.esit("⑬ kısa hüküm de aynı", _o13.get("genel_sonuc_kisa"), "UYGUN DEĞİL")
+    #  PDF EKRANLA AYNI HÜKMÜ BASMALI
+    from exports import pdf_export as _PDF13
+    _pdf13 = _PDF13.uygulama_pdf(
+        {"asansorler": [dict(_s13, no=1, tanim="A")], "adet": 1}, {})
+    r.kontrol("⑬ PDF üretiliyor", len(_pdf13) > 10000, f"→ {len(_pdf13)} bayt")
+    _kaynak13 = io.open(os.path.join(KOK, "exports", "pdf_export.py"),
+                        encoding="utf-8").read()
+    r.kontrol("⑬ PDF hükmü kendi kurmuyor, motordan okuyor",
+              _kaynak13.count('o.get("genel_sonuc")') == 2
+              and "HESAP EKSİK" not in _kaynak13,
+              "→ pdf_export hâlâ kendi hükmünü kuruyor")
+    _js13 = io.open(os.path.join(KOK, "static", "uygulama.js"),
+                    encoding="utf-8").read()
+    r.kontrol("⑬ ekran hükmü kendi kurmuyor, motordan okuyor",
+              "genel_sonuc_kisa" in _js13 and "'HESAP EKSİK'" not in _js13,
+              "→ uygulama.js hâlâ kendi hükmünü kuruyor")
+
+    #  ⑭  ÇOKLU PAKETTE EKSİK KİTAP SESSİZCE ATLANMAZ
+    #  Hesaplanamayan asansör eskiden ``continue`` ile geçiliyordu:  iki
+    #  asansörlük projede tek kitaplı ZIP iniyor, kullanıcı farkına
+    #  varmıyordu.
+    from api.uygulama import _asansor_kitaplari as _AK14
+    _p14 = {"asansorler": [{"no": 1, "tanim": "A", "aktif": True, "girdi": {}},
+                           {"no": 2, "tanim": "B", "aktif": False, "girdi": {}}]}
+    _k14 = _AK14(_p14, {})
+    _adlar14 = [a for a, _ in _k14]
+    r.kontrol("⑭ eksik asansör pakette bildiriliyor",
+              any(a.endswith(".txt") for a in _adlar14), f"→ {_adlar14}")
+    _not14 = next(i for a, i in _k14 if a.endswith(".txt")).decode("utf-8")
+    r.kontrol("⑭ bildirimde asansörün adı geçiyor", "2 - B" in _not14,
+              f"→ {_not14[:120]!r}")
+    r.kontrol("⑭ paketin eksik olduğu açıkça yazıyor",
+              "TAMAMI DEĞİLDİR" in _not14)
+    #  Hepsi üretilebiliyorsa fazladan dosya OLMAMALI
+    _k14b = _AK14({"asansorler": [{"no": 1, "tanim": "A", "aktif": True,
+                                   "girdi": {}}]}, {})
+    r.esit("⑭ eksik yokken bildirim dosyası eklenmiyor",
+           [a for a, _ in _k14b if a.endswith(".txt")], [])
+
+    #  ⑮  α — SARILMA AÇISI ZORUNLU BEYANDIR, VARSAYIMI YOKTUR
+    #  TS EN 81-50 m.5.11.2.1'in iki eşitsizliği terstir;  hiçbir açı iki
+    #  kontrolde birden emniyetli değildir ( 180° varsayılanı 486 senaryonun
+    #  %33'ünde yükleme/frenleme hükmünü geçme yönüne çeviriyordu ).  Bu
+    #  yüzden açı girilmezse dört SINIR hesaplanmaz ve bölüm HESAP EKSİK olur.
+    #  Ama bölüm ERKEN DÖNMEZ:  bir ara sürüm boş bölüm döndürüp T1 · T2'yi
+    #  bile hesaplamıyor, Excel'i hiç üretmiyordu.
+    _CS15 = "Yarım Daire Kanal (Çift Sarım)"
+    _s15y = MK.hesapla({})
+    _s15b = MK.hesapla({"sarilma_acisi": 150})
+    _s15t = MK.hesapla({"sarilma_acisi": 180})
+    _b15y = next(x for x in _s15y["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+    r.kontrol("⑮ α varsayılanı yok", _s15y["girdi"].get("sarilma_acisi") is None,
+              f"→ {_s15y['girdi'].get('sarilma_acisi')!r}")
+    r.kontrol("⑮ α yokken bölüm HESAP EKSİK",
+              "α girilmedi" in str(_b15y.get("eksik_hesap") or ""),
+              f"→ {_b15y.get('eksik_hesap')!r}")
+    r.kontrol("⑮ α yokken genel hüküm 'uygundur' olamıyor",
+              _s15y["ozet"]["tumu_uygun"] is False)
+    #  Açıdan BAĞIMSIZ her şey yine hesaplanmalı
+    _eksik_h = [h for h in ("AF235", "AJ240", "K242", "AF250", "AJ255", "K257",
+                            "AH264", "AF269", "K271", "AH278", "AF283", "K285",
+                            "AS190", "AE216")
+                if _s15y["_h"].get(h) is None]
+    r.esit("⑮ α yokken T1 · T2 · oranlar · f yine hesaplanıyor", _eksik_h, [])
+    r.esit("⑮ α yokken sınır hücreleri YAZILMIYOR ( sahte sayı yok )",
+           [h for h in ("S184", "AA184", "O242", "O257", "O271", "O285")
+            if h in _s15y["_h"]], [])
+    _k15y = [a["deger"] for a in _b15y["adimlar"] if isinstance(a, dict)
+             and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+    r.esit("⑮ α yokken beş kontrol satırı da HESAP EKSİK", _k15y,
+           ["HESAP EKSİK"] * 5)
+    r.kontrol("⑮ α yokken proje uyarısı çıkıyor",
+              any("SARILMA AÇISI" in u for u in _s15y["uyarilar"]),
+              f"→ {[u[:40] for u in _s15y['uyarilar']]}")
+    r.kontrol("⑮ α girilince uyarı çıkmıyor",
+              not any("SARILMA AÇISI" in u for u in _s15b["uyarilar"]))
+    r.esit("⑮ girilen açı hesaba giriyor", _s15b["_h"]["S184"], 150.0)
+    r.kontrol("⑮ açı büyüyünce e^(f·α) sınırı da büyüyor",
+              _s15t["_h"]["O242"] > _s15b["_h"]["O242"],
+              f"→ {_s15b['_h']['O242']:.4f} → {_s15t['_h']['O242']:.4f}")
+    _a15 = [a for a in next(x for x in _s15b["bolumler"]
+                            if x["kimlik"] == "tahrik_yetenegi")["adimlar"]
+            if isinstance(a, dict) and str(a.get("sembol") or "") == "α"]
+    r.esit("⑮ paftada α kaynağı 'GİRİŞ'", _a15[0].get("kaynak") if _a15 else None,
+           "GİRİŞ")
+    #  GEVŞEK HALAT, EKSİK AÇIYLA ÖRTÜLMEZ — kesin başarısızlık eksikten güçlü
+    _s15g = MK.hesapla({"acil_frenleme_a": 9.81})
+    _b15g = next(x for x in _s15g["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+    r.kontrol("⑮ α yokken gevşek halat 'UYGUN DEĞİL' kalıyor, eksikle örtülmüyor",
+              not _b15g.get("eksik_hesap")
+              and "gevşiyor" in str(_b15g["sonuc"]["metin"]),
+              f"→ {_b15g['sonuc']['metin']!r} / eksik {_b15g.get('eksik_hesap')!r}")
+    #  Türetme kalktı:  C · D · Ra artık girdi değil
+    for _alan in ("sap_kasnak_yuk", "makine_yatak_yuk", "halat_arasi_yan",
+                  "halat_arasi"):
+        r.kontrol(f"⑮ '{_alan}' girdisi kaldırıldı",
+                  _alan not in _s15y["girdi"], "→ hâlâ var")
+    #  ÇİFT SARIMDA AÇI 180°'Yİ AŞARSA BLOKE HÜKMÜ VERİLİR
+    _s15c = MK.hesapla({"kanal_sekli": _CS15, "sarilma_acisi": 330})
+    _b15c = next(x for x in _s15c["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+    r.kontrol("⑮ çift sarımda 180°'yi aşan açıyla hüküm veriliyor",
+              not _b15c.get("eksik_hesap"), f"→ {_b15c.get('eksik_hesap')!r}")
+    r.esit("⑮ çift sarımda üst sınır 360°", _s15c["_h"]["S184"], 330.0)
+    #  Tek sarımda 180°'yi aşan açı reddedilmeli ( fiziksel olarak imkânsız )
+    _s15d = MK.hesapla({"sarilma_acisi": 300})
+    _k15d = [a for a in next(x for x in _s15d["bolumler"]
+                             if x["kimlik"] == "tahrik_yetenegi")["adimlar"]
+             if isinstance(a, dict) and a.get("deger") in ("UYGUN", "UYGUN DEĞİL")]
+    r.esit("⑮ tek sarımda α > 180° kabul edilmiyor", _k15d[0]["deger"], "UYGUN DEĞİL")
+    r.kontrol("⑮ aralık dışı açı girdi doğrulamasında reddediliyor",
+              MK.hesapla({"sarilma_acisi": 400}).get("aktif") is False)
+    #  TESLİM EDİLEN KİTAP
+    import openpyxl as _o15
+    _w15 = _o15.load_workbook(io.BytesIO(
+        _MX4.mukavemet_xlsx({"sarilma_acisi": 180})))["11-Muk. Hesapları"]
+    r.esit("⑮ kitap girilen açıyı yazıyor", _w15["S184"].value, 180.0)
+    try:
+        _x15 = _MX4.mukavemet_xlsx({})
+    except Exception as _e15:                                  # noqa: BLE001
+        _x15 = None
+        r.kontrol("⑮ α yokken de kitap üretiliyor", False, f"→ {_e15}")
+    if _x15 is not None:
+        r.kontrol("⑮ α yokken de kitap üretiliyor", True)
+        _w15b = _o15.load_workbook(io.BytesIO(_x15))["11-Muk. Hesapları"]
+        r.kontrol("⑮ α yokken kitapta açı hücresi BOŞ", _w15b["S184"].value is None,
+                  f"→ {_w15b['S184'].value!r}")
+        r.kontrol("⑮ kitaptaki geometrik türetme temizlendi",
+                  all(_w15b[h].value is None for h in ("U174", "Z178", "C184",
+                                                       "L184", "P184")),
+                  f"→ {[_w15b[h].value for h in ('U174','Z178','C184','L184','P184')]}")
+        for _z in ("Z242", "Z257", "Z271", "Z285"):
+            r.kontrol(f"⑮ kitap hükmü {_z} açı boşken HESAP EKSİK yazacak şekilde",
+                      str(_w15b[_z].value or "").startswith('=IF($S$184="","HESAP EKSİK"'),
+                      f"→ {str(_w15b[_z].value)[:50]!r}")
+        for _o in ("O242", "O257", "O271", "O285"):
+            r.kontrol(f"⑮ kitap sınırı {_o} açı boşken sayı üretmeyecek şekilde",
+                      str(_w15b[_o].value or "").startswith('=IF($S$184="",""'),
+                      f"→ {str(_w15b[_o].value)[:50]!r}")
+    #  ÇOKLU PAKETTE α'SIZ ASANSÖR ZIP'TEN DÜŞMEMELİ
+    from api.uygulama import _asansor_kitaplari as _AK15
+    _k15z = _AK15({"asansorler": [{"no": 1, "tanim": "A", "aktif": True,
+                                   "girdi": {}}]}, {})
+    r.esit("⑮ α'sız asansörün kitabı pakete giriyor",
+           [a for a, _ in _k15z if a.endswith(".xlsx")],
+           ["Mukavemet Hesaplari - 1 - A.xlsx"])
+    r.esit("⑮ açı proje dosyasından geri okunuyor",
+           _MX4.xlsx_oku(_MX4.mukavemet_xlsx({"sarilma_acisi": 165}))
+           .get("sarilma_acisi"), 165)
+    r.kontrol("⑮ ek girdi bloğu ofis sabitleri bloğuna taşmıyor",
+              _MX4._ek_satir_cakismasi() is False)
+
+    #  ⑯  ELEKTRİK SAYFASI MOTORUN KULLANDIĞI DEĞERLERİ YAZIYOR
+    #  Avan motoru L1 · L2 · S1 · S2'yi kendi aralıklarına göre denetler ve
+    #  aralık dışındakini REDDEDİP varsayılana döner.  Kitap girileni ham
+    #  yazıyordu:  L1 = 600 m'de pafta 29,85 m ile, kitap 600 m ile ε
+    #  hesaplıyordu — aynı projenin iki belgesi farklı sonuç veriyordu.
+    _HUC16 = {"kolon_uzunluk": "W26", "makine_uzunluk": "W27",
+              "kolon_kesit": "W33", "makine_kesit": "W34"}
+    _ARALIK_DISI = {"kolon_uzunluk": 600, "makine_uzunluk": 900,
+                    "kolon_kesit": 900, "makine_kesit": 900}
+    for _alan, _hucre in _HUC16.items():
+        #  TAM zaten kolon_uzunluk taşıyor;  üzerine yazılır.
+        _ham16 = dict(UG.varsayilanlar(), **TAM)
+        _ham16[_alan] = _ARALIK_DISI[_alan]
+        _g16 = UG.tamamla(_ham16)
+        _r16 = UY.hesapla(_g16)
+        _motor = {"kolon_uzunluk": "L1", "makine_uzunluk": "L2",
+                  "kolon_kesit": "S1", "makine_kesit": "S2"}[_alan]
+        _deg = None
+        for _b in _r16["bolumler"]:
+            for _a in _b.get("adimlar") or []:
+                if (str(_a.get("sembol") or "") == _motor
+                        and _a.get("deger") is not None):
+                    _deg = _a["deger"]
+        _ws16 = _o15.load_workbook(io.BytesIO(
+            _MX4.mukavemet_xlsx(_g16)))["12-Elk.Hesapları"]
+        _kitap = _ws16[_hucre].value
+        r.kontrol(f"⑯ {_motor} aralık dışıyken pafta ile kitap aynı",
+                  _deg is not None and abs(float(_kitap) - float(_deg)) < 0.01,
+                  f"→ pafta {_deg} · kitap {_kitap}")
+        r.kontrol(f"⑯ {_motor} girilen aralık dışı değeri KULLANMIYOR",
+                  abs(float(_kitap) - _ARALIK_DISI[_alan]) > 0.01,
+                  f"→ kitap {_kitap}, girilen {_ARALIK_DISI[_alan]}")
+        #  Reddin sebebi kullanıcıya söyleniyor mu
+        r.kontrol(f"⑯ {_motor} reddi uyarıda yazıyor",
+                  any(_motor in u and "geçerli aralık" in u
+                      for u in _r16["uyarilar"]),
+                  f"→ {[u for u in _r16['uyarilar'] if 'aralık' in u]}")
+    #  Geçerli değer aynen yazılmalı — red yalnız aralık dışında olmalı
+    _g16b = UG.tamamla(dict(dict(UG.varsayilanlar(), **TAM), kolon_uzunluk=45))
+    _ws16b = _o15.load_workbook(io.BytesIO(
+        _MX4.mukavemet_xlsx(_g16b)))["12-Elk.Hesapları"]
+    r.esit("⑯ geçerli L1 aynen yazılıyor", float(_ws16b["W26"].value), 45.0)
+    #  Proje dosyası KULLANICININ GİRDİĞİNİ korumalı ( hesap ayrı, dosya ayrı )
+    r.esit("⑯ geri okumada kullanıcının girdiği değer korunuyor",
+           _MX4.xlsx_oku(_MX4.mukavemet_xlsx(UG.tamamla(
+               dict(dict(UG.varsayilanlar(), **TAM), kolon_uzunluk=600))))
+           .get("kolon_uzunluk"), 600)
+
+    #  ⑰  TESLİM KİTABINDA SÜRTÜNME ÇARPANI f KANAL ŞEKLİNE BAĞLI
+    #  Kitap yarım daire kanalda da V kanal bağıntısını kullanıyor, γ · β'yı
+    #  hücreye çiviliyordu ( AH102 = 38 · AH103 = 90 · Y216 = 38 ).  Pafta ile
+    #  kitap 10 kanal × işleme birleşiminin 8'inde ayrışıyordu.  Sayısal
+    #  eşitlik TEST 10'da LibreOffice ile denetlenir;  burası YAPIYI sabitler.
+    from engine.uygulama import mukavemet_tablolari as _MT17
+    from engine.uygulama import sabitler as _US17
+    for _ofis17 in (None, {"kanal_gama_v": 45, "kanal_gama_yd": 30, "kanal_beta": 100}):
+        _O17 = _US17.sabitler(_ofis17)
+        _g17 = {"sarilma_acisi": 180}
+        if _ofis17:
+            _g17["_ofis"] = _ofis17
+        _wb17 = _o15.load_workbook(io.BytesIO(_MX4.mukavemet_xlsx(_g17)))
+        _tb17 = _wb17["TABLOLAR"]
+        _et17 = "ofis açıları değişik" if _ofis17 else "ofis varsayılan"
+        for _ad17, _sat17 in _MX4.KANAL_TABLO_SATIRI.items():
+            _bek17 = (_MT17.kanal_acisi(_ad17, _O17["kanal_gama_v"], _O17["kanal_gama_yd"]),
+                      _MT17.kanal_beta(_ad17, _O17["kanal_beta"]),
+                      1 if _MT17.kanal_yarim_daire_mi(_ad17) else 0)
+            _bul17 = tuple(_tb17[f"{_MX4.KANAL_F_SUTUN[x]}{_sat17}"].value
+                           for x in ("gama", "beta", "yarim_daire"))
+            r.esit(f"⑰ [{_et17}] kanal tablosu γ · β · tür — {_ad17}",
+                   _bul17, _bek17)
+    _ws17 = _wb17["11-Muk. Hesapları"]
+    r.kontrol("⑰ γ hücresi ( AH102 ) kanal tablosundan okunuyor",
+              str(_ws17["AH102"].value).startswith("=VLOOKUP('Veri Girişi'!$F$105"),
+              f"→ {_ws17['AH102'].value!r}")
+    r.kontrol("⑰ β hücresi ( AH103 ) kanal tablosundan okunuyor",
+              str(_ws17["AH103"].value).startswith("=VLOOKUP('Veri Girişi'!$F$105"),
+              f"→ {_ws17['AH103'].value!r}")
+    r.esit("⑰ bloke satırının γ'sı artık sabit 38 değil", _ws17["Y216"].value, "=AH102")
+    for _h17, _v17 in (("AJ198", "V188/AE198"), ("AL202", "AC202/AG202"),
+                       ("AU206", "AK206*AN206/AN207"), ("AV211", "AK211*AO211/AO212"),
+                       ("AE216", "1/SIN(Y216/M216/180*PI())*P216")):
+        _f17 = str(_ws17[_h17].value)
+        r.kontrol(f"⑰ {_h17} yarım daire dalını taşıyor ve V bağıntısını koruyor",
+                  _f17.startswith("=IF(VLOOKUP(") and "COS(" in _f17
+                  and _f17.endswith(f",{_v17})"),
+                  f"→ {_f17[:90]!r}")
+    r.kontrol("⑰ yarım daire notu yalnız o kanalda görünecek şekilde",
+              str(_ws17["A195"].value).startswith("=IF(VLOOKUP("),
+              f"→ {str(_ws17['A195'].value)[:60]!r}")
+    #  Ofisin ana ( usta ) kopyası da aynı düzeltmeyi taşımalı
+    _u17 = _o15.load_workbook(io.BytesIO(_MX4.duzeltilmis_kaynak()))["11-Muk. Hesapları"]
+    r.kontrol("⑰ usta kopyada da f kanal şekline bağlı",
+              str(_u17["AU206"].value).startswith("=IF(VLOOKUP("),
+              f"→ {str(_u17['AU206'].value)[:60]!r}")
 
     # ------------------------------------------------- proje adı sızıntısı
     #  AVAN VE UYGULAMA AYRI PROJELERDİR.  Avandan alınan bölümlerin bazı

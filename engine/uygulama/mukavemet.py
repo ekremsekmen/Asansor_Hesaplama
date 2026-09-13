@@ -855,6 +855,28 @@ EXCEL_FARKLARI = (
      "NPU dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer;  MRL'de öyle "
      "bir kaide yoktur ve eskiden yine de \"UYGUNDUR.\" yazıyordu.",
      ("AH292", "AL455")),
+
+    ("Sarılma açısı α makine şasesi ölçülerinden türetiliyordu",
+     "TS EN 81-50 m.5.11.2.1",
+     "Kitap α'yı üç ölçüden türetir:  A = Ra − 2·R1 ( halat arası ), "
+     "B = H − C + D ( şase yüksekliği, saptırma kasnağı mili, makine yatağı ), "
+     "α = 180° − arctan( A / B ).  Bağıntı doğrudur — tahrik kasnağı ile "
+     "saptırma kasnağının ortak teğetinden çıkar — ama İKİ KASNAĞIN "
+     "YARIÇAPINI EŞİT varsayar ve üç ölçüye bağlıdır.  O üç ölçü ( C · D · "
+     "Ra ) BAŞKA HİÇBİR HESABA girmiyordu:  yalnız bu türetme için "
+     "soruluyorlardı.",
+     "α artık ZORUNLU PROJE GİRDİSİDİR ve varsayılanı YOKTUR.  C · D · Ra "
+     "girdileri kaldırıldı;  kitabın türetme bloğu teslim kopyasında "
+     "temizlenir ve S184 girdi hücresi olur.  Dış referansların ikisi de açıyı "
+     "türetmez:  ELEport onu 'Rope Winding Angle' diye ayrı girdi alır, 'new "
+     "block' paftası formüle sabit 3,1416 yazar.  VARSAYILAN NİÇİN YOK:  "
+     "m.5.11.2.1'in iki eşitsizliği terstir ve hiçbir açı ikisinde birden "
+     "emniyetli değildir — 180° blokede emniyetli, yükleme ve frenlemede "
+     "gevşek uçtur ( 486 senaryonun %33'ünde hüküm geçme yönünde dönüyordu ).  "
+     "Açı girilmezse T1 · T2 · oranlar yine hesaplanır, dört sınır ve "
+     "hükümleri HESAP EKSİK olur;  kitapta da O242 … O285 boş, Z242 … Z285 "
+     "'HESAP EKSİK' yazar.",
+     ("S184", "AA184", "O242", "O257", "O271", "O285")),
 )
 
 #  Testlerin okuduğu düz küme
@@ -2086,31 +2108,81 @@ def _T2(t, FRcwt, s):
 ISLEM = {"yukleme": +1, "fren_alt": +1, "fren_ust": -1, "bloke": +1}
 
 
+#  SARILMA AÇISI α ZORUNLU BEYANDIR — VARSAYIMI YOKTUR.
+#  TS EN 81-50 m.5.11.2.1 İKİ EŞİTSİZLİK verir ve YÖNLERİ TERSTİR:
+#
+#      yükleme · acil frenleme :   T1 / T2  ≤  e^(f·α)
+#      bloke ( kabin/ağırlık )  :   T1 / T2  ≥  e^(f·α)
+#
+#  Küçük α ilk ikisinde sınırı DARALTIR ( emniyetli ), blokede GEVŞETİR
+#  ( emniyetsiz );  büyük α tersini yapar.  Hiçbir açı iki kontrolde birden
+#  "emniyetli varsayılan" değildir.  180° varsayılanı denendi:  486
+#  senaryonun %33'ünde yükleme/frenleme hükmü geçme yönünde dönüyordu.
+#  Bu yüzden açı GİRİLMEDİKÇE dört sınır hesaplanmaz ve bölüm HESAP EKSİK
+#  sayılır.  Açıdan bağımsız olan her şey ( T1 · T2 · oranlar · f ) yine
+#  hesaplanır ve paftada durur — mühendis açıyı girince eksik yalnız sınır
+#  satırlarıdır.
+ALFA_YOK = "HESAP EKSİK — sarılma açısı α girilmedi"
+
+#  ÇİFT SARIMDA 180°'Yİ AŞMAYAN AÇI TEK SARIMA AİTTİR.
+#  Çift sarımda halat kasnağın üzerinden iki kez geçer ve toplam sarım yarım
+#  turu aşar.  180° ve altı bir açıyla yükleme/frenleme kontrolleri emniyetli
+#  tarafta kalır ( geçerlidir ), bloke kontrolü ise GEVŞER:  3.888 senaryonun
+#  216'sında gerçek açıyla kalacak bir kontrol "UYGUNDUR" çıkıyordu.  O
+#  yüzden yalnız bloke kontrolü karara bağlanmaz.
+CIFT_SARIM_BLOKE = ("HESAP EKSİK — çift sarımda α 180°'yi aşmalı;  girilen "
+                    "açıyla bloke kontrolü karara bağlanamaz")
+
+CIFT_SARIM_NOTU = (
+    "ÇİFT SARIM SEÇİLDİ, GİRİLEN α 180°'Yİ AŞMIYOR.  Çift sarımda halat tahrik "
+    "kasnağının üzerinden iki kez geçer ve toplam sarılma açısı yarım turu "
+    "aşar;  180° ve altı bir açı tek sarıma aittir.  TS EN 81-50 m.5.11.2.1 "
+    "yükleme ve frenleme için  T1/T2 ≤ e^(f·α),  bloke için  T1/T2 ≥ e^(f·α) "
+    "der — EŞİTSİZLİKLERİN YÖNÜ TERSTİR.  Küçük α ilk ikisinde sınırı daraltır "
+    "( emniyetli taraf;  o üç sonuç geçerlidir ), blokede ise GEVŞETİR — gerçek "
+    "açıyla kalacak bir kontrol 'UYGUNDUR' çıkabilir.  Bu yüzden BLOKE KONTROLÜ "
+    "KARARA BAĞLANMAMIŞTIR:  gerçek toplam açı saptırma düzeninden belirlenip "
+    "girilmelidir.  ( Nequiv(t) çift sarımda iki geçişle hesaba girer;  bkz. "
+    "bölüm 4. )")
+
+
 def _tahrik(g, o):
     S, O = SABIT, o["ofis"]
-    Ra = g["halat_arasi"]
-    C, D = g["sap_kasnak_yuk"], g["makine_yatak_yuk"]
     R1 = g["tahrik_kasnak_capi"] / 2.0
-    H = g["sase_yuksekligi"]
     v = o["v"]
+    sekil = g["kanal_sekli"]
+    cift_sarim = (MT.kanal_gecis_sayisi(sekil) or 1) > 1
 
     #  ------------------------------------------------------------------
-    #  SARILMA AÇISI  α          TEK SARIMLI TAHRİK KASNAĞI MODELİ
+    #  SARILMA AÇISI  α          BEYAN EDİLİR, TÜRETİLMEZ
     #  ------------------------------------------------------------------
-    #  α = 180° − arctan( ( Ra − 2·R1 ) / B ).  Halat kasnağın iki yanından
-    #  teğet iner;  iki iniş kolu birbirinden uzaklaştıkça ( Ra büyüdükçe )
-    #  α küçülür ve EN ÇOK 180° olur.  Ra < 2·R1 girildiğinde pay negatife
-    #  düşüyor ve α 180°'yi aşıyordu ( Ra = 100 mm → 187,65° ) — fiziksel
-    #  olarak imkânsız bir geometri sessizce hesaplanıyordu.  Yön
-    #  EMNİYETSİZDİR:  e^(f·α) sınırı α ile büyür, tahrik yeteneği olduğundan
-    #  iyi çıkar.  Girdi doğrulaması bu geometriyi zaten reddediyor;  aşağısı
-    #  ikinci kalkandır ( bkz. bölüm 2'deki negatif gerilme kalkanı ).
-    A_yatay = Ra - 2 * R1
-    B_dusey = H - C + D
-    theta = math.atan2(A_yatay, B_dusey)
-    alfa_derece = 180 - math.degrees(theta)
-    alfa = math.radians(alfa_derece)
-    alfa_uygun = 0 < alfa_derece <= 180
+    #  Kaynak kitap α'yı makine şasesinin ölçülerinden türetiyordu:
+    #      A = Ra − 2·R1 ,  B = H − C + D ,  α = 180° − arctan( A / B )
+    #  Bağıntı DOĞRUDUR ( tahrik kasnağı ile saptırma kasnağı arasındaki
+    #  ortak teğetten çıkar ) ama üç ölçüye bağlıdır ve o üç ölçü BAŞKA
+    #  HİÇBİR HESABA girmiyordu:  C · D · Ra yalnız bunun için soruluyordu.
+    #  Üstelik model iki kasnağın yarıçapını EŞİT varsayar;  Dp ≠ Dt olan
+    #  her tesiste yaklaşıktır.
+    #
+    #  α artık doğrudan sorulur.  Dış referansların ikisi de böyle yapar:
+    #  ELEport "Rope Winding Angle α" diye ayrı girdi alır ( ve C · D · Ra
+    #  diye bir girdisi hiç yoktur ), "new block" paftası formüle sabit
+    #  3,1416 yazar.
+    #
+    #  AÇI GİRİLMEMİŞSE BÖLÜM ERKEN DÖNMEZ ( bkz. ALFA_YOK ).  Bir ara sürüm
+    #  burada boş bir bölüm döndürüyordu:  T1 ve T2 bile hesaplanmıyor,
+    #  Excel doğrulama hücrelerinin hiçbiri yazılmıyor ve kitap üretimi
+    #  çöküyordu.  Açıya bağlı olan yalnız DÖRT SINIR ve HÜKÜMLERİDİR.
+    _a = g.get("sarilma_acisi")
+    alfa_var = (isinstance(_a, (int, float)) and not isinstance(_a, bool)
+                and _a > 0)
+    alfa_derece = float(_a) if alfa_var else None
+    alfa = math.radians(alfa_derece) if alfa_var else None
+    #  Tek sarımda halat kasnağı en çok yarım tur dolanır.  Çift sarımda
+    #  halat kasnaktan İKİ kez geçer;  toplam sarım her zaman yarım turdan
+    #  büyüktür ve bir tam turu aşamaz.
+    alt, ust = (180.0, 360.0) if cift_sarim else (0.0, 180.0)
+    alfa_uygun = alfa_var and alt < alfa_derece <= ust
 
     #  Sürtünme katsayısı kabulleri  ( EN 81-50 m.5.11.2.3.2 )
     #  Acil frenlemedeki μ HALAT hızına bağlıdır;  palangalı sistemde halat
@@ -2125,7 +2197,6 @@ def _tahrik(g, o):
     #  kullanıyordu;  yarım daire kanal seçilebildiği hâlde onun maddesi
     #  ( m.5.11.2.3.1.1 ) hiç uygulanmıyordu — f olduğundan BÜYÜK, yani
     #  tahrik yeteneği olduğundan iyi çıkıyordu.  ( bkz. EXCEL_FARKLARI )
-    sekil = g["kanal_sekli"]
     yarim_daire = MT.kanal_yarim_daire_mi(sekil)
     #  Alt kesilme yoksa β = 0;  düz yarım daire kanalın alt kesilmesi yoktur.
     #  Açılar bölüm 4 ile AYNI kaynaktan okunur ( MT.kanal_acisi / kanal_beta ) —
@@ -2152,8 +2223,12 @@ def _tahrik(g, o):
     #  bağıntı μ = 0,2 ile kullanılır.
     f_bloke = (_f(mu_bloke) if yarim_daire else mu_bloke / math.sin(gama / 2.0))
 
-    _kay(o, U174=A_yatay, Z178=B_dusey, C184=math.degrees(theta),
-         S184=alfa_derece, AA184=alfa, AS190=mu_fren, AE216=f_bloke)
+    #  A · B · θ hücreleri ( U174 · Z178 · C184 ) ARTIK YAZILMIYOR:  onlar
+    #  geometrik türetmenin ara adımlarıydı ve o türetme kalktı.  Teslim
+    #  edilen kitapta da temizleniyorlar ( bkz. mukavemet_xlsx ).
+    _kay(o, AS190=mu_fren, AE216=f_bloke)
+    if alfa_var:
+        _kay(o, S184=alfa_derece, AA184=alfa)
     #  Excel her iki kanal işlemesinin f değerini de ayrı satırda tutar
     _kay(o, **{("AJ198" if sert else "AU206"): f_yuk,
                ("AL202" if sert else "AV211"): f_fren})
@@ -2174,21 +2249,15 @@ def _tahrik(g, o):
             "yapılmıştır ama kanal ya sertleştirilmeli ya da altı kesik "
             "seçilmelidir."]
     b["adimlar"] = [
-        veri("Ra", "Halat arası ( ray merkezleri arası mesafe )", Ra, "mm",
-             "GİRİŞ  ( " + g["agirlik_yeri"] + " ağırlık )"),
-        veri("C", "Saptırma kasnağı milinin yerden yüksekliği", C, "mm", "GİRİŞ"),
-        veri("D", "Tahrik kasnağı mili yatak yüksekliği", D, "mm", "GİRİŞ"),
         veri("R1", "Tahrik kasnağı yarıçapı", R1, "mm"),
-        veri("H", "Makine şasesi yüksekliği", H, "mm", "GİRİŞ"),
-        hesap("A = Ra − 2 × R1", f"{trn(Ra, 0)} − 2 × {trn(R1, 0)}", A_yatay, "mm"),
-        hesap("B = H − C + D",
-              f"{trn(H, 0)} − {trn(C, 0)} + {trn(D, 0)}", B_dusey, "mm"),
-        hesap("θ = arctan( A / B )",
-              f"arctan( {trn(A_yatay, 0)} / {trn(B_dusey, 0)} )",
-              math.degrees(theta), "°"),
-        hesap("α = 180° − θ", f"180 − {tr(math.degrees(theta))}", alfa_derece, "°"),
-        kontrol(f"α = {tr(alfa_derece)}°  —  tek sarımlı kasnakta 0° < α ≤ 180°",
-                alfa_uygun),
+        veri("α", "Halat sarılma açısı", alfa_derece, "°",
+             "GİRİŞ" if alfa_var else "GİRİLMEDİ"),
+        (kontrol(f"α = {tr(alfa_derece)}°  —  "
+                 f"{'çift' if cift_sarim else 'tek'} sarımlı kasnakta "
+                 f"{trn(alt, 0)}° < α ≤ {trn(ust, 0)}°", alfa_uygun)
+         if alfa_var else
+         kontrol("α girilmedi  —  gerçek sarılma açısı proje yerleşiminden "
+                 "belirlenip girilmelidir", False, "HESAP EKSİK")),
         metin("Sürtünme katsayısı μ kabulleri  ( TS EN 81-50 Şekil 8 ) :"),
         veri("μ", "Yükleme için", mu_yuk, "", "EN 81-50 Şekil 8"),
         veri("v halat", "Halat hızı  ( kabin hızı × askı oranı )", v_halat, "m/s"),
@@ -2242,9 +2311,12 @@ def _tahrik(g, o):
         "bloke":    ("AH278", "AF283", "K285", "O285"),
     }
     tumu_uygun = alfa_uygun
+    gevsek_var = False
     for durum, baslik in YUK_DURUMLARI:
         t = _terimler(g, o, durum)
         isl = ISLEM[durum]
+        kont_mesaj = ""          # kontrol satırının "UYGUN / UYGUN DEĞİL"i
+        sinir_kaynak = "EN 81-50 m.5.11.3"
         #  SÜRTÜNME DİRENCİ, KENDİ TARAFININ KUVVETİNDEN TÜREMELİDİR.
         #  FRcar kabin tarafındaki, FRcwt ağırlık tarafındaki dirençtir;
         #  ikisi de o taraftaki sürtünmesiz halat kuvvetinin bir yüzdesidir
@@ -2273,51 +2345,99 @@ def _tahrik(g, o):
         #  tesadüfen yakalanırdı;  kasnak atalet terimi eklenince sıfırı
         #  geçip negatife düştü ve tesadüf bozuldu.
         gergin = T1 > 0 and T2 > 0
+        GEVSEK = ("HALAT GEVŞİYOR — T1 ya da T2 sıfırın altına iniyor, "
+                  "tahrik bağıntısı bu noktada geçerli değildir")
         if durum == "bloke":
             oran = T1 / T2 if T2 else None
             f_kul = f_bloke
-            sinir = math.exp(f_kul * alfa)
-            uygun = gergin and oran is not None and sinir <= oran
-            metni = (f"e^(f·α) = {tr(sinir)}  ≤  T1/T2 = {tr(oran)}" if gergin
-                     else "HALAT GEVŞİYOR — T1 ya da T2 sıfırın altına iniyor, "
-                          "tahrik bağıntısı bu noktada geçerli değildir")
+            sinir = math.exp(f_kul * alfa) if alfa_var else None
+            #  T1 · T2 · oran GERÇEKTİR ve paftada durur;  açı yoksa ya da
+            #  çift sarıma ait değilse karara bağlanamayan yalnız SINIRDIR.
+            uygun = (gergin and oran is not None and sinir is not None
+                     and sinir <= oran)
+            metni = (f"e^(f·α) = {tr(sinir)}  ≤  T1/T2 = {tr(oran)}"
+                     if gergin and sinir is not None else GEVSEK)
+            if alfa_var and cift_sarim and not alfa_uygun:
+                uygun, metni = False, CIFT_SARIM_BLOKE
+                kont_mesaj = "HESAP EKSİK"
+                #  SAYI PAFTADA KALIR AMA ÖLÇÜT SANILMAMALI.  "HESAP EKSİK"
+                #  yazan satırın hemen üstünde e^(f·α) = 1,82 ≤ T1/T2 = 15,97
+                #  duruyor;  okuyan mühendis bunu kendi gözüyle geçirebilir.
+                #  Sayının TEK SARIM açısından geldiği kendi satırında yazar.
+                sinir_kaynak = ("180°'yi aşmayan açıyla  —  çift sarımda "
+                                "karara dayanak DEĞİLDİR")
         else:
             oran = _oran(T1, T2)
             f_kul = f_yuk if durum == "yukleme" else f_fren
-            sinir = math.exp(f_kul * alfa)
-            uygun = gergin and oran is not None and sinir >= oran
-            metni = (f"T1/T2 = {tr(oran)}  ≤  e^(f·α) = {tr(sinir)}" if gergin
-                     else "HALAT GEVŞİYOR — T1 ya da T2 sıfırın altına iniyor, "
-                          "tahrik bağıntısı bu noktada geçerli değildir")
+            sinir = math.exp(f_kul * alfa) if alfa_var else None
+            uygun = (gergin and oran is not None and sinir is not None
+                     and sinir >= oran)
+            metni = (f"T1/T2 = {tr(oran)}  ≤  e^(f·α) = {tr(sinir)}"
+                     if gergin and sinir is not None else GEVSEK)
+        if not gergin:
+            #  GEVŞEK HALAT AÇIDAN BAĞIMSIZ, KESİN BİR BAŞARISIZLIKTIR.  Açı
+            #  girilmemiş olsa bile "eksik" ile örtülmez — genel hükümde
+            #  "uygun değil"in "hesap eksik"ten önce gelmesinin sebebi budur.
+            gevsek_var = True
+            uygun, metni, kont_mesaj = False, GEVSEK, ""
+        elif not alfa_var:
+            #  Açı yoksa sınır yok;  hüküm verilmez, sebep satırda yazar.
+            uygun, metni, kont_mesaj = False, ALFA_YOK, "HESAP EKSİK"
         tumu_uygun = tumu_uygun and uygun
+        #  ORAN SATIRI KENDİ SAYILARINI VERMELİ.
+        #  T1 ve T2 satırları TARAFA göre yazılır ( T1 = kabin tarafı ) —
+        #  TS EN 81-50 m.5.11.2.1 hangisinin T1 olduğunu söylemez, yalnız
+        #  "kasnağın iki yanındaki kuvvetler" der.  Ama ORAN büyük/küçüktür
+        #  ( _oran ) ve "boş kabin en üstte frenleme"de büyük olan KARŞI
+        #  AĞIRLIK tarafıdır:  paftada T1 = 4.653, T2 = 7.044 yazarken oran
+        #  1,5137 çıkıyordu.  Okuyan 4.653/7.044 = 0,66 bulur ve satırı
+        #  doğrulayamaz.  Bölmeyi YAPAN çifti yazıyoruz.
+        #  ( ELEport bunun yerine BÜYÜK olana T1 der ve tarafı yük durumuna
+        #    göre değiştirir;  bizim taraf etiketimiz sabittir ve Excel'in
+        #    hücre düzeniyle aynı — bkz. TEST 12. )
+        if T1 and T2 and (T1 / T2) < (T2 / T1):
+            o_pay, o_payda = T2, T1
+        else:
+            o_pay, o_payda = T1, T2
         h1, h2, h3, h4 = DURUM_HUCRE[durum]
-        _kay(o, **{h1: T1, h2: T2, h3: oran, h4: sinir})
+        #  Sınır yalnız açı varken yazılır:  None bir hücre, kitapla
+        #  karşılaştırmada "motor 0 buldu" gibi okunurdu.
+        _kay(o, **{h1: T1, h2: T2, h3: oran})
+        if sinir is not None:
+            _kay(o, **{h4: sinir})
         b["adimlar"] += [
             metin(baslik + " :", vurgu=True),
             hesap("T1  ( kabin tarafı )", "EN 81-50 m.5.11.2", T1, "N"),
             hesap("T2  ( karşı ağırlık tarafı )", "EN 81-50 m.5.11.2", T2, "N"),
-            hesap("T1 / T2", f"{tr(T1)} / {tr(T2)}"
-                  if durum == "bloke" else "büyük / küçük", oran, "", ondalik=4),
-            hesap("e^(f·α)", f"exp( {tr(f_kul)} × {tr(alfa_derece)}° )", sinir,
-                  "", "EN 81-50 m.5.11.3", 4),
-            kontrol(metni, uygun),
+            hesap("T1 / T2" if durum == "bloke" else "T1 / T2   ( büyük / küçük )",
+                  f"{tr(o_pay)} / {tr(o_payda)}", oran, "", ondalik=4),
+            hesap("e^(f·α)",
+                  f"exp( {tr(f_kul)} × {tr(alfa_derece)}° )" if alfa_var
+                  else "α girilmedi", sinir, "", sinir_kaynak, 4),
+            kontrol(metni, uygun, kont_mesaj),
         ]
 
     b["sonuc"] = {"baslik": "KONTROL      dört yük durumunda tahrik yeteneği",
                   "metin": "UYGUNDUR." if tumu_uygun else
-                           ("UYGUN DEĞİLDİR — sarılma açısı α tek sarımlı kasnakta "
-                            "imkânsız ( halat arası ile kasnak çapını denetleyin )"
+                           ("UYGUN DEĞİLDİR — girilen sarılma açısı α tek "
+                            "sarımlı kasnakta imkânsız ( en çok 180° )"
                             if not alfa_uygun else "UYGUN DEĞİLDİR"),
                   "uygun": bool(tumu_uygun)}
-    if (MT.kanal_gecis_sayisi(sekil) or 1) > 1:
-        b["notlar"] = (b.get("notlar") or []) + [
-            "ÇİFT SARIM SEÇİLDİ.  Sarılma açısı yukarıdaki bağıntıyla TEK "
-            "SARIM için hesaplanır ( α ≤ 180° );  çift sarımda halat kasnağı "
-            "iki kez dolanır ve gerçek α bunun yaklaşık iki katıdır.  Hesap bu "
-            "yüzden tahrik yeteneğini OLDUĞUNDAN KÖTÜ gösterir — emniyetli "
-            "taraftadır, ama gerçek α saptırma düzenine göre ayrıca "
-            "belirlenmelidir.  ( Nequiv(t) çift sarımda iki geçişle hesaba "
-            "girer;  bkz. bölüm 4. )"]
+    if not alfa_var and gevsek_var:
+        #  Kesin başarısızlık eksikten güçlüdür:  bölüm "uygun değil" kalır,
+        #  açının eksikliği ayrıca söylenir ( proje uyarısı da çıkar ).
+        b["sonuc"]["metin"] = ("UYGUN DEĞİLDİR — halat gevşiyor  ( ayrıca "
+                               "sarılma açısı α girilmedi )")
+    elif not alfa_var:
+        b["sonuc"]["metin"] = ALFA_YOK
+        b["eksik_hesap"] = ALFA_YOK
+    elif cift_sarim and not alfa_uygun:
+        #  Bölüm "uygun değil" DEĞİL, HESAP EKSİKTİR:  ilk üç durum geçse
+        #  bile bloke kontrolü denetlenemediği için proje "uygundur" çıkmaz.
+        #  ( Regülatör bölümündeki kalıbın aynısı — bkz. _regulator. )
+        b["sonuc"]["metin"] = CIFT_SARIM_BLOKE
+        b["eksik_hesap"] = CIFT_SARIM_BLOKE
+        b["notlar"] = (b.get("notlar") or []) + [CIFT_SARIM_NOTU]
     return b
 
 
@@ -2761,8 +2881,8 @@ def _kabin_raylari(g, o):
 
     uygunlar = []
 
-    def _kesim(baslik, kaynak, Fx1, Fy1, Fx2, Fy2, kk, sperm, omega=None,
-               hucre=()):
+    def _kesim(baslik, kaynak, kaynak_y, Fx1, Fy1, Fx2, Fy2, kk, sperm,
+               omega=None, hucre=()):
         """Bir yükleme durumu için gerilme · burkulma · flanş · sehim satırları.
 
         hucre  her durum için  ( Fx, σy, Fy, σx, σm, σc, σ, σF, δx, δy )
@@ -2780,8 +2900,13 @@ def _kabin_raylari(g, o):
                 (("Durum 1  x-ekseni", Fx1, Fy1), ("Durum 2  y-ekseni", Fx2, Fy2))):
             h = hucre[sira] if sira < len(hucre) else ()
             ad.append(metin(etiket + " :"))
+            #  Fy'nin KENDİ bağıntısı yazılır.  İkisine de Fx'in formülü
+            #  basılıyordu:  y ekseni kuvvetinin yanında x ekseni bağıntısı
+            #  duruyor, üstelik paydası ( n·h ) görünüyordu — oysa C.2.1.1 b),
+            #  C.2.2.1 b) ve C.2.3.1 b) Fy'yi ( n/2 )·h'ye böler ve hesap da
+            #  öyle yapıyor.  Sayı doğruydu, PAFTA yanlış anlatıyordu.
             ad.append(hesap("Fx", kaynak, Fx, "N"))
-            ad.append(hesap("Fy", kaynak, Fy, "N"))
+            ad.append(hesap("Fy", kaynak_y, Fy, "N"))
             #  m.C.2.1.1:  Fx → My → Wy   ·   Fy → Mx → Wx
             sy, dx = _ray_satirlari("y", "x", Fx, l, p["Wy"], p["Iy"], ad, dstr_x)
             sx, dy = _ray_satirlari("x", "y", Fy, l, p["Wx"], p["Ix"], ad, dstr_y)
@@ -2864,7 +2989,9 @@ def _kabin_raylari(g, o):
         kontrol(_burkulma_mesaji(lam, sigma_k, sperm_g), burkulma_uygun),
     ]
     uygunlar.append(burkulma_uygun)
-    _kesim("Eğilme gerilmesi  ( C.2.1 ) :", "k1 × gn × ( Q·xQ + P·xp ) / ( n × h )",
+    _kesim("Eğilme gerilmesi  ( C.2.1 ) :",
+           "k1 × gn × ( Q·xQ + P·xp ) / ( n × h )",
+           "k1 × gn × ( Q·yQ + P·yp ) / ( ( n / 2 ) × h )",
            k1 * gn * (Q * xQ1_g + P * xp) / (n * h),
            k1 * gn * (Q * yc + P * yp) / ((n / 2.0) * h),
            k1 * gn * (Q * xc + P * xp) / (n * h),
@@ -2896,6 +3023,7 @@ def _kabin_raylari(g, o):
     #  n·h yazıyordu, yani Fy'yi YARISI kadar gösteriyordu — emniyetsiz.
     _kesim("Eğilme gerilmesi  ( C.2.2 ) :",
            "k2 × gn × ( Q·(xQ−xs) + P·(xp−xs) ) / ( n × h )",
+           "k2 × gn × ( Q·(yQ−ys) + P·(yp−ys) ) / ( ( n / 2 ) × h )",
            k2 * gn * (Q * (xQ1_n - xs) + P * (xp - xs)) / (n * h),
            k2 * gn * (Q * (yc - ys) + P * (yp - ys)) / ((n / 2.0) * h),
            k2 * gn * (Q * (xc - xs) + P * (xp - xs)) / (n * h),
@@ -2914,9 +3042,9 @@ def _kabin_raylari(g, o):
     ad.append(hesap("Fx = ( gn × P × (xp−xs) + Fs × (xi−xs) ) / ( n × h )",
                     f"( {tr(gn)} × {trn(P, 0)} × {tr(xp - xs)} + {tr(Fs)} × "
                     f"{tr(xi - xs)} ) / ( {trn(n, 0)} × {trn(h, 0)} )", Fx3, "N"))
-    ad.append(hesap("Fy = ( gn × P × (yp−ys) + Fs × (yi−ys) ) / ( n × h )",
+    ad.append(hesap("Fy = ( gn × P × (yp−ys) + Fs × (yi−ys) ) / ( ( n / 2 ) × h )",
                     f"( {tr(gn)} × {trn(P, 0)} × {tr(yp - ys)} + {tr(Fs)} × "
-                    f"{tr(yi - ys)} ) / ( {trn(n, 0)} × {trn(h, 0)} )", Fy3, "N"))
+                    f"{tr(yi - ys)} ) / ( {tr(n / 2.0)} × {trn(h, 0)} )", Fy3, "N"))
     #  m.C.2.3:  Fx → My → Wy   ·   Fy → Mx → Wx
     sy3, dx3 = _ray_satirlari("y", "x", Fx3, l, p["Wy"], p["Iy"], ad, dstr_x)
     sx3, dy3 = _ray_satirlari("x", "y", Fy3, l, p["Wx"], p["Ix"], ad, dstr_y)
@@ -3703,6 +3831,42 @@ BOLUM_URETICILERI = (_motor, _makine, _kabin_alani, _aski_halatlari, _regulator,
                      _tamponlar, _siginma)
 
 
+# =====================================================================
+#  GENEL HÜKÜM  —  TEK YERDE ÜRETİLİR
+# =====================================================================
+#  Üç hüküm vardır ve SIRALARI ÖNEMLİDİR:
+#
+#      UYGUN DEĞİLDİR  —  en az bir bölüm GERÇEKTEN kaldı
+#      HESAP EKSİK     —  kalan yok, ama yapılamayan zorunlu hesap var
+#      UYGUNDUR        —  ikisi de yok
+#
+#  SIRA TERS KURULAMAZ.  Eksik önce gelirse, dört bölümü çakılan bir proje
+#  ekranda yalnız "HESAP EKSİK" der;  okuyan "bir alanı doldurayım geçer"
+#  anlar ve tasarımın tutmadığını göremez.  Kesin olumsuzluk, eksiklikten
+#  DAHA GÜÇLÜ bilgidir ve onu örtemez.
+#
+#  Eksik bir bölümün KENDİ sonucu da "uygun değil" işaretlidir ( regülatör ·
+#  tahrik yeteneği ).  Bu yüzden "kaldı" sayılırken eksik bölümler DIŞARIDA
+#  bırakılır — yoksa her eksik aynı zamanda "kaldı" görünür ve üstteki sıra
+#  hiçbir zaman ikinci basamağa inemezdi.
+#
+#  HÜKÜM MOTORDAN ÇIKAR, ekran ve PDF onu YALNIZ BASAR.  İki kopya hâlinde
+#  tutulduğu için ayrışmıştı:  PDF "HESAP EKSİK" derken ekranın rengi hâlâ
+#  "uygun değil"i gösteriyordu.
+def genel_hukum(bolumler, tumu_uygun, eksik=()):
+    """( uzun hüküm , kısa hüküm )  —  ör. ( "UYGUNDUR." , "UYGUN" )."""
+    kaldi = any((b.get("sonuc") or {}).get("uygun") is False
+                for b in (bolumler or []) if not b.get("eksik_hesap"))
+    if kaldi:
+        return "UYGUN DEĞİLDİR.", "UYGUN DEĞİL"
+    if eksik:
+        return "HESAP EKSİK", "HESAP EKSİK"
+    if tumu_uygun:
+        return "UYGUNDUR.", "UYGUN"
+    #  Bölüm kalmadı, eksik de yok:  geriye ENGELLEYİCİ uyarı kalır.
+    return "UYGUN DEĞİLDİR.", "UYGUN DEĞİL"
+
+
 def hesapla(veriler=None):
     """Mukavemet hesabının tamamı.
 
@@ -3728,6 +3892,8 @@ def hesapla(veriler=None):
                 for i, uret in enumerate(BOLUM_URETICILERI, 1)]
     uygunlar = [b["sonuc"]["uygun"] for b in bolumler
                 if b.get("sonuc") and b["sonuc"].get("uygun") is not None]
+    _eksikler = [b["eksik_hesap"] for b in bolumler if b.get("eksik_hesap")]
+    _hukum = genel_hukum(bolumler, all(uygunlar), _eksikler)
     return {
         "aktif": True,
         "baslik": "ASANSÖR MUKAVEMET HESAPLARI",
@@ -3745,7 +3911,8 @@ def hesapla(veriler=None):
             "FKR": o.get("FKR"), "FAR": o.get("FAR"),
             "Fkt": o.get("Fkt"), "Fat": o.get("Fat"),
             "tumu_uygun": all(uygunlar),
-            "eksik_hesap": [b["eksik_hesap"] for b in bolumler if b.get("eksik_hesap")],
+            "eksik_hesap": _eksikler,
+            "genel_sonuc": _hukum[0], "genel_sonuc_kisa": _hukum[1],
         },
         #  HESABI DURDURMAYAN UYARILAR  ( bkz. MG.uyarilar ).  λ > 250 gibi
         #  durumlar hesabı imkânsız kılmaz, yalnız bir kontrolü düşürür;

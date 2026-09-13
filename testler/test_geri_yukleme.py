@@ -407,7 +407,11 @@ def calistir():
            "reg_halat_birim_kutle": 0.14, "reg_halat_kopma_kN": 28,
            #  Makine yükünün yolu  ( TS EN 81-20 m.5.7.2.3.7 ):  makine
            #  raylara biniyorsa Maux 150 N değildir.
-           "makine_raya_biniyor": MT.MAKINE_YUK_YOLU[1], "raya_binen_yuk": 1000}
+           "makine_raya_biniyor": MT.MAKINE_YUK_YOLU[1], "raya_binen_yuk": 1000,
+           #  α — sarılma açısı.  Kitap onu geometriden türetir ve kendi
+           #  girdi sayfasında karşılığı yoktur;  beyan edilen açı ek blokta
+           #  yazılıp geri okunur ( bkz. mukavemet_xlsx.EK_GIRDI_HUCRELERI ).
+           "sarilma_acisi": 165}
     _ug.update(_EK)
     r.esit("ek girdi haritası bütün alanları kapsıyor",
            sorted(_MX.EK_GIRDI_ANAHTARLARI), sorted(_EK))

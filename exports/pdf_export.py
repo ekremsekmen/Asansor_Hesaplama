@@ -1069,7 +1069,11 @@ def _mukavemet_ozet(sonuc):
         ("FAR — Ağırlık raylarına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
         ("Fkt — Kabin tamponlarına gelen kuvvet", f"{trn(o.get('Fkt'), 0)} N"),
         ("Fat — Ağırlık tamponlarına gelen kuvvet", f"{trn(o.get('Fat'), 0)} N"),
-        ("GENEL SONUÇ", "UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR."),
+        #  HÜKÜM MOTORDAN GELİR ( mukavemet.genel_hukum ):  "uygun değil" >
+        #  "hesap eksik" > "uygundur".  Burada yeniden kurulursa ekranla
+        #  ayrışır — zaten bir kez öyle ayrışmıştı.
+        ("GENEL SONUÇ", o.get("genel_sonuc")
+         or ("UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR.")),
     ]
     return _kv_tablo(satirlar, genislikler=(105 * mm, 75 * mm), vurgu_son=True)
 
@@ -1215,6 +1219,6 @@ def _uygulama_ozet(sonuc):
         satirlar.append(("Re — Temel topraklama direnci",
                          f"{tr(o.get('Re'), 3)} Ω   —   "
                          + ("UYGUN" if o.get("topraklama_uygun") else "UYGUN DEĞİL")))
-    satirlar.append(("GENEL SONUÇ",
-                     "UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR."))
+    satirlar.append(("GENEL SONUÇ", o.get("genel_sonuc")
+                     or ("UYGUNDUR." if o.get("tumu_uygun") else "UYGUN DEĞİLDİR.")))
     return _kv_tablo(satirlar, genislikler=(105 * mm, 75 * mm), vurgu_son=True)

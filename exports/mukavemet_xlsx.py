@@ -31,6 +31,8 @@ from engine.uygulama import mukavemet_girdi as MG
 from engine.avan import tablolar as AV_TAB
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
+from engine.uygulama import girdi as UYG_GIRDI
+from engine.avan import hesap as AV_HESAP
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SABLON = os.path.join(KOK, "templates", "MUKAVEMET_HESABI.xlsx")
@@ -52,6 +54,12 @@ def mukavemet_xlsx(girdi: dict, proje: dict = None) -> bytes:
         raise FileNotFoundError(
             f"Mukavemet şablonu bulunamadı: templates/{os.path.basename(SABLON)}")
     g = MG.tamamla(dict(MG.varsayilanlar(), **(girdi or {})))
+    #  ( Sarılma açısı girilmemişse kitap YİNE üretilir.  Bir ara sürüm burada
+    #    ValueError fırlatıyordu:  α'sı olmayan HER proje — kayıtlı eski
+    #    projelerin hepsi — kitap üretemiyor, çoklu pakette de asansör ZIP'ten
+    #    düşüyordu.  Açıya bağlı olan yalnız dört tahrik sınırıdır;  kitap
+    #    onları "HESAP EKSİK" yazar, geri kalanı eksiksiz hesaplar.
+    #    bkz. _standarda_uydur · SARILMA AÇISI. )
     wb = openpyxl.load_workbook(SABLON)
     ws = wb[GIRDI_SAYFASI]
     for anahtar, hucre, _e, _b, tur, _s, _v in MG.ALANLAR:
@@ -419,6 +427,10 @@ EK_GIRDI_HUCRELERI = (
     ("reg_halat_kopma_kN",    264, "Regülatör halatı kopma yükü  ( imalatçı )", "kN"),
     ("makine_raya_biniyor",   265, "Makine yükünün yolu",  "bina / raylar"),
     ("raya_binen_yuk",        266, "Bir raya düşen makine yükü  ( imalatçı )", "kg"),
+    #  α — SARILMA AÇISI.  Kitap onu geometriden türetir ( S184 = 180 − θ )
+    #  ve kendi girdi sayfasında karşılığı yoktur;  beyan edilen açı hem
+    #  hesaba hem geri okumaya girsin diye ek girdi bloğuna yazılır.
+    ("sarilma_acisi",         267, "α — halat sarılma açısı  ( beyan )", "°"),
 )
 EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 
@@ -433,12 +445,12 @@ EK_GIRDI_ANAHTARLARI = tuple(a for a, *_x in EK_GIRDI_HUCRELERI)
 #  ÜST ÜSTE bindi:  teslim kopyasında xs'in etiketi ofis başlığıyla
 #  eziliyordu.  Aşağıdaki iki sayı bu yüzden listenin sonuna göre ayarlanır;
 #  _ek_satir_cakismasi() ikisinin bir daha çakışmamasını denetler.
-OFIS_BASLIK = 268
-OFIS_BAS = 270
+OFIS_BASLIK = 269
+OFIS_BAS = 271
 #  Blok, başlık metni ARANARAK bulunur:  yukarıdaki ek girdi listesi büyürse
 #  başlık aşağı kayar ve konuma çivili bir okuyucu ESKİ dosyaları okuyamaz
 #  olurdu.  Arama penceresi iki yönde de yeterince geniştir.
-OFIS_ARAMA = range(230, 275)
+OFIS_ARAMA = range(230, 280)
 OFIS_BASLIK_ONEK = "PROJENİN OFİS SABİTLER"
 #  Onay kutuları Excel'de metin olarak durur — projeci hücreyi elle de
 #  düzeltebilsin diye "EVET / HAYIR" yazılır, geri okunurken çözülür.
@@ -587,11 +599,26 @@ KANAL_TABLO_SATIRI = {
 }
 
 
+#  Sürtünme çarpanı f'in açıları — kanal tablosunun boş H · I · J sütunları.
+#  F sütunu Çizelge 2'nin "belirleyici açısı"dır ( Nequiv(t) için );  f ise
+#  AYRI bir çift ister:  γ kanal açısıdır ( yarım dairede γ_yd, V'de γ_v ),
+#  β alt kesilme açısıdır ( alt kesilmesiz kanalda 0 ).  İkisi aynı sütunda
+#  tutulamaz — altı kesik V'de F = γ, altı kesik yarım dairede F = β.
+KANAL_F_BASLIK = 46
+KANAL_F_SUTUN = {"gama": "H", "beta": "I", "yarim_daire": "J"}
+#  VLOOKUP( kanal şekli , TABLOLAR!$D$47:$J$52 , sütun , 0 )  için sütun sırası
+KANAL_F_ARALIK = "TABLOLAR!$D$47:$J$52"
+KANAL_F_INDIS = {"gama": 5, "beta": 6, "yarim_daire": 7}
+
+
 def _kanal_tablosu(wb, O):
     """Kanal tablosunu projenin kendi γ / β açılarıyla yeniden yazar."""
     if TABLOLAR not in wb.sheetnames:
         return
     tb = wb[TABLOLAR]
+    tb[f"{KANAL_F_SUTUN['gama']}{KANAL_F_BASLIK}"] = "γ ( f )"
+    tb[f"{KANAL_F_SUTUN['beta']}{KANAL_F_BASLIK}"] = "β ( f )"
+    tb[f"{KANAL_F_SUTUN['yarim_daire']}{KANAL_F_BASLIK}"] = "Yarım daire"
     for ad, satir in KANAL_TABLO_SATIRI.items():
         #  Çizelge 2'de belirleyici açı:  V ve altı kesik V'de γ, altı kesik
         #  yarım dairede β, alt kesilmesiz yarım dairede yok.
@@ -600,6 +627,71 @@ def _kanal_tablosu(wb, O):
                else (None if _tur == "U" else O["kanal_gama_v"]))
         tb[f"F{satir}"] = aci
         tb[f"G{satir}"] = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
+        #  f'in açıları — motorun _tahrik'te kullandığıyla AYNI kaynaktan
+        tb[f"{KANAL_F_SUTUN['gama']}{satir}"] = MT.kanal_acisi(
+            ad, O["kanal_gama_v"], O["kanal_gama_yd"])
+        tb[f"{KANAL_F_SUTUN['beta']}{satir}"] = MT.kanal_beta(ad, O["kanal_beta"])
+        tb[f"{KANAL_F_SUTUN['yarim_daire']}{satir}"] = (
+            1 if MT.kanal_yarim_daire_mi(ad) else 0)
+
+
+def _surtunme_carpani(wb):
+    """Teslim kitabında f'i KANAL ŞEKLİNE bağlar  ( TS EN 81-50 m.5.11.2.3.1 ).
+
+    Kitap f'i kanal şeklinden bağımsız hep V KANAL bağıntısıyla kuruyordu:
+      · YARIM DAİRE kanallarda m.5.11.2.3.1.1 hiç uygulanmıyordu —
+        f = μ·4( cos(γ/2) − sin(β/2) ) / ( π − β − γ − sin β + sin γ ).
+        Kitap yerine V bağıntısını koyuyordu:  f olduğundan BÜYÜK, tahrik
+        sınırı olduğundan geniş ( bloke sınırı motor 2,19 · kitap 6,89 ).
+      · γ ve β hücreleri ( AH102 = 38 · AH103 = 90 ) SABİTTİ:  alt kesilmesi
+        olmayan düz V kanalda da β = 90 alınıyordu ( motor 0 alır ) ve ofis
+        sabiti değişince kitap eski açıda kalıyordu.
+      · Bloke satırında γ HÜCREYE 38 yazılıydı ( Y216 ).
+    Motor bunu çoktan düzeltmişti ( bkz. EXCEL_FARKLARI );  teslim kopyası
+    düzeltilmemişti ve pafta ile kitap tahrik sınırında 10 kanal × işleme
+    birleşiminin 8'inde ayrışıyordu.
+
+    Açılar kanal tablosundan CANLI okunur ( bkz. _kanal_tablosu ):  kitapta
+    kanal şekli ya da işlemesi değiştirilirse f de onu izler.  V kanal
+    satırları olduğu gibi kalır;  sonuç hücrelerine yalnız yarım daire dalı
+    eklenir.  Yarım dairede ara satırlar V bağıntısını gösterir — bu yüzden
+    blok başına, yalnız yarım daire seçiliyken görünen bir satır yazılır.
+    """
+    if HESAP not in wb.sheetnames or TABLOLAR not in wb.sheetnames:
+        return
+    ws = wb[HESAP]
+    anahtar = "'Veri Girişi'!$F$105"
+
+    def _ara(ne):
+        return f"VLOOKUP({anahtar},{KANAL_F_ARALIK},{KANAL_F_INDIS[ne]},0)"
+
+    #  Açı hücreleri tablodan okunur;  V satırlarının hepsi bunlara bakar.
+    ws["AH102"] = f"={_ara('gama')}"
+    ws["AH103"] = f"={_ara('beta')}"
+    ws["Y216"] = "=AH102"
+
+    g, b = "(AH102*PI()/180)", "(AH103*PI()/180)"
+
+    def yarim(mu):
+        return (f"{mu}*4*(COS({g}/2)-SIN({b}/2))"
+                f"/(PI()-{b}-{g}-SIN({b})+SIN({g}))")
+
+    yd = f"{_ara('yarim_daire')}=1"
+    #  ( hücre , μ hücresi , kitabın V kanal sonucu )
+    for hucre, mu, v_kanal in (("AJ198", "V188", "V188/AE198"),
+                               ("AL202", "AC202", "AC202/AG202"),
+                               ("AU206", "AK206", "AK206*AN206/AN207"),
+                               ("AV211", "AK211", "AK211*AO211/AO212"),
+                               ("AE216", "P216", "1/SIN(Y216/M216/180*PI())*P216")):
+        eski = ws[hucre].value
+        #  Şablon değişmişse sessizce ezme — beklenen formül değilse dokunma.
+        if not (isinstance(eski, str) and eski.replace(" ", "") == f"={v_kanal}"):
+            continue
+        ws[hucre] = f"=IF({yd},{yarim(mu)},{v_kanal})"
+    #  Excel formül içindeki metni 255 karakterle sınırlar — kısa tutulur.
+    ws["A195"] = (f'=IF({yd},"YARIM DAİRE KANAL (m.5.11.2.3.1.1):  '
+                  f'f = μ·4(cos(γ/2)−sin(β/2)) / (π−β−γ−sin β+sin γ).  '
+                  f'Aşağıdaki V kanal ara satırları bu kanalda kullanılmaz.","")')
 
 
 #  'Askı Tipleri' sayfasında MSR'nin ± işaretini taşıyan hücreler.
@@ -719,6 +811,27 @@ def _koruma_iletkeni(wb):
         ws[f"AB{r0 + j}"] = "mm²"
 
 
+def _elektrik_degerleri(g):
+    """( S1 , S2 , L1 , L2 )  —  avan motorunun GERÇEKTEN kullandığı değerler.
+
+    Motor çağrılamazsa ( köprü için gereken alanlar eksikse ) girilen
+    değerlere düşülür:  kitap yine üretilir, yalnız denetimden geçmemiş
+    olur.  Sessiz kalmaz — ayrışma zaten ancak aralık dışı bir girdide
+    oluşur ve o durumda motor da hesap yapamıyordur.
+    """
+    ham = (g.get("kolon_kesit"), g.get("makine_kesit"),
+           g.get("kolon_uzunluk"), g.get("makine_uzunluk"))
+    try:
+        av = AV_HESAP.hesapla(UYG_GIRDI.kopru(g))
+        oz = ((av.get("asansorler") or [{}])[0].get("ozet")) or {}
+    except Exception:                                         # noqa: BLE001
+        return ham
+    if not oz:
+        return ham
+    return (oz.get("S1", ham[0]), oz.get("S2", ham[1]),
+            oz.get("L1", ham[2]), oz.get("L2", ham[3]))
+
+
 def _elektrik_sayfasi(wb, g):
     """Kitabın elektrik sayfasını programın girdileriyle doldurur.
 
@@ -730,8 +843,15 @@ def _elektrik_sayfasi(wb, g):
         return
     ws = wb[ELEKTRIK]
     O = US.sabitler(g.get("_ofis"))
-    S1, S2 = g.get("kolon_kesit"), g.get("makine_kesit")
-    L1, L2 = g.get("kolon_uzunluk"), g.get("makine_uzunluk")
+    #  MOTORUN KULLANDIĞI DEĞER YAZILIR, GİRİLEN DEĞİL.
+    #  Avan motoru L1 · L2 · S1 · S2'yi kendi aralıklarına göre DENETLER ve
+    #  aralık dışındakini REDDEDİP varsayılana döner ( bkz. engine/avan/
+    #  hesap.py — "geçerli aralık … → Hk + ofis payı kullanıldı" ).  Kitap
+    #  ise girileni olduğu gibi yazıyordu:  L1 = 600 m girildiğinde pafta
+    #  29,85 m ile, teslim edilen kitap 600 m ile ε hesaplıyordu — aynı
+    #  projenin iki belgesi farklı gerilim düşümü veriyordu.  Dördü de aynı
+    #  yoldan geçer, bu yüzden dördü de motordan okunur.
+    S1, S2, L1, L2 = _elektrik_degerleri(g)
     for hucre, deger in (("W27", L2), ("W28", O["U"]), ("W29", O["eps_max"]),
                          ("W32", O["kappa"]), ("W33", S1), ("W34", S2),
                          ("W35", O["motor_elektrik_verimi"]),
@@ -1069,6 +1189,83 @@ def _standarda_uydur(wb, g):
     #  değiştirilirse PE de takip etsin diye.
     _koruma_iletkeni(wb)
 
+    #  SARILMA AÇISI BEYANDIR — KİTAPTAKİ TÜRETME TEMİZLENİR
+    #  Kitap α'yı makine şasesi ölçülerinden türetiyordu:
+    #      A = Ra − 2·R1  ( U174 ) ,  B = H − C + D  ( Z178 ) ,
+    #      θ = arctan( A / B )  ( AR182 · C184 ) ,  α = 180 − θ  ( S184 )
+    #  Motor artık α'yı doğrudan girdi alıyor ve C · D · Ra diye üç girdi
+    #  kalmadı.  Kitap kendi türetmesini sürdürürse teslim edilen dosya
+    #  paftadan BAŞKA bir açı ile hesap yapar.
+    #
+    #  BLOK KENDİ İÇİNE KAPALIDIR:  U174 · Z178 · AR182 · C184 yalnız
+    #  birbirlerini besler, dışarıdan tek başvuru AA184 = S184·π/180'dır.
+    #  Bu yüzden ara adımlar TEMİZLENİR ve S184'e açının kendisi yazılır —
+    #  yoksa kitapta "α = 180 − 42,11 = 180" gibi kendi kendini yalanlayan
+    #  bir satır kalırdı.
+    _alfa = g.get("sarilma_acisi")
+    _alfa_var = (isinstance(_alfa, (int, float)) and not isinstance(_alfa, bool)
+                 and _alfa > 0)
+    #  S184 artık kitabın GİRDİ hücresidir.  Açı yoksa BOŞ bırakılır — bir
+    #  ara sürüm usta kopyada şablonun formülünü koruyordu ama türetme
+    #  bloğunu da temizliyordu:  =L184−P184 boş hücrelere bakıp α = 0°
+    #  veriyordu.
+    ws["S184"] = float(_alfa) if _alfa_var else None
+    for _h in ("J174", "N174", "O174", "P174", "Q174", "T174", "U174", "X174",
+               "L178", "M178", "N178", "Q178", "R178", "U178", "V178",
+               "Y178", "Z178", "AC178",
+               "L182", "N182", "O182", "P182", "S182", "T182", "Y182", "Z182",
+               "AA182", "AE182", "AF182", "AI182", "AJ182", "AM182",
+               "AP182", "AQ182", "AR182", "AU182",
+               "A184", "B184", "C184", "E184", "G184", "L184", "O184", "P184"):
+        ws[_h] = None
+    ws["A173"] = None
+    ws["A176"] = None
+    ws["B174"] = None
+    ws["B178"] = None
+    ws["C178"] = None
+    ws["D178"] = None
+    ws["A182"] = None
+    ws["C182"] = None
+    ws["D182"] = None
+    ws["E182"] = None
+    ws["A180"] = ("Sarılma Açısı (α)  —  PROJE GİRDİSİ  ( boşsa tahrik "
+                  "sınırları hesaplanmaz ) :")
+    #  AÇI YOKSA SINIR VE HÜKÜM YOK.  O242 · O257 · O271 · O285 = e^(f·α)
+    #  AA184'e bakar;  S184 boşken AA184 = 0 olur ve sınır SESSİZCE 1,0000
+    #  çıkar — hüküm de o sahte sayıdan verilirdi.  Sınırlar boş yazılır,
+    #  hükümler ( RAPOR!H19…H22'ye de akarlar ) "HESAP EKSİK" der.  Kitapta
+    #  açı sonradan elle girilirse ikisi de kendiliğinden hesaplanır.
+    for _o in ("O242", "O257", "O271", "O285"):
+        _es = ws[_o].value
+        if isinstance(_es, str) and _es.startswith("=") and "$S$184" not in _es:
+            ws[_o] = f'=IF($S$184="","",{_es[1:]})'
+    for _z in ("Z242", "Z257", "Z271", "Z285"):
+        _es = ws[_z].value
+        if isinstance(_es, str) and _es.startswith("=") and "$S$184" not in _es:
+            ws[_z] = f'=IF($S$184="","HESAP EKSİK",{_es[1:]})'
+
+    #  ÇİFT SARIMDA BLOKE KARARI KİTAPTA DA VERİLMEZ
+    #  Z285 kitabın bloke hükmüdür:  =IF(O285<=K285,"UYGUNDUR.","UYGUN
+    #  DEĞİLDİR.").  O285 sarılma açısını 'Veri Girişi'!$AA$184'ten okur ve o
+    #  açı TEK SARIMA göredir.  TS EN 81-50 m.5.11.2.1 blokede eşitsizliği
+    #  TERS yazar ( T1/T2 ≥ e^(f·α) ), bu yüzden küçük α burada EMNİYETSİZ
+    #  taraftır ve hüküm verilemez  ( bkz. mukavemet.CIFT_SARIM_BLOKE ).
+    #  Motor bu kontrolü HESAP EKSİK sayar;  teslim edilen kitap "UYGUNDUR."
+    #  demeye devam ederse pafta ile kitap ayrışır — ofisin masasındaki
+    #  dosya paftanın söylemediğini söylerdi.
+    #  T1 · T2 · oran hücrelerine DOKUNULMAZ:  onlar gerçektir ve motorla
+    #  aynı sayıyı verir;  değişen yalnız HÜKÜMDÜR.
+    #  ( α 180°'yi aşıyorsa çift sarım için beyan edilmiş demektir ve hüküm
+    #    verilebilir;  kalkan yalnız açı beyan edilmemişken devrede. )
+    if (MT.kanal_gecis_sayisi(g.get("kanal_sekli")) or 1) > 1 and _alfa_var and _alfa <= 180:
+        ws["Z285"] = "HESAP EKSİK"
+        ws["A286"] = (
+            "ÇİFT SARIM:  girilen α 180°'yi aşmıyor — bu açı tek sarıma aittir.  "
+            "TS EN 81-50 m.5.11.2.1 blokede  T1/T2 ≥ e^(f·α)  ister;  küçük α bu "
+            "kontrolü GEVŞETİR, dolayısıyla hüküm verilemez.  Gerçek sarılma açısı "
+            "saptırma düzeninden belirlenip m.5.11.2.2.3 elle denetlenmelidir.  "
+            "( Yükleme ve frenleme kontrolleri emniyetli taraftadır, geçerlidir. )")
+
     #  ㊿  T75/B RAYI KİTABA EKLENİR
     #  Motorun kataloğu genişledi;  teslim edilen kitap onu tanımazsa
     #  ekranda seçilen ray kitapta #YOK verir.
@@ -1113,6 +1310,12 @@ def _standarda_uydur(wb, g):
     #  değiştiğinde kımıldamaz.  Teslim kopyasında satırlar projenin kendi
     #  açılarıyla yeniden yazılır.
     _kanal_tablosu(wb, O)
+
+    #  SÜRTÜNME ÇARPANI f KANAL ŞEKLİNE BAĞLANIR  —  EN 81-50 m.5.11.2.3.1
+    #  Kitap yarım daire kanalda da V kanal bağıntısını kullanıyor, γ ve β'yı
+    #  hücreye çiviliyordu ( 38° · 90° ).  Pafta ile kitap tahrik sınırında
+    #  10 kanal × işleme birleşiminin 8'inde ayrışıyordu.  bkz. EXCEL_FARKLARI.
+    _surtunme_carpani(wb)
 
     #  ⑱  HALAT KÜTLESİNİN TARAF DAĞILIMI  —  EN 81-50 m.5.11.2.2
     #  Kitap dört yük durumunun üçünde ± işaretini ters yazıyordu:  kabin en

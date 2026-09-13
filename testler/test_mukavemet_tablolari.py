@@ -403,8 +403,9 @@ def _girdi_sozlesmesi(r, wb):
     #  Hesaplanan üç alan Excel formülüyle aynı sonucu veriyor mu
     v = wb  # data_only=True yüklendi
     g = MG.varsayilanlar()
-    for anahtar, hucre in (("karsi_agirlik", "C80"), ("kuyu_boyu", "F80"),
-                           ("halat_arasi", "F109")):
+    #  ( "halat_arasi" KALDIRILDI:  yalnız sarılma açısının payındaydı
+    #    ( A = Ra − 2·R1 ) ve α artık proje girdisi — bkz. EXCEL_FARKLARI. )
+    for anahtar, hucre in (("karsi_agirlik", "C80"), ("kuyu_boyu", "F80")):
         r.kontrol(f"hesaplanan {anahtar} ≡ Excel {hucre}",
                   _esit(g[anahtar], v["Veri Girişi"][hucre].value),
                   f"→ modül {g[anahtar]!r}, Excel {v['Veri Girişi'][hucre].value!r}")

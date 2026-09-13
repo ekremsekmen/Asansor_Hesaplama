@@ -7,6 +7,7 @@ Tam TS baskısı doğrulaması yerine geçmez. Üretim kodunu değiştirmez.
 Beklenen değerler Excel/altın çıktıdan alınmaz. Kalan testler açık bulgudur.
 """
 import math
+import re
 import unittest
 
 from engine.uygulama import mukavemet as M
@@ -23,7 +24,10 @@ class BagimsizDenetim(unittest.TestCase):
             "tahrik_kasnak_capi": 320, "saptirma_kasnak_capi": 320,
             "halat_capi": 8, "halat_adedi": 5, "halat_kopma_kN": 43,
             "kasnak_tek_yon": 2, "kanal_sekli": "V Kanal",
-            "kanal_isleme": "Sertleştirilmiş", "halat_arasi_yan": 320,
+            #  Yayında halat arası = kasnak çapı = 320 mm:  halatlar kasnaktan
+            #  DİKEY iner, sarılma açısı 180°'dir.  ( Eskiden bu açı Ra'dan
+            #  türetiliyordu;  α artık zorunlu girdi. )
+            "kanal_isleme": "Sertleştirilmiş", "sarilma_acisi": 180,
             "_ofis": {"kanal_gama_v": 50, "q_denge": 0.45},
         })
         self.assertTrue(s["aktif"], s.get("hata"))
@@ -687,6 +691,345 @@ class KuyuTabaniK3Denetimi(unittest.TestCase):
         a = self._bilesenler(s, "kuyu_tabani")["FKR = gn × Gr × LR / 1000 + k3 × MY + Fgt"]
         sayi = a["islem"].replace(".", "").replace(",", ".").replace("×", "*")
         self.assertAlmostEqual(eval(sayi), a["deger"], delta=1.0)   # noqa: S307
+
+
+class PaftaIslemDenetimi(unittest.TestCase):
+    """Paftadaki 'işlem' satırı kendi sonucunu vermeli.
+
+    Bu oturumda AYNI KUSUR ÜÇ KEZ çıktı:  FKR'nin işlemi ofis sabitini
+    yazıyordu, Sapd'ınki üst sınırı uygulanmış değeri, ray Fy'lerininki
+    x ekseninin bağıntısını ve n·h paydasını.  Hepsinde SAYI doğruydu,
+    pafta yanlış anlatıyordu — denetçi için görünmez bir hata.
+
+    Aşağısı sayıya dökülebilen her işlem satırını ayrıştırıp değerle
+    karşılaştırır.  Ayrıştırılamayanlar ( 'l = 1.700 mm , Iy = …' gibi
+    açıklama taşıyanlar ) atlanır;  ölçüt, AYRIŞTIRILABİLENLERİN hepsinin
+    tutmasıdır.
+    """
+
+    #  Türkçe sayı biçimi:  binlik ayıracı nokta, ondalık virgül.
+    _SAYI = re.compile(r"^[-+0-9.,()×xX*/ ]+$")
+
+    @classmethod
+    def _cevir(cls, islem):
+        t = islem.strip().lstrip("=").strip()
+        if not t or not cls._SAYI.match(t):
+            return None
+        t = t.replace(".", "").replace(",", ".").replace("×", "*").replace("x", "*")
+        try:
+            return eval(t, {"__builtins__": {}}, {})      # noqa: S307
+        except Exception:
+            return None
+
+    def _satirlar(self, s):
+        for b in s["bolumler"]:
+            for a in b["adimlar"]:
+                if (isinstance(a, dict) and a.get("tip") == "hesap"
+                        and isinstance(a.get("deger"), (int, float))
+                        and isinstance(a.get("islem"), str)):
+                    yield b["kimlik"], a
+
+    def test_islem_kendi_sonucunu_verir(self):
+        denenen = 0
+        for ek in ({}, {"kabin_kaciklik": 200},
+                   {"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY},
+                   {"agirlik_guvenlik_tertibati": "Kaymalı"}):
+            s = M.hesapla(dict(ek))
+            self.assertTrue(s["aktif"], s.get("hata"))
+            for kimlik, a in self._satirlar(s):
+                hesaplanan = self._cevir(a["islem"])
+                if hesaplanan is None:
+                    continue
+                denenen += 1
+                self.assertAlmostEqual(
+                    hesaplanan, a["deger"],
+                    delta=max(1.0, abs(a["deger"]) * 2e-3),
+                    msg=f"{kimlik} · {a.get('formul')} · işlem={a['islem']!r}")
+        #  Tarama gerçekten iş görmüş olmalı — kalkan boş kalmasın.
+        self.assertGreater(denenen, 40, f"yalnız {denenen} satır sınanabildi")
+
+    def test_tahrik_oran_satiri_kendi_bolmesini_yazar(self):
+        """T1/T2 satırı, üstündeki iki sayıdan üretilebilmeli.
+
+        T1 ve T2 TARAFA göre etiketlenir ( T1 = kabin tarafı ).  Oran ise
+        büyük/küçüktür ve "boş kabin en üstte frenleme"de büyük olan karşı
+        ağırlık tarafıdır:  pafta T1 = 3.238 · T2 = 6.049 yazarken oran
+        1,8678 çıkıyordu ve okuyan 0,54 buluyordu.
+        """
+        s = M.hesapla({})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        oranlar = [a for a in b["adimlar"] if isinstance(a, dict)
+                   and str(a.get("formul") or "").startswith("T1 / T2")]
+        self.assertEqual(len(oranlar), 4, "dört yük durumu bekleniyor")
+        for a in oranlar:
+            pay, _, payda = str(a["islem"]).partition("/")
+            p = float(pay.strip().replace(".", "").replace(",", "."))
+            q = float(payda.strip().replace(".", "").replace(",", "."))
+            self.assertAlmostEqual(p / q, a["deger"], places=3,
+                                   msg=f"{a['formul']} · {a['islem']}")
+            #  Bloke DIŞINDA oran her zaman ≥ 1 olmalı ( büyük / küçük )
+            if "büyük" in a["formul"]:
+                self.assertGreaterEqual(a["deger"], 1.0)
+
+    def test_ray_Fy_paydasi_paftada_dogru_yazar(self):
+        """C.2.1.1 b) · C.2.2.1 b) · C.2.3.1 b):  Fy'nin paydası ( n/2 )·h."""
+        s = M.hesapla({"kabin_kaciklik": 200})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "kabin_raylari")
+        fy = [a for a in b["adimlar"] if isinstance(a, dict)
+              and (str(a.get("formul") or "") == "Fy"
+                   or str(a.get("formul") or "").startswith("Fy ="))]
+        self.assertGreaterEqual(len(fy), 5, "Fy satırları bulunamadı")
+        for a in fy:
+            metin = str(a.get("formul") or "") + " " + str(a.get("islem") or "")
+            self.assertIn("n / 2", metin,
+                          msg=f"Fy satırı ( n/2 )·h demiyor: {metin!r}")
+            #  x ekseninin bağıntısı Fy satırına basılmamalı
+            self.assertNotIn("Q·xQ", metin)
+            self.assertNotIn("xp−xs", metin)
+
+
+class CiftSarimBlokeDenetimi(unittest.TestCase):
+    """EN 81-50 m.5.11.2.1'in İKİ eşitsizliği ters yönlüdür.
+
+        yükleme · acil frenleme :  T1 / T2  ≤  e^(f·α)
+        bloke                    :  T1 / T2  ≥  e^(f·α)
+
+    Sarılma açısı α programda TEK SARIM geometrisinden çıkar.  İlk ikisinde
+    küçük α sınırı daraltır — emniyetli taraftır.  Blokede ise gevşetir:
+    gerçek ( daha büyük ) açıyla kalacak bir kontrol "UYGUNDUR" çıkabilir.
+
+    Aşağıdaki sayılar motorun kararından DEĞİL, standardın bağıntısından
+    türetilir:  e^(f·α) doğrudan hesaplanır ve α büyütülünce hükmün
+    döndüğü GÖSTERİLİR.  Sonra motorun çift sarımda hüküm vermediği
+    denetlenir.
+    """
+
+    CIFT = "Yarım Daire Kanal (Çift Sarım)"
+
+    def _bloke(self, ek=None):
+        """( T1/T2 , e^(f·α) , α derece ) — motorun yazdığı ham sayılar."""
+        s = M.hesapla(dict(ek or {}))
+        self.assertTrue(s["aktif"], s.get("hata"))
+        h = s["_h"]
+        return h["K285"], h["O285"], h["S184"], s
+
+    def test_blokede_buyuk_aci_kontrolu_ZORLASTIRIR(self):
+        """m.5.11.2.1:  bloke  T1/T2 ≥ e^(f·α).  α ↑  →  sağ taraf ↑."""
+        oran, sinir, alfa, _ = self._bloke({"kanal_sekli": self.CIFT, "sarilma_acisi": 180})
+        #  e^(f·2α) = ( e^(f·α) )²  —  üstel bağıntının kendisi.
+        self.assertGreater(sinir ** 2, sinir)
+        #  Yükleme tarafında YÖN TERSTİR:  aynı büyüme sınırı GENİŞLETİR.
+        #  İkisi aynı anda doğru olduğu için "küçük α her zaman emniyetli"
+        #  denemez — düzeltmenin bütün dayanağı budur.
+        self.assertLess(1.0, sinir)
+        self.assertGreater(alfa, 0)
+        self.assertLessEqual(alfa, 180)
+
+    def test_cift_sarimda_tek_sarim_acisi_karari_DONDUREBILIYOR(self):
+        """Kusur kuramsal değil:  çift sarımda 180° kullanılsa hüküm dönüyor.
+
+        Çift sarımda gerçek açı 180°'yi aşar.  Program bu yüzden çift
+        sarımda 180°'yi aşmayan bir açıyı "beyan edilmemiş" sayar.  Aşağısı
+        o kalkanın GEREKLİ olduğunu gösterir:  aynı tesiste 180° ile hüküm
+        "uygun" çıkarken gerçek açıyla düşüyor.
+        """
+        CIFT = self.CIFT
+        donen = 0
+        #  Hafif kabin, kalın halat, 2:1:  boş kabin blokede T1/T2 = 4,23.
+        #  180°'de sınır 2,19 ( geçer ), 350°'de 4,60 ( kalır ).
+        for ek in ({"beyan_yuku": 400, "kabin_agirligi": 600, "halat_adedi": 6,
+                    "halat_capi": 13.0, "aski_orani": 2},
+                   {"beyan_yuku": 400, "kabin_agirligi": 600, "halat_adedi": 6,
+                    "halat_capi": 16.0, "aski_orani": 2}):
+            tek = M.hesapla(dict(ek, kanal_sekli="Yarım Daire Kanal",
+                                 sarilma_acisi=180))
+            cift = M.hesapla(dict(ek, kanal_sekli=CIFT, sarilma_acisi=350))
+            if not (tek["aktif"] and cift["aktif"]):
+                continue
+            ot, st = tek["_h"]["K285"], tek["_h"]["O285"]
+            oc, sc = cift["_h"]["K285"], cift["_h"]["O285"]
+            if None in (ot, st, oc, sc):
+                continue
+            #  m.5.11.2.1:  hüküm  e^(f·α) ≤ T1/T2
+            if (st <= ot) and not (sc <= oc):
+                donen += 1
+        self.assertGreater(
+            donen, 0,
+            "180° ile geçip gerçek çift sarım açısıyla kalan senaryo "
+            "bulunamadı — kalkanın gerekliliği gösterilemiyor")
+
+    def test_cift_sarimda_bloke_hukum_verilmiyor(self):
+        s = M.hesapla({"kanal_sekli": self.CIFT, "sarilma_acisi": 180})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        self.assertIn("çift sarım", str(b.get("eksik_hesap") or ""))
+        self.assertNotIn("UYGUNDUR", str(b["sonuc"]["metin"]))
+        satir = [a for a in b["adimlar"] if isinstance(a, dict)
+                 and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+        self.assertEqual(satir[-1]["deger"], "HESAP EKSİK")
+
+    def test_cift_sarimda_emniyetli_uc_durum_HESAPLANMAYA_DEVAM_EDER(self):
+        """Küçük α yüklemede/frenlemede emniyetlidir;  o üç sonuç atılamaz."""
+        s = M.hesapla({"kanal_sekli": self.CIFT, "sarilma_acisi": 180})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        satir = [a for a in b["adimlar"] if isinstance(a, dict)
+                 and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+        #  α kontrolü + dört yük durumu
+        self.assertEqual(len(satir), 5)
+        self.assertTrue(all(a["deger"] in ("UYGUN", "UYGUN DEĞİL")
+                            for a in satir[:-1]), [a["deger"] for a in satir])
+        #  Excel doğrulama haritası BOŞ KALMAMALI  ( bölümün tamamını
+        #  hesaplamayı bırakan bir ara sürüm TEST 9'u çökertmişti ).
+        for hucre in ("S184", "AA184", "AE216", "AF235", "AJ240",
+                      "AH278", "AF283", "K285", "O285", "AU206"):
+            self.assertIsNotNone(s["_h"].get(hucre), hucre)
+
+    def test_bloke_siniri_olcut_sanilmasin_diye_isaretli(self):
+        """Sayı paftada kalır;  hangi açıdan geldiği kendi satırında yazar."""
+        s = M.hesapla({"kanal_sekli": self.CIFT, "sarilma_acisi": 180})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        sinir = [a for a in b["adimlar"] if isinstance(a, dict)
+                 and a.get("formul") == "e^(f·α)"]
+        self.assertEqual(len(sinir), 4)
+        self.assertIn("dayanak DEĞİLDİR", str(sinir[-1].get("kaynak") or ""))
+        for a in sinir[:-1]:
+            self.assertIn("m.5.11.3", str(a.get("kaynak") or ""))
+
+    def test_tek_sarim_davranisi_degismedi(self):
+        s = M.hesapla({"kanal_sekli": "Yarım Daire Kanal", "sarilma_acisi": 180})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        self.assertIsNone(b.get("eksik_hesap"))
+        oran, sinir = s["_h"]["K285"], s["_h"]["O285"]
+        satir = [a for a in b["adimlar"] if isinstance(a, dict)
+                 and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+        #  Hüküm m.5.11.2.1'in kendisinden yeniden türetilir.
+        self.assertEqual(satir[-1]["deger"],
+                         "UYGUN" if sinir <= oran else "UYGUN DEĞİL")
+
+
+class SarilmaAcisiDenetimi(unittest.TestCase):
+    """α bir KABULDÜR ve yönü m.5.11.2.1'in iki eşitsizliğinde terstir.
+
+    Kitabın geometrik modeli  α = 180° − arctan( ( Ra − 2·R1 ) / B )  halatın
+    tahrik kasnağından karşı ağırlığa EĞİK indiğini varsayar.  Arada saptırma
+    kasnağı varsa halat kasnaktan DİKEY iner ve gerçek α 180°'ye yakındır —
+    iki dış referans programı da 180° kullanır.
+
+    Aşağısı motorun kararına bakmaz;  bağıntıyı doğrudan kurup YÖNÜ denetler.
+    """
+
+    @staticmethod
+    def _h(ek=None):
+        s = M.hesapla(dict(ek or {}))
+        assert s["aktif"], s.get("hata")
+        return s["_h"]
+
+    def test_aci_buyuyunce_sinir_buyur(self):
+        """e^(f·α) α ile artar — iki eşitsizlikte ZIT etki yapar."""
+        kucuk = self._h({"sarilma_acisi": 140})
+        buyuk = self._h({"sarilma_acisi": 180})
+        self.assertLess(kucuk["S184"], buyuk["S184"])
+        #  f aynı kaldığına göre sınır yalnız α ile büyümeli
+        self.assertAlmostEqual(kucuk["AE216"], buyuk["AE216"], places=9)
+        for hucre in ("O242", "O257", "O271", "O285"):
+            self.assertLess(kucuk[hucre], buyuk[hucre], hucre)
+
+    def test_kucuk_aci_yuklemede_EMNIYETLI_blokede_EMNIYETSIZ(self):
+        """m.5.11.2.1:  yükleme  T1/T2 ≤ e^(fα) ·  bloke  T1/T2 ≥ e^(fα)."""
+        kucuk = self._h({"sarilma_acisi": 140})
+        buyuk = self._h({"sarilma_acisi": 180})
+        #  Yüklemede sınır DARALIR  →  geçmek zorlaşır  ( emniyetli taraf )
+        self.assertLessEqual(kucuk["O242"], buyuk["O242"])
+        #  Blokede de sınır küçülür, ama orada ölçüt  sınır ≤ oran  olduğu
+        #  için küçük sınır geçmeyi KOLAYLAŞTIRIR  ( emniyetsiz taraf ).
+        self.assertLessEqual(kucuk["O285"], buyuk["O285"])
+        #  Aynı oranla iki hüküm:  küçük açı blokede daha kolay geçiyor.
+        oran = kucuk["K285"]
+        self.assertTrue(kucuk["O285"] <= oran or buyuk["O285"] > oran)
+
+    def test_beyan_edilen_aci_modeli_EZER(self):
+        self.assertAlmostEqual(self._h({"sarilma_acisi": 155})["S184"], 155.0)
+        #  radyan hücresi de takip etmeli — bütün e^(f·α) satırları ona bakar
+        self.assertAlmostEqual(self._h({"sarilma_acisi": 155})["AA184"],
+                               math.radians(155.0), places=9)
+
+    def test_tek_sarimda_180_ustu_reddedilir(self):
+        s = M.hesapla({"sarilma_acisi": 300})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        k = [a for a in b["adimlar"] if isinstance(a, dict)
+             and a.get("deger") in ("UYGUN", "UYGUN DEĞİL")]
+        self.assertEqual(k[0]["deger"], "UYGUN DEĞİL")
+
+    def test_cift_sarimda_360_ye_kadar_kabul(self):
+        s = M.hesapla({"kanal_sekli": "Yarım Daire Kanal (Çift Sarım)",
+                       "sarilma_acisi": 330})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
+        k = [a for a in b["adimlar"] if isinstance(a, dict)
+             and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+        self.assertEqual(k[0]["deger"], "UYGUN")
+        #  Açı bilindiği için bloke artık karara bağlanabilir
+        self.assertIsNone(b.get("eksik_hesap"))
+
+    def test_ELEport_acisiyla_sinir_yayindaki_gibi(self):
+        """α = 180° · V kanal sertleştirilmiş · γ = 38°  →  f = 0,2/sin19°."""
+        h = self._h({"sarilma_acisi": 180, "kanal_sekli": "V Kanal",
+                     "kanal_isleme": "Sertleştirilmiş",
+                     "_ofis": {"kanal_gama_v": 38}})
+        f_bloke = 0.2 / math.sin(math.radians(38) / 2)
+        self.assertAlmostEqual(h["AE216"], f_bloke, places=6)
+        #  ELEport aynı girdilerde 6,89 basıyor
+        self.assertAlmostEqual(h["O285"], math.exp(f_bloke * math.pi), places=6)
+        self.assertAlmostEqual(h["O285"], 6.89, delta=0.01)
+
+
+class GenelHukumDenetimi(unittest.TestCase):
+    """Hüküm sırası:  "uygun değil"  >  "hesap eksik"  >  "uygundur".
+
+    Kesin olumsuzluk, eksiklikten daha güçlü bilgidir.  Sıra ters kurulursa
+    bölümleri çakılan bir proje ekranda yalnız "HESAP EKSİK" der.
+    """
+
+    @staticmethod
+    def _b(uygun, eksik=False):
+        b = {"sonuc": {"uygun": uygun}}
+        if eksik:
+            b["eksik_hesap"] = "x"
+        return b
+
+    def test_kalan_bolum_eksigi_orter(self):
+        self.assertEqual(
+            M.genel_hukum([self._b(True), self._b(False)], False, ["e"])[0],
+            "UYGUN DEĞİLDİR.")
+
+    def test_yalniz_eksik_varsa_hesap_eksik(self):
+        #  Eksik bölümün KENDİ sonucu da "uygun değil"dir;  "kaldı" sayılmamalı.
+        self.assertEqual(
+            M.genel_hukum([self._b(True), self._b(False, eksik=True)],
+                          False, ["e"])[0], "HESAP EKSİK")
+
+    def test_temiz_proje_uygundur(self):
+        self.assertEqual(M.genel_hukum([self._b(True)], True, [])[0],
+                         "UYGUNDUR.")
+
+    def test_engelleyici_uyari_uygun_birakmaz(self):
+        self.assertEqual(M.genel_hukum([self._b(True)], False, [])[0],
+                         "UYGUN DEĞİLDİR.")
+
+    def test_kisa_hukum_uzuna_uyar(self):
+        for bol, tu, eks in (([self._b(False)], False, []),
+                             ([self._b(False, eksik=True)], False, ["e"]),
+                             ([self._b(True)], True, [])):
+            uzun, kisa = M.genel_hukum(bol, tu, eks)
+            self.assertTrue(uzun.startswith(kisa.split()[0]), (uzun, kisa))
+
+    def test_gercek_projede_kalan_bolum_soyleniyor(self):
+        s = M.hesapla({})
+        o = s["ozet"]
+        kalan = [b for b in s["bolumler"]
+                 if (b.get("sonuc") or {}).get("uygun") is False
+                 and not b.get("eksik_hesap")]
+        self.assertTrue(kalan, "senaryoda kalan bölüm yok")
+        self.assertTrue(o["eksik_hesap"], "senaryoda eksik hesap yok")
+        self.assertEqual(o["genel_sonuc"], "UYGUN DEĞİLDİR.")
 
 
 if __name__ == "__main__":

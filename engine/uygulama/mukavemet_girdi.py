@@ -101,8 +101,14 @@ ALANLAR = (
     # ── MAKİNE VE MOTOR ───────────────────────────────────────────────
     ("motor_gucu",        "F95",  "Motor gücü",                        "kW",   "sayi", None, 4.9),
     ("makine_agirligi",   "F126", "Makine - motor ağırlığı  ( Gm )",   "kg",   "sayi", None, 300),
-    ("sap_kasnak_yuk",    "F97",  "C  ( sap. kasnak yükü )",           "mm",   "sayi", None, 230),
-    ("makine_yatak_yuk",  "F98",  "D  ( makine yatak yükü )",          "mm",   "sayi", None, 172),
+    #  C ( sap. kasnak yükü ) ve D ( makine yatak yükü ) KALDIRILDI.
+    #  İkisi de YALNIZ sarılma açısını türetmek için vardı:
+    #      B = H − C + D ,  α = 180° − arctan( ( Ra − 2·R1 ) / B )
+    #  α artık doğrudan beyan ediliyor ( bkz. "sarilma_acisi" ), o yüzden
+    #  bu iki ölçü hiçbir sonuca girmiyordu — formda durup kullanıcıyı
+    #  oyalıyorlardı.  ELEport da açıyı doğrudan sorar ve bu ölçüleri hiç
+    #  istemez.  ( Kitaptaki F97 · F98 hücreleri de artık yazılmıyor;
+    #  şablonun α bloğu teslim kopyasında temizleniyor. )
     ("tahrik_kasnak_capi", "F99", "D1 ( tahrik kasnağı çapı )",        "mm",   "sayi", None, 240),
     ("saptirma_kasnak_capi", "F100", "D2 — saptırma kasnaklarının ORTALAMA çapı", "mm", "sayi", None, 240),
     #  Ds — EN KÜÇÜK kasnak çapı.  Sf formülündeki Kp = (Dt/Dp)⁴ ORTALAMA
@@ -148,7 +154,9 @@ ALANLAR = (
      MT.KANAL_SEKILLERI, "Altı Kesik V Kanal"),
     ("kanal_isleme",      "F106", "Kanal işleme şekli",                "—",    "secim",
      MT.KANAL_ISLEME_SEKILLERI, "Sertleştirilmemiş"),
-    ("halat_arasi_yan",   "F109", "Halat arası  ( yan ağırlıkta )",    "mm",   "sayi", None, 1182),
+    # Açı doğrudan beyan edilir; eksik açıya varsayılan atanmaz.
+    ("sarilma_acisi",     "",     "α — halat sarılma açısı",
+     "°", "sayi", None, None),
     #  EN 81-50 m.5.12.2 — Nequiv(p).  Kaynak Excel bunları hücreye SABİT
     #  yazar ( 11!AH105 = 1 , AH106 = 0 );  oysa tesisin askı düzenine bağlıdır.
     ("kasnak_tek_yon",    "",     "Tek yönde bükülmeli kasnak sayısı  ( Nps )", "adet", "sayi", None, 1),
@@ -159,7 +167,10 @@ ALANLAR = (
     #  2. kablo tipi GİRDİ DEĞİLDİR:  kaynak kitapta kat kapısı tipinden
     #  HLOOKUP ile türetilir ( 'Veri Girişi'!B108 ).  Sorulmaz, hesaplanır.
     ("kablo_tipi_2",      "B108", "2. bükülgen kablo tipi",            "—",    "hesap", None, None),
-    ("halat_arasi",       "F108", "Halat arası  ( kullanılan )",       "mm",   "hesap", None, None),
+    #  "halat_arasi" ( Ra ) da KALDIRILDI — o da yalnız α'nın payındaydı
+    #  ( A = Ra − 2·R1 ).  Arka ağırlıkta kuyu derinliği − ray-kapı arası −
+    #  ağırlık ray-duvar'dan türetiliyordu;  o üç ölçü kendi hesaplarında
+    #  duruyor, yalnız bu türetme kalktı.
 
     # ── REGÜLATÖR ─────────────────────────────────────────────────────
     ("reg_halat_capi",    "B104", "Regülatör halatı çapı",             "mm",   "secim", _s(6, 6.5, 8), 6),
@@ -372,12 +383,16 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi")
 #  AÇI alanları:  0 < açı < 180.  360° girildiğinde sin(180°) = 0 çıkıyor ve
 #  hesap OverflowError ile çöküyordu.
-ACI_ALANLARI = {"reg_kanal_acisi": (1, 179)}
+#  α — sarılma açısı:  tek sarımda en çok yarım tur, çift sarımda bir tam
+#  tur.  Üst sınır 360'tır;  seçilen kanal şekline göre DARALTMAYI motor
+#  yapar ( bkz. mukavemet._tahrik · alfa_ust ), çünkü burada kanal şekli
+#  ile açı alanı birbirini görmez.
+ACI_ALANLARI = {"reg_kanal_acisi": (1, 179), "sarilma_acisi": (1, 360)}
 
 #  kabin_agirligi BURADA DEĞİLDİR:  tamamla() onu ofis tablosundan doldurur
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
-OPSIYONEL_ALANLAR = ("asansor_adi",
+OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi",
                      "paten_balata_boyu", "guvenlik_devreye_kuvvet",
                      "reg_devreye_hizi", "makine_tst",
                      "halat_birim_kutle", "halat_kopma_kN",
@@ -453,7 +468,7 @@ GRUPLAR = (
       "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar",
       "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
-     ("motor_gucu", "makine_agirligi", "sap_kasnak_yuk", "makine_yatak_yuk",
+     ("motor_gucu", "makine_agirligi",
       "tahrik_kasnak_capi", "saptirma_kasnak_capi",
       "saptirma_kasnak_min_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
@@ -461,8 +476,9 @@ GRUPLAR = (
       "makine_raya_biniyor", "raya_binen_yuk")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kanal_sekli", "kanal_isleme",
+      "sarilma_acisi",
       "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
-      "halat_arasi_yan", "kasnak_tek_yon", "kasnak_ters_yon",
+      "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1")),
     ("Hız regülatörü",
      ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
@@ -572,6 +588,8 @@ def tamamla(g):
                          yan ağırlıkta   elle girilen F109
     """
     g = dict(g)
+    if isinstance(g.get("sarilma_acisi"), str) and not g["sarilma_acisi"].strip():
+        g["sarilma_acisi"] = None
     #  BOŞ KABİN KÜTLESİ:  girilmemişse ofis tablosundan doldurulur.
     #  Kaynak kitapta bu hücre ( C75 ) elle doldurulur;  program aynı tabloyu
     #  avan tarafında da kullandığı için iki proje aynı asansöre aynı kütleyi
@@ -604,11 +622,6 @@ def tamamla(g):
     sm, sk, kd = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi"), g.get("kuyu_dibi")
     if _sayi(sm) and _sayi(sk) and _sayi(kd):
         g["kuyu_boyu"] = sm * 1000.0 + sk + kd
-    if g.get("agirlik_yeri") == "Arka":
-        a, b, c = g.get("kuyu_derinligi"), g.get("ray_kapi_arasi"), g.get("agirlik_ray_duvar")
-        g["halat_arasi"] = (a - b - c) if (_sayi(a) and _sayi(b) and _sayi(c)) else None
-    else:
-        g["halat_arasi"] = g.get("halat_arasi_yan")
     #  2. bükülgen kablo kat kapısı tipinden türetilir  ( Veri Girişi!B108 )
     g["kablo_tipi_2"] = MT.kapi_kablosu(g.get("kat_kapisi_tipi"))
     #  ESKİ BİÇİM:  makine yükünün yolu bir zamanlar ONAY KUTUSUYDU ve
@@ -798,22 +811,11 @@ def dogrula(g):
     #  ------------------------------------------------------------------
     #  TAHRİK KASNAĞI GEOMETRİSİ            TS EN 81-50 m.5.11.2 / m.5.11.3
     #  ------------------------------------------------------------------
-    #  Sarılma açısı α = 180° − arctan( ( Ra − 2·R1 ) / B ) bağıntısı TEK
-    #  SARIMLI bir tahrik kasnağını modeller:  halat kasnağın iki yanından
-    #  aşağı iner ve α en çok 180° olur.  Ra < 2·R1 girildiğinde pay
-    #  negatife düşüyor, α 180°'yi aşıyordu ( Ra = 100 mm'de 187,65° ) ve
-    #  hesap sorunsuz devam ediyordu.  Yön EMNİYETSİZDİR:  e^(f·α) sınırı
-    #  α ile büyür, yani tahrik yeteneği olduğundan iyi çıkar.
-    Ra, Dt = g.get("halat_arasi"), g.get("tahrik_kasnak_capi")
-    if _sayi(Ra) and _sayi(Dt) and Dt > 0 and Ra < Dt:
-        hata.append(
-            f"Halat arası ({Ra:g} mm) tahrik kasnağı çapından ({Dt:g} mm) küçük "
-            "olamaz. Tek sarımlı kasnakta halatlar kasnağın iki yanından "
-            "teğet iner; halat arası en az kasnak çapı kadardır. Daha küçük "
-            "bir değer sarılma açısını 180°'nin üstüne çıkarır ve tahrik "
-            "yeteneğini olduğundan İYİ gösterir."
-            + ("  ( Karşı ağırlık arkada:  halat arası KD − RK − ray-duvar'dan "
-               "hesaplanır. )" if g.get("agirlik_yeri") == "Arka" else ""))
+    #  ( "Halat arası tahrik kasnağı çapından küçük olamaz" doğrulaması
+    #    KALDIRILDI.  O kural, α'yı Ra'dan türeten geometrik modelin
+    #    kendisini korumak içindi:  Ra < 2·R1'de pay negatife düşüyor ve α
+    #    180°'yi aşıyordu.  α artık doğrudan beyan ediliyor ve kendi
+    #    aralığında ( 1° – 360° ) denetleniyor;  Ra diye bir girdi kalmadı. )
 
     #  ------------------------------------------------------------------
     #  SİSTEM VERİMİ  η  FİZİKSEL OLMALI             0 < η ≤ 1
@@ -882,6 +884,17 @@ def uyarilar(g):
     yapar ve sebebini yazar.
     """
     uyari = []
+    #  ------------------------------------------------------------------
+    #  SARILMA AÇISI ZORUNLU BEYANDIR ( bkz. mukavemet.ALFA_YOK ).
+    #  Girilmemişse tahrik yeteneğinin dört sınırı hesaplanmaz;  proje
+    #  "uygundur" çıkamaz ve sebep burada, açıkça söylenir.
+    #  ------------------------------------------------------------------
+    if g.get("sarilma_acisi") in (None, ""):
+        uyari.append(
+            "SARILMA AÇISI α GİRİLMEDİ — halatın tahrik kasnağını sardığı "
+            "toplam açıyı proje yerleşiminden belirleyip girin (tek sarımda en "
+            "çok 180°, çift sarımda 180°–360°). Açı girilene kadar tahrik "
+            "yeteneğinin dört sınırı hesaplanmaz ve bölüm HESAP EKSİK kalır.")
     #  ------------------------------------------------------------------
     #  MAKİNE DAİRESİZ TESİSTE MAKİNENİN YÜKÜ BİR YERE GİDER.
     #  TS EN 81-20 m.5.7.2.3.7 makine raya bağlıysa EK YÜK DURUMLARI ister.

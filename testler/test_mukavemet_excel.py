@@ -59,6 +59,14 @@ def senaryolar():
 
     E("varsayılan")
 
+    #  SARILMA AÇISI zorunlu girdidir ve varsayılanı YOKTUR:  öteki bütün
+    #  senaryolarda tahrik sınırları hesaplanmaz ( HESAP EKSİK ).  Kitap ise
+    #  açıyı kendi şase ölçülerinden türetir ( 137,89° ).  Bu iki senaryo
+    #  sınır hücrelerinin ( S184 · AA184 · O242 … O285 ) motorda gerçekten
+    #  üretildiğini ve kitaptan BİLİNÇLİ olarak ayrıştığını gösterir.
+    E("sarılma açısı 180°", sarilma_acisi=180)
+    E("sarılma açısı 150°", sarilma_acisi=150)
+
     #  DENGE ZİNCİRİ:  P'ye giren MCR yolunu açar  ( m.5.2.1.8.5 · m.5.7.2.3.2 ).
     #  Zincirsiz senaryolarda MCR = 0'dır ve ray / kuyu tabanı sapmaları
     #  görünmez;  bu senaryo onları sınar.
@@ -372,6 +380,73 @@ def calistir():
             for _e in hata_hucresi_ara(_syol):
                 if _e.startswith(SAYFA):
                     r.kontrol("[serbest ölçü] Excel hata hücresi", False, _e)
+
+    #  ---------------------------------------------------------------
+    #  TESLİM EDİLEN KİTAP  —  SÜRTÜNME ÇARPANI f KANAL ŞEKLİNE BAĞLI
+    #  ---------------------------------------------------------------
+    #  Kitap f'i kanal şeklinden bağımsız hep V kanal bağıntısıyla kuruyor,
+    #  γ ve β'yı hücreye çiviliyordu ( 38° · 90° ).  Motor bunu çoktan
+    #  düzeltmişti ( EXCEL_FARKLARI ) ama teslim kopyası düzeltilmemişti:
+    #  pafta ile kitap tahrik sınırında 10 kanal × işleme birleşiminin
+    #  8'inde ayrışıyordu ( ör. yarım daire bloke sınırı 2,19 · 6,89 ).
+    #  Yukarıdaki senaryolar HAM kitabı denetler;  burası TESLİM kopyasını.
+    #  Ofis açıları değiştirilmiş bir tur da koşulur:  kitap açıları kendi
+    #  sabitinden değil, projenin ofis sabitinden okumalı.
+    #  DOSYA ADLARI BENZERSİZ:  bir ön denetim adı işlemenin ilk beş harfiyle
+    #  kurmuş ( "Sertl" ), iki işleme aynı dosyaya yazılıp birbirini ezmişti.
+    _fk = os.path.join(GECICI, "kanal_f")
+    _fg = os.path.join(_fk, "in")
+    os.makedirs(_fg, exist_ok=True)
+    _F_HUC = ("AU206", "AV211", "AJ198", "AL202", "AE216",
+              "O242", "O257", "O271", "O285")
+    _OFIS_DEGISIK = {"kanal_gama_v": 45, "kanal_gama_yd": 30, "kanal_beta": 100}
+    _fsen = []
+    for _ofis in (None, _OFIS_DEGISIK):
+        for _k in MT.KANAL_SEKILLERI:
+            for _i in MT.KANAL_ISLEME_SEKILLERI:
+                _g = {"kanal_sekli": _k, "kanal_isleme": _i, "sarilma_acisi": 180}
+                if _ofis:
+                    _g["_ofis"] = dict(_ofis)
+                _fsen.append((f"f{len(_fsen):02d}", _g))
+    try:
+        for _ad, _g in _fsen:
+            with open(os.path.join(_fg, _ad + ".xlsx"), "wb") as _f:
+                _f.write(MX.mukavemet_xlsx(_g))
+    except FileNotFoundError:
+        _fsen = []
+        r.atla("mukavemet şablonu yok — kanal f denetimi atlandı")
+    if _fsen:
+        yeniden_hesapla([os.path.join(_fg, a + ".xlsx") for a, _ in _fsen],
+                        os.path.join(_fk, "out"))
+        r.esit("[kanal f] her birleşim ayrı kitap olarak yeniden hesaplandı",
+               len([a for a, _ in _fsen
+                    if os.path.isfile(os.path.join(_fk, "out", a + ".xlsx"))]),
+               len(_fsen))
+        for _ad, _g in _fsen:
+            _fyol = os.path.join(_fk, "out", _ad + ".xlsx")
+            if not os.path.isfile(_fyol):
+                continue
+            _fws = openpyxl.load_workbook(_fyol, data_only=True)[SAYFA]
+            _et = (f"{_g['kanal_sekli']} · {_g['kanal_isleme']}"
+                   + ("  · ofis açıları değişik" if "_ofis" in _g else ""))
+            _hm = MK.hesapla(_g)["_h"]
+            for _h in _F_HUC:
+                if _h in _hm:
+                    r.kontrol(f"[kanal f] {_et} · {_h}", _esit(_hm[_h], _fws[_h].value),
+                              f"→ motor {_hm[_h]!r}, kitap {_fws[_h].value!r}")
+            #  ÖBÜR İŞLEMENİN SATIRI da doğru olmalı:  kitapta işleme sonradan
+            #  değiştirilirse sınır o satırdan okunur.  Motor yalnız seçili
+            #  işlemeninkini yazdığı için öbürü ayrı bir hesapla kıyaslanır.
+            _obur = [x for x in MT.KANAL_ISLEME_SEKILLERI if x != _g["kanal_isleme"]][0]
+            _ho = MK.hesapla(dict(_g, kanal_isleme=_obur))["_h"]
+            for _h in (("AJ198", "AL202") if _obur == "Sertleştirilmiş"
+                       else ("AU206", "AV211")):
+                r.kontrol(f"[kanal f] {_et} · öbür işleme {_h}",
+                          _esit(_ho[_h], _fws[_h].value),
+                          f"→ motor {_ho[_h]!r}, kitap {_fws[_h].value!r}")
+            for _e in hata_hucresi_ara(_fyol):
+                if _e.startswith(SAYFA):
+                    r.kontrol(f"[kanal f] {_et} · Excel hata hücresi", False, _e)
 
     shutil.rmtree(GECICI, ignore_errors=True)
     return r

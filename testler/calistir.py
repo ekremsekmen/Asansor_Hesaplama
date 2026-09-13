@@ -30,6 +30,10 @@ TESTLER = [
     ("9", "Mukavemet motoru", "testler.test_mukavemet", False),
     ("10", "Mukavemet ↔ Excel", "testler.test_mukavemet_excel", True),
     ("11", "Uygulama projesi", "testler.test_uygulama", False),
+    #  Dış referanslar:  öteki testlerin hepsi motoru KENDİ kaynağımıza
+    #  ( Excel · altın çıktı ) karşı denetler;  bu, bizden bağımsız iki
+    #  programın yayımlanmış paftalarına karşı denetler.
+    ("12", "Dış referans paftaları", "testler.test_referans_paftalar", False),
 ]
 
 

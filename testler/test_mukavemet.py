@@ -69,9 +69,10 @@ HUCRELER = {
         ("W151",  "Freg"),
         ("J156",  "F'reg"),
         ("G161",  "T'min / F'reg")],
-    "tahrik_yetenegi": [("U174", "A  kasnaklar arası yatay mesafe"),
-        ("Z178", "B  kasnaklar arası düşey mesafe"),
-        ("C184", "θ"),
+    #  U174 ( A ) · Z178 ( B ) · C184 ( θ ) KALDIRILDI:  üçü de α'yı
+    #  geometriden türeten ara adımlardı.  α artık proje girdisidir
+    #  ( bkz. EXCEL_FARKLARI ) ve o üç ölçü hiçbir hesaba girmiyor.
+    "tahrik_yetenegi": [
         ("S184", "α  sarılma açısı"),
         ("AS190", "μ  frenleme"),
         ("AU206", "f  yükleme ( sertleştirilmemiş )"),
@@ -193,9 +194,13 @@ def calistir():
     #  olması ( f = μ / sin(γ/2) — EN 81-50 m.5.11.2.3.1.2 ) ve DENGE ZİNCİRİ
     #  ( boş kabin en üstteyken dengesiz halat kütlesini götürür ).  İkisi de
     #  kitabın örneğinde beyan edilmemiştir;  gerçek projede imalatçıdan gelir.
+    #  SARILMA AÇISI da beyan edilmeli ( zorunlu girdi, varsayılanı yok ).
+    #  Senaryo 137,89° ile 180° arasındaki her açıda tam geçiyor;  180°
+    #  alındı ( halat kasnaktan dikey iniyor — ELEport'un örneğiyle aynı ).
     _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280,
                      "motor_gucu": 7.5, "guvenlik_devreye_kuvvet": 200,
-                     "kanal_isleme": "Sertleştirilmiş", "denge_zinciri": "Var"})
+                     "kanal_isleme": "Sertleştirilmiş", "denge_zinciri": "Var",
+                     "sarilma_acisi": 180})
     r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · sertleştirilmiş "
               "kanal · denge zinciri girilince bütün bölümler uygun",
               _d["aktif"] and _d["ozet"]["tumu_uygun"],
@@ -265,7 +270,7 @@ def calistir():
 
 def _sapmalar(r):
     """Standart gereği Excel'den ayrıldığımız noktalar gerçekten uygulanıyor mu."""
-    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 47)
+    r.esit("sapma kaydı dolu", len(MK.EXCEL_FARKLARI), 48)
     for ad, madde, _ex, _biz, _h in MK.EXCEL_FARKLARI:
         #  Her sapmanın DAYANAĞI yazılı olmalı.  Üç geçerli dayanak vardır:
         #    · TS EN 81-20 / 81-50 maddesi
@@ -718,11 +723,21 @@ def _denetim_bulgulari(r):
                   f"→ {_t1['MSRcar']!r} / {_t1['MSRcwt']!r}")
 
     #  ── B6  Sarılma açısı α tek sarımda 180°'yi aşamaz
-    _g6 = _MG.tamamla(dict(_MG.varsayilanlar(), halat_arasi_yan=200))
-    r.kontrol("B6  Ra < Dt girdi doğrulamasında reddediliyor",
-              any("Halat arası" in x and "kasnak" in x for x in _MG.dogrula(_g6)),
-              f"→ {_MG.dogrula(_g6)}")
-    _b6 = [x for x in MK.hesapla()["bolumler"] if x["baslik"].startswith("6 ")][0]
+    #  α artık türetilmiyor, BEYAN EDİLİYOR;  aralığı kendi girdisinde
+    #  ( 1° – 360° ) ve bölüm 6'da kanal şekline göre ( tek sarım ≤ 180° )
+    #  denetlenir.  Eski "Ra < Dt" kuralı geometrik modeli koruyordu, o
+    #  model kalktı ( bkz. EXCEL_FARKLARI ).
+    r.kontrol("B6  aralık dışı α girdi doğrulamasında reddediliyor",
+              bool(_MG.dogrula(_MG.tamamla(
+                  dict(_MG.varsayilanlar(), sarilma_acisi=400)))),
+              "→ 400° kabul edildi")
+    _b6 = [x for x in MK.hesapla({"sarilma_acisi": 200})["bolumler"]
+           if x["baslik"].startswith("6 ")][0]
+    _k6 = [a for a in _b6["adimlar"]
+           if a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
+    r.kontrol("B6  tek sarımda α > 180° bölümde reddediliyor",
+              _k6 and _k6[0]["deger"] == "UYGUN DEĞİL",
+              f"→ {_k6[0]['deger'] if _k6 else 'kontrol satırı yok'}")
     r.kontrol("B6  bölüm 6'da α aralık kontrolü var",
               any("tek sarımlı" in str(a.get("aciklama", ""))
                   for a in _b6["adimlar"]),
@@ -875,7 +890,9 @@ def _denetim_bulgulari(r):
     #  yanındaki gerginlik FARKI ( Fçekme = F'reg − Freg ).  m.5.6.2.2.1.3 b)
     #  ise halattaki EN BÜYÜK gerginliği ( F'reg ) emniyet katsayısına sokar.
     #  Kitap ikisini de F'reg ile yapıyordu.
-    _s5 = MK.hesapla()
+    #  ( α verilir ki eksik listesinde YALNIZ regülatörün eksiği kalsın —
+    #    bu blok regülatörü denetler. )
+    _s5 = MK.hesapla({"sarilma_acisi": 180})
     _b5 = [x for x in _s5["bolumler"] if x["baslik"].startswith("5 ")][0]
     _h5 = _s5["_h"]
     r.kontrol("B12  Fçekme = F'reg − Freg",
@@ -1374,11 +1391,13 @@ def _girdi_yollari(r):
         s = MK.hesapla({anahtar: 0})
         r.kontrol(f"{anahtar} = 0 reddediliyor", not s["aktif"])
 
-    #  Arka karşı ağırlıkta halat arası hesaplanır
+    #  Arka karşı ağırlık hâlâ hesaplanmalı.  ( "halat arası" türetmesi
+    #  kalktı — o değer yalnız α'nın payındaydı ve α artık girdi. )
     s = MK.hesapla({"agirlik_yeri": "Arka"})
     r.kontrol("arka ağırlıkta hesap koşuyor", s["aktif"], f"→ {s.get('hata')}")
-    if s["aktif"]:
-        r.esit("arka ağırlıkta halat arası", s["girdi"]["halat_arasi"], 825)
+    r.kontrol("halat arası artık girdi değil",
+              "halat_arasi" not in (s.get("girdi") or {}),
+              f"→ {(s.get('girdi') or {}).get('halat_arasi')!r}")
 
     #  a = 1 gn sınırında T1 sıfırlanır — motor çökmemeli, tahrik yeteneğini
     #  UYGUN DEĞİL saymalı.  ( Kaynak Excel bu noktada #SAYI/0! verir. )

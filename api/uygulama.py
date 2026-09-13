@@ -266,19 +266,36 @@ def indir_uygulama_xlsx(veri: dict = Body(...)):
 def _asansor_kitaplari(s, proje):
     """Çoklu projede asansör başına mukavemet çalışma kitabı.
 
-    Döner:  [ ( dosya adı , içerik ) … ].  Şablon yoksa o asansör atlanır —
-    paket yine çıkar, yalnız kitabı olmaz.
+    Döner:  [ ( dosya adı , içerik ) … ].
+
+    EKSİK KİTAP SESSİZCE ATLANAMAZ.  Bir asansörün kitabı üretilemediğinde
+    eskiden yalnız ``continue`` vardı:  kullanıcı iki asansörlük bir projede
+    tek kitaplı — hatta boş — bir ZIP indiriyor ve eksiğin farkına
+    varmıyordu.  Üretilemeyen asansörler artık paketin İÇİNE konan bir
+    metin dosyasında adıyla ve sebebiyle yazılır;  paket yine çıkar ama
+    eksik görünür olur.
     """
-    kitaplar = []
+    kitaplar, eksikler = [], []
     for a in s.get("asansorler") or []:
         if not a.get("aktif"):
+            eksikler.append(f"{a.get('no')} - {a.get('tanim') or ''}:  "
+                            "asansör hesaplanamadı ( girdiler eksik ya da geçersiz )")
             continue
         etiket = _dosya_parcasi(f"{a.get('no')} - {a.get('tanim') or ''}")
         try:
             kitaplar.append((f"Mukavemet Hesaplari - {etiket}.xlsx",
                              X_MXLS.mukavemet_xlsx(a["girdi"], proje)))
-        except Exception:                                     # noqa: BLE001
-            continue
+        except Exception as e:                                # noqa: BLE001
+            eksikler.append(f"{etiket}:  {e}")
+    if eksikler:
+        kitaplar.append((
+            "URETILEMEYEN ASANSORLER.txt",
+            ("BU PAKETTE EKSİK VAR\r\n"
+             "====================\r\n\r\n"
+             "Aşağıdaki asansörlerin mukavemet çalışma kitabı üretilemedi.\r\n"
+             "Paketteki dosyalar projenin TAMAMI DEĞİLDİR.\r\n\r\n"
+             + "\r\n".join(f"  •  {x}" for x in eksikler)
+             + "\r\n").encode("utf-8")))
     return kitaplar
 
 
