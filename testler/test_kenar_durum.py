@@ -647,6 +647,22 @@ def calistir():
             b = AV.hesapla_asansor(AS, ORT, S_, 1)["bolumler"][bolum]
         return next(x for x in b["adimlar"] if x.get("sembol") == "ØL")["kaynak"]
 
+    #  MAKİNE DAİRESİNDE ÇALIŞMA DÜZLEMİ DÖŞEMEDİR  ( TS EN 81-20 m.5.2.1.4.2 )
+    #  200 lüks döşeme seviyesinde istenir;  armatür tavandadır ve net yükseklik
+    #  en az 2,10 m'dir ( m.5.2.6.3.2.1 ).  Kabinin 1,0 m'lik düzlemi ( m.5.4.10.1:
+    #  döşemeden 1 m yukarıda 100 lüks ) buraya da uygulanıyordu:  k iki kat,
+    #  η büyük, armatür %20-30 az.
+    _Sd = AV.sabitler(None)
+    _mk = AV.hesapla_makine_dairesi(dict(ORT, mk_yok=False, mk_uzunluk=4000,
+                                         mk_genislik=3000), _Sd)
+    r.esit("makine dairesi: h = döşemeden armatüre 2,10 m",
+           next(x for x in _mk["bolum"]["adimlar"] if x.get("sembol") == "h")["deger"], 2.10)
+    r.esit("makine dairesi: k = a·b / ( 2,10 · ( a + b ) )", _mk["k"], 4 * 3 / (2.10 * 7))
+    r.esit("makine dairesi 4 × 3 m → 5 armatür  ( h = 1 m ile 4 çıkıyordu )", _mk["n"], 5)
+    r.esit("kabin: h = 1,0 m  ( döşemeden 1 m yukarıda ölçülür )",
+           next(x for x in AV.hesapla_asansor(AS, ORT, _Sd, 1)["bolumler"][2]["adimlar"]
+                if x.get("sembol") == "h")["deger"], 1.0)
+
     #  KAYNAK "MMO/697 Tablo-4" DEĞİLDİR:  kitapta aydınlatma bölümü yoktur ve
     #  Tablo-4 kapı süreleri tablosudur.  Varsayılan ofis armatür tablosundan gelir.
     for bolum, ad in ((2, "kabin"), (3, "kuyu"), ("mk", "mk.dairesi")):
@@ -1394,41 +1410,60 @@ def calistir():
                   for x in AV.sabitler({"sigorta_katsayisi": 0})["_reddedilen"]))
 
     #  ------------------------------------------------------------------
-    #  B5  KOLON HATTI AKIMI DA ŞEBEKEDEN ÇEKİLEN GÜÇTEN HESAPLANIR
+    #  B5  KURULU GÜÇ ETİKET GÜCÜDÜR;  KOLON HATTI ŞEBEKEDEN ÇEKİLENİ TAŞIR
     #  ------------------------------------------------------------------
-    #  ηm düzeltmesi makine besleme hattı ( I2 ) için yapılmış, KOLON hattı
-    #  ( I ) için yapılmamıştı.  P_kurulu motorun MİL gücünü taşıyordu;  oysa
-    #  I ≤ Iz kararı kolon hattına aittir ve o hatta Pşeb akar.  Yön
-    #  EMNİYETSİZDİ:  kesit olduğundan küçük seçilebiliyordu.
+    #  Kurulu güç tanım gereği anma ( etiket ) güçlerinin toplamıdır ( Elektrik
+    #  İç Tesisleri Proje Hazırlama Yönetmeliği m.5-19 );  motorun anma gücü
+    #  mil gücüdür ( TS EN 60034-1 m.5.5.3 ).  Kolon hattı ise motorun
+    #  şebekeden çektiğini taşır ( Pşeb = Nsç / ηm ):  I ve ε1 onunla kurulur.
+    #  Önce hat ηm'siz hesaplanıyordu ( kesit emniyetsiz ), sonra akım doğru
+    #  çıksın diye Pşeb cetvele yazıldı ( kurulu güç %18 büyük ) — ikisi ayrıldı.
     _etam = _S0["motor_elektrik_verimi"]
-    r.esit("B5  cetveldeki motor gücü = Pşeb  ( Nsç / ηm )",
-           round(_cet[0]["guc"], 3), round(_s["Nsc"] * 1000 / _etam, 3))
-    r.esit("B5  kurulu güç Pşeb'i içeriyor",
+    r.esit("B5  cetveldeki motor gücü = etiket gücü  ( Nsç )",
+           round(_cet[0]["guc"], 3), round(_s["Nsc"] * 1000, 3))
+    r.esit("B5  kurulu güç = etiket güçlerinin toplamı",
            round(_s["P_kurulu"], 3),
-           round(_s["g_motor"] + _s["g_kuyu"] + _s["g_kabin"] + _s["g_priz"], 3))
+           round(_s["Nsc"] * 1000 + _s["g_kuyu"] + _s["g_kabin"] + _s["g_priz"], 3))
+    r.esit("B5  kolon hattı gücü P1 = Nsç / ηm + aydınlatma + priz",
+           round(_s["P_hat"], 3),
+           round(_s["Nsc"] * 1000 / _etam + _s["g_kuyu"] + _s["g_kabin"] + _s["g_priz"], 3))
     r.esit("B5  kolon hattı akımı I = P1 / (√3·U·cosφ)",
            round(_s["I"], 3),
-           round(_s["P_kurulu"] / (_m.sqrt(3) * 380 * 0.90), 3))
+           round(_s["P_hat"] / (_m.sqrt(3) * 380 * 0.90), 3))
     r.kontrol("B5  I, ηm'siz eski değerden BÜYÜK",
               _s["I"] > (_s["Nsc"] * 1000 + _s["g_kuyu"] + _s["g_kabin"]
                          + _s["g_priz"]) / (_m.sqrt(3) * 380 * 0.90),
               f"→ {_s['I']}")
     r.kontrol("B5  ε1 de Pşeb ile hesaplanıyor  ( ε1 ∝ P1 )",
               _yakin_o(_s["eps1"],
-                       100 * _s["P_kurulu"] * _s["L1"]
+                       100 * _s["P_hat"] * _s["L1"]
                        / (AV.sabitler(None)["kappa"] * _s["S1"] * 380 ** 2))
               if all(_s.get(k) is not None for k in ("eps1", "L1", "S1")) else True,
               f"→ {_s.get('eps1')!r}")
     #  Denetimin bildirdiği karar çeviren birleşimler
-    for _kw, _s1, _iz in ((22, 6, 41), (30, 10, 57), (55, 25, 101)):
+    for _kw, _s1, _iz in ((22, 6, 41), (30, 10, 57), (55, 25, 96)):
         _o5 = _av({"Nsc": _kw, "S1": _s1, "S2": _s1})["asansorler"][0]["ozet"]
         r.kontrol(f"B5  {_kw} kW · S1 = {_s1} mm² → UYGUN DEĞİL  "
                   f"( I = {_o5['I']:.1f} A > Iz = {_iz} A )",
                   _o5["akim_uygun"] is False and _o5["Iz"] == _iz,
                   f"→ I={_o5['I']!r} Iz={_o5['Iz']!r} uygun={_o5['akim_uygun']!r}")
         r.kontrol(f"B5  {_kw} kW ηm'siz olsaydı 'uygun' görünürdü",
-                  (_o5["P_kurulu"] - _o5["g_motor"] + _o5["g_motor"] * _etam)
-                  / (_m.sqrt(3) * 380 * 0.90) < _iz)
+                  _o5["P_kurulu"] / (_m.sqrt(3) * 380 * 0.90) < _iz)
+    #  B6  Iz TABLOSU BAŞLIĞINDAKİ TABLONUN KENDİSİDİR
+    #  IEC 60364-5-52 Tablo B.52.4 · bakır · PVC · 3 yüklü iletken · Yöntem C.
+    #  25 mm² ve üstü eskiden 101 · 125 · 151 · 192 · 232 · 269 A yazıyordu —
+    #  tablonun değerlerinden %4-5 fazla.  Aradaki akımlarda kolon hattı
+    #  "uygundur" görünüyordu.
+    r.esit("B6  Iz tablosu = IEC 60364-5-52 B.52.4 · Cu · PVC · 3 yüklü · Yöntem C",
+           T.KABLO_IZ, {1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 96,
+                        35: 119, 50: 144, 70: 184, 95: 223, 120: 259})
+    for _kw, _s1, _iz, _eski in ((48, 25, 96, 101), (60, 35, 119, 125)):
+        _o6 = _av({"Nsc": _kw, "S1": _s1, "S2": _s1})["asansorler"][0]["ozet"]
+        r.kontrol(f"B6  {_kw} kW · S1 = {_s1} mm² → UYGUN DEĞİL  "
+                  f"( Iz = {_iz} A < I ≤ eski tablonun {_eski} A'i )",
+                  _o6["akim_uygun"] is False and _o6["Iz"] == _iz
+                  and _iz < _o6["I"] <= _eski,
+                  f"→ I={_o6['I']!r} Iz={_o6['Iz']!r} uygun={_o6['akim_uygun']!r}")
     #  ε2 de mil gücüyle değil, ŞEBEKEDEN ÇEKİLEN güçle hesaplanır.
     #  ε ∝ P olduğu için oran doğrudan 1/ηm'dir.
     _e2 = _s["eps2"]
@@ -1453,7 +1488,7 @@ def calistir():
     _cet0 = [b for b in _s0["bolumler"] if b.get("cetvel")][0]["cetvel"]
     r.esit("B18  bölüm 1'in Nsç'si özetle aynı", _nsc_b1, [_s0["ozet"]["Nsc"]])
     r.esit("B18  cetveldeki güç aynı Nsç'den geliyor",
-           round(_cet0[0]["guc"], 3), round(_s0["ozet"]["Nsc"] * 1000 / _etam, 3))
+           round(_cet0[0]["guc"], 3), round(_s0["ozet"]["Nsc"] * 1000, 3))
     r.kontrol("B18  paftada sıfır motor gücü yazmıyor",
               _s0["ozet"]["Nsc"] > 0 and _cet0[0]["guc"] > 0)
 

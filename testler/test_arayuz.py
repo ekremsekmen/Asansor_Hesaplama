@@ -1060,8 +1060,9 @@ def calistir():
         #  Var olmayan kaidenin kiriş satırları basılmaz, alanları da gizlenir
         _n2m = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).adimlar.length")
         r.esit("MRL'de bölüm 2 yalnız 'uygulanmaz' satırını taşıyor", _n2m, 1)
-        r.kontrol("MRL'de kaide kirişi alanları gizli",
-                  pg.evaluate("MUK.kaide_alanlari.length > 0 && MUK.kaide_alanlari.every("
+        r.kontrol("MRL'de kaide kirişi ve makine dairesi alanları gizli",
+                  pg.evaluate("MUK.yerlesime_gore_gizli.mrl.length > 0 && "
+                              "MUK.yerlesime_gore_gizli.mrl.every("
                               "a => document.getElementById('m_' + a).closest('.alan')"
                               ".classList.contains('kural-disi'))"))
         #  Kutu VARSAYILAN durumunda ( MRL ) bırakılır ve SABİTLER sekmesine

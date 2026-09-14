@@ -470,8 +470,8 @@ def hesapla_tek(g: dict) -> dict:
     b1["adimlar"] += [
         veri("b", "Binada sürekli bulunan kişi (Σc)", b, "kişi", "MMO/697 Tablo-1"),
         veri("n", "Nüfus artış oranı (b<200 → 0,30 / b≥200 → 0,25)", n_artis, "—", "MMO/697"),
-        hesap("B  =  b + ( n · b )",
-              f"=  {trn(b,1)} + ( {tr(n_artis)} · {trn(b,1)} )", B, "kişi", "MMO/697", 0),
+        hesap("B  =  ROUNDUP( b + ( n · b ) )",
+              f"=  ROUNDUP( {trn(b,1)} + ( {tr(n_artis)} · {trn(b,1)} ) )", B, "kişi", "MMO/697", 0),
     ]
 
     b2 = Bolum("HESAP DEĞERLERİ", "MMO/697 Tablo-2 … Tablo-8")
@@ -1028,7 +1028,8 @@ def hesapla_coklu(g: dict) -> dict:
         veri("", "Bina / yapı yüksekliği", f"{tr(by)} / {tr(yy)}", "m", "BYKHY md.4"),
         veri("b", "Binada sürekli bulunan kişi (Σc)", b, "kişi", "MMO/697 Tablo-1"),
         veri("n", "Nüfus artış oranı", n_artis, "—", "MMO/697"),
-        hesap("B  =  b + ( n · b )", f"=  {trn(b,1)} + ( {tr(n_artis)} · {trn(b,1)} )",
+        hesap("B  =  ROUNDUP( b + ( n · b ) )",
+              f"=  ROUNDUP( {trn(b,1)} + ( {tr(n_artis)} · {trn(b,1)} ) )",
               B, "kişi", "MMO/697", 0),
         veri("k", "Taşınacak insan yüzdesi", k, "—", k_notu, 4),
     ]

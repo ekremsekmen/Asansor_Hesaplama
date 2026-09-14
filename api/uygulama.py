@@ -13,8 +13,8 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
-                       _paket_ekleri, _proje_kimligi, _sayi, _uretilemedi,
-                       belirsiz_sayi_mi)
+                       _paket_ekleri, _proje_kimligi, _sabitler_coz, _sayi,
+                       _uretilemedi, belirsiz_sayi_mi)
 from engine.uygulama import girdi as E_UGR
 from engine.uygulama import sabitler as E_US
 from engine.uygulama import tablolar_gorunum as E_UTB
@@ -73,11 +73,30 @@ def _mukavemet_girdi(veri: dict):
     burada yapılmazsa motorun doğrulaması "geçersiz seçim" der.
     """
     _BELIRSIZ.clear(); _RED.clear()
-    return _girdi_coz((veri or {}).get("girdiler"), veri)
+    girdiler = (veri or {}).get("girdiler")
+    return _girdi_coz(girdiler, veri,
+                      _uygulanmayan((girdiler or {}) if isinstance(girdiler, dict) else {}))
 
 
-def _girdi_coz(v, veri):
+def _onay(ham):
+    return ham if isinstance(ham, bool) else str(ham).lower() in ("1", "true", "evet", "on")
+
+
+def _uygulanmayan(ham):
+    """Ham girdideki makine yerleşimine göre hesaba girmeyen alanlar.
+
+    Kutu gönderilmemişse sözleşmenin varsayılanı ( makine dairesiz ) geçerlidir.
+    """
+    mk_yok = _onay(ham["mk_yok"]) if "mk_yok" in ham else E_UGR.EK_ALAN["mk_yok"][5]
+    return E_UGR.uygulanmayan_alanlar(mk_yok)
+
+
+def _girdi_coz(v, veri, atla=frozenset()):
     """Tek asansörün ham alanlarını türlerine çevirir.
+
+    ``atla``:  makine yerleşimine göre hesaba girmeyen ( ekranda gizli )
+    alanlar.  OKUNMAZLAR — içlerinde kalmış "4.000" ya da "-3" projeyi
+    durdurmaz, çünkü kullanıcı gizli alanı göremez ve düzeltemez.
 
     _BELIRSIZ / _RED KASITLI OLARAK TEMİZLENMEZ:  çoklu projede her asansör
     ayrı çağrılır ve belirsiz girdiler hepsinden TOPLANMALIDIR — temizlik
@@ -91,16 +110,21 @@ def _girdi_coz(v, veri):
     for anahtar, _et, _b2, tur2, _s2, _v2 in E_UGR.EK_ALANLAR:
         if anahtar not in v:
             continue
+        if anahtar in atla:
+            g[anahtar] = None
+            continue
         ham = v[anahtar]
         if tur2 == "onay":
-            g[anahtar] = ham if isinstance(ham, bool) else str(ham).lower() in (
-                "1", "true", "evet", "on")
+            g[anahtar] = _onay(ham)
             continue
         if belirsiz_sayi_mi(ham):
             _BELIRSIZ.append(f"{_et} = {str(ham).strip()}")
         g[anahtar] = _sayi(ham)
     for anahtar, etiket, _b, tur, secenekler, _var in E_MGR.ALANLAR:
         if tur == "hesap" or anahtar not in v:
+            continue
+        if anahtar in atla:
+            g[anahtar] = None
             continue
         ham = v[anahtar]
         if tur == "liste":
@@ -134,25 +158,8 @@ def _girdi_coz(v, veri):
             ham if str(ham).strip() != "" else None)
     #  Ofis standardı ( Sabitler sekmesi ) — elektrik ve topraklama hesapları
     #  buradan besleniyor;  avan tarafındaki ile aynı biçimde alınır.
-    #  METİN ALANLARI SAYIYA ÇEVRİLMEZ.  Hepsine _sayi() uygulanıyordu;
-    #  kablo tipine "NYY" yazınca None'a düşüyor ve sessizce varsayılan
-    #  ( NHXMH FE180 ) kullanılıyordu.  Belirsiz yazımlar ( "1.200" ) da
-    #  uyarısız varsayılana düşüyordu — artık bildiriliyor.
-    sb = (veri or {}).get("sabitler")
-    ofis = {}
-    if isinstance(sb, dict):
-        for k, ham in sb.items():
-            if k in E_US.METIN:
-                metin = str(ham).strip()
-                if metin:
-                    ofis[k] = metin
-                continue
-            if belirsiz_sayi_mi(ham):
-                _BELIRSIZ.append(f"{E_US.ETIKET.get(k, (k,))[0]} = {str(ham).strip()}")
-            d = _sayi(ham)
-            if d is not None:
-                ofis[k] = d
-    g["_ofis"] = ofis
+    g["_ofis"] = _sabitler_coz((veri or {}).get("sabitler"), E_US.METIN,
+                               lambda k: E_US.ETIKET.get(k, (k,))[0])
     return g
 
 
@@ -179,9 +186,11 @@ def _asansor_girdileri(veri):
     pg_ham = veri.get("proje_geneli")
     if not isinstance(pg_ham, dict):
         pg_ham = {k: ham[0][k] for k in PROJE_GENELI_ALANLAR if k in ham[0]}
-    ortak = {k: v for k, v in _girdi_coz(pg_ham, veri).items()
+    #  Makine yerleşimi proje genelidir:  gizli alanlar bütün asansörlerde aynı.
+    atla = _uygulanmayan(pg_ham)
+    ortak = {k: v for k, v in _girdi_coz(pg_ham, veri, atla).items()
              if k in PROJE_GENELI_ALANLAR or k == "_ofis"}
-    return [_girdi_coz(x, veri) for x in ham], ortak
+    return [_girdi_coz(x, veri, atla) for x in ham], ortak
 
 
 def _coklu_sonuc(veri):

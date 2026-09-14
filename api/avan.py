@@ -13,8 +13,8 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
-                       _paket_ekleri, _proje_kimligi, _sayi, _sozluk_listesi, _temiz,
-                       _uretilemedi, belirsiz_sayi_mi)
+                       _paket_ekleri, _proje_kimligi, _sabitler_coz, _sayi,
+                       _sozluk_listesi, _temiz, _uretilemedi, belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
@@ -44,6 +44,12 @@ AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "kapasite", "Q_elle", "V", "eta", "Hk", "kuyu_genisligi", "kabin_boyu",
                    "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
                    "S1", "L1", "S2", "L2")
+
+#  Ofis standardında METİN olan sabitler ( kablo tipi … ) — sayıya çevrilmez.
+AVAN_METIN_SABITLER = tuple(
+    k for k, v in {**E_AVAN.SABIT_B_VARSAYILAN, **E_AVAN.OFIS_VARSAYILAN}.items()
+    if isinstance(v, str))
+
 
 def _ek_nufus_oku(ham):
     """Ek nüfus satırlarını okur.  Bozuk satırlar `_BELIRSIZ` üzerinden bildirilir."""
@@ -112,8 +118,8 @@ def _avan_girdi(veri: dict):
             continue
         t = _temiz(a, AVAN_AS_SAYISAL, f"{sira} NOLU ASANSÖR: ")
         asansorler.append(t if (t.get("kapasite") or t.get("Q_elle")) else None)
-    sb_ham = v.get("sabitler")
-    sb = {k: _sayi(x) for k, x in (sb_ham if isinstance(sb_ham, dict) else {}).items()}
+    sb = _sabitler_coz(v.get("sabitler"), AVAN_METIN_SABITLER,
+                       lambda k: f"Ofis standardı · {k}")
     return {"ortak": ortak, "asansorler": asansorler, "sabitler": sb,
             "trafik": _trafik_koprusu(v.get("trafik"))}
 

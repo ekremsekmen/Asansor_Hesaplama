@@ -22,6 +22,8 @@ import main as UYGULAMA                                # noqa: E402
 #  yardımcılar api/ortak.py'ye taşındı.  Test onları oradan alır.
 from api import avan as UC_AVAN                        # noqa: E402
 from api import ortak as UC_ORTAK                      # noqa: E402
+from api import uygulama as UC_UYG                     # noqa: E402
+from engine.uygulama import girdi as UYG_GIRDI         # noqa: E402
 
 BASE = os.environ.get("AVAN_TEST_URL", "http://127.0.0.1:8760")
 
@@ -149,6 +151,66 @@ def calistir():
                 cokme += 1
                 r.kontrol(f"sabit {alan}={kotu!r} çökme", False, f"→ {e}")
     r.kontrol("bozuk ofis standardı değerleri çökmedi", cokme == 0)
+
+    # ------------------------------------------------ ofis standardı SESSİZCE varsayılana dönmez
+    #  Avan tarafı her değere _sayi() uyguluyordu:  β = "1.200" ve "abc" hata
+    #  vermeden 150'ye dönüyor, kablo tipine yazılan "NYY" NHXMH FE180 oluyordu
+    #  ( bağımsız incelemede bulundu:  1200 yazan kullanıcının topraklama
+    #  direnci 4,83 yerine 38,61 Ω olmalıydı ).
+    def _avan(sb):
+        #  β ortak alanda boş:  ofis standardındaki değer kullanılsın
+        return json.loads(UC_AVAN.api_avan({"girdiler": {"ortak": dict(O, beta=""),
+                                                         "asansorler": [A],
+                                                         "sabitler": sb}}).body)
+
+    def _uyg(sb=None, asansor=None, pg=None):
+        return json.loads(UC_UYG.api_uygulama_coklu({
+            "asansorler": [dict({"sarilma_acisi": "180"}, **(asansor or {}))],
+            "proje_geneli": pg if pg is not None else {"mk_yok": True},
+            "sabitler": sb or {}}).body)
+
+    _re_150, _re_1200 = _avan({})["ozet"]["Re"], _avan({"beta": "1200"})["ozet"]["Re"]
+    r.kontrol("avan · β = 1200 hesaba giriyor", _re_1200 > _re_150 * 5, f"→ {_re_150} · {_re_1200}")
+    for proje, kos in (("avan", _avan), ("uygulama", _uyg)):
+        for ham, beklenen in (("1.200", "Belirsiz sayı"), ("abc", "kabul edilmedi")):
+            h = kos({"beta": ham}).get("hata")
+            h = " ".join(h) if isinstance(h, list) else str(h or "")
+            r.kontrol(f"{proje} · ofis standardında β = {ham!r} sessizce varsayılana dönmüyor",
+                      beklenen in h, f"→ {h[:120]!r}")
+    r.esit("avan · metin sabiti ( kablo tipi ) metin kalıyor",
+           UC_AVAN._avan_girdi({"girdiler": {"ortak": O, "asansorler": [A],
+                                             "sabitler": {"kablo_tipi": "NYY"}}})["sabitler"]
+           .get("kablo_tipi"), "NYY")
+    r.esit("uygulama · metin sabiti ( kablo tipi ) metin kalıyor",
+           UC_UYG._asansor_girdileri({"asansorler": [{}], "proje_geneli": {},
+                                      "sabitler": {"kablo_tipi": "NYY"}})[0][0]["_ofis"]
+           .get("kablo_tipi"), "NYY")
+
+    # ------------------------------------------------ gizli alan projeyi durdurmaz
+    #  Makine yerleşimine göre ekranda gizlenen bir alanda kalmış değer projeyi
+    #  durduruyordu;  kullanıcı gizli alanı göremez, düzeltemez.  Görünen alanda
+    #  aynı değer yine reddedilmeli.
+    _DAIRELI = {"mk_yok": False, "mk_uzunluk": "4000", "mk_genislik": "3000"}
+    for ad, asansor, pg, gecerli in (
+            ("MRL · makine dairesi ölçüsü '4.000'", {}, {"mk_yok": True, "mk_uzunluk": "4.000"}, True),
+            ("MRL · makine dairesi ölçüsü '-5'", {}, {"mk_yok": True, "mk_uzunluk": "-5"}, True),
+            ("MRL · yan yatak boyu '1.400'", {"yan_yatak_boyu": "1.400"}, {"mk_yok": True}, True),
+            ("MRL · dikine kiriş 'x'", {"dikine_kiris": "x"}, {"mk_yok": True}, True),
+            ("daireli · raya binen yük '1.000'", {"raya_binen_yuk": "1.000"}, _DAIRELI, True),
+            ("daireli · raya binen yük '-3'", {"raya_binen_yuk": "-3"}, _DAIRELI, True),
+            ("daireli · makine dairesi ölçüsü '4.000' ( görünür )", {},
+             dict(_DAIRELI, mk_uzunluk="4.000"), False),
+            ("daireli · yan yatak boyu '1.400' ( görünür )", {"yan_yatak_boyu": "1.400"}, _DAIRELI, False),
+            ("MRL · raya binen yük '-3' ( görünür )", {"raya_binen_yuk": "-3",
+             "makine_raya_biniyor": "Kılavuz raylara"}, {"mk_yok": True}, False)):
+        s = _uyg(asansor=asansor, pg=pg)
+        r.kontrol(f"uygulama · {ad} → {'hesaplanır' if gecerli else 'reddedilir'}",
+                  bool(s.get("aktif")) is gecerli, f"→ {s.get('hata')}")
+    _gizli = UYG_GIRDI.arayuz_alanlari()["yerlesime_gore_gizli"]
+    r.esit("ekranın gizlediği alanlar = motorun hesaba almadığı alanlar ( MRL )",
+           set(_gizli["mrl"]), UYG_GIRDI.uygulanmayan_alanlar(True))
+    r.esit("ekranın gizlediği alanlar = motorun hesaba almadığı alanlar ( daireli )",
+           set(_gizli["daireli"]), UYG_GIRDI.uygulanmayan_alanlar(False))
 
     # ek nüfus satırları
     for ek in ([], [{}], [{"kalem": "yok", "miktar": "5"}],

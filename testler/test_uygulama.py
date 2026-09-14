@@ -738,11 +738,9 @@ def calistir():
         _c = [b for b in _bt["bolumler"] if "KURULU GÜÇ" in b["baslik"]][0]["cetvel"][0]
         r.kontrol("taşan sigorta hücresinde proje adı yok",
                   not _kalip.search(str(_c["sigorta"])), f"→ {_c['sigorta']!r}")
-        #  Cetvele MİL gücü değil, ŞEBEKEDEN ÇEKİLEN güç yazılır
-        #  ( Pşeb = Pm / ηm ) — kolon hattında akan odur.
-        _etam = US.VARSAYILAN["motor_elektrik_verimi"]
-        r.esit("taşan sigortada güç değeri bozulmadı", _c["guc"],
-               400_000 / _etam)
+        #  Kurulu güç cetveline motorun ETİKET ( mil ) gücü yazılır;
+        #  şebekeden çekilen güç kolon hattı hesabındadır ( bölüm 6 ).
+        r.esit("taşan sigortada güç değeri bozulmadı", _c["guc"], 400_000)
 
     #  Ofis standardı köprüden geçiyor mu
     y = UY.hesapla(dict(TAM, _ofis={"kuyu_armatur_lm": 1000}))

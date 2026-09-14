@@ -936,7 +936,8 @@ function sabitATablosu(){
     E_kabin:['E','Aydınlatma şiddeti — kabin','lüx','TS EN 81-20'],
     E_kuyu:['E','Aydınlatma şiddeti — kuyu','lüx','TS EN 81-20'],
     kuyu_ek_armatur:['—','Kuyu aydınlatmasına eklenen armatür','adet','Kuyu dibi + kuyu üstü'],
-    h_armatur:['h','Armatür ile çalışma düzlemi arası yükseklik','m','Bölge indeksi k hesabında'],
+    h_armatur:['h','Armatür ile çalışma düzlemi arası yükseklik — kabin · kuyu','m','Bölge indeksi k hesabında'],
+    h_makine_dairesi:['h','Armatür ile döşeme arası yükseklik — makine dairesi','m','TS EN 81-20 m.5.2.1.4.2 · m.5.2.6.3.2.1'],
     ray_dusumu:['—','Ray uzunluğu düşümü','m','I = Hk − 0,20'],
     flexbil_sabiti:['—','Flexbil uzunluğu sabiti','m','Flexbil boyu = Hk / 2 + 3']};
   let h='<tr><th>Sembol</th><th>Büyüklük</th><th style="text-align:right">Değer</th><th>Birim</th><th>Kaynak</th></tr>';

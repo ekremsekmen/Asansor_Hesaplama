@@ -27,6 +27,9 @@ değeri bir sonraki hesaba taşır.
      elle yazılan değerse o değerdir.
   4. İNDİRİLEN ÇIKTI  —  PDF ve paketin sunucuya gönderdiği girdi, ekranın
      hesapladığı girdiyle aynı sonucu verir ( çok asansörlü projede de ).
+  5. KAYDEDİLEN PROJE  —  yük değiştirilip hesap gelmeden kaydedilen proje
+     ( dosya ya da tarayıcı belleği ) açılınca yeni yükün kabin ağırlığıyla
+     hesaplanır.
 
 "Aynı" kelimenin tam anlamıyladır:  sonucun JSON'u bayt bayt karşılaştırılır
 ve ekrana basılan bölüm hükümleri de aranır.
@@ -237,6 +240,7 @@ def _uygulama_dizileri(r, pg, rnd):
         __T.yaz(e('m_mk_uzunluk'), '4000'); __T.yaz(e('m_mk_genislik'), '3000'); }""")
     _gecersizden_donus(r, pg)
     _ardisik_iki_asansor(r, pg)
+    _hemen_kaydet(r, pg)
     pg.evaluate("__T.gecikme = () => Math.floor(Math.random() * 500)")
     for n in range(DIZI_ADEDI):
         son_olay = {}                       # asansör sırası → ( 'beyan', yük ) | ( 'elle', değer )
@@ -310,7 +314,8 @@ def _gecersizden_donus(r, pg):
     ara = pg.evaluate("() => ({aktif: SON.mc.aktif, bekliyor: mGkTazelenecek(MUK_AKTIF),"
                       " kutu: document.getElementById('m_kabin_agirligi').value})")
     r.kontrol("[uygulama] istek reddedilirken yük değişince kabin ağırlığı yenilenmeyi bekliyor",
-              ara["aktif"] is False and ara["bekliyor"] and ara["kutu"] == "777", f"→ {ara}")
+              #  Kutu boştur:  eski kütle yeni yükün yanında durmaz, tablo değeri gelecek
+              ara["aktif"] is False and ara["bekliyor"] and ara["kutu"] == "", f"→ {ara}")
     pg.evaluate("() => __T.yaz(document.getElementById('m_kabin_genisligi'), '1350')")
     d = _kural(r, pg, "uygulama", "geçersizden dönüş")
     if d:
@@ -357,6 +362,51 @@ def _ardisik_iki_asansor(r, pg):
                   str(yuk) == str(q) and float(str(kabin).replace(',', '.')) == beklenen,
                   f"→ yük {yuk} · kabin {kabin!r} · beklenen {beklenen}")
     _kural(r, pg, "uygulama", "iki asansörde art arda yük değişimi")
+
+
+def _hemen_kaydet(r, pg):
+    """Yük değişir, tablo değeri gelmeden proje kaydedilir.
+
+    Kutu yeni değeri beklerken eski kütleyi taşıyordu:  o anda kaydedilen
+    dosyaya ve tarayıcı belleğine 1600 kg yükün yanına eski kabin ağırlığı
+    yazılıyor, açılınca hesap o değerle yapılıyordu ( kabin tamponu
+    116,29 kN yerine 94,71 kN — bağımsız incelemede bulundu )."""
+    q = 1600
+    beklenen = OFIS.bos_kabin_kutlesi(q)
+    pg.evaluate("""async () => { __T.yaz(document.getElementById('m_kabin_agirligi'), '777');
+        await __T.sakin(); }""")
+    kayit = pg.evaluate("""q => {
+        __T.yaz(document.getElementById('m_beyan_yuku'), String(q));
+        return {dosya: JSON.stringify(projeGovdesi('uygulama')),
+                kova: localStorage.getItem(KOVA.uygulama)};   // HEMEN — yanıt beklenmez
+    }""", q)
+    _sakin(pg)
+
+    def _denetle(etiket):
+        d = pg.evaluate("""() => ({kutu: document.getElementById('m_kabin_agirligi').value,
+            yuk: SON.mc.asansorler[MUK_AKTIF].girdi.beyan_yuku,
+            kabin: SON.mc.asansorler[MUK_AKTIF].girdi.kabin_agirligi})""")
+        r.kontrol(f"[uygulama] {etiket} · yeni yükün kabin ağırlığıyla hesaplanıyor",
+                  d["yuk"] == q and d["kabin"] == beklenen
+                  and float(str(d["kutu"]).replace(',', '.')) == beklenen,
+                  f"→ {d} · beklenen {beklenen}")
+        _kural(r, pg, "uygulama", etiket)
+
+    #  1) Dosyadan
+    pg.evaluate("d => { localStorage.clear(); projeUygula(JSON.parse(d), 'hemen.uygulama'); }",
+                kayit["dosya"])
+    _sakin(pg)
+    _denetle("hemen kaydedilen dosya açıldı")
+    #  2) Tarayıcı belleğinden ( sayfa yenilenir )
+    pg.evaluate("k => localStorage.setItem(KOVA.uygulama, k)", kayit["kova"])
+    pg.goto(BASE, wait_until="networkidle")
+    pg.wait_for_timeout(500)
+    if pg.is_visible("#giris"):
+        pg.click("#gk_uygulama")
+    pg.wait_for_timeout(2500)
+    pg.evaluate(_ALET)
+    _sakin(pg)
+    _denetle("hemen kaydedilen tarayıcı belleğiyle sayfa yenilendi")
 
 
 def _kabin_beklentisi(r, d, son_olay, tablo, etiket, olaylar):

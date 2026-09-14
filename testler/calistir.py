@@ -36,6 +36,10 @@ TESTLER = [
     #  sonucunu gösterebilir ya da eski bir değeri sonraki hesaba taşıyabilir.
     #  Her girdi değişikliğinden sonra ekran = formun taze hesabı = çıktı.
     ("13", "Canlı hesap tutarlılığı", "testler.test_canli_hesap"),
+    #  İşlem satırları:  sonuç doğru olsa bile paftadaki işlem satırı o sonucu
+    #  vermeyebilir ( eksik parantez, yazılmamış yuvarlama, eksik hane ).  Her
+    #  satır, basıldığı hanelerle yeniden hesaplanır.
+    ("14", "Pafta işlem satırları", "testler.test_islem_satirlari"),
 ]
 
 

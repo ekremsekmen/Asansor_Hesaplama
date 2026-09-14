@@ -400,10 +400,15 @@ def _motor(g, o):
         veri("dh", "Halat çapı", dh, "mm", "GİRİŞ"),
         veri("nh", "Halat sayısı", nh, "adet", "GİRİŞ"),
         veri("gh", "Halatın 1 m'deki ağırlığı", gh, "kg/m", gh_kaynak, 4),
-        hesap("lh = ( Kuyu boyu − tampon/paten yığını ) / 1000 + halat payı"
-              + ("  ( × 2 :  2:1 askı )" if r != 1 else ""),
-              f"( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
-              f"{O['halat_pay_m']}" + ("  × 2" if r != 1 else ""),
+        #  2:1 askıda PAY DA iki kat gider:  köşeli parantez yazılmazsa satır
+        #  "… + 5 × 2" okunur ve yeniden hesaplayan sonucu bulamaz.
+        hesap(("lh = [ ( Kuyu boyu − tampon/paten yığını ) / 1000 + halat payı ] × 2"
+               "  ( 2:1 askı )") if r != 1 else
+              "lh = ( Kuyu boyu − tampon/paten yığını ) / 1000 + halat payı",
+              (f"[ ( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
+               f"{trn(O['halat_pay_m'])} ] × 2") if r != 1 else
+              (f"( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
+               f"{trn(O['halat_pay_m'])}"),
               lh, "m", "halat payı ofis sabiti"),
         hesap("Gh = gh × lh × nh", f"{_trh(gh)} × {tr(lh)} × {trn(nh, 0)}",
               Gh, "kg"),
@@ -2135,8 +2140,8 @@ def _kabin_raylari(g, o):
             ad.append(hesap(
                 "σF = 1,85 × | Fx | / c²" if makarali else
                 "σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-                (f"1,85 × {tr(Fx)} / {tr(p['c'] ** 2)}" if makarali else
-                 f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
+                (f"1,85 × {tr(abs(Fx))} / {tr(p['c'] ** 2)}" if makarali else
+                 f"{tr(abs(Fx))} × {tr(p['h1_b_f'] * 6)} / "
                  f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
                 sf, "N/mm²", f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"))
             ad.append(kontrol(f"σF = {tr(sf)}  ≤  σperm = {tr(sperm)} N/mm²",
@@ -2463,9 +2468,9 @@ def _agirlik_raylari(g, o):
         kontrol(f"σc = {tr(sc)}  ≤  σperm = {tr(sperm)} N/mm²", sc <= sperm),
         metin("Flanş eğilmesi :"),
         hesap("σF = 1,85 × | Fx | / c²" if makarali else
-              "σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-              (f"1,85 × {tr(Fx)} / {tr(p['c'] ** 2)}" if makarali else
-               f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
+              "σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+              (f"1,85 × {tr(abs(Fx))} / {tr(p['c'] ** 2)}" if makarali else
+               f"{tr(abs(Fx))} × {tr(p['h1_b_f'] * 6)} / "
                f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
               sf, "N/mm²",
               f"EN 81-50 m.5.10.5  ·  {paten.lower()} paten"),
@@ -2524,9 +2529,9 @@ def _agirlik_raylari(g, o):
             kontrol(f"σ = {tr(kg['sc'])}  ≤  σperm = {tr(sg)} N/mm²",
                     kg["sc"] is not None and kg["sc"] <= sg),
             hesap("σF = 1,85 × | Fx | / c²" if makarali else
-                  "σF = Fx × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
-                  (f"1,85 × {tr(kg['Fx'])} / {tr(p['c'] ** 2)}" if makarali else
-                   f"{tr(kg['Fx'])} × {tr(p['h1_b_f'] * 6)} / "
+                  "σF = | Fx | × ( h1−b−f ) × 6 / ( c² × ( ℓ + 2 × ( h1−f ) ) )",
+                  (f"1,85 × {tr(abs(kg['Fx']))} / {tr(p['c'] ** 2)}" if makarali else
+                   f"{tr(abs(kg['Fx']))} × {tr(p['h1_b_f'] * 6)} / "
                    f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
                   kg["sF"], "N/mm²",
                   f"EN 81-50 m.5.10.5  ·  {paten.lower()} paten"),

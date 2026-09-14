@@ -706,7 +706,7 @@ function projeUygula(d, dosyaAdi){
   if(MOD !== 'uygulama'){ bolumuTemizle('tek'); bolumuTemizle('coklu'); }
   uygula(govde);
   yaz();
-  if(MOD === 'uygulama') hesapMukavemet(); else hesaplaHepsi();
+  if(MOD === 'uygulama'){ mGkBoslariIsaretle(); hesapMukavemet(); } else hesaplaHepsi();
   let m = 'Proje açıldı: ' + dosyaAdi;
   if(surum && surum !== PROJE_SURUM) m += `  ( dosya sürüm ${surum}, program sürüm ${PROJE_SURUM} )`;
   if(eksik.length) m += `  ·  dosyada bulunmayan ${eksik.length} alan VARSAYILANA döndü`;

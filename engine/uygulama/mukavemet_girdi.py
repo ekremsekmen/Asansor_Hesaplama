@@ -400,11 +400,19 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "yan_yatak_boyu", "sase_yuksekligi", "tahrik_kasnak_capi",
                    "halat_capi", "reg_kasnak_capi", "reg_halat_capi",
                    "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi")
-#  MAKİNE DAİRESİ KAİDESİNİN alanları.  Yalnız bölüm 2'ye girerler;
-#  makine dairesiz ( MRL ) projede o bölüm hesaplanmaz, bu yüzden alanlar
-#  doğrulanmaz ve ekranda gizlenir ( arayüz listeyi buradan okur ).
+#  MAKİNE YERLEŞİMİNE GÖRE HESABA GİRMEYEN ALANLAR.  Ekranda gizlenirler;
+#  gizli bir alandaki değer projeyi DURDURMAMALI ( bkz. uygulanmayan ).
+#    · Makine dairesi kaidesi yalnız bölüm 2'ye girer — MRL'de o bölüm yoktur.
+#    · Makine yükünün yolu yalnız MRL'de sorulur — makine daireli tesiste
+#      makine kendi kaidesindedir, yükü raya binmez.
 KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "dikine_kiris_tipi",
                   "yan_yatak", "yan_yatak_tipi", "yan_yatak_boyu")
+RAYA_BINEN_ALANLARI = ("makine_raya_biniyor", "raya_binen_yuk")
+
+
+def uygulanmayan(g):
+    """Bu makine yerleşiminde hesaba girmeyen mukavemet alanları."""
+    return set(KAIDE_ALANLARI) if evet_mi(g.get("mk_yok")) else set(RAYA_BINEN_ALANLARI)
 
 #  AÇI alanları:  0 < açı < 180.  360° girildiğinde sin(180°) = 0 çıkıyor ve
 #  hesap OverflowError ile çöküyordu.
@@ -591,8 +599,7 @@ def arayuz_alanlari():
             #  hiçbir şeyin değişmemesi sessiz bir tuzaktı.
             "malzeme_derinligi": {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI},
             "durak_azami": DURAK_AZAMI,
-            "hesaplanan": list(HESAPLANAN),
-            "kaide_alanlari": list(KAIDE_ALANLARI)}
+            "hesaplanan": list(HESAPLANAN)}
 
 
 def varsayilanlar():
@@ -670,9 +677,8 @@ def _sayi(v):
 def dogrula(g):
     """Girdi sözlüğünü denetler; hata metinleri listesi döner ( boşsa temiz )."""
     hata = []
-    #  MRL'de kaide yoktur:  hesaba girmeyen, ekranda da görünmeyen bir alan
-    #  projeyi durdurmamalı.
-    atla = set(KAIDE_ALANLARI) if evet_mi(g.get("mk_yok")) else set()
+    #  Hesaba girmeyen, ekranda da görünmeyen bir alan projeyi durdurmamalı.
+    atla = uygulanmayan(g)
     for anahtar, etiket, birim, tur, secenekler, _v in ALANLAR:
         if tur == "hesap" or anahtar in atla:
             continue

@@ -376,8 +376,11 @@ def kabin_azami_alan(Q):
 
 # --------------- Kablo akım taşıma kapasitesi
 # IEC 60364-5-52 Tablo B.52.4 — bakır, PVC, 3 yüklü iletken, Yöntem C
-KABLO_IZ = {1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 101,
-            35: 125, 50: 151, 70: 192, 95: 232, 120: 269}
+#  25 mm² ve üstü eskiden 101 · 125 · 151 · 192 · 232 · 269 A yazıyordu:
+#  başlıktaki tablonun değerleri değildi ve kablonun taşıyabileceğinden
+#  %4-5 FAZLAYDI — kesit kontrolünde emniyetsiz taraf.
+KABLO_IZ = {1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 96,
+            35: 119, 50: 144, 70: 184, 95: 223, 120: 259}
 
 
 def kablo_iz(kesit):

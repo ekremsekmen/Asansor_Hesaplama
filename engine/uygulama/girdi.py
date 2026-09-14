@@ -27,6 +27,7 @@ Not:  ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β �
 zaten "Sabitler / Ofis Standardı" sekmesinden gelir;  o da ikinci kez
 sorulmaz.
 """
+from engine.ortak.steps import evet_mi
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_girdi as MG
@@ -146,6 +147,9 @@ def arayuz_alanlari():
                                "alanlar": [f for f in _yer if f]})
     veri["bolum_grubu"].update({no: list(gr)
                                 for no, gr in EK_BOLUM_GRUBU.items()})
+    #  Arayüz gizleyeceği alanları buradan okur — motorun atladığıyla aynı liste.
+    veri["yerlesime_gore_gizli"] = {"mrl": sorted(uygulanmayan_alanlar(True)),
+                                    "daireli": sorted(uygulanmayan_alanlar(False))}
     return veri
 
 
@@ -163,13 +167,27 @@ def tamamla(g):
     return g
 
 
+def uygulanmayan_alanlar(mk_yok):
+    """Makine yerleşimine göre HESABA GİRMEYEN alanlar  —  ekranda gizlenirler.
+
+    Gizli bir alanda kalmış değer ( makine dairesizde "4.000" yazılı makine
+    dairesi ölçüsü, makine dairelide "-3" yazılı raya binen yük ) projeyi
+    durduruyordu:  kullanıcı hatayı göremiyor, düzeltemiyordu.  API bu
+    alanları okumaz, motor da doğrulamaz.
+    """
+    mrl = evet_mi(mk_yok)
+    alanlar = MG.uygulanmayan({"mk_yok": mrl})
+    return alanlar | {"mk_uzunluk", "mk_genislik"} if mrl else alanlar
+
+
 def dogrula(g):
     """Mukavemet doğrulaması + elektrik girdilerinin denetimi."""
     hata = list(MG.dogrula(g))
+    atla = uygulanmayan_alanlar(g.get("mk_yok"))
     for a, et, birim, tur, _s, _v in EK_ALANLAR:
         d = g.get(a)
         ad = f"{et} ({birim})" if birim not in ("—", "") else et
-        if tur == "onay":
+        if tur == "onay" or a in atla:
             continue
         if d is None or d == "":
             continue                       # boş bırakılabilir — hesap uyarır
@@ -177,7 +195,7 @@ def dogrula(g):
             hata.append(f"{ad}: negatif olmayan bir sayı olmalı ( {d!r} girildi ).")
     #  Makine dairesi işaretli DEĞİLSE ölçüsü istenir;  yoksa aydınlatma
     #  hesabı sessizce yapılamaz hâle gelirdi.
-    if not g.get("mk_yok"):
+    if not evet_mi(g.get("mk_yok")):
         for a in ("mk_uzunluk", "mk_genislik"):
             if not (isinstance(g.get(a), (int, float)) and g[a] > 0):
                 hata.append(f"{EK_ALAN[a][1]}: makine dairesi varsa ölçüsü girilmelidir "

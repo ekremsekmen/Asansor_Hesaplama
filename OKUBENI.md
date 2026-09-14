@@ -47,7 +47,7 @@ hücre hücre karşılaştırılarak doğrulandı ve standardın gerektirdiği y
 TS EN 81-20 / TS EN 81-50'ye göre düzeltildi. **Bugün hesabın tek kaynağı
 programın kendisidir** — program Excel üretmez ve okumaz.
 
-**Sürüm 3.2** — ELEport örnek projesiyle yapılan kıyasta bulunan iki düzeltme.
+**Sürüm 3.2** — ELEport örnek projesiyle yapılan kıyasta ve bağımsız incelemelerde bulunan düzeltmeler.
 
 | | Önce | Sonra |
 |---|---|---|
@@ -57,7 +57,14 @@ programın kendisidir** — program Excel üretmez ve okumaz.
 | **Hızlı yük değişiminde kabin ağırlığı** | 1000 kg'ın hesabı yoldayken yük 1600 kg yapılınca eski yanıt 950 kg'ı kutuya yazıyor, 1600 kg'lık hesap 950 ile gidiyordu ( 1350 olmalı ) | Tablodan yenileme her değişikliğe numara verir;  yanıt yalnız kendi değişikliği hâlâ en sonuncusuysa yazar |
 | **İki asansörde art arda yük değişimi** | Yenilenecek asansör tek bir işaretle tutuluyordu;  ikinci asansörün değişikliği birincinin işaretini siliyor, o asansörün kabin ağırlığı eski değerde kalıyordu | İşaret her asansörde ayrı;  hesap reddedilirse işaret açık kalır ve girdi düzelince tablo gelir |
 | **Çok asansörlü projede ortak topraklama iletkenleri** | Binaya ait bölümler ilk asansörün kendi hesabından alınıyordu;  iletkenler yalnız o asansörün koruma iletkenini görüyordu.  Kolon kesiti 16 ve 95 mm² olan iki asansörde sıraya göre topraklama iletkeni 16 ya da 50, ana potansiyel dengeleme 10 ya da 25 mm² çıkıyordu | Makine dairesi aydınlatması ve temel topraklama bütün asansörler hesaplandıktan sonra, **tesisteki en büyük koruma iletkeniyle** bir kez hesaplanır ( avan projesiyle aynı kural );  asansörlerin sırası sonucu değiştirmez |
+| **Yük değiştirilip hemen kaydedilen proje** | Kabin ağırlığı kutusu tablo değeri gelene kadar eski kütleyi taşıyordu;  o arada kaydedilen dosyaya ( ve tarayıcı belleğine ) 1600 kg yükün yanına 800 kg kabin yazılıyor, açılınca hesap o değerle yapılıyordu ( kabin tamponu 116,29 yerine 94,71 kN ) | Yük değişince kutu hemen boşalır ( boş = tablodan gelecek );  boş kutuyla açılan proje tablo değerini ister |
+| **Ofis standardında belirsiz ya da okunamayan sayı ( avan )** | "1.200" ve "abc" hata vermeden varsayılana dönüyordu:  β = 1.200 yazan kullanıcının topraklama direnci 150 Ω·m ile hesaplanıyordu;  kablo tipine yazılan "NYY" NHXMH FE180 oluyordu | İki proje ofis standardını aynı kuralla okur:  belirsiz ya da okunamayan sayı hesabı durdurur ve sebebini yazar, metin alanı metin kalır |
+| **Gizli alan projeyi durduruyordu ( uygulama )** | Makine dairesizde gizli makine dairesi ölçüsü ya da kaide alanı, makine dairelide gizli "raya binen yük" içinde kalmış "4.000" · "-3" gibi bir değer bütün projeyi reddettiriyordu — kullanıcı alanı göremiyor, düzeltemiyordu | Makine yerleşimine göre hesaba girmeyen alanlar tek listede ( `engine/uygulama/girdi.uygulanmayan_alanlar` );  ekran onları gizler, API okumaz, motor doğrulamaz |
+| **Kurulu güç şebekeden çekilen güçle yazılıyordu** | Kolon hattı akımı doğru çıksın diye cetvele motorun şebekeden çektiği güç ( Nsç / ηm ) yazılıyor, asansörün kurulu gücü de ~%18 büyük bildiriliyordu ( 11 kW motor → 12,94 kW ) | Kurulu güç tanımına döndü:  cetvelde motorun **etiket gücü** ( Elektrik İç Tesisleri Proje Hazırlama Yönetmeliği m.5-19 · TS EN 60034-1 m.5.5.3 ).  Kolon hattı akımı ve gerilim düşümü bölüm 6'daki ayrı satırla ( P1 = Pşeb + aydınlatma + priz ) hesaplanmaya devam eder — **kesit, sigorta ve gerilim düşümü değişmez** |
 | **Kabin ağırlığının kaynağı** | Tablodan gelen değer ilk hesapta "OFİS TABLOSU", sonraki hesaplarda ve indirilen paftada "GİRİŞ" yazıyordu | Kaynak değerden okunur:  değer o beyan yükünün tablo değeriyse kaynak tablodur |
+| **Kablo akım taşıma kapasitesi ( Iz )** | Tablo IEC 60364-5-52 B.52.4 Yöntem C diyordu ama 25 mm² ve üstü o tablonun değerleri değildi ( 101 · 125 · 151 · 192 · 232 · 269 A ) — %4-5 fazla.  Örneğin 48 kW motor + 25 mm² kolon hattı ( I = 97,4 A ) "uygundur" çıkıyordu | B.52.4 Yöntem C:  **96 · 119 · 144 · 184 · 223 · 259 A**.  16 mm² ve altı zaten doğruydu |
+| **Makine dairesi aydınlatması** | Bölge indeksinde h = 1,0 m alınıyordu — kabinin ölçüm düzlemi ( döşemeden 1 m yukarıda ).  Makine dairesinde 200 lüks **döşeme seviyesinde** istenir;  k iki kat, armatür %20-30 az çıkıyordu ( 4 × 3 m daire:  4 yerine 5 armatür gerekir ) | h = **2,10 m** ( armatür–döşeme;  TS EN 81-20 m.5.2.1.4.2 · m.5.2.6.3.2.1 asgari net yükseklik ).  Kabin ve kuyu aynı kalır |
+| **Paftadaki işlem satırları** | Sonuç doğru, işlem satırı yanlış yazılmış altı bağıntı:  2:1 askıda halat boyunda köşeli parantez yoktu ( "… / 1000 + 5 × 2" ), \| Fx \| bağıntısına işaretli Fx yazılıyordu, bina nüfusu B ve kuvvetler ( P1 · P2 · PR · PK · Fs ) yuvarlanıyor ama satır bunu söylemiyordu, "Sapd = 0,5 · 4 = 6" asgariyi göstermiyordu, ε satırında κ = 44,4 "44" basılıyordu | Her satır yazılı sayılarıyla yeniden hesaplanınca basılan sonucu verir;  yuvarlama ve asgari adımları satırda yazılıdır |
 
 **Canlı hesap artık kalıcı olarak denetleniyor ( TEST 13 ).**  Tarayıcıda iki proje
 modunun her girdisi tek tek değiştirilir ve tohumlu rastgele değişiklik dizileri
@@ -66,6 +73,13 @@ sunucudaki taze hesabı = indirilen çıktının girdisi** olmalıdır.  Yukarı
 ekran hatası bu testle bulundu;  her biri geri alındığında test onu yakalıyor.
 Sıra hatası ise TEST 11'de her sıralama denenerek sabitlendi;  aynı tarama avan
 ve trafik motorlarında da yapıldı, orada sıraya bağlı bir hesap farkı yok.
+
+**Paftadaki işlem satırları da artık kalıcı olarak denetleniyor ( TEST 14 ).**  Bütün
+senaryolarda her hesap satırının işlemi, basıldığı hanelerin yuvarlama belirsizliği
+hesaba katılarak ( aralık aritmetiği ) yeniden hesaplanır;  basılan sonuç o sayılarla
+bulunamıyorsa test durur.  Yukarıdaki düzeltmelerden biri geri alındığında test onu
+yakalıyor;  tek istisna 10 N yuvarlamasıdır — fark çoğu satırda yazılı sayıların
+kendi yuvarlama payı içinde kalır, yalnız aştığı senaryoda görünür.
 
 **Sürüm 3.1** — **Excel tamamen kaldırıldı.  Her şey programdan yapılır.**
 
@@ -440,13 +454,13 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-( 2026-09-14 ) **40.369 kontrolün tamamı geçmiştir.**
+( 2026-09-14 ) **40.420 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Avan referans taraması** | 123 senaryo ( 87 tek · 12 grup · 24 avan ) × bütün sonuç değerleri, dondurulmuş referansa karşı | **5.599 / 5.599** |
-| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **841 / 841** |
-| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) | **120 / 120** |
+| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile, kurulu gücün etiket gücüyle hesaplandığı**, **boş kabin kütlesi tablosu**, **Iz tablosunun B.52.4 Yöntem C değerleri**, **makine dairesi aydınlatmasında döşeme düzlemi** | **849 / 849** |
+| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) + **ofis standardında belirsiz / okunamayan sayının sessizce varsayılana dönmediği** + **gizli alanın projeyi durdurmadığı** | **138 / 138** |
 | **4 · Çıktı bütünlüğü** | PDF açılabilirliği ve içeriği, uygulama paftası, paketlerin içeriği ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **282 / 282** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **471 / 471** |
 | **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan ve **hesap sonucu** aynı | **848 / 848** |
@@ -456,7 +470,8 @@ Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
 | **10 · Mukavemet referans taraması** | 155 senaryo ( girdi uzayı taraması · proje senaryoları · kanal / tahrik birleşimleri · geçersiz girdiler ) × **168 ara değer + bölüm hükümleri**, dondurulmuş referansa karşı | **28.744 / 28.744** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **denetimlerde bulunan hataların her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **asansörlerin sırasının sonucu değiştirmediği**, **hesap → PDF → DXF zinciri** | **402 / 402** |
 | **12 · Dış referans paftaları** | ELEport ve "new block" paftalarının yayımlanmış sayıları | **37 / 37** |
-| **13 · Canlı hesap tutarlılığı** | tarayıcıda avan ve uygulama formunun **her girdisi** değiştirilir + tohumlu rastgele hızlı değişiklik dizileri **yapay ağ gecikmesiyle**;  her seferinde ekrandaki sonuç = formun taze hesabı = indirilen çıktının girdisi, kabin ağırlığı son olayı izler | **809 / 809** |
+| **13 · Canlı hesap tutarlılığı** | tarayıcıda avan ve uygulama formunun **her girdisi** değiştirilir + tohumlu rastgele hızlı değişiklik dizileri **yapay ağ gecikmesiyle**;  her seferinde ekrandaki sonuç = formun taze hesabı = indirilen çıktının girdisi, kabin ağırlığı son olayı izler | **815 / 815** |
+| **14 · Pafta işlem satırları** | bütün senaryolarda ( ~34.000 hesap satırı ) işlem metni, basıldığı hanelerin yuvarlama payıyla **yeniden hesaplanır** ve basılan sonucu vermesi aranır;  bilinen bağıntıların gerçekten denetlendiği ayrıca doğrulanır | **19 / 19** |
 
 ### Referans taraması neden güçlü bir kanıt?
 
@@ -1240,9 +1255,13 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   basılır. Avan projesindeki MMO/697 hesabı farklı bir formüldür ( halat
   ağırlığını almaz, palanga verim düşüşü uygular ) ve küçük bir fark verir —
   aynı asansörün iki projesinde iki değer görülmesi normaldir. Kurulu güç
-  cetveli her iki tarafta da **seçilen** motor gücünü ( Nsç ) kullanır — ama
-  cetvele yazılan sayı **şebekeden çekilen** güçtür ( Pşeb = Nsç / ηm );
-  hatta akan odur ve kesitler ondan seçilir.
+  cetveli her iki tarafta da **seçilen** motor gücünü ( Nsç ) kullanır ve
+  cetvele **etiket gücünü** yazar:  kurulu güç tanım gereği tüketicilerin anma
+  ( etiket ) güçlerinin toplamıdır ( Elektrik İç Tesisleri Proje Hazırlama
+  Yönetmeliği m.5-19 ) ve motorun anma gücü mil gücüdür ( TS EN 60034-1
+  m.5.5.3 ).  Kolon hattının akımı ve gerilim düşümü ise motorun **şebekeden
+  çektiği** güçle hesaplanır ( Pşeb = Nsç / ηm );  bölüm 6'da ayrı satırdır
+  ( P1 = Pşeb + aydınlatma + priz ) ve kesitler ondan seçilir.
 - **Çift sarımda sarılma açısı α tek sarım bağıntısıyla hesaplanır**
   ( α = 180° − arctan(A/B), yani **α ≤ 180°** ). Gerçekte halat kasnağı iki kez
   dolanır ve α bunun yaklaşık iki katıdır. Hesap bu yüzden tahrik yeteneğini

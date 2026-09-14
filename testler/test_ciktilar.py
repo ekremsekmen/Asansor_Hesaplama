@@ -166,7 +166,7 @@ def calistir():
             r.kontrol(f"{_ad} paftasında renk yok ( siyah beyaz / AutoCAD )",
                       not _renk, f"→ {sorted(_renk)[:4]}")
             #  Küçültme İÇERİK KAYBETMEZ — hesabın gövdesi yerinde olmalı
-            for _im in (("BİNADA BULUNAN İNSAN SAYISININ TESPİTİ", "B = b + ( n · b )")
+            for _im in (("BİNADA BULUNAN İNSAN SAYISININ TESPİTİ", "B = ROUNDUP( b + ( n · b ) )")
                         if _ad == "tek" else ("ORTAK BİNA BİLGİLERİ", "GRUP KONTROLÜ")):
                 r.kontrol(f"{_ad} paftasında bölüm duruyor: {_im[:28]}", _im in tum)
         #  Avan paftası çok sayfalıdır ve imza kutusu ORADA durur

@@ -114,6 +114,7 @@ async function mukavemetKur(){
   mIkiliTazele();
   mKanalUyumu();
   mAsansorSekmeleriTazele();
+  mGkBoslariIsaretle();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
   //  sorun yok, orada form açılışta kuruluyor ).
@@ -427,6 +428,18 @@ let MUK_GK_TAZELE = {};
 let MUK_GK_SURUM = 0;
 const mGkTazelenecek = i => MUK_GK_TAZELE[i] !== undefined;
 
+/*  BOŞ KABİN AĞIRLIĞI TABLOYU İZLER.  Proje açılınca ya da sayfa yenilenince
+    kutusu boş gelen asansörler tablodan yenilenmeyi bekler — boşluk, tablo
+    değeri gelmeden kaydedilmiş bir projenin izidir ( bkz. mukavemetPlanla ). */
+function mGkBoslariIsaretle(){
+  MUK_ASANSORLER.forEach((a, i) => {
+    const gk = $('m_kabin_agirligi');
+    const deger = (i === MUK_AKTIF && gk) ? gk.value : (a || {}).kabin_agirligi;
+    if(String(deger ?? '').trim() === '' && !mGkTazelenecek(i))
+      MUK_GK_TAZELE[i] = ++MUK_GK_SURUM;
+  });
+}
+
 /* ==========================================================================
    FORM ALANLARININ TEK GEZİNTİSİ
 
@@ -533,20 +546,27 @@ function mMakineDairesiKutulari(){
     const kap = e && (e.closest('.alan') || e);
     if(kap) kap.classList.toggle('kural-disi', !!nezaman);
   };
-  //  Ölçüler MRL'de gizlenir — makine dairesi yoksa hesap da yok.
-  //  Kaide kirişleri de öyle:  bölüm 2 MRL'de hesaplanmaz ve motor bu
-  //  alanları doğrulamaz ( liste motordan gelir ).
-  for(const a of ['mk_uzunluk', 'mk_genislik', ...((MUK && MUK.kaide_alanlari) || [])])
-    gizle(a, k.checked);
-  //  MAKİNE YÜKÜNÜN YOLU İSE TERSİ:  yalnız MRL'de sorulur.  Makine dairesi
-  //  varsa makine kendi kaidesinde durur ( bölüm 2 ) ve yükü raya bindirmek
-  //  onu İKİ KEZ saymak olur.  Motor bu seçimi zaten makine daireli projede
-  //  yok sayar;  kutuyu gizlemek kullanıcıyı yanıltmamak içindir.
-  for(const a of ['makine_raya_biniyor', 'raya_binen_yuk']) gizle(a, !k.checked);
+  //  LİSTE MOTORDAN GELİR ( engine/uygulama/girdi.uygulanmayan_alanlar ):
+  //  ekranın gizlediği alanla motorun hesaba almadığı alan aynı olmalı.
+  //    MRL      → makine dairesi ölçüleri ve kaide kirişleri ( bölüm 2 yok )
+  //    daireli  → makine yükünün yolu ( makine kendi kaidesinde durur;  yükü
+  //               raya bindirmek onu İKİ KEZ saymak olur )
+  const gizli = (MUK && MUK.yerlesime_gore_gizli) || {mrl: [], daireli: []};
+  for(const a of gizli.mrl) gizle(a, k.checked);
+  for(const a of gizli.daireli) gizle(a, !k.checked);
 }
 
 function mukavemetPlanla(hedef){
-  if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE[MUK_AKTIF] = ++MUK_GK_SURUM;
+  //  YÜK DEĞİŞİNCE ESKİ KÜTLE HEMEN SİLİNİR.  Kutu tablo değeri gelene kadar
+  //  eski kütleyi taşıyordu:  o arada proje kaydedilirse ( ya da sayfa
+  //  yenilenirse ) dosyaya 1600 kg yükün yanına 800 kg kabin yazılıyor, açılınca
+  //  hesap o değerle yapılıyordu.  Boş kutu "tablodan gelecek" demektir;
+  //  dosya da, tarayıcı belleği de, istek de aynı şeyi taşır.
+  if(hedef && hedef.id === 'm_beyan_yuku'){
+    MUK_GK_TAZELE[MUK_AKTIF] = ++MUK_GK_SURUM;
+    const gk = $('m_kabin_agirligi');
+    if(gk) gk.value = '';
+  }
   //  KULLANICININ YAZDIĞI KABİN AĞIRLIĞI KAZANIR.  Beyan yükü seçilip hemen
   //  ardından kabin ağırlığı yazılınca bayrak hâlâ açıktı:  istek alanı boş
   //  gönderiyor, dönen tablo değeri de yazılan sayının ÜSTÜNE basılıyordu

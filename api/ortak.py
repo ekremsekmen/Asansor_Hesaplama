@@ -106,6 +106,41 @@ def _temiz(d: dict, sayisal: tuple, on_ek: str = "") -> dict:
     return out
 
 
+def _sabitler_coz(ham, metin=(), etiket=None):
+    """Ofis standardı ( Sabitler sekmesi )  —  ham metinler → motorun sözlüğü.
+
+    İKİ PROJE AYNI KURALLA OKUR.  Avan tarafı her değere _sayi() uyguluyordu:
+    "1.200" ( belirsiz ) ve "abc" ( sayı değil ) sessizce None'a düşüyor,
+    motor da varsayılanı kullanıyordu — β = 1.200 yazan kullanıcının
+    topraklama direnci 150 Ω·m ile hesaplanıyordu.  Kablo tipine yazılan
+    "NYY" de aynı yoldan NHXMH FE180'e dönüyordu.
+
+        metin alanı       →  metin kalır
+        boş               →  yazılmaz ( varsayılan )
+        belirsiz yazım    →  _BELIRSIZ ( hesap durur, sebebi söylenir )
+        okunamayan yazım  →  _RED      ( hesap durur, sebebi söylenir )
+    """
+    etiket = etiket or (lambda k: k)
+    out = {}
+    for k, x in (ham if isinstance(ham, dict) else {}).items():
+        if k in metin:
+            m = "" if x is None else str(x).strip()
+            if m:
+                out[k] = m
+            continue
+        if x is None or (isinstance(x, str) and not x.strip()):
+            continue
+        if belirsiz_sayi_mi(x):
+            _BELIRSIZ.append(f"{etiket(k)} = {str(x).strip()}")
+            continue
+        d = _sayi(x)
+        if d is None:
+            _RED.append(f"{etiket(k)} = {str(x).strip()}  ( sayı değil )")
+            continue
+        out[k] = d
+    return out
+
+
 def _belirsiz_hata():
     """Reddedilen girdi varsa açık hata metni, yoksa None."""
     if _BELIRSIZ:

@@ -28,7 +28,14 @@ SABIT_A = {
     "E_kabin": 100,                # lüx     TS EN 81-20
     "E_kuyu": 50,                  # lüx     TS EN 81-20
     "kuyu_ek_armatur": 2,          # Kuyu dibi + kuyu üstü
-    "h_armatur": 1.0,              # Armatür–çalışma düzlemi arası yükseklik, m
+    "h_armatur": 1.0,              # Armatür–çalışma düzlemi arası yükseklik, m  ( kabin · kuyu )
+    #  MAKİNE DAİRESİNDE ÇALIŞMA DÜZLEMİ DÖŞEMEDİR:  TS EN 81-20 m.5.2.1.4.2
+    #  200 lüksü "döşeme seviyesinde" ister, armatür tavandadır ve net
+    #  yükseklik en az 2,10 m'dir ( m.5.2.6.3.2.1 ).  Kabindeki 1,0 m'lik
+    #  düzlem ( m.5.4.10.1:  döşemeden 1 m yukarıda 100 lüks ) buraya da
+    #  uygulanıyordu:  k iki katına çıkıyor, η büyüyor, armatür sayısı
+    #  %20-30 AZ çıkıyordu.
+    "h_makine_dairesi": 2.10,      # Armatür–döşeme arası yükseklik, m
     "ray_dusumu": 0.20,            # I = Hk − 0,20, m
     "flexbil_sabiti": 3.0,         # Flexbil boyu = Hk/2 + 3, m
 }
@@ -293,14 +300,16 @@ def _zorunlu_hatasi(no, d):
 #      k = a·b / ( h·( a + b ) )      bölge indeksi
 #      T = E·a·b·d / η                gerekli toplam ışık akısı   ( η: TABLOLAR T2 )
 #      Z = T / ØL                     hesaplanan armatür sayısı
-def _aydinlatma(a_m, b_m, E, OL, S):
+def _aydinlatma(a_m, b_m, E, OL, S, hh=None):
     """
     a_m, b_m : METRE cinsinden ölçüler        E : asgari aydınlatma şiddeti, lüks
-    OL       : bir armatürün ışık akısı, lm
+    OL       : bir armatürün ışık akısı, lm   hh : armatür–çalışma düzlemi, m
+                                                   ( verilmezse h_armatur )
 
     Dönen:  (k, eta, T, Z)  —  η okunamazsa T ve Z None döner.
     """
-    hh = S["h_armatur"]
+    if hh is None:
+        hh = S["h_armatur"]
     k = a_m * b_m / (hh * (a_m + b_m))
     eta = T.ayd_verim(k, S["ayd_sutun"])
     isik = E * a_m * b_m * S["kirlenme_faktoru"] / eta if eta else None
@@ -587,6 +596,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     Lr = Hk - S["ray_dusumu"]                              # kılavuz ray uzunluğu
     Mg = Lr * gr                                           # bir ray hattının kütlesi
 
+    #  Kuvvetler 10 N'un üst katına yuvarlanır.  Satırın işlemi yuvarlanmamış
+    #  sonucu verir;  aradaki farkın nereden geldiği kaynak kolonunda yazılı
+    #  olmazsa paftayı yeniden hesaplayan okur sonucu bulamaz.
+    _ON_N = "10 N'a yukarı yuvarlanır"
     P1 = tavana_yuvarla(S["tampon_katsayi"] * gn * (P_kut + Q), 10)
     P2 = tavana_yuvarla(S["tampon_katsayi"] * gn * Ga, 10)
     PR = tavana_yuvarla(k1 * gn * (P_kut + Q) / n_ray + Mg * gn, 10)
@@ -618,26 +631,26 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
 
         metin("A -  KUYU ALT BOŞLUĞU TABANINA GELEN KUVVET  ( kabin tamponu altı )"),
         hesap("P1  =   4 · gn · ( P  +  Q )",
-              f"=   4  ·  {tr(gn)}  ·  ( {tr(P_kut)}  +  {trn(Q,0)} )", P1, "N", "", 0),
+              f"=   4  ·  {tr(gn)}  ·  ( {tr(P_kut)}  +  {trn(Q,0)} )", P1, "N", _ON_N, 0),
 
         metin("B -  KARŞI AĞIRLIK TAMPONU ALTINDAKİ ZEMİNE GELEN KUVVET"),
         hesap("P2  =   4 · gn · ( P  +  q · Q )   =   4 · gn · Ga",
-              f"=   4  ·  {tr(gn)}  ·  {tr(Ga)}", P2, "N", "", 0),
+              f"=   4  ·  {tr(gn)}  ·  {tr(Ga)}", P2, "N", _ON_N, 0),
 
         metin("C -  KABİN KILAVUZ RAYLARINA GELEN DÜŞEY KUVVET"),
         hesap("PR  =   k1 · gn · ( P  +  Q ) / n   +   Mg · gn",
               f"=   {trn(k1,0)} · {tr(gn)} · ( {tr(P_kut)} + {trn(Q,0)} ) / {trn(n_ray,0)}"
-              f"   +   {tr(Mg)} · {tr(gn)}", PR, "N", "", 0),
+              f"   +   {tr(Mg)} · {tr(gn)}", PR, "N", _ON_N, 0),
 
         metin("D -  KARŞI AĞIRLIK KILAVUZ RAYLARINA GELEN DÜŞEY KUVVET"),
         hesap("PK  =   k1 · gn · Ga / n   +   Mg · gn",
               f"=   {trn(k1,0)} · {tr(gn)} · {tr(Ga)} / {trn(n_ray,0)}   +   {tr(Mg)} · {tr(gn)}",
-              PK, "N", "", 0),
+              PK, "N", _ON_N, 0),
 
         metin("E -  KUYU ÜSTÜ BETONUNA ETKİ EDEN KUVVET"),
         hesap("Fs  =   gn · ( Fmk  +  Fsh  +  Fmt  +  P  +  Q  +  Ga )",
               f"=   {tr(gn)} · ( {trn(Fmk,0)} + {trn(Fsh,0)} + {trn(S['Fmt'],0)} + "
-              f"{tr(P_kut)} + {trn(Q,0)} + {tr(Ga)} )", Fs, "N", "", 0),
+              f"{tr(P_kut)} + {trn(Q,0)} + {tr(Ga)} )", Fs, "N", _ON_N, 0),
     ]
     b2["aciklamalar"] = [
         "PR ve PK, MMO/697 §2.3.3 formülündeki  Mg · gn  ray kütlesi terimini içerir "
@@ -749,21 +762,30 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # =========================================================
     # 5 -  KURULU GÜÇ CETVELİ                        ( TAS )
     # =========================================================
-    #  MOTORUN CETVELDEKİ GÜCÜ ŞEBEKEDEN ÇEKİLEN GÜÇTÜR.
-    #  Nsç motorun MİL ( anma ) gücüdür;  şebekeden çekilen güç Pşeb = Nsç/ηm'dir
-    #  ve kolon hattında akan da odur.  Program cetvele mil gücünü yazıyor,
-    #  I ve ε1'i ondan hesaplıyordu — kolon hattı akımı %18 DÜŞÜK çıkıyor,
-    #  kesit ve sigorta OLDUĞUNDAN KÜÇÜK seçilebiliyordu.
-    #  Makine besleme hattı için düzeltme daha önce yapılmıştı;  kolon hattında
-    #  açık kalmıştı.
+    #  İKİ AYRI GÜÇ VARDIR VE KARIŞTIRILMAMALIDIR.
+    #
+    #  KURULU GÜÇ — cetvel.  Tanım gereği tüketicilerin ANMA ( ETİKET )
+    #  güçlerinin toplamıdır ( Elektrik İç Tesisleri Proje Hazırlama
+    #  Yönetmeliği m.5-19 ).  Motorun anma gücü MİL gücüdür ( TS EN 60034-1
+    #  m.5.5.3 ):  11 kW'lık motor cetvele 11 kW yazılır.
+    #
+    #  HATTAN ÇEKİLEN GÜÇ — bölüm 6.  Motor şebekeden mil gücünden fazlasını
+    #  çeker:  Pşeb = Nsç / ηm.  Kolon hattının akımı ve gerilim düşümü bu
+    #  güçle hesaplanır;  mil gücüyle hesaplanınca akım %18 düşük çıkıyor,
+    #  kesit olduğundan küçük seçilebiliyordu.
+    #
+    #  Bir süre ikisi tek sayıydı:  akım doğru çıksın diye cetvele Pşeb
+    #  yazılıyor, asansörün kurulu gücü de %18 büyük bildiriliyordu.
     _eta_m = S["motor_elektrik_verimi"]
     _eta_m_gecerli = sayi_mi(_eta_m) and 0 < _eta_m <= 1
-    g_motor_mil = Nsc * 1000                        # anma ( mil ) gücü
-    g_motor = (g_motor_mil / _eta_m) if _eta_m_gecerli else g_motor_mil
+    g_motor = Nsc * 1000                            # anma ( etiket · mil ) gücü
+    g_motor_seb = (g_motor / _eta_m) if _eta_m_gecerli else g_motor
     g_kuyu = n_kuyu * S["kuyu_armatur_W"]
     g_kabin = (n_kabin + S["kabin_ustu_armatur"]) * S["kabin_armatur_W"]
     g_priz = S["priz_adedi"] * S["priz_gucu"]
     P_kurulu = g_motor + g_kuyu + g_kabin + g_priz
+    #  Kolon hattı motoru, aydınlatmayı ve prizi birlikte besler.
+    P_hat = g_motor_seb + g_kuyu + g_kabin + g_priz
 
     #  MOTOR KORUMA CİHAZI  —  her güçte aynı sabit metin ( "4 x 25" ) değil,
     #  motor anma akımından seçilir:
@@ -772,7 +794,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  ŞEBEKEDEN ÇEKİLEN AKIM.  Motorun MİL gücü değil, şebekeden çektiği
     #  güç akar:  Pşeb = P2 / ηm.  Program bir süre ηm'yi atlıyordu ve akımı
     #  %18 DÜŞÜK gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.
-    I_motor = (g_motor / (math.sqrt(3) * U_sebeke * S["cosfi"])
+    I_motor = (g_motor_seb / (math.sqrt(3) * U_sebeke * S["cosfi"])
                if all(sayi_mi(x) and x > 0
                       for x in (U_sebeke, S["cosfi"])) else None)
     sigorta_A = T.sigorta_sec(I_motor, S["sigorta_katsayisi"])
@@ -780,11 +802,14 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
 
     b5 = Bolum(f"5 -  KURULU GÜÇ CETVELİ", f"tablo adı :  TAS{no}",
                kimlik="kurulu_guc")
-    b5["aciklamalar"] = [T.SIGORTA_NOTU]
+    b5["aciklamalar"] = [
+        "Kurulu güç, tüketicilerin anma ( etiket ) güçlerinin toplamıdır "
+        "( Elektrik İç Tesisleri Proje Hazırlama Yönetmeliği m.5-19 ).  Motorun "
+        "anma gücü mil gücüdür ( TS EN 60034-1 m.5.5.3 ).  Kolon hattının akımı "
+        "ve gerilim düşümü motorun şebekeden çektiği güçle hesaplanır ( bölüm 6 ).",
+        T.SIGORTA_NOTU]
     b5["cetvel"] = [
-        {"lin": 1, "sorti": ("MOTOR" + (f"          ( {tr(Nsc)} kW / ηm = {tr(_eta_m)} "
-                                        "— şebekeden çekilen )"
-                                        if _eta_m_gecerli else "")),
+        {"lin": 1, "sorti": f"MOTOR          ( Nsç = {tr(Nsc)} kW )",
          "guc": g_motor, "birim": "W", "sigorta": motor_sigorta},
         {"lin": 2, "sorti": f"KUYU AYDINLATMASI          ( {n_kuyu} X {trn(S['kuyu_armatur_W'],0)} W )",
          "guc": g_kuyu, "birim": "W", "sigorta": "10"},
@@ -802,17 +827,16 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # 6 -  GERİLİM DÜŞÜMÜ VE KESİT KONTROLÜ
     # =========================================================
     cosfi = S["cosfi"]
-    eps1 = (100 * P_kurulu * L1 / (kappa * S1 * U_sebeke ** 2)) \
+    #  ε BAĞINTISI ( 100·P·L / (κ·S·U²) ) HATTAN AKAN AKTİF GÜÇTEN türetilir:
+    #  iki hatta da motorun şebekeden çektiği güç akar, kurulu güç değil.
+    eps1 = (100 * P_hat * L1 / (kappa * S1 * U_sebeke ** 2)) \
         if all(sayi_mi(x) and x > 0 for x in (kappa, S1, U_sebeke)) else None
-    #  ε2 DE ŞEBEKEDEN ÇEKİLEN GÜÇLE HESAPLANIR.  ε bağıntısı ( 100·P·L /
-    #  (κ·S·U²) ) hattan akan AKTİF GÜÇTEN türetilir;  mil gücü kullanmak
-    #  gerilim düşümünü de %18 düşük gösteriyordu.
-    P_motor_W = g_motor
+    P_motor_W = g_motor_seb
     eps2 = (100 * P_motor_W * L2 / (kappa * S2 * U_sebeke ** 2)) \
         if all(sayi_mi(x) and x > 0 for x in (kappa, S2, U_sebeke)) else None
     eps = (eps1 + eps2) if all(sayi_mi(x) for x in (eps1, eps2)) else None
     eps_uygun = sayi_mi(eps) and sayi_mi(eps_max) and eps <= eps_max
-    I_hat = (P_kurulu / (math.sqrt(3) * U_sebeke * cosfi)) \
+    I_hat = (P_hat / (math.sqrt(3) * U_sebeke * cosfi)) \
         if all(sayi_mi(x) and x > 0 for x in (U_sebeke, cosfi)) else None
     #  KESİT TABLODA YOKSA:  Iz kesitle birlikte arttığı için, kesitten küçük
     #  en büyük tablo satırı GÜVENLİ ALT SINIRDIR.  Eskiden Iz = None dönüyor,
@@ -823,7 +847,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
 
     #  MAKİNE BESLEME HATTININ ( S2 ) AKIM KONTROLÜ
     #  Paftadaki "I ≤ Iz" kontrolü KOLON HATTINA ( S1 ) aittir ve öyle
-    #  olmalıdır: o hat asansörün toplam kurulu gücünü taşır.  Ama makine
+    #  olmalıdır: o hat motoru, aydınlatmayı ve prizi birlikte taşır.  Ama makine
     #  besleme hattı hiç denetlenmiyordu — yalnız gerilim düşümüne ( ε2 )
     #  giriyordu ve ε2 kısa bir hatta çok ince kesitte bile küçük çıkar.
     #  Sonuç: 37 kW motor + S2 = 1,5 mm² ( I2 = 62 A, kablo 17,5 A )
@@ -863,10 +887,12 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                kimlik="gerilim_dusumu")
     b6["aciklamalar"] = [
         "ε %  =  100 · P · L  /  ( κ · S · U² )          I  =  P  /  ( √3 · U · cosφ )",
-        "Kolon hattı asansörün TOPLAM kurulu gücünü ( motor + aydınlatma + priz ) taşır; "
-        "makine besleme hattı yalnız motoru besler.",
+        "Kolon hattı motoru, aydınlatmayı ve prizi birlikte besler; makine besleme "
+        "hattı yalnız motoru besler.",
         "Her iki hatta da motorun ŞEBEKEDEN ÇEKTİĞİ güç ( Pşeb = Pm / ηm ) akar; "
-        "Nsç motorun mil gücüdür ve hattı o değil, ondan büyük olan Pşeb yükler.",
+        "Nsç motorun mil gücüdür ve hattı o değil, ondan büyük olan Pşeb yükler.  "
+        "Bu yüzden P1 kurulu güçten ( bölüm 5 ) büyüktür — kurulu güç tanım gereği "
+        "etiket güçlerinin toplamıdır.",
         "SPE  —  koruma iletkeni, besleme kablosunun bakır damarı kabul edilmiştir "
         "( Çizelge-8 ancak PE ile ana iletken aynı malzemedense geçerlidir ). "
         "Kablo dışında çekilen bir PE hiçbir şekilde 2,5 mm²'den ( mekanik korumalı ) "
@@ -884,31 +910,32 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
               if abs(kappa - 44.4) < 0.05 else
               ("20 °C değeri  —  işletme sıcaklığında ε daha büyüktür"
                if abs(kappa - 56) < 0.05 else "GİRİŞ")), 1),
-        veri("Pm", "Makine ( motor ) anma gücü  —  mil gücü", g_motor_mil, "W",
+        veri("Pm", "Makine ( motor ) anma gücü  —  mil gücü", g_motor, "W",
              "GİRİŞ  ( Nsç )", 0),
         veri("ηm", "Motorun elektrik verimi", _eta_m, "—", "SABİTLER B"),
         hesap("Pşeb  =   Pm  /  ηm",
-              f"=   {trn(g_motor_mil, 0)}  /  {tr(_eta_m)}", g_motor, "W",
+              f"=   {trn(g_motor, 0)}  /  {tr(_eta_m)}", g_motor_seb, "W",
               "motorun şebekeden çektiği güç", 0),
-        veri("P1", "Asansörün toplam kurulu gücü  ( Pşeb + aydınlatma + priz )",
-             P_kurulu, "W", "yukarıdan", 0),
+        hesap("P1  =   Pşeb  +  aydınlatma  +  priz",
+              f"=   {trn(g_motor_seb, 0)}  +  {trn(g_kuyu + g_kabin, 0)}  +  {trn(g_priz, 0)}",
+              P_hat, "W", "kolon hattından çekilen güç", 0),
         veri("L1", "Kolon hattı uzunluğu", L1, "m", L1_kaynak),
         veri("S1", "Kolon hattı kesiti", S1, "mm²", S1_kaynak),
         hesap("ε1  =   100 · P1 · L1   /   ( κ · S1 · U² )",
-              f"=   100 · {trn(P_kurulu,0)} · {tr(L1)}   /   ( {trn(kappa,0)} · {tr(S1)} · {trn(U_sebeke,0)}² )",
+              f"=   100 · {trn(P_hat,0)} · {tr(L1)}   /   ( {trn(kappa,1)} · {tr(S1)} · {trn(U_sebeke,0)}² )",
               eps1, "%", "kolon hattı", 3),
         veri("P2", "Makine besleme hattının gücü  ( = Pşeb )", P_motor_W, "W",
              "yukarıdan", 0),
         veri("L2", "Makine besleme uzunluğu", L2, "m", L2_kaynak),
         veri("S2", "Makine besleme kesiti", S2, "mm²", S2_kaynak),
         hesap("ε2  =   100 · P2 · L2   /   ( κ · S2 · U² )",
-              f"=   100 · {trn(P_motor_W,0)} · {tr(L2)}   /   ( {trn(kappa,0)} · {tr(S2)} · {trn(U_sebeke,0)}² )",
+              f"=   100 · {trn(P_motor_W,0)} · {tr(L2)}   /   ( {trn(kappa,1)} · {tr(S2)} · {trn(U_sebeke,0)}² )",
               eps2, "%", "makine besleme", 3),
         hesap("ε   =   ε1  +  ε2",
               f"=   {tr(eps1,3)}  +  {tr(eps2,3)}", eps, "%", "toplam", 3),
         veri("εmax", "İzin verilen gerilim düşümü", eps_max, "%", "GİRİŞ", 1),
         hesap("I   =   P1   /   ( √3 · U · cosφ )",
-              f"=   {trn(P_kurulu,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · {tr(cosfi)} )",
+              f"=   {trn(P_hat,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · {tr(cosfi)} )",
               I_hat, "A", "kolon hattı akımı  —  şebekeden çekilen"),
         hesap("I2  =   P2   /   ( √3 · U · cosφ )",
               f"=   {trn(P_motor_W,0)}   /   ( 1,73 · {trn(U_sebeke,0)} · "
@@ -1032,10 +1059,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
             "eta_kabin": eta_kabin, "T_kabin": T_kabin, "Z_kabin": Z_kabin,
             "eta_kuyu": eta_kuyu, "T_kuyu": T_kuyu, "Z_kuyu": Z_kuyu,
             "n1_kuyu": n1, "n2_kuyu": n2,
-            "g_motor": g_motor, "g_motor_mil": g_motor_mil, "eta_m": _eta_m,
+            "g_motor": g_motor, "g_motor_seb": g_motor_seb, "eta_m": _eta_m,
             "g_kuyu": g_kuyu, "g_kabin": g_kabin, "g_priz": g_priz,
             "kabin_a": ka, "kabin_b": kb, "kuyu_a": qa, "kuyu_b": qb,
-            "P_kurulu": P_kurulu, "eps1": eps1, "eps2": eps2, "eps": eps,
+            "P_kurulu": P_kurulu, "P_hat": P_hat, "eps1": eps1, "eps2": eps2, "eps": eps,
             "eps_uygun": eps_uygun, "I": I_hat, "Iz": Iz, "akim_uygun": akim_uygun,
             "I2": I2, "Iz2": Iz2, "akim2_uygun": akim2_uygun,
             "I_motor": I_motor, "sigorta_A": sigorta_A, "motor_sigorta": motor_sigorta,
@@ -1074,9 +1101,9 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
         return {"aktif": False, "mk_yok": True,
                 "uyari": "Makine dairesiz ( MRL ) sistem  —  bu hesap uygulanmaz."}
     a, b = A / 1000, B / 1000
-    hh, d = S["h_armatur"], S["kirlenme_faktoru"]
+    hh, d = S["h_makine_dairesi"], S["kirlenme_faktoru"]
     E, OL = S["E_makine_dairesi"], S["kuyu_armatur_lm"]
-    k, eta, Tt, Z = _aydinlatma(a, b, E, OL, S)
+    k, eta, Tt, Z = _aydinlatma(a, b, E, OL, S, hh)
     n = int(yukari_yuvarla(Z, 0)) if sayi_mi(Z) else None
 
     bl = Bolum("MAKİNE DAİRESİ AYDINLATMA HESABI", "TS EN 81-20",
@@ -1084,7 +1111,8 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
     bl["adimlar"] = [
         veri("a", "Makine dairesi uzunluğu", a, "m", "GİRİŞ"),
         veri("b", "Makine dairesi genişliği", b, "m", "GİRİŞ"),
-        veri("h", "Armatür ile çalışma düzlemi arasındaki yükseklik", hh, "m", "SABİTLER A"),
+        veri("h", "Armatür ile döşeme ( çalışma düzlemi ) arasındaki yükseklik", hh, "m",
+             "TS EN 81-20 m.5.2.1.4.2 · m.5.2.6.3.2.1"),
         hesap("k   =   a · b   /   ( h · ( a + b ) )",
               f"=   {tr(a)} · {tr(b)}   /   ( {tr(hh)} · ( {tr(a)} + {tr(b)} ) )", k, "—", "bölge indeksi", 4),
         veri("η", "Oda aydınlatma verimi", eta, "—", "TABLOLAR T2"),
@@ -1247,10 +1275,17 @@ def hesapla_topraklama(ortak: dict, S: dict, en_buyuk_pe=None) -> dict:
         b4["adimlar"] = [
             veri("SPE", "Tesisteki en büyük koruma iletkeni kesiti",
                  en_buyuk_pe, "mm²", "asansör paftaları bölüm 6", 1),
+            #  İŞLEM SATIRI SONUCA KADAR HER ADIMI YAZAR:  "0,5 · 4 = 6" ya da
+            #  "0,5 · 16 = 8" ( sonuç 10 ) diye bir satır kendi içinde yanlıştır.
+            #  Yarım kesit → 6 mm² asgarisi / 25 mm² üst sınırı → standart kesit.
             hesap("Sapd  =   0,5 · SPE        ( en az 6 mm² )",
-                  f"=   0,5  ·  {tr(en_buyuk_pe)}   =   {tr(apd_ham)}"
+                  f"=   0,5  ·  {tr(en_buyuk_pe)}   =   {tr(en_buyuk_pe / 2)}"
+                  + (f"   →   en az {trn(T.APD_ASGARI, 0)} mm²"
+                     if en_buyuk_pe / 2 < T.APD_ASGARI else "")
                   + (f"   →   {trn(T.APD_UST_SINIR, 0)} mm² üst sınırı"
-                     if apd_sinir else ""),
+                     if apd_sinir else "")
+                  + (f"   →   standart kesit {trn(Sapd, 0)} mm²"
+                     if sayi_mi(Sapd) and Sapd != min(apd_ham, T.APD_UST_SINIR) else ""),
                   Sapd, "mm²", "m.9-j/1/i  ·  Çizelge-4b", 1),
             veri("Stopr", "Topraklama iletkeni  ( asgari )", Stopr, "mm²",
                  f"m.9/c  ·  {topr_dayanak}", 1),
