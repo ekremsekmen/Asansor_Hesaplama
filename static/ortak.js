@@ -396,17 +396,24 @@ function sayiOku(x){
 
 
 /* ---------------------------------------------------------- indir */
-async function indir(uc){
-  durum('Dosya hazırlanıyor…');
+/*  İNDİRİLEN ÇIKTININ GÖVDESİ  —  ekranın hesap isteğinin AYNISI.
+    Uygulama çıktısı yalnız açık asansörün formunu gönderiyordu:  iki
+    asansörlü projede ekran iki asansörü hesaplarken PDF ve paket yalnız
+    birini içeriyordu.  Çıktı ekranla aynı girdiden üretilmelidir. */
+function indirGovdesi(uc){
   //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI için
   //  kullanır — paftanın içeriği değişmez.
-  const govde = uc==='kapak-pdf'
+  return uc==='kapak-pdf'
     ? {kapak:kapakGirdi()}
     : uc.startsWith('trafik')
     ? {kapak:kapakGirdi(), girdiler:trafikGirdi()}
     : uc.startsWith('uygulama')
-    ? {kapak:mukavemetKimlik(), girdiler:mukavemetGirdi(), sabitler:ofisSabitleri()}
+    ? {kapak:mukavemetKimlik(), ...mukavemetIstek()}
     : {kapak:kapakGirdi(), girdiler:avanGirdi()};
+}
+async function indir(uc){
+  durum('Dosya hazırlanıyor…');
+  const govde = indirGovdesi(uc);
   //  PAKETLEME ( ZIP ):  teslim edilecek çıktıların yanına PROJE DOSYASI da
   //  konur — arşivden dönebilmek için tek gereken odur.  Uygulama paketine
   //  ayrıca kapak sayfası girer ( avanınki zaten "kapak" alanından gider ).
@@ -535,6 +542,9 @@ function bolumuTemizle(tur){
     const l=$('c_eknufus_liste'); if(l) l.innerHTML='';
   }
   if(tur==='mukavemet' && MUK){
+    //  Önceki projeden bekleyen kabin ağırlığı yenilemesi yeni projenin
+    //  değerini ezmesin.
+    MUK_GK_TAZELE = {};
     //  Dosyada BOŞ kalan alanlar, önceki projeden kalma değerle karışmasın:
     //  bölüm önce varsayılanlarına döner.
     for(const gr of MUK.gruplar) for(const f of gr.alanlar){

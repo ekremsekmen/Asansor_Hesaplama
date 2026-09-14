@@ -1553,10 +1553,28 @@ def _girdi_yollari(r):
               abs((dx_arka - dx_sag) - (3.0 - 1.0)) < 1e-6)
 
     #  5. Makaralı patende balata adımı ve Bölüm 8 formül adı
-    s_mak = MK.hesapla({"paten_tipi": "Makaralı", "agirlik_guvenlik_tertibati": "Kaymalı"})
+    s_mak = MK.hesapla({"agirlik_paten_tipi": "Makaralı", "agirlik_guvenlik_tertibati": "Kaymalı"})
     b8_mak = [x for x in s_mak["bolumler"] if x["baslik"].startswith("8 ")][0]
     r.kontrol("makaralı patende B8 flanş formülü 1,85 yazıyor",
               any("1,85" in a.get("formul", "") for a in b8_mak["adimlar"]))
+
+    #  6. Paten tipi ray başınadır:  kabinin seçimi karşı ağırlığa geçmez,
+    #     girilen ℓ de yalnız kabin pateninindir.
+    def _flans_formulu(s, no):
+        b = next(x for x in s["bolumler"] if x["baslik"].startswith(f"{no} "))
+        return [a.get("formul", "") for a in b["adimlar"] if "σF" in a.get("formul", "")]
+    s_kk = MK.hesapla({"paten_tipi": "Makaralı"})
+    _f7, _f8 = _flans_formulu(s_kk, 7), _flans_formulu(s_kk, 8)
+    r.kontrol("kabin makaralı: B7 flanş formülü 1,85",
+              any("1,85" in f for f in _f7) and not any("ℓ" in f for f in _f7), f"→ {_f7}")
+    r.kontrol("kabin makaralı, ağırlık kaymalı: B8 flanş formülü balatalı",
+              any("ℓ" in f for f in _f8) and not any("1,85" in f for f in _f8), f"→ {_f8}")
+    s_varsayilan = MK.hesapla({})
+    s_l = MK.hesapla({"paten_balata_boyu": 140})
+    r.kontrol("girilen ℓ kabin rayının σF'sini değiştiriyor",
+              s_l["ara"]["kabin_ray.c22.d1.sf"] != s_varsayilan["ara"]["kabin_ray.c22.d1.sf"])
+    r.esit("girilen ℓ karşı ağırlık rayına geçmiyor  ( kendi rayından türetilir )",
+           s_l["ara"]["agirlik_ray.sf"], s_varsayilan["ara"]["agirlik_ray.sf"])
     return r
 
 

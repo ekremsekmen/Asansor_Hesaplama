@@ -287,13 +287,21 @@ ALANLAR = (
      MT.SIGINMA_TIPLERI_UST, "Çömelme"),
     ("siginma_tipi_dip",  "Kuyu dibi sığınma hacmi tipi",      "—",    "secim",
      MT.SIGINMA_TIPLERI_DIP, "Çömelme"),
-    #  TS EN 81-50 m.5.10.5 flanş eğilmesindeki ℓ ( paten balatasının
+    #  TS EN 81-50 m.5.10.5 flanş eğilmesindeki ℓ ( KABİN paten balatasının
     #  uzunluğu ).  Boş bırakılırsa ray tablosundaki balata yarı genişliğinden
-    #  türetilir.
-    ("paten_balata_boyu", "Paten balatası uzunluğu  ( ℓ )",  "mm",   "sayi", None, None),
+    #  türetilir.  Karşı ağırlığın kaymalı pateni bu değeri KULLANMAZ:  iki
+    #  patenin balatası aynı parça değildir;  onun ℓ'si kendi rayından
+    #  türetilir ( bkz. mukavemet._balata_boyu ).
+    ("paten_balata_boyu", "Kabin paten balatası uzunluğu  ( ℓ )", "mm", "sayi", None, None),
     #  TS EN 81-50 m.5.10.5 / Ek C.2.1.4 flanş eğilmesi için İKİ formül verir:
     #  makaralı patende 1,85·Fx/c² , kaymalı patende balata boyuna bağlı olan.
-    ("paten_tipi",        "Paten tipi",                        "—",    "secim",
+    #  PATEN TİPİ RAY BAŞINADIR.  Kabin ve karşı ağırlık patenleri ayrı
+    #  seçilir:  kabinde kaymalı, karşı ağırlıkta makaralı paten yaygın bir
+    #  düzendir ve tek seçimle girilemiyordu — karşı ağırlık rayının flanş
+    #  gerilmesi yanlış formülle hesaplanıyordu.
+    ("paten_tipi",        "Kabin paten tipi",                  "—",    "secim",
+     _s("Kaymalı", "Makaralı"), "Kaymalı"),
+    ("agirlik_paten_tipi", "Karşı ağırlık paten tipi",         "—",    "secim",
      _s("Kaymalı", "Makaralı"), "Kaymalı"),
     #  Ek C.2.1.2 / C.2.2.2 / C.2.3.2:  Fv = … + Fp.  Fp, bir raydaki bütün
     #  konsol klipslerinin itme kuvvetidir ( binanın oturması, betonun
@@ -392,6 +400,12 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "yan_yatak_boyu", "sase_yuksekligi", "tahrik_kasnak_capi",
                    "halat_capi", "reg_kasnak_capi", "reg_halat_capi",
                    "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi")
+#  MAKİNE DAİRESİ KAİDESİNİN alanları.  Yalnız bölüm 2'ye girerler;
+#  makine dairesiz ( MRL ) projede o bölüm hesaplanmaz, bu yüzden alanlar
+#  doğrulanmaz ve ekranda gizlenir ( arayüz listeyi buradan okur ).
+KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "dikine_kiris_tipi",
+                  "yan_yatak", "yan_yatak_tipi", "yan_yatak_boyu")
+
 #  AÇI alanları:  0 < açı < 180.  360° girildiğinde sin(180°) = 0 çıkıyor ve
 #  hesap OverflowError ile çöküyordu.
 #  α — sarılma açısı:  tek sarımda en çok yarım tur, çift sarımda bir tam
@@ -498,7 +512,8 @@ GRUPLAR = (
      ("kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
       "agirlik_konsol_arasi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
       "ray_celigi_rm", "kabin_paten_arasi", "agirlik_paten_arasi",
-      "guvenlik_tertibati", "paten_balata_boyu", "paten_tipi",
+      "guvenlik_tertibati", "paten_tipi", "paten_balata_boyu",
+      "agirlik_paten_tipi",
       "klips_itme_kuvveti", "yapi_sehim_x", "yapi_sehim_y")),
     ("Karşı ağırlık", ("agirlik_genisligi", "agirlik_derinligi",
                        "agirlik_malzemesi", "agirlik_ray_arasi",
@@ -576,7 +591,8 @@ def arayuz_alanlari():
             #  hiçbir şeyin değişmemesi sessiz bir tuzaktı.
             "malzeme_derinligi": {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI},
             "durak_azami": DURAK_AZAMI,
-            "hesaplanan": list(HESAPLANAN)}
+            "hesaplanan": list(HESAPLANAN),
+            "kaide_alanlari": list(KAIDE_ALANLARI)}
 
 
 def varsayilanlar():
@@ -609,11 +625,15 @@ def tamamla(g):
             and not g["kabin_agirligi"].strip()):
         g["kabin_agirligi"] = OFIS.bos_kabin_kutlesi(by)
         g["kabin_agirligi_kaynak"] = OFIS.GK_KAYNAGI
-    elif not (g.get("kabin_agirligi_kaynak") == OFIS.GK_KAYNAGI
-              and g.get("kabin_agirligi") == OFIS.bos_kabin_kutlesi(by)):
-        # Tekrar tamamlanırken otomatik değerin kaynağını koru.
-        # Kütle değiştirilmişse artık elle girilen değerdir.
-        g["kabin_agirligi_kaynak"] = "GİRİŞ"
+    else:
+        #  KAYNAK DEĞERDEN OKUNUR, GEÇMİŞTEN DEĞİL.  Ekran tablo değerini
+        #  kutuya yazar;  sonraki her istek o sayıyı taşır.  Kaynak "boş mu
+        #  geldi" diye belirlenince aynı girdi ilk hesapta "OFİS TABLOSU",
+        #  sonrakilerde ( ve indirilen paftada ) "GİRİŞ" yazıyordu.  Değer bu
+        #  beyan yükünün tablo değeriyse kaynak tablodur;  değilse girilmiştir.
+        g["kabin_agirligi_kaynak"] = (
+            OFIS.GK_KAYNAGI if g.get("kabin_agirligi") == OFIS.bos_kabin_kutlesi(by)
+            else "GİRİŞ")
     ka = g.get("kabin_agirligi")
     #  KARŞI AĞIRLIK DENGE ORANI OFİS SABİTİDİR.
     #  Bölüm 1 Ga'yı  P + q·Q  ile kurar;  karşı ağırlık da buradan aynı q
@@ -650,8 +670,11 @@ def _sayi(v):
 def dogrula(g):
     """Girdi sözlüğünü denetler; hata metinleri listesi döner ( boşsa temiz )."""
     hata = []
+    #  MRL'de kaide yoktur:  hesaba girmeyen, ekranda da görünmeyen bir alan
+    #  projeyi durdurmamalı.
+    atla = set(KAIDE_ALANLARI) if evet_mi(g.get("mk_yok")) else set()
     for anahtar, etiket, birim, tur, secenekler, _v in ALANLAR:
-        if tur == "hesap":
+        if tur == "hesap" or anahtar in atla:
             continue
         d = g.get(anahtar)
         ad = f"{etiket} ({birim})" if birim not in ("—", "") else etiket
@@ -696,7 +719,7 @@ def dogrula(g):
     #  neyi düzelteceği söylenmeli.
     for anahtar in BOLEN_ALANLAR:
         d = g.get(anahtar)
-        if _sayi(d) and d == 0:
+        if anahtar not in atla and _sayi(d) and d == 0:
             hata.append(f"{ALAN[anahtar][1]}: sıfır olamaz — bu değer hesapta "
                         "bölen olarak kullanılır.")
 
@@ -705,7 +728,7 @@ def dogrula(g):
     #  240 · 280 · 300 için atalet yarıçapı yoktur ).
     for anahtar, oku, ne in TABLO_GEREKLI:
         d = g.get(anahtar)
-        if d is None or d == "":
+        if anahtar in atla or d is None or d == "":
             continue
         eksik = [a for a, f in oku if f(d) is None]
         if eksik:
@@ -740,6 +763,8 @@ def dogrula(g):
                     "(TS EN 81-20 m.5.5.1.3).")
     for anahtar in POZITIF_ALANLAR:
         d = g.get(anahtar)
+        if anahtar in atla:
+            continue
         if anahtar in ALAN and d is not None and (not _sayi(d) or d <= 0):
             hata.append(f"{ALAN[anahtar][1]}: sıfırdan büyük olmalıdır "
                         f"( {d} girildi ).")
@@ -844,7 +869,7 @@ def dogrula(g):
     if not _sayi(pay):
         from engine.uygulama import sabitler as _US
         pay = _US.VARSAYILAN["yan_yatak_L_X"]
-    if _sayi(L) and _sayi(pay) and L - pay <= 0:
+    if "yan_yatak_boyu" not in atla and _sayi(L) and _sayi(pay) and L - pay <= 0:
         hata.append(f"Yan yatak boyu ({L} mm) mesnet payından ({pay} mm) büyük "
                     "olmalıdır. Makine kaidesi hesabı, açıklığı L olan basit "
                     f"kirişte yükün mesnetten X = L − {pay} uzaklıkta olduğunu "

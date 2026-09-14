@@ -776,8 +776,9 @@ def calistir():
 
     #  Mukavemet girdisi geçersizse uygulama da durmalı
     #  ( kabin ağırlığı ARTIK boş bırakılabilir — ofis tablosundan dolar;
-    #    burada gerçekten geçersiz bir geometri kullanılıyor )
-    s = UY.hesapla({"yan_yatak_boyu": 0})
+    #    burada gerçekten geçersiz bir geometri kullanılıyor.  Kaide alanı
+    #    DEĞİL:  varsayılan proje MRL'dir ve orada kaide doğrulanmaz. )
+    s = UY.hesapla({"kabin_paten_arasi": 0})
     r.kontrol("geçersiz mukavemet girdisi uygulamayı da durduruyor",
               not s["aktif"], f"→ {s.get('hata')}")
 
@@ -1227,8 +1228,72 @@ def calistir():
                   "mk_yok", "mk_uzunluk", "mk_genislik"},
               f"→ {UG.PROJE_GENELI_ALANLAR}")
 
+    _sira_degismezligi(r)
     _pafta_zinciri(r)
     return r
+
+
+# =====================================================================
+#  ASANSÖRLERİN SIRASI HESABI DEĞİŞTİRMEZ
+# =====================================================================
+#  Binaya ait bölümler ( makine dairesi aydınlatması · temel topraklama )
+#  çoklu projede ilk asansörün KENDİ hesabından alınıyordu.  Topraklama
+#  iletkenleri tesisteki EN BÜYÜK koruma iletkeninden türediği için sonuç
+#  asansörlerin sırasına bağlıydı:  kolon kesiti 16 ve 95 mm² olan iki
+#  asansörde 16'lık önce gelince topraklama iletkeni 16, ana potansiyel
+#  dengeleme 10 mm² çıkıyordu — 95'lik önce gelince 50 ve 25 ( bağımsız
+#  incelemede bulundu ).  Burada her sıralama denenir.
+def _sira_degismezligi(r):
+    import itertools
+    ortak = {"temel_a": 26.55, "temel_b": 16.4, "mk_yok": False,
+             "mk_uzunluk": 4000, "mk_genislik": 3000}
+    asansorler = [
+        {"asansor_adi": "A16", "kolon_kesit": 16, "makine_kesit": 6, "sarilma_acisi": 180},
+        {"asansor_adi": "A95", "kolon_kesit": 95, "makine_kesit": 10, "sarilma_acisi": 180},
+        {"asansor_adi": "A35", "kolon_kesit": 35, "makine_kesit": 70, "beyan_yuku": 1000,
+         "sarilma_acisi": 180},
+    ]
+
+    def _iletkenler(c):
+        b = next(x for x in c["proje_geneli"] if x.get("kimlik") == "topraklama_iletkenleri")
+        return {a.get("sembol") or a.get("formul", "")[:5]: a.get("deger")
+                for a in b["adimlar"] if isinstance(a, dict) and a.get("deger") is not None}
+
+    #  Beklenen:  avan motorunun TESİS hesabı — bütün asansörler tek girdide
+    tesis = UG.kopru(UG.tamamla(dict(UG.varsayilanlar(), **ortak, **asansorler[0])))
+    tesis["asansorler"] = [
+        UG.kopru(UG.tamamla(dict(UG.varsayilanlar(), **ortak, **a)))["asansorler"][0]
+        for a in asansorler]
+    beklenen = AV.hesapla(tesis)["topraklama"]
+    _pe = max(x for a in asansorler for x in (AVT.koruma_iletkeni_kesiti(a["kolon_kesit"])[0],
+                                              AVT.koruma_iletkeni_kesiti(a["makine_kesit"])[0]))
+    r.esit("tesisteki en büyük koruma iletkeni ( 95 mm² kolon → 50 )", beklenen["en_buyuk_pe"], _pe)
+
+    taban = None
+    for sira in itertools.permutations(asansorler):
+        ad = " → ".join(a["asansor_adi"] for a in sira)
+        c = UY.hesapla_coklu([dict(a) for a in sira], ortak)
+        if not r.kontrol(f"sıra {ad} · hesap koşuyor", c["aktif"], f"→ {c.get('hata')}"):
+            continue
+        il = _iletkenler(c)
+        r.esit(f"sıra {ad} · en büyük koruma iletkeni", il.get("SPE"), beklenen["en_buyuk_pe"])
+        r.esit(f"sıra {ad} · topraklama iletkeni", il.get("Stopr"), beklenen["Stopr"])
+        r.kontrol(f"sıra {ad} · ana potansiyel dengeleme iletkeni",
+                  beklenen["Sapd"] in il.values(), f"→ {il} · beklenen Sapd {beklenen['Sapd']}")
+        #  Asansörlerin kendi sonuçları da sıradan bağımsız ( no ve etiket hariç )
+        ozu = {
+            "proje_geneli": c["proje_geneli"],
+            "asansorler": {a["tanim"]: {k: v for k, v in a.items() if k != "no"}
+                           for a in c["asansorler"]},
+            "tumu_uygun": c["ozet"]["tumu_uygun"],
+            "proje_geneli_uygun": c["ozet"]["proje_geneli_uygun"],
+            "hata": sorted(c["hata"]),
+        }
+        ozu = json.dumps(ozu, sort_keys=True, default=str, ensure_ascii=False)
+        if taban is None:
+            taban = ozu
+        else:
+            r.kontrol(f"sıra {ad} · bütün sonuç ilk sıralamayla aynı", ozu == taban)
 
 
 # =====================================================================

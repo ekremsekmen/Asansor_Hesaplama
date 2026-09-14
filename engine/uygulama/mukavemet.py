@@ -529,6 +529,26 @@ def _motor(g, o):
 def _makine(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     k1 = US.darbe_k1(O, g["guvenlik_tertibati"])
+    #  Kabin rayları ( bölüm 7 ) aynı k1'i okur — makine dairesi olsun olmasın.
+    o.update(k1=k1)
+    b = Bolum("MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", kimlik="makine_konstruksiyonu", kaynak="MMO 208/4 - m.3.4.6")
+    #  MAKİNE DAİRESİ YOKSA BU BÖLÜM HESAPLANMAZ.  Bölüm, döşemeye basan NPU
+    #  dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer;  MRL'de öyle bir
+    #  kaide yoktur — makine ya raylara ya bina yapısına biner ( bölüm 7 ).
+    #  Eskiden hesap yine basılıyordu:  hüküm "UYGULANMAZ" derken paftada
+    #  var olmayan bir kaidenin kiriş satırları ve kırmızı "UYGUN DEĞİL"
+    #  kontrolleri duruyordu.  Bölüm yerinde kalır ( numaralar kaymasın ),
+    #  içinde yalnız neden uygulanmadığı yazar.
+    if evet_mi(g.get("mk_yok")):
+        b["adimlar"] = [metin("MAKİNE DAİRESİZ ( MRL ) SİSTEM — makine dairesi "
+                              "kaidesi yoktur, bu hesap uygulanmaz.  Makine yükü "
+                              "bölüm 7'de kılavuz raylara ya da bina yapısına "
+                              "verilir.", vurgu=True)]
+        b["sonuc"] = {"baslik": "MAKİNE DAİRESİ KAİDESİ",
+                      "metin": "UYGULANMAZ — makine dairesiz ( MRL ) sistem. "
+                               "Makine yükünün yolu bölüm 7'de denetlenir.",
+                      "uygun": None}
+        return b
     Gm, L, L1 = g["makine_agirligi"], g["yan_yatak_boyu"], g["sase_yuksekligi"]
     A = MT.npu(g["dikine_kiris"], "A") * 100            # cm² → mm²
     #  NPU tablosunun atalet YARIÇAPI ( cm ):  λ = L1 / imin bağıntısında
@@ -574,17 +594,12 @@ def _makine(g, o):
     egilme_uygun = 0 <= sigma_e <= O["sigma_em"]
     burkulma_uygun = (sigma_b is not None and 0 <= sigma_b <= O["sigma_em"])
 
-    o.update(k1=k1, F_kaide=F, FA=FA, FB=FB)
     #  σem de kaydedilir:  hükmün sınırıdır ve ofis sabitidir.
     _kay(o, "makine", k1=k1, A=A, imin=imin, Wx=Wx, omega=omega,
          sigma_em=O["sigma_em"], F=F, F1=F1, X=X, FB=FB, FA=FA, Mmax=Mmax,
          sigma_e=sigma_e, lam_ham=lam_ham, lam=lam, sigma_b=sigma_b)
 
-    b = Bolum("MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", kimlik="makine_konstruksiyonu", kaynak="MMO 208/4 - m.3.4.6")
-    b["adimlar"] = ([metin("MAKİNE DAİRESİZ ( MRL ) SİSTEM — aşağıdaki kaide "
-                           "hesabı uygulanmaz;  makine yükü bölüm 7'de "
-                           "raylara ya da bina yapısına verilir.", vurgu=True)]
-                    if evet_mi(g.get("mk_yok")) else []) + [
+    b["adimlar"] = [
         veri("k1", "Darbe katsayısı", k1, "",
              f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
         veri("Gm", "Makine motor ağırlığı", Gm, "kg", "GİRİŞ ( üretici kataloğu )"),
@@ -621,23 +636,10 @@ def _makine(g, o):
         kontrol(f"σb = {tr(sigma_b)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['dikine_kiris']}", burkulma_uygun),
     ]
-    #  MAKİNE DAİRESİ YOKSA BU HESAP UYGULANMAZ.  Bölüm, döşemeye basan NPU
-    #  dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer.  MRL'de öyle bir
-    #  kaide yoktur — makine ya raylara ya bina yapısına biner.  Hesap yine
-    #  üretilir ama UYGUNLUK BEYAN ETMEZ:  eskiden MRL projesinde de "UYGUNDUR." yazıyor,
-    #  denetçiye var olmayan bir kaidenin hesabını doğrulanmış gibi
-    #  gösteriyordu.
-    _mrl = evet_mi(g.get("mk_yok"))
-    if _mrl:
-        b["sonuc"] = {"baslik": "MAKİNE DAİRESİ KAİDESİ",
-                      "metin": "UYGULANMAZ — makine dairesiz ( MRL ) sistem. "
-                               "Makine yükünün yolu bölüm 7'de denetlenir.",
-                      "uygun": None}
-    else:
-        b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
-                      "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
-                               else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
-                      "uygun": bool(egilme_uygun and burkulma_uygun)}
+    b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
+                  "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
+                           else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
+                  "uygun": bool(egilme_uygun and burkulma_uygun)}
     b["aciklamalar"] = [
         "Kiriş statiği:  açıklığı L olan basit kirişte, A mesnedinden X "
         "uzaktaki tekil yük için  FA = F1·(L−X)/L,  FB = F1·X/L,  "
@@ -1706,16 +1708,21 @@ def _flans(F, p, balata, makarali=False):
     return F * (p["h1_b_f"] * 6) / (p["c"] ** 2 * (balata + 2 * p["h1_f"]))
 
 
-def _balata_boyu(g, p):
+def _balata_boyu(g, p, kabin=True):
     """Paten balata uzunluğu ℓ  ( mm ).
 
     Girilmemişse ray tablosundaki balata YARI genişliğinden türetilir:
     ℓ = 2·b, yani kare balata kabulü.  Balatalar genelde genişliğinden
     uzundur;  kare kabulü ℓ'yi küçük tutar ve σF'yi EMNİYETLİ tarafta
     ( büyük ) bırakır.  Kesin değer paten imalatçısından alınmalıdır.
+
+    GİRİLEN ℓ KABİN PATENİNİNDİR.  Karşı ağırlığın pateni başka bir parçadır
+    ve genelde daha kısa balatalıdır;  kabinin ℓ'sini ona vermek σF'yi
+    emniyetsiz tarafa çekerdi.  Karşı ağırlıkta ℓ her zaman kendi rayından
+    türetilir ( kabin=False ).
     """
     d = g.get("paten_balata_boyu")
-    if isinstance(d, (int, float)) and not isinstance(d, bool) and d > 0:
+    if kabin and isinstance(d, (int, float)) and not isinstance(d, bool) and d > 0:
         return d, "GİRİŞ"
     return 2 * p["b"], "türetilen  ( 2 × balata yarı genişliği )"
 
@@ -2304,7 +2311,9 @@ def _agirlik_raylari(g, o):
         dstr_ray_x, dstr_ray_y = dstr_y, dstr_x
     else:
         dstr_ray_x, dstr_ray_y = dstr_x, dstr_y
-    makarali = g["paten_tipi"] == "Makaralı"
+    #  Karşı ağırlığın KENDİ paten tipi  ( kabininkinden ayrı seçilir ).
+    paten = g["agirlik_paten_tipi"]
+    makarali = paten == "Makaralı"
     prof = g["agirlik_ray_profili"]
     p = _ray_ozellik(prof)
     n = g["agirlik_ray_sayisi"]
@@ -2356,7 +2365,7 @@ def _agirlik_raylari(g, o):
     Fv = Mg * gn + Fp
     sv = (Fv + k3 * MY) / p["A"]
     sc = sv + sm
-    balata, balata_kaynak = _balata_boyu(g, p)
+    balata, balata_kaynak = _balata_boyu(g, p, kabin=False)
     sf = abs(_flans(Fx, p, balata, makarali))
     dx = abs(_sehim(Fx, l, p["Iy"])) + dstr_ray_x
     dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_ray_y
@@ -2459,7 +2468,7 @@ def _agirlik_raylari(g, o):
                f"{tr(Fx)} × {tr(p['h1_b_f'] * 6)} / "
                f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
               sf, "N/mm²",
-              f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"),
+              f"EN 81-50 m.5.10.5  ·  {paten.lower()} paten"),
         kontrol(f"σF = {tr(sf)}  ≤  σperm = {tr(sperm)} N/mm²", sf <= sperm),
         metin("Sehim miktarları :"),
         hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |" + (" + δstr-x" if dstr_ray_x else ""),
@@ -2520,7 +2529,7 @@ def _agirlik_raylari(g, o):
                    f"{tr(kg['Fx'])} × {tr(p['h1_b_f'] * 6)} / "
                    f"{tr(p['c'] ** 2 * (balata + 2 * p['h1_f']))}"),
                   kg["sF"], "N/mm²",
-                  f"EN 81-50 m.5.10.5  ·  {g['paten_tipi'].lower()} paten"),
+                  f"EN 81-50 m.5.10.5  ·  {paten.lower()} paten"),
             kontrol(f"σF = {tr(kg['sF'])}  ≤  σperm = {tr(sg)} N/mm²",
                     kg["sF"] <= sg),
             hesap("δx = | 0,7 × l³ × Fx / ( 48 × E × Iy ) |" + (" + δstr-x" if dstr_ray_x else ""),

@@ -142,6 +142,21 @@ def _eleport(r):
         r.kontrol(f"ELEport · kendi kablosu ve %2 ile {_ad} birebir  ( ≤ 0,05 N )",
                   abs(_v - _bek) <= 0.05, f"→ bizim {_v:.3f} · ELEport {_bek}")
 
+    #  ── KARŞI AĞIRLIK RAYI:  PATEN TİPİ RAY BAŞINA ─────────────────────
+    #  ELEport kabinde kaymalı, karşı ağırlıkta MAKARALI paten kullanır
+    #  ( "Guide Shoe Type : Roller Type" ) ve flanş gerilmesini 1,85·Fx/c²
+    #  ile hesaplar.  Karşı ağırlık rayında zinciri saymadığı için ( Mcwt =
+    #  1.300 kg ) karşılaştırma zincirsiz yapılır.  Birim:  N/cm² → N/mm².
+    s_a = MK.hesapla(dict(ELEPORT, denge_zinciri="Yok", agirlik_ray_profili="70 x 65 x 9",
+                          agirlik_konsol_arasi=1200, agirlik_paten_arasi=1500,
+                          agirlik_genisligi=850, agirlik_derinligi=160,
+                          paten_tipi="Kaymalı", agirlik_paten_tipi="Makaralı"))
+    for _ad, _h, _bek in (("Fx", "agirlik_ray.Fx", 81.62), ("Fy", "agirlik_ray.Fy", 433.6),
+                          ("σF  makaralı paten", "agirlik_ray.sf", 4.1943)):
+        _v = s_a["ara"][_h]
+        r.kontrol(f"ELEport · ağırlık rayı {_ad} birebir  ( ≤ %0,05 )",
+                  abs(_v - _bek) / _bek * 100 <= 0.05, f"→ bizim {_v:.4f} · ELEport {_bek}")
+
     #  ── T1/T2 ETİKETİ:  AYNI SAYI, BAŞKA AD ───────────────────────────
     #  EN 81-50 m.5.11.2.1 T1 ve T2'yi "kasnağın İKİ YANINDAKİ kuvvetler"
     #  diye tanımlar, hangisinin T1 olduğunu söylemez.  ELEport BÜYÜK olana

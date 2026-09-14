@@ -581,6 +581,42 @@ class PveMRLDenetimi(unittest.TestCase):
                      if x["kimlik"] == "makine_konstruksiyonu")
             self.assertIs(b["sonuc"]["uygun"], beklenen, msg=f"mk_yok={mrl}")
 
+    def test_MRL_de_kaide_hesabi_paftaya_basilmaz(self):
+        """Var olmayan bir kaidenin kiriş satırları ve kontrolleri basılmaz;
+        bölüm yerinde kalır ki numaralar kaymasın."""
+        s = M.hesapla({"mk_yok": True})
+        b = next(x for x in s["bolumler"] if x["kimlik"] == "makine_konstruksiyonu")
+        self.assertEqual([a.get("tip") for a in b["adimlar"]], ["metin"])
+        self.assertIn("uygulanmaz", b["adimlar"][0]["deger"])
+        self.assertFalse(any(k.startswith("makine.") for k in s["ara"]))
+        self.assertTrue(b["baslik"].startswith("2 "))
+        #  Kabin rayı k1'i yine bulur
+        daireli = M.hesapla({"mk_yok": False})
+        self.assertEqual(s["ara"]["kabin_ray.c21.d1.Fx"], daireli["ara"]["kabin_ray.c21.d1.Fx"])
+
+    def test_MRL_de_kaide_alanlari_dogrulanmaz(self):
+        """Hesaba girmeyen, ekranda da gizli bir alan projeyi durdurmamalı."""
+        bozuk = {"yan_yatak_boyu": 100, "sase_yuksekligi": 0}
+        self.assertFalse(M.hesapla(dict(bozuk, mk_yok=False))["aktif"])
+        s = M.hesapla(dict(bozuk, mk_yok=True))
+        self.assertTrue(s["aktif"], s.get("hata"))
+        self.assertIn("yan_yatak_boyu", MG.KAIDE_ALANLARI)
+
+    def test_paten_tipi_ray_basina(self):
+        """Kabinin paten tipi karşı ağırlığa geçmez;  girilen ℓ kabinindir."""
+        kabin_mak = M.hesapla({"paten_tipi": "Makaralı"})
+        ikisi_mak = M.hesapla({"paten_tipi": "Makaralı", "agirlik_paten_tipi": "Makaralı"})
+        varsayilan = M.hesapla({})
+        p = {"c": T.ray(MG.ALAN["agirlik_ray_profili"][5], "c")}
+        #  karşı ağırlık kaymalı kaldıkça σF varsayılanla aynı
+        self.assertEqual(kabin_mak["ara"]["agirlik_ray.sf"], varsayilan["ara"]["agirlik_ray.sf"])
+        #  makaralıda σF = 1,85·Fx/c²
+        self.assertAlmostEqual(ikisi_mak["ara"]["agirlik_ray.sf"],
+                               1.85 * ikisi_mak["ara"]["agirlik_ray.Fx"] / p["c"] ** 2, places=9)
+        l140 = M.hesapla({"paten_balata_boyu": 140})
+        self.assertEqual(l140["ara"]["agirlik_ray.sf"], varsayilan["ara"]["agirlik_ray.sf"])
+        self.assertNotEqual(l140["ara"]["kabin_ray.c23.sf"], varsayilan["ara"]["kabin_ray.c23.sf"])
+
     def test_makine_dairesi_varken_secim_yok_sayilir(self):
         """Makine dairesi varsa makine kendi kaidesindedir ( bölüm 2 );  aynı
         yükü bir de raya bindirmek onu İKİ KEZ saymaktır."""

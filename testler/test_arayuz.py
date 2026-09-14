@@ -839,6 +839,45 @@ def calistir():
         r.esit("yoldaki eski yanıt tazelemeyi iptal etmiyor — kutu tablo değerinde",
                _yaris["kutu"], str(int(_bek1000)))
         r.esit("… ve hesaba tablo değeri gidiyor", _yaris["hesap"], _bek1000)
+
+        #  AYNI ASANSÖRDE İKİ HIZLI DEĞİŞİKLİK.  1000 kg'ın isteği yoldayken
+        #  yük 1600 kg yapılınca iki değişiklik aynı asansör sırasını taşıyordu:
+        #  eski yanıt bayrağı kapatıp 950'yi kutuya yazıyor, 1600 kg'lık hesap
+        #  950 ile gidiyordu ( bağımsız incelemede yeniden üretildi ).  İlk
+        #  yanıt elle bekletilir ve ikinci değişiklikten HEMEN sonra bırakılır —
+        #  zamanlamaya bağlı değildir.
+        _bek1600 = _OFK.bos_kabin_kutlesi(1600)
+        _yaris2 = pg.evaluate("""async () => {
+            const bek = ms => new Promise(r => setTimeout(r, ms));
+            const by = document.getElementById('m_beyan_yuku');
+            const sec = v => { by.value = v;
+                by.dispatchEvent(new Event('change', {bubbles: true})); };
+            const f0 = window.fetch;
+            let birak; const kapi = new Promise(r => birak = r);
+            let ilk = true;
+            const giden = [];
+            window.fetch = async (u, o) => {
+                const coklu = String(u).includes('/api/uygulama/coklu');
+                if (coklu) { const b = JSON.parse(o.body).asansorler[0];
+                             giden.push([b.beyan_yuku, b.kabin_agirligi]); }
+                const r = await f0(u, o);
+                if (coklu && ilk) { ilk = false; await kapi; }
+                return r; };
+            try {
+                sec('1000');
+                await bek(600);                 // 1000 kg'ın isteği yolda, yanıt bekletiliyor
+                sec('1600');
+                birak();                        // eski yanıt, yeni istek çıkmadan döner
+                await bek(2500);
+            } finally { window.fetch = f0; }
+            return {kutu: document.getElementById('m_kabin_agirligi').value,
+                    hesap: SON.m.girdi.kabin_agirligi, giden};
+        }""")
+        r.kontrol("hızlı yük değişiminde eski yanıt yeni yükün kabin ağırlığını ezmiyor",
+                  _yaris2["kutu"] == str(int(_bek1600)),
+                  f"→ kutu {_yaris2['kutu']!r}, beklenen {int(_bek1600)} · gönderilenler {_yaris2['giden']}")
+        r.esit("… ve 1600 kg'lık hesaba 1600 kg'ın tablo değeri gidiyor",
+               _yaris2["hesap"], _bek1600)
         pg.select_option("#m_beyan_yuku", "800")
         pg.wait_for_timeout(1600)
         pg.fill("#m_kabin_agirligi", "700")
@@ -1007,6 +1046,10 @@ def calistir():
         _b2 = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
         r.kontrol("σem düşürülünce makine kaidesi kalıyor",
                   _b2.get("uygun") is False, f"→ {_b2}")
+        r.kontrol("σem satırı kaynağını OFİS STANDARDI diye yazıyor",
+                  "OFİS STANDARDI" in pg.evaluate(
+                      "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
+                      ".adimlar.find(a=>a.sembol==='σem').kaynak"))
         #  MRL'ye dönünce kaide hesabı uygunluk beyan etmemeli
         _mrl_sec(pg, True)
         pg.wait_for_timeout(2200)
@@ -1014,14 +1057,17 @@ def calistir():
         r.kontrol("MRL'de makine kaidesi uygunluk beyan etmiyor",
                   _b2m.get("uygun") is None and "UYGULANMAZ" in _b2m.get("metin", ""),
                   f"→ {_b2m}")
+        #  Var olmayan kaidenin kiriş satırları basılmaz, alanları da gizlenir
+        _n2m = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).adimlar.length")
+        r.esit("MRL'de bölüm 2 yalnız 'uygulanmaz' satırını taşıyor", _n2m, 1)
+        r.kontrol("MRL'de kaide kirişi alanları gizli",
+                  pg.evaluate("MUK.kaide_alanlari.length > 0 && MUK.kaide_alanlari.every("
+                              "a => document.getElementById('m_' + a).closest('.alan')"
+                              ".classList.contains('kural-disi'))"))
         #  Kutu VARSAYILAN durumunda ( MRL ) bırakılır ve SABİTLER sekmesine
         #  dönülür — aşağıdaki "Tümünü varsayılana döndür" düğmesi oradadır.
         pg.click(".sekme[data-sekme='sabitler']")
         pg.wait_for_timeout(600)
-        r.kontrol("σem satırı kaynağını OFİS STANDARDI diye yazıyor",
-                  "OFİS STANDARDI" in pg.evaluate(
-                      "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
-                      ".adimlar.find(a=>a.sembol==='σem').kaynak"))
         pg.click("button:has-text('Tümünü varsayılana döndür')")
         pg.wait_for_timeout(2200)
         r.kontrol("sabitler varsayılana dönüyor",

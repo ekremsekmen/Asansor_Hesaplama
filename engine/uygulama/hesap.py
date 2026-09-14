@@ -64,6 +64,36 @@ def _notlari_uyarla(b):
     return b
 
 
+def _proje_geneli_bolumleri(av, g):
+    """Binaya ait bölümler ve yapılamayan zorunlu hesaplar  —  ( bölümler , eksik ).
+
+    Makine dairesi aydınlatması ve temel topraklama BİNAYA aittir, asansöre
+    değil:  bir binada dört asansör varsa topraklama tektir.  Bölümler
+    işaretlenir ( proje_geneli ) ve numarasızdır;  numarayı çağıran verir.
+    ``av`` avan motorunun sonucudur:  topraklama iletkenlerini oradaki
+    asansörlerin EN BÜYÜK koruma iletkeninden türetir ( bkz. hesapla_coklu ).
+    """
+    bolumler, eksik = [], []
+    mk = av.get("makine_dairesi") or {}
+    if mk.get("aktif"):
+        bolumler.append(dict(_notlari_uyarla(mk["bolum"]), proje_geneli=True))
+    elif mk.get("mk_yok") is False:
+        #  Makine dairesi VAR denmiş ama aydınlatması hesaplanamamış:  zorunlu
+        #  bir hesap eksiktir, proje "uygun" sayılamaz.
+        eksik.append("MAKİNE DAİRESİ AYDINLATMA HESABI YAPILAMADI: "
+                     + str(mk.get("uyari") or ""))
+
+    tp = av.get("topraklama") or {}
+    if tp.get("aktif"):
+        bolumler += [dict(_notlari_uyarla(b), proje_geneli=True)
+                     for b in (tp.get("bolumler") or [])]
+    elif g.get("temel_a") or g.get("temel_b"):
+        #  Temel ölçüsü girilmiş ama topraklama hesaplanamamış — eksik hesap.
+        eksik.append("TOPRAKLAMA HESABI YAPILAMADI: "
+                     + str(tp.get("uyari") or ""))
+    return bolumler, eksik
+
+
 def hesapla(veriler=None):
     """TEK ASANSÖRÜN hesabı  —  mukavemet + elektrik + topraklama.
 
@@ -115,34 +145,14 @@ def hesapla(veriler=None):
         sira += 1
         bolumler.append(numarala(_notlari_uyarla(b), sira))
 
-    #  PROJE GENELİ BÖLÜMLER.  Makine dairesi aydınlatması ve temel
-    #  topraklama BİNAYA aittir, asansöre değil:  bir binada dört asansör
-    #  varsa topraklama tektir.  İşaretlenirler ki çoklu projede yalnız BİR
-    #  KEZ paftaya girsinler ( bkz. hesapla_coklu ) — avan projesi de bu iki
-    #  hesabı proje seviyesinde tutar.
-    mk = av.get("makine_dairesi") or {}
-    if mk.get("aktif"):
+    #  PROJE GENELİ BÖLÜMLER.  İşaretlenirler ki çoklu projede yalnız BİR
+    #  KEZ paftaya girsinler — ve orada bütün asansörlerle yeniden
+    #  hesaplanırlar ( bkz. hesapla_coklu ).
+    _pg, _pg_eksik = _proje_geneli_bolumleri(av, g)
+    for b in _pg:
         sira += 1
-        b = numarala(_notlari_uyarla(mk["bolum"]), sira)
-        b["proje_geneli"] = True
-        bolumler.append(b)
-    elif mk.get("mk_yok") is False:
-        #  Makine dairesi VAR denmiş ama aydınlatması hesaplanamamış:  zorunlu
-        #  bir hesap eksiktir, proje "uygun" sayılamaz.
-        eksik.append("MAKİNE DAİRESİ AYDINLATMA HESABI YAPILAMADI: "
-                     + str(mk.get("uyari") or ""))
-
-    tp = av.get("topraklama") or {}
-    if tp.get("aktif"):
-        for b in (tp.get("bolumler") or []):
-            sira += 1
-            b = numarala(_notlari_uyarla(b), sira)
-            b["proje_geneli"] = True
-            bolumler.append(b)
-    elif g.get("temel_a") or g.get("temel_b"):
-        #  Temel ölçüsü girilmiş ama topraklama hesaplanamamış — eksik hesap.
-        eksik.append("TOPRAKLAMA HESABI YAPILAMADI: "
-                     + str(tp.get("uyari") or ""))
+        bolumler.append(numarala(b, sira))
+    eksik += _pg_eksik
 
     #  GENEL SONUÇ:  bölüm sonuçları + ENGELLEYİCİ uyarılar + EKSİK hesaplar.
     #  Bilgilendirici uyarılar ( reddedilen ofis girdisi, kabin alanı uyarısı … )
@@ -200,8 +210,31 @@ def hesapla(veriler=None):
 #  PROJE GENELİ HESAPLAR BİR KEZ GİRER.  Temel topraklama ve makine dairesi
 #  aydınlatması binaya aittir;  dört paftada dört kez aynı topraklama
 #  hesabını basmak hem yer kaplar hem de "hangisi geçerli" sorusunu doğurur.
-#  İlk asansörün sonucundan alınır, ötekilerden düşülür.
+#  Asansörlerden düşülür ve BÜTÜN asansörlerle bir kez hesaplanır.
 ASANSOR_AZAMI = 4
+
+
+def _tesis_bolumleri(aktifler):
+    """Binaya ait bölümler  —  bütün asansörlerin sonuçlarıyla BİR KEZ.
+
+    TOPRAKLAMA İLETKENLERİ TESİSTEKİ EN BÜYÜK KORUMA İLETKENİNDEN TÜRER
+    ( Elektrik Tesislerinde Topraklamalar Yönetmeliği m.9 ).  Bölümler önce
+    ilk asansörün kendi hesabından alınıyordu;  o hesap yalnız KENDİ koruma
+    iletkenini gördüğü için sonuç asansörlerin SIRASINA bağlıydı:  kolon
+    kesiti 16 ve 95 mm² olan iki asansörde 16'lık önce gelince topraklama
+    iletkeni 16 mm², ana potansiyel dengeleme 10 mm² çıkıyordu — 95'lik önce
+    gelince 50 ve 25.  Avan projesi bunu zaten tesis düzeyinde yapar;  burada
+    aynı motor, bütün asansörler tek tesis olarak verilerek bir kez koşturulur.
+    """
+    if not aktifler:
+        return []
+    ilk = aktifler[0]["girdi"]
+    tesis = UG.kopru(ilk)                       # ortak · ofis sabitleri binanındır
+    tesis["asansorler"] = [UG.kopru(s["girdi"])["asansorler"][0] for s in aktifler]
+    bolumler, _eksik = _proje_geneli_bolumleri(E_AVAN.hesapla(tesis), ilk)
+    #  KENDİ NUMARALARINI ALIRLAR:  bir asansörün bölümleri değil, ayrı bir
+    #  başlığın altındadırlar.
+    return [numarala(b, n) for n, b in enumerate(bolumler, 1)]
 
 
 def hesapla_coklu(asansorler=None, ortak=None):
@@ -227,28 +260,22 @@ def hesapla_coklu(asansorler=None, ortak=None):
     #  ait hesap, asansörlerin arasında değil HEPSİNİN ARKASINDA durmalıdır.
     #  Burada ayrılıp üst seviyeye alınırlar;  paftayı basan taraf onları en
     #  sona, kendi şeridiyle bir kez koyar ( bkz. pdf_export.uygulama_coklu_pdf ).
-    sonuclar, proje_geneli = [], []
+    sonuclar = []
     for i, g in enumerate(ham, 1):
         s = hesapla(dict(ortak, **g))
         s["no"] = i
         s["tanim"] = str(g.get("asansor_adi") or "").strip() or f"{i} nolu asansör"
         if s.get("aktif"):
-            ayrilan = [b for b in s["bolumler"] if b.get("proje_geneli")]
-            if ayrilan:
-                if not proje_geneli:
-                    #  KENDİ NUMARALARINI ALIRLAR:  artık bir asansörün
-                    #  bölümleri değiller, ayrı bir başlığın altındalar.
-                    proje_geneli = [numarala(b, n)
-                                    for n, b in enumerate(ayrilan, 1)]
-                #  Asansörün kalan bölümleri boşluksuz 1..N diye yeniden
-                #  numaralanır — paftada 11-12-13 diye gitsin.
-                s["bolumler"] = [
-                    numarala(b, n) for n, b in
-                    enumerate([x for x in s["bolumler"]
-                               if not x.get("proje_geneli")], 1)]
+            #  Asansörün kalan bölümleri boşluksuz 1..N diye yeniden
+            #  numaralanır — paftada 11-12-13 diye gitsin.
+            s["bolumler"] = [
+                numarala(b, n) for n, b in
+                enumerate([x for x in s["bolumler"]
+                           if not x.get("proje_geneli")], 1)]
         sonuclar.append(s)
 
     aktifler = [s for s in sonuclar if s.get("aktif")]
+    proje_geneli = _tesis_bolumleri(aktifler)
     #  PROJE GENELİ HESAP DA "HEPSİ UYGUN"A GİRER.  Bölümler asansörlerden
     #  çıkınca onların ozet.tumu_uygun bayrağı bunları artık saymaz;  ayrıca
     #  katılmasaydı topraklaması yetersiz bir proje "UYGUNDUR" görünürdü.

@@ -32,6 +32,10 @@ TESTLER = [
     #  ( dondurulmuş referans · altın çıktı ) karşı denetler;  bu, bizden
     #  bağımsız iki programın yayımlanmış paftalarına karşı denetler.
     ("12", "Dış referans paftaları", "testler.test_referans_paftalar"),
+    #  Canlı hesap:  motor doğru hesaplasa bile ekran eski bir girdinin
+    #  sonucunu gösterebilir ya da eski bir değeri sonraki hesaba taşıyabilir.
+    #  Her girdi değişikliğinden sonra ekran = formun taze hesabı = çıktı.
+    ("13", "Canlı hesap tutarlılığı", "testler.test_canli_hesap"),
 ]
 
 
