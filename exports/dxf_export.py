@@ -61,8 +61,8 @@ ARA = 10.0
 #  Paftalar boşluğa değil, ofisin KENDİ pafta formatının içine dizilir:
 #  solda değişmeyen antet bloğu, sağında paftaların yerleştiği büyük alan.
 #  Şablon `templates/proje_formati.dxf` dosyasıdır ve ofisin kendi çiziminden
-#  ( TİP PROJE FORMATI.dwg ) alınmıştır — Excel şablonlarında olduğu gibi,
-#  program formatı yeniden çizmez, hazır olanı doldurur.
+#  ( TİP PROJE FORMATI.dwg ) alınmıştır — program formatı yeniden çizmez,
+#  hazır olanı doldurur.
 #
 #  Aşağıdaki ölçüler ŞABLONUN KENDİ KOORDİNATLARIDIR ( mm ).  Şablon
 #  değişirse `_sablon_dogrula` bunu yakalar ve dosya üretilmez — sessizce
@@ -449,6 +449,24 @@ def _kapak_hucresini_bosalt(d):
     return silinen
 
 
+def _uzatma(adet):
+    """Sayfalar sığsın diye formatın SAĞA uzatılacağı miktar  ( mm ).
+
+    Ofis formatının serbest alanı iki satırda 13 A4 alır ( 26 sayfa ).  Uygulama
+    projesi asansör başına ~21 sayfadır;  iki asansörlü bir proje 45 sayfa
+    eder ve sayfalar çerçevenin ALTINA taşıyordu — çizimde duruyor ama baskıya
+    giden çerçevenin dışındaydı.  Artık satır sayısı sabit kalır ( formatın
+    yüksekliği ) ve çerçeve gerektiği kadar SÜTUN kadar sağa uzar.  Sığan
+    projede uzatma sıfırdır, format olduğu gibi kalır.
+    """
+    sol, alt, sag, ust = SERBEST
+    sutun = max(1, int((sag - sol) // (A4_G + SUTUN_ARA)))
+    satir_azami = max(1, int((ust - alt + SATIR_ARA) // (A4_Y + SATIR_ARA)))
+    if adet <= sutun * satir_azami:
+        return 0.0
+    return (-(-adet // satir_azami) - sutun) * (A4_G + SUTUN_ARA)
+
+
 def _yerlesim(adet):
     """
     Serbest alanda `adet` A4 sayfanın sol-alt köşelerini verir.
@@ -457,8 +475,13 @@ def _yerlesim(adet):
     SOLA YASLANIR:  ilk sayfa antet bloğunun hemen yanından başlar, sonradan
     eklenen sayfalar sağa doğru büyür.  Ortalansaydı proje büyüdükçe bütün
     sayfaların yeri kayardı.  Dikeyde ise alanın ortasına oturur.
+
+    Sayfalar formatın yüksekliğine sığmıyorsa aşağı taşmaz:  alan SAĞA
+    uzatılır ( bkz. _uzatma ) — dönen `tasti` bu yüzden şablonlu çizimde
+    hep yanlıştır.
     """
     sol, alt, sag, ust = SERBEST
+    sag += _uzatma(adet)
     gen, yuk = sag - sol, ust - alt
     #  Sol boşluk düşüldükten sonra kaç A4 sığıyor
     sutun = max(1, int((gen - SUTUN_ARA + SUTUN_ARA) // (A4_G + SUTUN_ARA)))
@@ -472,6 +495,26 @@ def _yerlesim(adet):
         yerler.append((x0 + c * (A4_G + SUTUN_ARA),
                        y_ust - (r + 1) * A4_Y - r * SATIR_ARA))
     return yerler, (kullanilan_y > yuk + 0.5)
+
+
+def _cerceveyi_uzat(d, uzatma):
+    """Formatın dış çerçevesini `uzatma` mm sağa uzatır.
+
+    Şablonda sağ kenara dayanan yalnız ÇERÇEVE ÇİZGİLERİ vardır:  sağ dikey
+    kenar ile ona bağlanan üst / alt yatay kenarlar ( antet ve kapak hücresi
+    solda durur ).  Ucu sağ kenarda olan her LINE ucu kaydırılır:  dikey kenar
+    bütünüyle sağa geçer, yatay kenarlar uzar.  Başka hiçbir varlığa dokunulmaz.
+    """
+    if uzatma <= 0:
+        return 0
+    kayan = 0
+    for e in d.modelspace().query("LINE"):
+        for uc in ("start", "end"):
+            p = e.dxf.get(uc)
+            if abs(p.x - BANT[2]) <= 0.5:
+                e.dxf.set(uc, (p.x + uzatma, p.y, p.z))
+                kayan += 1
+    return kayan
 
 
 def _gorunumu_ayarla(d, kutu):
@@ -556,6 +599,8 @@ def _formata_yerlestir(sayfalar):
         _sayfayi_ciz(msp, kapak, ox, oy)
 
     yerler, tasti = _yerlesim(len(digerleri))
+    uzatma = _uzatma(len(digerleri))
+    _cerceveyi_uzat(d, uzatma)
     for sayfa, (ox, oy) in zip(digerleri, yerler):
         _a4_cercevesi(msp, ox, oy, sayfa["genislik"] * PT_MM,
                       sayfa["yukseklik"] * PT_MM)
@@ -563,7 +608,7 @@ def _formata_yerlestir(sayfalar):
 
     _gorunumu_ayarla(d, (BANT[0] - 10,
                          min([BANT[1]] + [y for _x, y in yerler]) - 10,
-                         BANT[2] + 10, BANT[3] + 10))
+                         BANT[2] + uzatma + 10, BANT[3] + 10))
     return _kaydet(d), tasti
 
 
@@ -691,9 +736,9 @@ def _okubeni(dosya_adi, dwg_var, sebep, sablonlu=False, tasti=False, ekler=()):
 def proje_paketi(paftalar, dosya_adi="Avan Projesi", ekler=None):
     """`ekler`:  pakete konacak ek dosyalar  —  [ ( ad, bayt ) ].
 
-    "Projeyi paketle" düğmesi buradan geçer:  paftaların yanına çalışma
-    kitabı ve PROJE DOSYASI da girer, böylece teslim paketi ile geri dönüş
-    noktası aynı arşivde durur.
+    "Projeyi paketle" düğmesi buradan geçer:  paftaların yanına PROJE
+    DOSYASI da girer, böylece teslim paketi ile geri dönüş noktası aynı
+    arşivde durur.
     """
     return _proje_paketi(paftalar, dosya_adi, ekler)
 

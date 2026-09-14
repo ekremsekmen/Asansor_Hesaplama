@@ -2,25 +2,22 @@
 """
 MUKAVEMET HESABI — GİRDİ SÖZLEŞMESİ        ( uygulama projesi )
 
-Kaynak:  templates/MUKAVEMET_HESABI.xlsx · "Veri Girişi" sayfası
-Tüketen: "11-Muk. Hesapları" sayfası  ( → engine/mukavemet.py )
+Tüketen:  engine/uygulama/mukavemet.py
 
 Bu modül hesap YAPMAZ.  Yalnızca mukavemet motorunun hangi girdileri
-beklediğini, her birinin Excel'deki karşılığını, birimini, seçenek
-listesini ve varsayılanını tanımlar.  Arayüz, XLSX içe/dışa aktarım ve
-doğrulama testi hep buradan okur — tek doğruluk kaynağı.
+beklediğini, her birinin birimini, seçenek listesini ve varsayılanını
+tanımlar.  Arayüz, API ve doğrulama testleri hep buradan okur — tek
+doğruluk kaynağı.
 
-AVANDAN AYRIDIR.  Avan tarafındaki tablolar ( engine/tables.py ) MMO/697
-avan kitabından gelir; buradakiler bu Excel'in kendi tablolarıdır ve
-bilerek ayrı tutulmuştur ( bkz. engine/mukavemet_tablolari.py ).
+AVANDAN AYRIDIR.  Avan tarafındaki tablolar ( engine/avan/tablolar.py )
+MMO/697 avan kitabından gelir;  uygulama projesinin tabloları bilerek ayrı
+tutulmuştur ( bkz. engine/uygulama/mukavemet_tablolari.py ).
 """
 from engine.ortak import ofis as OFIS
 from engine.ortak.steps import evet_mi
 from engine.uygulama import mukavemet_tablolari as MT
 
-#  Kabin durak yüksekliklerinin Excel'deki yeri:  G12:G34  ( 20 durak +
-#  3 boş satır ).  Motor bunları tek tek değil, liste olarak alır.
-DURAK_HUCRELERI = tuple(f"G{r}" for r in range(12, 35))
+#  Kabin durak yükseklikleri tek tek değil, liste olarak alınır.
 DURAK_AZAMI = 20
 
 
@@ -28,45 +25,50 @@ def _s(*d):
     return tuple(d)
 
 
-#  ( anahtar, hücre, etiket, birim, tür, seçenekler, varsayılan )
+#  ( anahtar, etiket, birim, tür, seçenekler, varsayılan )
 #    tür:  "sayi" · "secim" · "liste" · "hesap"
 #    "hesap" alanları kullanıcıdan alınmaz — tamamla() üretir.
 ALANLAR = (
     # ── ASANSÖR TEKNİK BİLGİLERİ ──────────────────────────────────────
     #  ASANSÖR ADI.  Bir binada dört asansör olabilir ve hepsi ayrı kuyudadır;
     #  paftaları birbirinden ayırt edilebilmeli.  Boş bırakılırsa "1 nolu
-    #  asansör" gibi numarayla anılır.  Kaynak Excel'de karşılığı yoktur
-    #  ( tek asansörlük bir kitaptır ), o yüzden hücre adresi boştur.
-    ("asansor_adi",       "",     "Asansör adı  ( paftada görünür )",  "—",    "metin", None, None),
+    #  asansör" gibi numarayla anılır.
+    ("asansor_adi",       "Asansör adı  ( paftada görünür )",  "—",    "metin", None, None),
+    #  ASANSÖR TİPİ.  TS EN 81-20 m.5.7.2.3.6 kapı eşiğine binen kuvveti
+    #  asansörün TİPİNE göre verir:  insan asansöründe Fs = 0,4·gn·Q, yük-insan
+    #  asansöründe 0,6·gn·Q.  Beyan yüküne bağlı bir eşik ( Q < 2500 kg →
+    #  0,4 ) standartta yoktur — 1600 kg bir yük-insan asansörü 0,4 ile
+    #  emniyetsiz hesaplanırdı.
+    ("asansor_tipi",      "Asansör tipi",                      "—",    "secim",
+     MT.ASANSOR_TIPLERI, MT.ASANSOR_TIPLERI[0]),
     #  SEÇENEKLER TABLODAN TÜRETİLİR.  Elle yazılan ikinci bir liste, kabin
-    #  alanı tablosuyla ayrışabilir — nitekim kaynak kitapta ayrışmıştı:
-    #  EN 81-20 Çizelge 6'nın 7 beyan yükü listede yoktu ve o yüklerde hiç
-    #  hesap yapılamıyordu.  Artık tek kaynak KABIN_ALANI'dır.
-    ("beyan_yuku",        "C59",  "Beyan yükü",                        "kg",   "secim",
+    #  alanı tablosuyla ayrışabilir ( EN 81-20 Çizelge 6'nın bazı yükleri
+    #  listede olmaz, o yüklerde hesap yapılamaz ).  Tek kaynak KABIN_ALANI'dır.
+    ("beyan_yuku",        "Beyan yükü",                        "kg",   "secim",
      tuple(k[0] for k in MT.KABIN_ALANI), 800),
-    ("beyan_hizi",        "C61",  "Beyan hızı",                        "m/s",  "secim",
+    ("beyan_hizi",        "Beyan hızı",                        "m/s",  "secim",
      _s(0.63, 0.8, 1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6), 1),
-    ("seyir_mesafesi",    "C63",  "Seyir mesafesi",                    "m",    "sayi", None, 21),
+    ("seyir_mesafesi",    "Seyir mesafesi",                    "m",    "sayi", None, 21),
     #  BOŞ BIRAKILIRSA OFİS TABLOSUNDAN DOLAR  ( engine/ortak/ofis.py ).
     #  Standartlarda böyle bir çizelge yoktur — TS EN 81-20 / 81-50 kabin
     #  kütlesini ( P ) hep GİRDİ olarak tanımlar;  tablo ofisin kendi
     #  imalatçı deneyimidir ve avan tarafında da aynı yerden okunur.
-    #  VARSAYILANI 700'DÜR:  kaynak kitabın örnek projesinin değeri ( C75 ) ve
-    #  bütün Excel karşılaştırma testlerinin dayanağı odur.  Beyan yükü
-    #  değiştirildiğinde arayüz alanı tablodan günceller.
-    ("kabin_agirligi",    "C75",  "Kabin ağırlığı",                    "kg",   "sayi", None, 700),
-    ("karsi_agirlik",     "C80",  "Karşı ağırlık",                     "kg",   "hesap", None, None),
-    ("aski_orani",        "B100", "Askı oranı  ( 1 : n )",             "—",    "secim", _s(1, 2), 2),
+    #  VARSAYILANI 700'DÜR:  örnek projenin değeri ve doğrulama testlerinin
+    #  dayanağı odur.  Beyan yükü değiştirildiğinde arayüz alanı tablodan
+    #  günceller.
+    ("kabin_agirligi",    "Kabin ağırlığı",                    "kg",   "sayi", None, 700),
+    ("karsi_agirlik",     "Karşı ağırlık",                     "kg",   "hesap", None, None),
+    ("aski_orani",        "Askı oranı  ( 1 : n )",             "—",    "secim", _s(1, 2), 2),
 
     # ── KABİN VE KAPI ─────────────────────────────────────────────────
-    ("kabin_genisligi",   "C73",  "Kabin genişliği",                   "mm",   "sayi", None, 1450),
-    ("kabin_derinligi",   "C74",  "Kabin derinliği",                   "mm",   "sayi", None, 1350),
-    ("kat_kapisi_tipi",   "C66",  "Kat kapısı tipi",                   "—",    "secim",
+    ("kabin_genisligi",   "Kabin genişliği",                   "mm",   "sayi", None, 1450),
+    ("kabin_derinligi",   "Kabin derinliği",                   "mm",   "sayi", None, 1350),
+    ("kat_kapisi_tipi",   "Kat kapısı tipi",                   "—",    "secim",
      MT.KAPI_TIPLERI, "Teleskopik Sol"),
-    ("kapi_genisligi",    "C71",  "Kat kapısı genişliği",              "mm",   "secim",
+    ("kapi_genisligi",    "Kat kapısı genişliği",              "mm",   "secim",
      _s(700, 800, 900, 1000, 1100, 1200, 1300, 1400), 900),
-    ("uzun_pervaz",       "F69",  "Uzun pervaz",                       "mm",   "sayi", None, 90),
-    ("kabin_kaciklik",    "C76",  "Kabin merkezinin y ekseninde kaçıklığı", "mm", "sayi", None, 0),
+    ("uzun_pervaz",       "Uzun pervaz",                       "mm",   "sayi", None, 90),
+    ("kabin_kaciklik",    "Kabin merkezinin y ekseninde kaçıklığı", "mm", "sayi", None, 0),
     #  ASKI NOKTASI ( S ) — KAÇIKLIKTAN AYRI BİR NOKTADIR.
     #  Ek C.1.2 ray eksenini orijin alıp beş nokta tanımlar:  kabin merkezi
     #  ( C ), boş kabin kütlesi ( P ), beyan yükü ( Q ), ASKI ( S ) ve kapı.
@@ -80,55 +82,54 @@ ALANLAR = (
     #  kavradığı için tepki ray ekseninden ölçülür.  Bölümün hükmünü genelde
     #  o durum verdiğinden ( k1 = 2 ), varsayılan 0 çoğu projede sonucu
     #  değiştirmez — ama eksantrik askılı yerleşimde gerçek değer girilmelidir.
-    ("aski_kaciklik_x",   "",     "Askı noktasının x kaçıklığı  ( xs )", "mm", "sayi", None, 0),
-    ("aski_kaciklik_y",   "",     "Askı noktasının y kaçıklığı  ( ys )", "mm", "sayi", None, 0),
-    ("agirlik_yeri",      "C77",  "Karşı ağırlık yeri",                "—",    "secim",
+    ("aski_kaciklik_x",   "Askı noktasının x kaçıklığı  ( xs )", "mm", "sayi", None, 0),
+    ("aski_kaciklik_y",   "Askı noktasının y kaçıklığı  ( ys )", "mm", "sayi", None, 0),
+    ("agirlik_yeri",      "Karşı ağırlık yeri",                "—",    "secim",
      _s("Sağ", "Sol", "Arka"), "Sağ"),
-    ("kapi_agirligi",     "F127", "Kabin kapısı ağırlığı  ( F_D1 )",   "kg",   "sayi", None, 75),
-    ("kapi_mekanizma_payi", "F128", "Kapı mekanizma ağ. mrk. payı",    "mm",   "sayi", None, 50),
+    ("kapi_agirligi",     "Kabin kapısı ağırlığı  ( F_D1 )",   "kg",   "sayi", None, 75),
+    ("kapi_mekanizma_payi", "Kapı mekanizma ağ. mrk. payı",    "mm",   "sayi", None, 50),
 
     # ── DURAK VE KUYU ─────────────────────────────────────────────────
-    ("durak_yukseklikleri", "G12:G34", "Durak yükseklikleri",          "mm",   "liste", None,
+    ("durak_yukseklikleri", "Durak yükseklikleri",          "mm",   "liste", None,
      _s(3000, 3000, 3000, 3000, 3000, 3000, 3000, 3750)),
-    ("son_kat_yuksekligi", "B132", "Son kat yüksekliği",               "mm",   "sayi", None, 3750),
-    ("kuyu_boyu",         "F80",  "Kuyu boyu",                         "mm",   "hesap", None, None),
-    ("kaide_yuksekligi",  "F107", "Kaide yüksekliği",                  "mm",   "sayi", None, 750),
-    ("kuyu_dibi",         "F114", "Kuyu dibi yüksekliği  ( KY )",      "mm",   "sayi", None, 1600),
-    ("kuyu_derinligi",    "F111", "Kuyu derinliği  ( KD )",            "mm",   "sayi", None, 1600),
-    ("ray_kapi_arasi",    "F112", "Ray - kapı arası  ( RK )",          "mm",   "sayi", None, 650),
-    ("agirlik_ray_duvar", "F113", "Ağırlık ray merkezi - duvar",       "mm",   "sayi", None, 125),
+    ("son_kat_yuksekligi", "Son kat yüksekliği",               "mm",   "sayi", None, 3750),
+    ("kuyu_boyu",         "Kuyu boyu",                         "mm",   "hesap", None, None),
+    ("kaide_yuksekligi",  "Kaide yüksekliği",                  "mm",   "sayi", None, 750),
+    ("kuyu_dibi",         "Kuyu dibi yüksekliği  ( KY )",      "mm",   "sayi", None, 1600),
+    ("kuyu_derinligi",    "Kuyu derinliği  ( KD )",            "mm",   "sayi", None, 1600),
+    ("ray_kapi_arasi",    "Ray - kapı arası  ( RK )",          "mm",   "sayi", None, 650),
+    ("agirlik_ray_duvar", "Ağırlık ray merkezi - duvar",       "mm",   "sayi", None, 125),
 
     # ── MAKİNE VE MOTOR ───────────────────────────────────────────────
-    ("motor_gucu",        "F95",  "Motor gücü",                        "kW",   "sayi", None, 4.9),
-    ("makine_agirligi",   "F126", "Makine - motor ağırlığı  ( Gm )",   "kg",   "sayi", None, 300),
+    ("motor_gucu",        "Motor gücü",                        "kW",   "sayi", None, 4.9),
+    ("makine_agirligi",   "Makine - motor ağırlığı  ( Gm )",   "kg",   "sayi", None, 300),
     #  C ( sap. kasnak yükü ) ve D ( makine yatak yükü ) KALDIRILDI.
     #  İkisi de YALNIZ sarılma açısını türetmek için vardı:
     #      B = H − C + D ,  α = 180° − arctan( ( Ra − 2·R1 ) / B )
     #  α artık doğrudan beyan ediliyor ( bkz. "sarilma_acisi" ), o yüzden
     #  bu iki ölçü hiçbir sonuca girmiyordu — formda durup kullanıcıyı
     #  oyalıyorlardı.  ELEport da açıyı doğrudan sorar ve bu ölçüleri hiç
-    #  istemez.  ( Kitaptaki F97 · F98 hücreleri de artık yazılmıyor;
-    #  şablonun α bloğu teslim kopyasında temizleniyor. )
-    ("tahrik_kasnak_capi", "F99", "D1 ( tahrik kasnağı çapı )",        "mm",   "sayi", None, 240),
-    ("saptirma_kasnak_capi", "F100", "D2 — saptırma kasnaklarının ORTALAMA çapı", "mm", "sayi", None, 240),
+    #  istemez.
+    ("tahrik_kasnak_capi", "D1 ( tahrik kasnağı çapı )",        "mm",   "sayi", None, 240),
+    ("saptirma_kasnak_capi", "D2 — saptırma kasnaklarının ORTALAMA çapı", "mm", "sayi", None, 240),
     #  Ds — EN KÜÇÜK kasnak çapı.  Sf formülündeki Kp = (Dt/Dp)⁴ ORTALAMA
     #  bükülme şiddetini temsil eder;  EN 81-20 m.5.5.2.1'in D/dr ≥ 40 sınırı
     #  ise HER kasnak için ayrı ayrı geçerlidir — ortalama sınırı geçse bile
     #  tek bir küçük kasnak geçemiyor olabilir.  Boş bırakılırsa ortalama çap
     #  kullanılır ( eski davranış ).
-    ("saptirma_kasnak_min_capi", "", "Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( boşsa ortalama )",
+    ("saptirma_kasnak_min_capi", "Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( boşsa ortalama )",
      "mm", "sayi", None, None),
-    ("sase_yuksekligi",   "F101", "Şase yüksekliği",                   "mm",   "sayi", None, 1100),
-    ("dikine_kiris",      "F102", "E  ( dikine kiriş ölçüsü )",        "—",    "secim",
+    ("sase_yuksekligi",   "Şase yüksekliği",                   "mm",   "sayi", None, 1100),
+    ("dikine_kiris",      "E  ( dikine kiriş ölçüsü )",        "—",    "secim",
      MT.NPU_OLCULERI, 120),
-    ("dikine_kiris_tipi", "G102", "E  ( dikine kiriş profili )",       "—",    "secim", _s("NPU"), "NPU"),
-    ("yan_yatak",         "F103", "F  ( yan yatak ölçüsü )",           "—",    "secim",
+    ("dikine_kiris_tipi", "E  ( dikine kiriş profili )",       "—",    "secim", _s("NPU"), "NPU"),
+    ("yan_yatak",         "F  ( yan yatak ölçüsü )",           "—",    "secim",
      MT.NPU_OLCULERI, 120),
-    ("yan_yatak_tipi",    "G103", "F  ( yan yatak profili )",          "—",    "secim", _s("NPU"), "NPU"),
-    ("yan_yatak_boyu",    "F104", "Yan yatak boyu",                    "mm",   "sayi", None, 1400),
+    ("yan_yatak_tipi",    "F  ( yan yatak profili )",          "—",    "secim", _s("NPU"), "NPU"),
+    ("yan_yatak_boyu",    "Yan yatak boyu",                    "mm",   "sayi", None, 1400),
 
     # ── ASKI HALATLARI ────────────────────────────────────────────────
-    ("halat_adedi",       "B98",  "Askı halatı adedi",                 "adet", "sayi", None, 7),
+    ("halat_adedi",       "Askı halatı adedi",                 "adet", "sayi", None, 7),
     #  KATALOG HALAT VERİSİ.  Birim kütle ve kopma yükü TS 12385-5 tablosundan
     #  ( 6x19 / 8x19 LİF ÖZLÜ ) çapa göre okunuyordu ve elle girme yolu yoktu.
     #  Küçük kasnaklı dişlisiz makinelerde kullanılan çelik özlü / özel halatlar
@@ -142,13 +143,13 @@ ALANLAR = (
     #  dengesizliği karşılar.  Program bunu HİÇ bilmiyordu:  zincirli bir
     #  tesiste motoru gereğinden büyük hesaplıyordu ( 120 m seyirde 20,7 kW
     #  yerine 39,3 kW ).  %0 = zincir yok  ·  %100 = tam dengeleme.
-    ("denge_zinciri",     "",     "Denge ( kompanzasyon ) zinciri",     "—",    "secim",
+    ("denge_zinciri",     "Denge ( kompanzasyon ) zinciri",     "—",    "secim",
      ("Yok", "Var"), "Yok"),
-    ("halat_birim_kutle", "",     "Askı halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+    ("halat_birim_kutle", "Askı halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
      "kg/m", "sayi", None, None),
-    ("halat_kopma_kN",    "",     "Askı halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
+    ("halat_kopma_kN",    "Askı halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
      "kN", "sayi", None, None),
-    ("halat_capi",        "B99",  "Askı halatı çapı",                  "mm",   "secim",
+    ("halat_capi",        "Askı halatı çapı",                  "mm",   "secim",
      MT.HALAT_CAPLARI, 6.5),
     #  D/d ≥ 40 — BELGEYLE AŞILABİLEN SINIR.  TS EN 81-20 m.5.5.2.1'in 40'ı
     #  uyumlaştırılmış standart şartıdır;  Asansör Yönetmeliği ( 2014/33/AB )
@@ -157,25 +158,24 @@ ALANLAR = (
     #  kanıtlar.  "Var" seçilirse 40'ın altı hata sayılmaz;  Sf ( EN 81-50
     #  m.5.12 ) yine aynen aranır — küçük kasnağın bedelini zaten o öder.
     #  ELEport aynı yerde Sf'yi de 12'ye indirir;  bu bilerek alınmadı.
-    ("kasnak_belgesi",    "",     "Dt/dh < 40 için onaylanmış kuruluş belgesi",
+    ("kasnak_belgesi",    "Dt/dh < 40 için onaylanmış kuruluş belgesi",
      "—",    "secim", ("Yok", "Var"), "Yok"),
-    ("kanal_sekli",       "F105", "Kasnak kanal şekli",                "—",    "secim",
+    ("kanal_sekli",       "Kasnak kanal şekli",                "—",    "secim",
      MT.KANAL_SEKILLERI, "Altı Kesik V Kanal"),
-    ("kanal_isleme",      "F106", "Kanal işleme şekli",                "—",    "secim",
+    ("kanal_isleme",      "Kanal işleme şekli",                "—",    "secim",
      MT.KANAL_ISLEME_SEKILLERI, "Sertleştirilmemiş"),
     # Açı doğrudan beyan edilir; eksik açıya varsayılan atanmaz.
-    ("sarilma_acisi",     "",     "α — halat sarılma açısı",
+    ("sarilma_acisi",     "α — halat sarılma açısı",
      "°", "sayi", None, None),
-    #  EN 81-50 m.5.12.2 — Nequiv(p).  Kaynak Excel bunları hücreye SABİT
-    #  yazar ( 11!AH105 = 1 , AH106 = 0 );  oysa tesisin askı düzenine bağlıdır.
-    ("kasnak_tek_yon",    "",     "Tek yönde bükülmeli kasnak sayısı  ( Nps )", "adet", "sayi", None, 1),
-    ("kasnak_ters_yon",   "",     "Ters yönde bükülmeli kasnak sayısı  ( Npr )", "adet", "sayi", None, 0),
-    ("acil_frenleme_a",   "B133", "Acil frenleme yavaşlaması  ( a )",  "m/s²", "sayi", None, 0.8),
-    ("kablo_tipi_1",      "B107", "1. bükülgen kablo tipi",            "—",    "secim",
+    #  EN 81-50 m.5.12.2 — Nequiv(p).  Sabit değil, tesisin askı düzenine bağlıdır.
+    ("kasnak_tek_yon",    "Tek yönde bükülmeli kasnak sayısı  ( Nps )", "adet", "sayi", None, 1),
+    ("kasnak_ters_yon",   "Ters yönde bükülmeli kasnak sayısı  ( Npr )", "adet", "sayi", None, 0),
+    ("acil_frenleme_a",   "Acil frenleme yavaşlaması  ( a )",  "m/s²", "sayi", None, 0.8),
+    ("kablo_tipi_1",      "1. bükülgen kablo tipi",            "—",    "secim",
      MT.KABLO_TIPLERI, "24 x 0,75"),
-    #  2. kablo tipi GİRDİ DEĞİLDİR:  kaynak kitapta kat kapısı tipinden
-    #  HLOOKUP ile türetilir ( 'Veri Girişi'!B108 ).  Sorulmaz, hesaplanır.
-    ("kablo_tipi_2",      "B108", "2. bükülgen kablo tipi",            "—",    "hesap", None, None),
+    #  2. kablo tipi GİRDİ DEĞİLDİR:  kat kapısı tipinden türetilir.
+    #  Sorulmaz, hesaplanır.
+    ("kablo_tipi_2",      "2. bükülgen kablo tipi",            "—",    "hesap", None, None),
     #  GEZİCİ KABLONUN İMALATÇI AĞIRLIĞI.  Program iki kabloyu tablodan alır
     #  ( 1. tip + kat kapısından türeyen 2. tip ) ve tablo dört kablo tanır;
     #  tek kablolu ya da farklı kesitli bir tesis girilemiyordu ( ELEport
@@ -183,7 +183,7 @@ ALANLAR = (
     #  MTrav motor gücüne, P'ye ( ray · kuyu tabanı ) ve tahrike girer.
     #  TOPLAMDIR:  bütün gezici kabloların metre ağırlıkları toplanıp yazılır.
     #  Boş bırakılırsa tablo kullanılır.
-    ("kablo_birim_kutle", "",     "Gezici kabloların toplam 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+    ("kablo_birim_kutle", "Gezici kabloların toplam 1 m ağırlığı  ( imalatçı — boşsa tablo )",
      "kg/m", "sayi", None, None),
     #  "halat_arasi" ( Ra ) da KALDIRILDI — o da yalnız α'nın payındaydı
     #  ( A = Ra − 2·R1 ).  Arka ağırlıkta kuyu derinliği − ray-kapı arası −
@@ -191,27 +191,26 @@ ALANLAR = (
     #  duruyor, yalnız bu türetme kalktı.
 
     # ── REGÜLATÖR ─────────────────────────────────────────────────────
-    ("reg_halat_capi",    "B104", "Regülatör halatı çapı",             "mm",   "secim", _s(6, 6.5, 8), 6),
-    ("reg_kasnak_capi",   "F121", "Regülatör kasnak çapı  ( Dreg )",   "mm",   "sayi", None, 300),
-    ("reg_kanal_acisi",   "F122", "Regülatör kanal açısı",             "°",    "sayi", None, 40),
-    ("reg_surtunme",      "F123", "Regülatör sürtünme faktörü  ( μ )", "—",    "sayi", None, 0.2),
-    ("reg_gergi_agirligi", "F124", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
+    ("reg_halat_capi",    "Regülatör halatı çapı",             "mm",   "secim", _s(6, 6.5, 8), 6),
+    ("reg_kasnak_capi",   "Regülatör kasnak çapı  ( Dreg )",   "mm",   "sayi", None, 300),
+    ("reg_kanal_acisi",   "Regülatör kanal açısı",             "°",    "sayi", None, 40),
+    ("reg_surtunme",      "Regülatör sürtünme faktörü  ( μ )", "—",    "sayi", None, 0.2),
+    ("reg_gergi_agirligi", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
     #  KATALOG VERİSİ ASKI HALATINDA VARDI, REGÜLATÖRDE YOKTU.  TS 12385-5
     #  tablosu yalnız LİF ÖZLÜ halatları kapsar;  regülatör halatları çoğu
     #  zaman çelik özlüdür ve kopma yükleri belirgin biçimde yüksektir
     #  ( 6 mm:  tablo 23,1 kN — piyasadaki çelik özlü 28 kN ).  Program bu
     #  yüzden UYGUN tasarımları reddedebiliyordu.  Boş bırakılırsa tablo.
-    ("reg_halat_birim_kutle", "", "Regülatör halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
+    ("reg_halat_birim_kutle", "Regülatör halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
      "kg/m", "sayi", None, None),
-    ("reg_halat_kopma_kN", "",   "Regülatör halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
+    ("reg_halat_kopma_kN", "Regülatör halatı en küçük kopma yükü  ( imalatçı — boşsa tablo )",
      "kN",   "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 d):  regülatörün ürettiği çekme kuvveti,
     #  "güvenlik tertibatını devreye sokmak için GEREKENİN İKİ KATI" ile
-    #  300 N'un BÜYÜĞÜNDEN az olamaz.  O kuvvet İMALATÇI VERİSİDİR;  kitap
-    #  onun yerine halatın kendi statik gergisinin iki katını koyuyordu
-    #  ( bkz. EXCEL_FARKLARI ).  Boş bırakılırsa yalnız 300 N sınırı
-    #  denetlenir ve pafta eksiği açıkça yazar.
-    ("guvenlik_devreye_kuvvet", "", "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )",
+    #  300 N'un BÜYÜĞÜNDEN az olamaz.  O kuvvet İMALATÇI VERİSİDİR ( halatın
+    #  kendi statik gergisinin iki katı DEĞİLDİR ).  Boş bırakılırsa yalnız
+    #  300 N sınırı denetlenir ve pafta eksiği açıkça yazar.
+    ("guvenlik_devreye_kuvvet", "Güv. tertibatını devreye sokma kuvveti  ( imalatçı )",
      "N", "sayi", None, None),
     #  Tst — SEÇİLEN makinenin tahrik kasnağına izin verdiği azami STATİK yük
     #  ( imalatçı kataloğu ).  Motor gücü "UYGUN" çıkıp kasnak yükü aşılmış bir
@@ -237,9 +236,8 @@ ALANLAR = (
     #  kullanıcı dokunmadığında program onun adına "bina yapısına" diye karar
     #  vermiş oluyordu ve bu yalnız paftadaki uyarı satırında görünüyordu.
     #  Seçim olarak sorulunca hangi yolun kabul edildiği HESAP SATIRI olur.
-    #  ( Eski projeler ve Excel kitapları True/'EVET' taşır;  MT.makine_raya_mi
-    #    ikisini de anlar. )
-    ("makine_raya_biniyor", "",   "Makine yükünün yolu",
+    #  ( Eski projeler True/'EVET' taşır;  MT.makine_raya_mi ikisini de anlar. )
+    ("makine_raya_biniyor", "Makine yükünün yolu",
      "—",    "secim", MT.MAKINE_YUK_YOLU, MT.MAKINE_YUK_YOLU[0]),
     #  RAY BAŞINA okunur — m.5.7.2.3.7 Maux'u "per guide rail" diye tanımlar.
     #  Boş bırakılırsa ( Gm + Tst ) / ray sayısı olarak TÜRETİLİR:  makinenin
@@ -248,69 +246,66 @@ ALANLAR = (
     #  bir kısmı duvara gidiyorsa imalatçının verdiği BİR RAYA DÜŞEN sayı
     #  buraya yazılır ( ELEport:  "calculated separately, the larger value
     #  should be taken" ).
-    ("raya_binen_yuk",    "",     "Bir raya düşen makine yükü  ( imalatçı — boşsa türetilir )",
+    ("raya_binen_yuk",    "Bir raya düşen makine yükü  ( imalatçı — boşsa türetilir )",
      "kg",   "sayi", None, None),
-    ("makine_tst",        "",     "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
+    ("makine_tst",        "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
      "kg", "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 a):  devreye girme hızı beyan hızının en az
     #  %115'i ve tertibat tipine göre belirlenen üst sınırın ALTINDA olmalı.
     #  Değer regülatörün TİP İNCELEME belgesinden gelir.
-    ("reg_devreye_hizi",  "",     "Regülatör devreye girme hızı  ( imalatçı )", "m/s", "sayi", None, None),
+    ("reg_devreye_hizi",  "Regülatör devreye girme hızı  ( imalatçı )", "m/s", "sayi", None, None),
 
     # ── KILAVUZ RAYLAR ────────────────────────────────────────────────
-    ("kabin_ray_profili", "E73",  "Kabin rayı profili",                "—",    "secim",
+    ("kabin_ray_profili", "Kabin rayı profili",                "—",    "secim",
      MT.RAY_PROFILLERI, "89 x 62 x 15,88"),
-    ("agirlik_ray_profili", "F73", "Ağırlık rayı profili",             "—",    "secim",
+    ("agirlik_ray_profili", "Ağırlık rayı profili",             "—",    "secim",
      MT.RAY_PROFILLERI, "50 x 50 x 5"),
-    ("kabin_konsol_arasi", "B111", "Kabin rayı konsollar arası en uzun mesafe", "mm", "sayi", None, 3000),
-    ("agirlik_konsol_arasi", "B112", "Ağırlık rayı konsollar arası en uzun mesafe", "mm", "sayi", None, 3000),
-    ("kabin_ray_sayisi",  "B115", "Kabin rayı sayısı",                 "adet", "sayi", None, 2),
-    ("agirlik_ray_sayisi", "B116", "Ağırlık rayı sayısı",              "adet", "sayi", None, 2),
-    ("ray_celigi_rm",     "B131", "Ray çeliği Rm",                     "N/mm²", "secim",
+    ("kabin_konsol_arasi", "Kabin rayı konsollar arası en uzun mesafe", "mm", "sayi", None, 3000),
+    ("agirlik_konsol_arasi", "Ağırlık rayı konsollar arası en uzun mesafe", "mm", "sayi", None, 3000),
+    ("kabin_ray_sayisi",  "Kabin rayı sayısı",                 "adet", "sayi", None, 2),
+    ("agirlik_ray_sayisi", "Ağırlık rayı sayısı",              "adet", "sayi", None, 2),
+    ("ray_celigi_rm",     "Ray çeliği Rm",                     "N/mm²", "secim",
      MT.RAY_CELIKLERI, 370),
-    #  Makine tipi kaynak kitapta B130'da DURUYOR ( açılır listesi bile var:
-    #  "Dişli,Dişlisiz" ) ama hiçbir hesaba girmiyordu — motor gücü sabit
-    #  η = 0,92 ile hesaplanıyordu.  Artık verim buradan belirlenir;  ofisin
-    #  kendi tablosu ( engine/ortak/ofis.py ) dişli makinede 0,50 der.
-    ("makine_tipi",       "B130", "Makine tipi",                       "—",    "secim",
+    #  Makine tipi motor verimini belirler;  ofisin tablosu
+    #  ( engine/ortak/ofis.py ) dişlisiz makinede 0,85, dişlide 0,50 der.
+    ("makine_tipi",       "Makine tipi",                       "—",    "secim",
      tuple(OFIS.MAKINE_VERIMLERI), "Dişlisiz"),
     #  "Ofis verimi η toplam sistem verimidir" ANAHTARI KALDIRILDI.
     #  η artık HER ZAMAN toplam sistem verimidir ( askı kaybı içinde ) —
     #  seçilecek bir şey kalmadı.  Bkz. engine/ortak/ofis.py, "PALANGA VERİM
     #  DÜŞÜŞÜ KALDIRILDI".  Eski projelerin JSON'unda kalan toplam_verim
     #  anahtarı yok sayılır, geri yükleme bozulmaz.
-    ("kabin_paten_arasi", "B127", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
-    ("agirlik_paten_arasi", "B128", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
-    ("guvenlik_tertibati", "G36", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
+    ("kabin_paten_arasi", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
+    ("agirlik_paten_arasi", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
+    ("guvenlik_tertibati", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
      MT.DARBE_TIPLERI_ADLARI, "Kaymalı"),
     #  SIĞINMA HACMİ TİPİ  ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 ).
     #  Standart üç duruştan BİRİNİ ister;  program bunu bilmiyor, ÇÖMELME
     #  tipini koda çivilemişti ve yatarak tipiyle uygun olan tesislere
     #  "UYGUN DEĞİL" diyordu.  Beyan edilen tip paftaya yazılır.
-    ("siginma_tipi_ust",  "",     "Kabin üstü sığınma hacmi tipi",     "—",    "secim",
+    ("siginma_tipi_ust",  "Kabin üstü sığınma hacmi tipi",     "—",    "secim",
      MT.SIGINMA_TIPLERI_UST, "Çömelme"),
-    ("siginma_tipi_dip",  "",     "Kuyu dibi sığınma hacmi tipi",      "—",    "secim",
+    ("siginma_tipi_dip",  "Kuyu dibi sığınma hacmi tipi",      "—",    "secim",
      MT.SIGINMA_TIPLERI_DIP, "Çömelme"),
-    #  TS EN 81-50 m.5.10.5 flanş eğilmesindeki ℓ.  Kaynak Excel'de karşılığı
-    #  YOKTUR ( oraya 1 yazılıdır ), bu yüzden hücre alanı boştur.  Boş
-    #  bırakılırsa ray tablosundaki balata yarı genişliğinden türetilir.
-    ("paten_balata_boyu", "", "Paten balatası uzunluğu  ( ℓ )",  "mm",   "sayi", None, None),
+    #  TS EN 81-50 m.5.10.5 flanş eğilmesindeki ℓ ( paten balatasının
+    #  uzunluğu ).  Boş bırakılırsa ray tablosundaki balata yarı genişliğinden
+    #  türetilir.
+    ("paten_balata_boyu", "Paten balatası uzunluğu  ( ℓ )",  "mm",   "sayi", None, None),
     #  TS EN 81-50 m.5.10.5 / Ek C.2.1.4 flanş eğilmesi için İKİ formül verir:
     #  makaralı patende 1,85·Fx/c² , kaymalı patende balata boyuna bağlı olan.
-    #  Kitap yalnız kaymalıyı tanıyordu.
-    ("paten_tipi",        "",     "Paten tipi",                        "—",    "secim",
+    ("paten_tipi",        "Paten tipi",                        "—",    "secim",
      _s("Kaymalı", "Makaralı"), "Kaymalı"),
     #  Ek C.2.1.2 / C.2.2.2 / C.2.3.2:  Fv = … + Fp.  Fp, bir raydaki bütün
     #  konsol klipslerinin itme kuvvetidir ( binanın oturması, betonun
-    #  büzülmesi ).  Kitapta hiç yoktu;  varsayılan 0, değeri tesise bağlıdır.
-    ("klips_itme_kuvveti", "",    "Fp ( konsol klipslerinin itme kuvveti )", "N", "sayi", None, 0),
+    #  büzülmesi ).  Varsayılan 0, değeri tesise bağlıdır.
+    ("klips_itme_kuvveti", "Fp ( konsol klipslerinin itme kuvveti )", "N", "sayi", None, 0),
     #  Ek C.2.1.5 / C.2.2.5 / C.2.3.5:  δ = 0,7·F·l³/(48·E·I) + δstr.
-    #  δstr binanın kendi sehimidir;  kitapta hiç yoktu, varsayılan 0.
-    ("yapi_sehim_x",      "",     "δstr-x ( bina yapısının x sehimi )", "mm",   "sayi", None, 0),
-    ("yapi_sehim_y",      "",     "δstr-y ( bina yapısının y sehimi )", "mm",   "sayi", None, 0),
+    #  δstr binanın kendi sehimidir;  varsayılan 0.
+    ("yapi_sehim_x",      "δstr-x ( bina yapısının x sehimi )", "mm",   "sayi", None, 0),
+    ("yapi_sehim_y",      "δstr-y ( bina yapısının y sehimi )", "mm",   "sayi", None, 0),
 
     # ── KARŞI AĞIRLIK ─────────────────────────────────────────────────
-    ("agirlik_malzemesi", "B118", "Karşı ağırlık malzemesi",           "—",    "secim",
+    ("agirlik_malzemesi", "Karşı ağırlık malzemesi",           "—",    "secim",
      MT.AGIRLIK_MALZEMELERI, "Barit"),
     #  KARŞI AĞIRLIĞIN KENDİ İKİ ÖLÇÜSÜ  —  TS EN 81-50 Ek C.2.2'nin Gx · Gy
     #  Eksantriklikler bunlardan çıkar:  Dxa = %10 × derinlik ( Gx ),
@@ -323,40 +318,39 @@ ALANLAR = (
     #  arasının ne malzemenin özelliğidir — imal edilen ÇERÇEVENİN özelliğidir.
     #  Program kabin tarafında zaten böyle yapıyor ( kabin_genisligi ·
     #  kabin_derinligi ).
-    ("agirlik_genisligi",  "",     "Karşı ağırlık genişliği  ( Gy )", "mm", "sayi", None, 960),
-    ("agirlik_derinligi",  "",     "Karşı ağırlık derinliği  ( Gx )", "mm", "sayi", None, 150),
+    ("agirlik_genisligi",  "Karşı ağırlık genişliği  ( Gy )", "mm", "sayi", None, 960),
+    ("agirlik_derinligi",  "Karşı ağırlık derinliği  ( Gx )", "mm", "sayi", None, 150),
     #  Ray arası PAFTA BİLGİSİDİR.  Mukavemet hesabına girmez ( standartta
     #  ray arası → genişlik diye bir bağıntı yoktur );  kuyu yerleşimine ve
     #  inşaat projesine ait bir ölçü olduğu için sorulmaya devam eder.
-    ("agirlik_ray_arasi", "B119", "Ağırlık ray arası  ( pafta bilgisi )", "mm", "sayi", None, 1050),
+    ("agirlik_ray_arasi", "Ağırlık ray arası  ( pafta bilgisi )", "mm", "sayi", None, 1050),
     #  TS EN 81-20 m.5.6.1:  karşı ağırlıkta güvenlik tertibatı, kuyunun
     #  altındaki hacme girilebiliyorsa ZORUNLUDUR.  Varsa ağırlık rayı
-    #  TS EN 81-50 Ek C.2.1'e göre de ( k1 darbe katsayısıyla ) hesaplanmalıdır;
-    #  kitap yalnız C.2.2'yi ( normal işletme ) kuruyordu.
-    ("agirlik_guvenlik_tertibati", "", "Karşı ağırlıkta güvenlik tertibatı", "—", "secim",
+    #  yalnız C.2.2'ye ( normal işletme ) değil TS EN 81-50 Ek C.2.1'e göre de
+    #  ( k1 darbe katsayısıyla ) hesaplanmalıdır.
+    ("agirlik_guvenlik_tertibati", "Karşı ağırlıkta güvenlik tertibatı", "—", "secim",
      ("Yok",) + MT.DARBE_TIPLERI_ADLARI, "Yok"),
 
     # ── TAMPONLAR ─────────────────────────────────────────────────────
     #  TİP, KONTROLÜN KENDİSİNİ SEÇER.  TS EN 81-20 m.5.8.1 tamponları üçe
     #  ayırır ve her birine başka bir kural bağlar ( strok formülü, hız
     #  sınırı );  tip sorulmadan bu kuralların hiçbiri denetlenemiyordu.
-    #  Kaynak kitapta bu alan yoktur — ofis poliüretan kullanıyor, varsayılan
-    #  odur ( teslim kopyasına ayrı blokta yazılır ).
-    ("tampon_tipi",         "",     "Tampon tipi",                     "—",    "secim",
+    #  Ofis poliüretan kullanıyor, varsayılan odur.
+    ("tampon_tipi",         "Tampon tipi",                     "—",    "secim",
      MT.TAMPON_TIPLERI_ADLARI, MT.TAMPON_TIPLERI_ADLARI[1]),
     #  ADET, KUYU TABANINA DÜŞEN KUVVETİ BÖLER.  m.5.2.1.8.5 kuvveti
     #  "evenly distributed between the total number of car buffers" der:
     #  toplam 4·gn·(P+Q)'dur ama döşemenin TAŞIYACAĞI şey tampon BAŞINA
-    #  düşendir.  Kaynak kitapta bu alan yok, toplam kuvvet veriliyordu.
-    ("kabin_tampon_adedi",  "",     "Kabin tamponu adedi",             "adet", "sayi", None, 1),
-    ("agirlik_tampon_adedi", "",    "Ağırlık tamponu adedi",           "adet", "sayi", None, 1),
-    ("kabin_tampon_baba",   "F118", "Kabin tamponu baba yüksekliği",   "mm",   "sayi", None, 1000),
-    ("agirlik_tampon_baba", "F119", "Ağırlık tamponu baba yüksekliği", "mm",   "sayi", None, 300),
-    ("kabin_tampon_ezilme", "B121", "Kabin tamponu ezilme miktarı",    "mm",   "sayi", None, 90),
-    ("kabin_carpma_arasi",  "B122", "Kabin tamponu - çarpma plakası arası", "mm", "sayi", None, 150),
-    ("kabin_tampon_boyu",   "B123", "Kabin tamponu uzunluğu",          "mm",   "sayi", None, 100),
-    ("agirlik_tampon_ezilme", "B124", "Ağırlık tamponu ezilme miktarı", "mm",  "sayi", None, 90),
-    ("agirlik_carpma_arasi", "B125", "Ağırlık tamponu - çarpma plakası arası", "mm", "sayi", None, 150),
+    #  düşendir.
+    ("kabin_tampon_adedi",  "Kabin tamponu adedi",             "adet", "sayi", None, 1),
+    ("agirlik_tampon_adedi", "Ağırlık tamponu adedi",           "adet", "sayi", None, 1),
+    ("kabin_tampon_baba",   "Kabin tamponu baba yüksekliği",   "mm",   "sayi", None, 1000),
+    ("agirlik_tampon_baba", "Ağırlık tamponu baba yüksekliği", "mm",   "sayi", None, 300),
+    ("kabin_tampon_ezilme", "Kabin tamponu ezilme miktarı",    "mm",   "sayi", None, 90),
+    ("kabin_carpma_arasi",  "Kabin tamponu - çarpma plakası arası", "mm", "sayi", None, 150),
+    ("kabin_tampon_boyu",   "Kabin tamponu uzunluğu",          "mm",   "sayi", None, 100),
+    ("agirlik_tampon_ezilme", "Ağırlık tamponu ezilme miktarı", "mm",  "sayi", None, 90),
+    ("agirlik_carpma_arasi", "Ağırlık tamponu - çarpma plakası arası", "mm", "sayi", None, 150),
 )
 
 #  İŞARETLİ ( NEGATİF OLABİLEN ) ALANLAR
@@ -374,8 +368,7 @@ ISARETLI_ALANLAR = ("kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y")
 
 #  Hızlı erişim
 ALAN = {a[0]: a for a in ALANLAR}
-HUCRE_ALAN = {a[1]: a[0] for a in ALANLAR}
-HESAPLANAN = tuple(a[0] for a in ALANLAR if a[4] == "hesap")
+HESAPLANAN = tuple(a[0] for a in ALANLAR if a[3] == "hesap")
 
 
 #  BOŞ BIRAKILABİLEN alanlar.  Boşsa motor değeri kendisi türetir ve
@@ -470,11 +463,10 @@ TABLO_GEREKLI = (
 
 
 #  ARAYÜZ GRUPLARI.  Form kendini bu listeden üretir;  sıralama ve başlıklar
-#  Excel'in "Veri Girişi" sayfasındaki bloklarla aynı tutulmuştur ki kâğıttan
-#  giren kullanıcı sırayı şaşırmasın.
+#  hesabın akışını izler.
 GRUPLAR = (
     ("Asansör teknik bilgileri",
-     ("asansor_adi", "beyan_yuku", "beyan_hizi", "seyir_mesafesi",
+     ("asansor_adi", "asansor_tipi", "beyan_yuku", "beyan_hizi", "seyir_mesafesi",
       "kabin_agirligi", "aski_orani")),
     ("Kabin ve kapı",
      ("kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
@@ -565,9 +557,9 @@ def arayuz_alanlari():
     for ad, anahtarlar in GRUPLAR:
         alanlar = []
         for a in anahtarlar:
-            _k, hucre, etiket, birim, tur, secenekler, varsayilan = ALAN[a]
+            _k, etiket, birim, tur, secenekler, varsayilan = ALAN[a]
             alanlar.append({
-                "anahtar": a, "hucre": hucre, "etiket": etiket, "birim": birim,
+                "anahtar": a, "etiket": etiket, "birim": birim,
                 "tur": tur,
                 "secenekler": list(secenekler) if secenekler is not None else None,
                 "varsayilan": list(varsayilan) if tur == "liste" else varsayilan,
@@ -588,9 +580,9 @@ def arayuz_alanlari():
 
 
 def varsayilanlar():
-    """Excel'deki örnek projenin girdileri — arayüzün açılış değerleri."""
+    """Örnek projenin girdileri — arayüzün açılış değerleri."""
     g = {}
-    for anahtar, _h, _e, _b, tur, _s2, var in ALANLAR:
+    for anahtar, _e, _b, tur, _s2, var in ALANLAR:
         if tur == "hesap":
             continue
         g[anahtar] = list(var) if tur == "liste" else var
@@ -598,19 +590,18 @@ def varsayilanlar():
 
 
 def tamamla(g):
-    """Excel'de formülle üretilen üç girdiyi doldurur.
+    """Girdilerden türetilen alanları doldurur.
 
-    C80  karşı ağırlık = kabin ağırlığı + beyan yükü / 2
-    F80  kuyu boyu     = seyir × 1000 + son kat yüksekliği + kuyu dibi
-    F108 halat arası   = arka ağırlıkta  KD − RK − ( ağırlık ray-duvar ),
-                         yan ağırlıkta   elle girilen F109
+    kabin ağırlığı  boşsa ofis tablosundan
+    karşı ağırlık   = kabin ağırlığı + q × beyan yükü
+    kuyu boyu       = seyir × 1000 + son kat yüksekliği + kuyu dibi
+    2. kablo tipi   kat kapısı tipinden
     """
     g = dict(g)
     if isinstance(g.get("sarilma_acisi"), str) and not g["sarilma_acisi"].strip():
         g["sarilma_acisi"] = None
     #  BOŞ KABİN KÜTLESİ:  girilmemişse ofis tablosundan doldurulur.
-    #  Kaynak kitapta bu hücre ( C75 ) elle doldurulur;  program aynı tabloyu
-    #  avan tarafında da kullandığı için iki proje aynı asansöre aynı kütleyi
+    #  Program aynı tabloyu avan tarafında da kullandığı için iki proje aynı asansöre aynı kütleyi
     #  verir.  Elle girilen değer HER ZAMAN önceliklidir.
     by = g.get("beyan_yuku")
     if g.get("kabin_agirligi") is None or (
@@ -625,12 +616,10 @@ def tamamla(g):
         g["kabin_agirligi_kaynak"] = "GİRİŞ"
     ka = g.get("kabin_agirligi")
     #  KARŞI AĞIRLIK DENGE ORANI OFİS SABİTİDİR.
-    #  Kaynak kitabın C80 formülü "kabin ağırlığı + beyan yükü / 2" diye
-    #  ÇİVİLİDİR;  ofis q'yu değiştirse bile 0,50 kalır.  Oysa bölüm 1
-    #  Ga'yı  P + q·Q  ile kurar.  q = 0,60'ta aynı projede İKİ FARKLI karşı
-    #  ağırlık oluşuyordu:  motor ve ağırlık tamponu 1.180 kg, tahrik ve
-    #  ağırlık rayı 1.100 kg.  Aynı fiziksel parçanın kütlesi her hesapta
-    #  aynı olmalıdır.
+    #  Bölüm 1 Ga'yı  P + q·Q  ile kurar;  karşı ağırlık da buradan aynı q
+    #  ile kurulur.  "Beyan yükü / 2" diye çivilenseydi q = 0,60'ta aynı
+    #  projede iki farklı karşı ağırlık oluşurdu — aynı fiziksel parçanın
+    #  kütlesi her hesapta aynı olmalıdır.
     from engine.uygulama import sabitler as _US
     # Motor, tahrik ve tampon aynı doğrulanmış denge oranını kullanmalı.
     # Ham sözlüğü koru: reddedilen girdiler uyarılarda gösterilmeye devam eder.
@@ -640,11 +629,11 @@ def tamamla(g):
     sm, sk, kd = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi"), g.get("kuyu_dibi")
     if _sayi(sm) and _sayi(sk) and _sayi(kd):
         g["kuyu_boyu"] = sm * 1000.0 + sk + kd
-    #  2. bükülgen kablo kat kapısı tipinden türetilir  ( Veri Girişi!B108 )
+    #  2. bükülgen kablo kat kapısı tipinden türetilir
     g["kablo_tipi_2"] = MT.kapi_kablosu(g.get("kat_kapisi_tipi"))
     #  ESKİ BİÇİM:  makine yükünün yolu bir zamanlar ONAY KUTUSUYDU ve
-    #  True / "EVET" olarak kaydediliyordu.  Eski .uygulama dosyaları ve
-    #  teslim edilmiş Excel kitapları bu değeri taşır;  seçime çevrilmezse
+    #  True / "EVET" olarak kaydediliyordu.  Eski .uygulama dosyaları bu
+    #  değeri taşır;  seçime çevrilmezse
     #  doğrulama "geçersiz seçim — True" deyip projeyi hiç açmaz.
     _yy = g.get("makine_raya_biniyor")
     if _yy is not None and _yy not in MT.MAKINE_YUK_YOLU:
@@ -661,7 +650,7 @@ def _sayi(v):
 def dogrula(g):
     """Girdi sözlüğünü denetler; hata metinleri listesi döner ( boşsa temiz )."""
     hata = []
-    for anahtar, _h, etiket, birim, tur, secenekler, _v in ALANLAR:
+    for anahtar, etiket, birim, tur, secenekler, _v in ALANLAR:
         if tur == "hesap":
             continue
         d = g.get(anahtar)
@@ -708,20 +697,19 @@ def dogrula(g):
     for anahtar in BOLEN_ALANLAR:
         d = g.get(anahtar)
         if _sayi(d) and d == 0:
-            hata.append(f"{ALAN[anahtar][2]}: sıfır olamaz — bu değer hesapta "
+            hata.append(f"{ALAN[anahtar][1]}: sıfır olamaz — bu değer hesapta "
                         "bölen olarak kullanılır.")
 
     #  TABLO BÜTÜNLÜĞÜ.  Bir seçenek listede var ama tablosunda karşılığı
-    #  eksikse hesap sessizce yanlış sonuç vermemeli.  ( Kaynak Excel'in NPU
-    #  tablosunda 240 · 280 · 300 için atalet yarıçapı yoktur;  Excel'de bu
-    #  seçim #SAYI/0! üretir. )
+    #  eksikse hesap sessizce yanlış sonuç vermemeli  ( ör. NPU tablosunda
+    #  240 · 280 · 300 için atalet yarıçapı yoktur ).
     for anahtar, oku, ne in TABLO_GEREKLI:
         d = g.get(anahtar)
         if d is None or d == "":
             continue
         eksik = [a for a, f in oku if f(d) is None]
         if eksik:
-            hata.append(f"{ALAN[anahtar][2]}: seçilen '{d}' için tabloda "
+            hata.append(f"{ALAN[anahtar][1]}: seçilen '{d}' için tabloda "
                         f"{ne} eksik ( {', '.join(eksik)} ). Başka bir değer seçin.")
 
     #  ACİL FRENLEME YAVAŞLAMASININ İKİ SINIRI DA VARDIR.
@@ -744,7 +732,7 @@ def dogrula(g):
     for anahtar in TAM_SAYI_ALANLARI:
         d = g.get(anahtar)
         if _sayi(d) and float(d) != int(d):
-            hata.append(f"{ALAN[anahtar][2]}: adet tam sayı olmalıdır "
+            hata.append(f"{ALAN[anahtar][1]}: adet tam sayı olmalıdır "
                         f"( {d} girildi ).")
     nh = g.get("halat_adedi")
     if _sayi(nh) and nh < 2:
@@ -753,12 +741,12 @@ def dogrula(g):
     for anahtar in POZITIF_ALANLAR:
         d = g.get(anahtar)
         if anahtar in ALAN and d is not None and (not _sayi(d) or d <= 0):
-            hata.append(f"{ALAN[anahtar][2]}: sıfırdan büyük olmalıdır "
+            hata.append(f"{ALAN[anahtar][1]}: sıfırdan büyük olmalıdır "
                         f"( {d} girildi ).")
     for anahtar, (alt, ust) in ACI_ALANLARI.items():
         d = g.get(anahtar)
         if d is not None and (not _sayi(d) or not (alt <= d <= ust)):
-            hata.append(f"{ALAN[anahtar][2]}: {alt}° ile {ust}° arasında "
+            hata.append(f"{ALAN[anahtar][1]}: {alt}° ile {ust}° arasında "
                         f"olmalıdır ( {d} girildi ).")
 
     #  ------------------------------------------------------------------
@@ -769,8 +757,7 @@ def dogrula(g):
     #  180° ve altı bir değer tek sarıma aittir — büyük ihtimalle tek geçişin
     #  açısı girilmiştir.  Bu kontrol eskiden yalnız motorun içindeydi:  motor
     #  bölümü "uygun değil" sayıyor ama altındaki üç yük durumuna imkânsız
-    #  açıyla "UYGUN" basıyordu;  teslim kitabı ise hiç denetlemiyor, RAPOR'a
-    #  üç kez "UYGUNDUR." yazıyordu ( tek sarım · 300° ).  Açı kanal şekline
+    #  açıyla "UYGUN" basıyordu ( tek sarım · 300° ).  Açı kanal şekline
     #  bağlı olduğundan alanın kendi aralığıyla ( 1–360° ) denetlenemez;
     #  burada, iki alan birlikte görülürken reddedilir.
     _aci, _kanal = g.get("sarilma_acisi"), g.get("kanal_sekli")
@@ -815,7 +802,7 @@ def dogrula(g):
     pbb = g.get("paten_balata_boyu")
     if pbb is not None and pbb != "":
         if not _sayi(pbb) or pbb <= 0:
-            hata.append(f"{ALAN['paten_balata_boyu'][2]}: sıfırdan büyük olmalıdır ( {pbb!r} girildi ).")
+            hata.append(f"{ALAN['paten_balata_boyu'][1]}: sıfırdan büyük olmalıdır ( {pbb!r} girildi ).")
         elif pbb < 20:
             hata.append(f"Paten balatası uzunluğu ({pbb:g} mm) fiziksel değil — balata boyu en az 20 mm olmalıdır.")
         else:
@@ -825,7 +812,7 @@ def dogrula(g):
     gdk = g.get("guvenlik_devreye_kuvvet")
     if gdk is not None and gdk != "":
         if not _sayi(gdk) or gdk <= 0:
-            hata.append(f"{ALAN['guvenlik_devreye_kuvvet'][2]}: sıfırdan büyük olmalıdır ( {gdk!r} girildi ).")
+            hata.append(f"{ALAN['guvenlik_devreye_kuvvet'][1]}: sıfırdan büyük olmalıdır ( {gdk!r} girildi ).")
 
     #  KATALOG HALAT VERİSİ ve Tst — hepsi opsiyoneldir, girilirse MAKUL olmalı.
     #  Kopma yükü alanı kN'dir:  katalog "31,5 kN" der, projeci 31500 yazarsa
@@ -843,7 +830,7 @@ def dogrula(g):
         if _v is None or _v == "":
             continue
         if not _sayi(_v) or not (_alt <= _v <= _ust):
-            hata.append(f"{ALAN[_ad][2]}: {_alt} - {_ust} aralığında olmalıdır "
+            hata.append(f"{ALAN[_ad][1]}: {_alt} - {_ust} aralığında olmalıdır "
                         f"( {_v!r} girildi ).")
 
     #  MAKİNE KAİDESİ GEOMETRİSİ.  Bölüm 2 basit kiriş modelidir:  açıklığı L
@@ -1032,7 +1019,7 @@ def uyarilar(g):
                     f"{l:g} / {imin:g} = {lam:.1f}  >  {MT.OMEGA_LAMBDA_MAX}. "
                     "TS EN 81-50 m.5.10.3'ün ω tablosu bu narinliğin ötesinde "
                     "tanımlı değildir;  BURKULMA HESABI YAPILAMAZ ve bölüm "
-                    f"uygun çıkmaz. '{ALAN[konsol_alan][2]}' en çok "
+                    f"uygun çıkmaz. '{ALAN[konsol_alan][1]}' en çok "
                     f"{azami:.0f} mm olabilir ( '{prof}' rayı için ), ya da daha "
                     "büyük kesitli bir ray profili seçilmelidir.")
 
@@ -1066,7 +1053,7 @@ def uyarilar(g):
 
 
 def toplam_ray_boyu(g):
-    """Kılavuz ray toplam boyu ( m ) — Excel: (ΣG12:G34 + F107−200 + F114−300)/1000."""
+    """Kılavuz ray toplam boyu ( m )  =  ( Σ durak + kaide − 200 + kuyu dibi − 300 ) / 1000."""
     dy = g.get("durak_yukseklikleri") or ()
     if not all(_sayi(v) for v in dy) or not dy:
         return None

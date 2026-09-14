@@ -1,34 +1,39 @@
 # -*- coding: utf-8 -*-
 """
-TEST 1  —  EXCEL UYUMU  (bağımsız doğrulama)
+TEST 1  —  AVAN REFERANS TARAMASI
 
-Her senaryo için:
-   1) girdiler ofis Excel ŞABLONUNA yazılır,
-   2) dosya LibreOffice ile açılıp YENİDEN HESAPLANIR
-      ( yani hesabı Excel'in kendi formülleri yapar, program değil ),
-   3) çıkan her hücre programın motoruyla karşılaştırılır.
+Trafik ( tek asansör / grup ) ve avan motorunun sonuç değerlerini, girdi
+uzayını sistemli tarayan senaryolarda DONDURULMUŞ referansa karşı denetler.
 
-Bu, programın Excel'den sapıp sapmadığını gösteren en güçlü testtir.
-LibreOffice kurulu değilse test zarifçe atlanır.
+Referansın dayanağı:  bu senaryoların her biri ofisin eski Excel çalışma
+kitaplarında LibreOffice ile yeniden hesaplanmış ve karşılaştırılan her
+değer motorla aynı çıkmıştı.  Sonuçlar o doğrulanmış hâlden donduruldu
+( testler/referans_avan.json.gz ).  Program artık Excel kullanmaz;  tek
+hesap kaynağı motordur.
+
+Altın çıktıdan ( TEST 7 ) farkı:  altın çıktı her metni kilitler, bu test
+yalnız SONUÇ DEĞERLERİNİ ve çok daha geniş bir senaryo yelpazesinde:
+bütün bina tipleri, kapasiteler, kat sınırları, hızlar, bodrum eşikleri,
+ara değerli kapılar, avan kesit / verim / topraklama çeşitleri.
+
+    python3 testler/tarama_uret.py        →  referansı YENİDEN ÜRETİR
+
+Yeniden üretmek DAVRANIŞI DEĞİŞTİRME İZNİDİR ( bkz. altin_uret ).
 """
+import gzip
+import json
 import os
-import shutil
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import openpyxl                                          # noqa: E402
-from engine.avan import hesap as AV
-from engine.avan import tablolar as T
-from engine.avan import trafik as TR  # noqa: E402
-from exports import xlsx_export as X                     # noqa: E402
-from testler.ortak import Rapor, yeniden_hesapla, soffice_yolu, hata_hucresi_ara  # noqa: E402
+from engine.avan import hesap as AV                               # noqa: E402
+from engine.avan import tablolar as T                             # noqa: E402
+from engine.avan import trafik as TR                              # noqa: E402
+from testler.ortak import Rapor                                   # noqa: E402
 
-# Geçici dosyalar sistemin temp klasörüne yazılır — proje klasörü kirlenmez
-# ve silme izni kısıtlı makinelerde test takılmaz.
-GECICI = os.path.join(tempfile.gettempdir(),
-                      "avan_test_" + os.path.splitext(os.path.basename(__file__))[0])
+DOSYA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "referans_avan.json.gz")
 
 
 # =====================================================================
@@ -202,7 +207,7 @@ def coklu_senaryolar():
 
 
 def avan_senaryolar():
-    """Her senaryo bir çalışma kitabı; kitap başına en çok 4 asansör."""
+    """Senaryo başına en çok 4 asansör."""
     ORT = dict(U=380, kappa=56, eps_max=3, temel_a=26.55, temel_b=16.4, beta=150,
                serit_L=58.5, cubuk_sayisi=4, mk_uzunluk=0, mk_genislik=0)
 
@@ -244,8 +249,7 @@ def avan_senaryolar():
         A(tanim="dişlisiz 2:1 ofis", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2),
         A(tanim="dişlisiz 2:1 katalog", makine_tipi="Dişlisiz", eta=0.78,
           i_palanga=2)]}))
-    # b-5) OFİS VARSAYILANLARI — alanlar BOŞ bırakılır.  Program bunları
-    #      dosyaya yazmalı ki Excel kendi başına aynı sonucu versin.
+    # b-5) OFİS VARSAYILANLARI — alanlar BOŞ bırakılır, ofis standardına düşer.
     BOS_ORT = dict(temel_a=26.55, temel_b=16.4, serit_L=58.5,
                    mk_uzunluk=0, mk_genislik=0)
 
@@ -284,9 +288,8 @@ def avan_senaryolar():
     s.append(("çubuksuz topraklama", {"ortak": dict(ORT, cubuk_sayisi=0), "asansorler": [A()]}))
     s.append(("β=300, 8 çubuk", {"ortak": dict(ORT, beta=300, cubuk_sayisi=8, serit_L=120),
                                  "asansorler": [A()]}))
-    #  d-2) ŞERİT BOYU TÜRETİLEN — ofiste yalnız uzunluk ve genişlik girilir.
-    #  Program türettiği boyu GİRİŞ!C13'e yazmalı ki Excel kendi başına aynı
-    #  Ry ve Re'yi bulsun.  ( Ofis paftası ölçüleri: 31,05 × 18,90 m )
+    #  d-2) ŞERİT BOYU TÜRETİLEN — ofiste yalnız uzunluk ve genişlik girilir
+    #  ( ofis paftası ölçüleri: 31,05 × 18,90 m ).
     TUR_ORT = dict(temel_a=31.05, temel_b=18.9, mk_uzunluk=0, mk_genislik=0)
     s.append(("şerit boyu türetilen — L boş",
               {"ortak": TUR_ORT, "asansorler": [A(tanim="ofis temeli")]}))
@@ -323,147 +326,124 @@ def avan_senaryolar():
 
 
 # =====================================================================
-#  KARŞILAŞTIRILACAK HÜCRELER
+#  KARŞILAŞTIRILAN SONUÇLAR
 # =====================================================================
-TEK_HUCRE = {
-    "C8": "standart", "C15": "p", "C20": "b", "C21": "n_artis", "C22": "B",
-    "C23": "V", "C24": "H", "C25": "S", "C26": "ta", "C27": "tk", "C28": "tg",
-    "C29": "tp", "C30": "k", "C33": "tv", "C34": "ts", "C35": "TR", "C36": "R",
-    "C37": "adet", "C38": "Ieer", "C42": "esik_standart", "C43": "esik_yukseltilmis",
-    "C44": "sonuc", "E13": "yuk_kg",
-    "H16": "bodrum", "H17": "toplam_seyahat",
-}
-COKLU_HUCRE = {
-    "B8": "standart", "B14": "b", "B15": "n_artis", "B16": "B", "B17": "k",
-    "B40": "Res", "B41": "gereken", "B43": "TRes", "B44": "Izul", "B53": "sonuc",
-    "H13": "bodrum",
-}
-COKLU_ASANSOR_SATIR = {27: "p", 28: "H", 29: "S", 30: "ta", 31: "tk", 32: "tg",
-                       33: "tp", 34: "tv", 35: "ts", 36: "TR", 37: "R",
-                       38: "yuk_kg", 57: "V", 60: "N", 101: "bodrum"}
-AVAN_HUCRE = {
-    "E6": "Q", "E7": "V", "E8": "q_denge", "E9": "i_palanga", "E10": "eta", "E14": "N_hes", "E15": "Nsc",
-    "E21": "Gk", "E24": "Gf", "E26": "P", "E30": "Ga", "E31": "k1", "E34": "Lr",
-    "E36": "Mg", "E40": "P1", "E44": "P2", "E48": "PR", "E52": "PK", "E56": "Fs",
-    "E63": "kabin_a", "E64": "kabin_b", "E67": "k_kabin", "E68": "eta_kabin",
-    "E72": "T_kabin", "E75": "Z_kabin", "E76": "n_kabin",
-    "E80": "kuyu_a", "E81": "kuyu_b", "E84": "k_kuyu", "E85": "eta_kuyu",
-    "E89": "T_kuyu", "E92": "Z_kuyu", "E93": "n1_kuyu", "E96": "n2_kuyu", "E97": "n_kuyu",
-    "E102": "g_motor", "E103": "g_kuyu", "E104": "g_kabin", "E105": "g_priz",
-    "E106": "P_kurulu", "E125": "eps1", "E130": "eps2", "E132": "eps",
-    "E137": "I", "E138": "Iz",
-}
-TOPRAKLAMA_HUCRE = {"E7": "A", "E9": "r", "E11": "D", "E15": "Ry", "E21": "Rc",
-                    "E25": "Re", "E29": "Re_max"}
-MK_HUCRE = {"E10": "k", "E11": "eta", "E15": "T", "E18": "Z", "E19": "n"}
+TEK_ANAHTARLAR = ("standart", "p", "b", "n_artis", "B", "V", "H", "S", "ta", "tk",
+                  "tg", "tp", "k", "tv", "ts", "TR", "R", "adet", "Ieer",
+                  "esik_standart", "esik_yukseltilmis", "sonuc", "yuk_kg",
+                  "bodrum", "toplam_seyahat")
+COKLU_ANAHTARLAR = ("standart", "b", "n_artis", "B", "k", "Res", "gereken", "TRes",
+                    "Izul", "sonuc", "bodrum")
+COKLU_ASANSOR_ANAHTARLARI = ("p", "H", "S", "ta", "tk", "tg", "tp", "tv", "ts",
+                             "TR", "R", "yuk_kg", "V", "N", "bodrum")
+AVAN_ANAHTARLAR = ("Q", "V", "q_denge", "i_palanga", "eta", "N_hes", "Nsc", "Gk", "Gf",
+                   "P", "Ga", "k1", "Lr", "Mg", "P1", "P2", "PR", "PK", "Fs",
+                   "kabin_a", "kabin_b", "k_kabin", "eta_kabin", "T_kabin", "Z_kabin",
+                   "n_kabin", "kuyu_a", "kuyu_b", "k_kuyu", "eta_kuyu", "T_kuyu",
+                   "Z_kuyu", "n1_kuyu", "n2_kuyu", "n_kuyu", "g_motor", "g_kuyu",
+                   "g_kabin", "g_priz", "P_kurulu", "eps1", "eps2", "eps", "I", "Iz")
+TOPRAKLAMA_ANAHTARLARI = ("A", "r", "D", "Ry", "Rc", "Re", "Re_max")
+MAKINE_DAIRESI_ANAHTARLARI = ("k", "eta", "T", "Z", "n")
 
 
-def _oku(yol, sayfa, adresler):
-    ws = openpyxl.load_workbook(yol, data_only=True)[sayfa]
-    return {a: ws[a].value for a in adresler}
+def _kopya(g):
+    return json.loads(json.dumps(g))
+
+
+def tek_sonucu(g):
+    s = TR.hesapla_tek(_kopya(g))
+    if s.get("hata"):
+        return {"hata": s["hata"]}
+    return {k: s["ozet"][k] for k in TEK_ANAHTARLAR}
+
+
+def coklu_sonucu(g):
+    s = TR.hesapla_coklu(_kopya(g))
+    if s.get("hata"):
+        return {"hata": s["hata"]}
+    return {"ozet": {k: s["ozet"][k] for k in COKLU_ANAHTARLAR},
+            "asansorler": [{k: a[k] for k in COKLU_ASANSOR_ANAHTARLARI}
+                           for a in s["asansorler"]]}
+
+
+def avan_sonucu(v):
+    s = AV.hesapla(_kopya(v))
+    tp, mk = s["topraklama"], s["makine_dairesi"]
+    return {"asansorler": [({k: a["ozet"][k] for k in AVAN_ANAHTARLAR}
+                            if a and a.get("aktif") else None)
+                           for a in s["asansorler"]],
+            "topraklama": ({k: tp[k] for k in TOPRAKLAMA_ANAHTARLARI}
+                           if tp.get("aktif") else None),
+            "makine_dairesi": ({k: mk[k] for k in MAKINE_DAIRESI_ANAHTARLARI}
+                               if mk.get("aktif") else None)}
+
+
+AILELER = (("tek", tek_senaryolar, tek_sonucu),
+           ("coklu", coklu_senaryolar, coklu_sonucu),
+           ("avan", avan_senaryolar, avan_sonucu))
+
+
+def uret():
+    """Referans kaydı  —  { aile : [ { ad, girdi, sonuc } ] }."""
+    return {aile: [{"ad": ad, "girdi": _kopya(g), "sonuc": _kopya(motor(g))}
+                   for ad, g in senaryo()]
+            for aile, senaryo, motor in AILELER}
+
+
+# =====================================================================
+#  KARŞILAŞTIRMA
+# =====================================================================
+def _yapraklar(yol, bulunan, beklenen):
+    """İki JSON ağacını yaprak yaprak eşler  →  ( yol, bulunan, beklenen )."""
+    if isinstance(beklenen, dict) and isinstance(bulunan, dict):
+        for k in sorted(set(beklenen) | set(bulunan)):
+            yield from _yapraklar(f"{yol}.{k}" if yol else k,
+                                  bulunan.get(k, "<yok>"), beklenen.get(k, "<yok>"))
+        return
+    if (isinstance(beklenen, list) and isinstance(bulunan, list)
+            and len(beklenen) == len(bulunan)):
+        for i, (a, b) in enumerate(zip(bulunan, beklenen)):
+            yield from _yapraklar(f"{yol}[{i}]", a, b)
+        return
+    yield yol, bulunan, beklenen
+
+
+def _ayni(bulunan, beklenen):
+    sayi = (int, float)
+    if (isinstance(beklenen, sayi) and isinstance(bulunan, sayi)
+            and not isinstance(beklenen, bool) and not isinstance(bulunan, bool)):
+        return abs(bulunan - beklenen) <= 1e-9 * max(1.0, abs(beklenen))
+    return bulunan == beklenen
+
+
+def karsilastir(r, dosya, simdi, etiket):
+    """Her senaryonun her sonuç değeri referansla ayrı bir kontrol olarak."""
+    with gzip.open(dosya, "rt", encoding="utf-8") as f:
+        referans = json.load(f)
+    for aile in referans:
+        eski, yeni = referans[aile], simdi.get(aile, [])
+        if not r.esit(f"[{etiket} · {aile}] senaryo sayısı", len(yeni), len(eski)):
+            continue
+        for e, y in zip(eski, yeni):
+            ad = e["ad"]
+            r.kontrol(f"[{etiket} · {aile}] {ad} · girdi değişmemiş",
+                      y["girdi"] == e["girdi"] and y["ad"] == ad,
+                      "→ senaryo tanımı değişti; bilerek değiştirildiyse "
+                      "referansı yeniden üretin")
+            for yol, bulunan, beklenen in _yapraklar("", y["sonuc"], e["sonuc"]):
+                r.kontrol(f"[{etiket} · {aile}] {ad} · {yol}", _ayni(bulunan, beklenen),
+                          f"→ bulunan {bulunan!r}, referans {beklenen!r}")
 
 
 def calistir():
-    print("\n\033[1mTEST 1 — EXCEL UYUMU\033[0m"
-          "   (girdiler şablona yazılır, LibreOffice yeniden hesaplar, motorla karşılaştırılır)")
-    r = Rapor("Excel uyumu")
-    if not soffice_yolu():
-        r.atla("LibreOffice bulunamadı — bu test yalnız LibreOffice kurulu makinede çalışır.")
+    print("\n\033[1mTEST 1 — AVAN REFERANS TARAMASI\033[0m"
+          "   (trafik + avan sonuçları dondurulmuş referansa karşı)")
+    r = Rapor("Avan referans taraması")
+    if not os.path.isfile(DOSYA):
+        r.kontrol("referans dosyası var", False,
+                  f"→ {os.path.basename(DOSYA)} yok — python3 testler/tarama_uret.py")
         return r
-
-    shutil.rmtree(GECICI, ignore_errors=True)
-    giris, cikis = os.path.join(GECICI, "girdi"), os.path.join(GECICI, "cikti")
-    os.makedirs(giris, exist_ok=True)
-
-    tek, coklu, avan = tek_senaryolar(), coklu_senaryolar(), avan_senaryolar()
-    dosyalar = []
-    for i, (_, g) in enumerate(tek):
-        p = f"{giris}/tek{i:03d}.xlsx"
-        open(p, "wb").write(X.trafik_xlsx("tek", g)); dosyalar.append(p)
-    for i, (_, g) in enumerate(coklu):
-        p = f"{giris}/cok{i:03d}.xlsx"
-        open(p, "wb").write(X.trafik_xlsx("coklu", g)); dosyalar.append(p)
-    for i, (_, v) in enumerate(avan):
-        p = f"{giris}/avan{i:03d}.xlsx"
-        open(p, "wb").write(X.avan_xlsx(v)); dosyalar.append(p)
-
-    print(f"   {len(dosyalar)} çalışma kitabı üretildi "
-          f"({len(tek)} tek + {len(coklu)} çoklu + {len(avan)} avan) — "
-          "LibreOffice yeniden hesaplıyor…")
-    yeniden_hesapla(dosyalar, cikis)
-
-    # ---------------- tek asansör
-    for i, (ad, g) in enumerate(tek):
-        yol = f"{cikis}/tek{i:03d}.xlsx"
-        if not os.path.exists(yol):
-            r.kontrol(f"[tek] {ad} dosya üretilemedi", False)
-            continue
-        s = TR.hesapla_tek(g)
-        if s.get("hata"):
-            continue
-        x = _oku(yol, "HESAPLAMA", list(TEK_HUCRE))
-        for adres, anahtar in TEK_HUCRE.items():
-            r.esit(f"[tek] {ad} · HESAPLAMA!{adres} ({anahtar})", x[adres], s["ozet"][anahtar])
-        pafta = _oku(yol, "PAFTA", ["A33"])
-        r.esit(f"[tek] {ad} · PAFTA!A33 (sonuç)", pafta["A33"], s["ozet"]["sonuc"])
-        for e in hata_hucresi_ara(yol):
-            r.kontrol(f"[tek] {ad} · Excel hata hücresi", False, e)
-
-    # ---------------- çoklu asansör
-    for i, (ad, g) in enumerate(coklu):
-        yol = f"{cikis}/cok{i:03d}.xlsx"
-        if not os.path.exists(yol):
-            r.kontrol(f"[çoklu] {ad} dosya üretilemedi", False)
-            continue
-        s = TR.hesapla_coklu(g)
-        if s.get("hata"):
-            continue
-        x = _oku(yol, "ÇOKLU ASANSÖR", list(COKLU_HUCRE))
-        for adres, anahtar in COKLU_HUCRE.items():
-            r.esit(f"[çoklu] {ad} · {adres} ({anahtar})", x[adres], s["ozet"][anahtar])
-        kolon = "BCDE"
-        adr = [f"{kolon[j]}{sat}" for j in range(len(s["asansorler"]))
-               for sat in COKLU_ASANSOR_SATIR]
-        xa = _oku(yol, "ÇOKLU ASANSÖR", adr)
-        for j, asn in enumerate(s["asansorler"]):
-            for sat, anahtar in COKLU_ASANSOR_SATIR.items():
-                r.esit(f"[çoklu] {ad} · {kolon[j]}{sat} ({anahtar})",
-                       xa[f"{kolon[j]}{sat}"], asn[anahtar])
-        pc = _oku(yol, "PAFTA-COKLU", ["A29"])
-        r.esit(f"[çoklu] {ad} · PAFTA-COKLU!A29", pc["A29"], s["ozet"]["sonuc"])
-        for e in hata_hucresi_ara(yol):
-            r.kontrol(f"[çoklu] {ad} · Excel hata hücresi", False, e)
-
-    # ---------------- avan
-    for i, (ad, v) in enumerate(avan):
-        yol = f"{cikis}/avan{i:03d}.xlsx"
-        if not os.path.exists(yol):
-            r.kontrol(f"[avan] {ad} dosya üretilemedi", False)
-            continue
-        s = AV.hesapla(v)
-        for j, a in enumerate(s["asansorler"]):
-            if not a.get("aktif"):
-                continue
-            x = _oku(yol, f"{j+1} NOLU ASANSÖR", list(AVAN_HUCRE))
-            for adres, anahtar in AVAN_HUCRE.items():
-                r.esit(f"[avan] {ad} · A{j+1}!{adres} ({anahtar})", x[adres], a["ozet"][anahtar])
-        tp = s["topraklama"]
-        if tp.get("aktif"):
-            x = _oku(yol, "TOPRAKLAMA", list(TOPRAKLAMA_HUCRE))
-            for adres, anahtar in TOPRAKLAMA_HUCRE.items():
-                bek = tp[anahtar]
-                if bek is None:
-                    continue
-                r.esit(f"[avan] {ad} · TOPRAKLAMA!{adres} ({anahtar})", x[adres], bek)
-        mk = s["makine_dairesi"]
-        if mk.get("aktif"):
-            x = _oku(yol, "MK.DAİRESİ AYD.", list(MK_HUCRE))
-            for adres, anahtar in MK_HUCRE.items():
-                r.esit(f"[avan] {ad} · MK!{adres} ({anahtar})", x[adres], mk[anahtar])
-        for e in hata_hucresi_ara(yol):
-            r.kontrol(f"[avan] {ad} · Excel hata hücresi", False, e)
-
-    shutil.rmtree(GECICI, ignore_errors=True)
+    karsilastir(r, DOSYA, uret(), "avan")
     return r
 
 

@@ -187,7 +187,7 @@ function avanDoldur(){
       const bos = (sp.value==='' && v('a_Q_elle'+i)==='');
       const trafikDegisti = ('P' in onceki) && String(onceki.P)!==String(t.P);
       /*  DOLU BİR ALAN İLK SENKRONDA EZİLMEZ.  Eskiden "ilk kez" durumunda
-          alan dolu olsa bile üzerine yazılıyordu;  Excel'den yüklenen
+          alan dolu olsa bile üzerine yazılıyordu;  dosyadan yüklenen
           16 kişi / 2,50 m/s, formdaki eski trafik yüzünden 10 kişi / 1,60'a
           dönüyordu.  Boş alan zaten `bos` ile dolduruluyor;  trafik gerçekten
           değiştiyse `trafikDegisti` güncelliyor ve kullanıcı bilgilendiriliyor. */
@@ -247,7 +247,7 @@ function avanGirdi(){
   /*  U · κ · εmax · β · Is alanları avan panelinden kaldırıldı ( ofis
       standardında ).  v() olmayan alan için '' döndürür, motor da boş
       değeri ofis varsayılanına çevirir — liste yine de tam bırakıldı ki
-      Excel'den geri yüklenen eski projelerdeki değerler taşınabilsin. */
+      eski proje dosyalarındaki değerler taşınabilsin. */
   const ortak={}; ['U','kappa','eps_max','temel_a','temel_b','beta','serit_L','cubuk_sayisi',
     'mk_uzunluk','mk_genislik'].forEach(k=>ortak[k]=v('a_'+k));
   ortak.mk_yok = !!($('a_mk_yok') && $('a_mk_yok').checked);
@@ -320,14 +320,13 @@ function ciz(hedef, r, mod){
   const o=r.ozet||{};
   let h=`<div class="pafta-bas"><h2>ASANSÖR TRAFİK HESABI${mod==='coklu'?'  —  ÇOKLU ASANSÖR':''}</h2>
          <div class="alt">MMO/697, 2. Baskı, Ocak 2020, s.11-17</div></div><div class="kart-ic">`;
-  /*  Hangi yolun ve hangi Excel pafta sayfasının kullanıldığı SESSİZ kalmasın:
-      kullanıcı yöntemi seçmiyor, o hâlde ne seçildiğini görmeli. */
-  if(!r.hata && r.pafta){
+  /*  Hangi yolun kullanıldığı SESSİZ kalmasın:  kullanıcı yöntemi seçmiyor,
+      o hâlde ne seçildiğini görmeli. */
+  if(!r.hata && r.yol){
     const ayni = r.yol!=='coklu';
     h += `<div class="uyari mavi" style="margin:0 0 10px">
       ${ayni ? 'Asansörlerin hepsi <b>aynı tip</b> — MMO/697 s.11-12 yolu.'
-             : 'Asansörler <b>farklı tipte</b> — grup formülü ( MMO/697 s.12 ).'}
-      Üretilecek pafta: <b>${kacis(r.pafta)}</b></div>`;
+             : 'Asansörler <b>farklı tipte</b> — grup formülü ( MMO/697 s.12 ).'}</div>`;
   }
   if(r.hata) h+=`<div class="uyari kirmizi">${kacis(r.hata)}</div>`;
   (r.uyarilar||[]).forEach(u=>h+=`<div class="uyari ${uyariSinifi(u)}">${kacis(u)}</div>`);
@@ -594,7 +593,7 @@ function avanAsansorleriKur(){
                 `<option value="${SEC.aski_oranlari[k]}"${SEC.aski_oranlari[k]===2?' selected':''}>${k}</option>`).join('')}
             </select></div>
           <div class="alan"><label>η — Toplam sistem verimi
-            ${bilgiSimgesi(['Askı ( palanga ), kasnak ve makine kayıpları DÂHİL tek verim. Ofis kabulü: dişlisiz 0,85 · dişli 0,50 — makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','İmalatçı kataloğundaki toplam sistem verimini ( EN 81-20/50 şablonlarında η_ins ) doğrudan buraya girin. Paftada marka-model referansı belirtilmelidir.','Askı oranına bağlı Δη = 0,10 düşüşü KALDIRILDI: makara kaybı çarpımsaldır ( geçiş başına ≈ 0,98 ) ve sabit bir sayı çıkarmak dişli ile dişlisiz makineyi farklı oranda cezalandırıyordu. Güç zaten askı oranından bağımsızdır.'])}</label>
+            ${bilgiSimgesi(['Askı ( palanga ), kasnak ve makine kayıpları DÂHİL tek verim. Ofis kabulü: dişlisiz 0,85 · dişli 0,50 — makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','İmalatçı kataloğundaki toplam sistem verimini ( η_ins ) doğrudan buraya girin. Paftada marka-model referansı belirtilmelidir.','Askı oranına bağlı Δη = 0,10 düşüşü KALDIRILDI: makara kaybı çarpımsaldır ( geçiş başına ≈ 0,98 ) ve sabit bir sayı çıkarmak dişli ile dişlisiz makineyi farklı oranda cezalandırıyordu. Güç zaten askı oranından bağımsızdır.'])}</label>
             <input id="a_eta${i}" class="girdi" value="0,85"></div>
         </div>
         <div class="bolum-bas">Boyutlar</div>
@@ -736,7 +735,6 @@ async function indirProjeDwg(){
     if(m) ad = decodeURIComponent(m[1]);
     const notlar = (r.headers.get('X-Avan-Not')||'').split(',');
     const sadeceDxf = notlar.includes('DXF'), tasti = notlar.includes('TASMA');
-    const kitapEksik = notlar.includes('KITAP');
     const b = await r.blob(), u = URL.createObjectURL(b);
     const a = document.createElement('a'); a.href=u; a.download=ad;
     document.body.appendChild(a); a.click(); a.remove();
@@ -748,13 +746,9 @@ async function indirProjeDwg(){
     const bicim = sadeceDxf
       ? '  —  ZIP içinde DXF var; AutoCAD birebir açar (DWG isterseniz açıp Farklı Kaydet demeniz yeterli).'
       : '  —  ZIP içinde hem DWG hem DXF var.';
-    /*  EKSİK KİTAP SESSİZ KALMAZ.  Sunucu bir çalışma kitabını üretemezse
-        paketi yine verir ama başlıkta KITAP notu gönderir ve ZIP'e
-        URETILEMEYEN DOSYALAR.txt koyar;  kullanıcı ZIP'i açmadan uyarılır. */
     const uyarilar = [];
     if(tasti) uyarilar.push('pafta sayısı proje formatının çerçevesine sığmadı, '
               + 'alta taşan sayfalar var. Çizimi baskıya göndermeden kontrol edin.');
-    if(kitapEksik) uyarilar.push(M_KITAP_EKSIK);
     if(uyarilar.length){
       const u = 'DİKKAT: ' + uyarilar.join('  —  ');
       durum('İndirildi: '+ad+bicim+'  '+u, true); alert(u);

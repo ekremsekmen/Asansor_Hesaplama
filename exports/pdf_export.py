@@ -2,9 +2,8 @@
 """
 PDF DIŞA AKTARIM  —  baskıya hazır pafta / hesap raporu
 
-Sayfa düzeni Excel'deki PAFTA ve "n NOLU ASANSÖR" sayfalarının işlem
-akışını birebir izler:  başlık → girdi satırları → denklem → sayıların
-yerine konmuş hâli → sonuç → kontrol → notlar.
+Sayfa düzeni ofis paftasının işlem akışını izler:  başlık → girdi
+satırları → denklem → sayıların yerine konmuş hâli → sonuç → kontrol → notlar.
 """
 import io
 import threading
@@ -279,7 +278,7 @@ class _Belge(BaseDocTemplate):
     #  `doc` bu paftada kullanılmaz ama imzadan çıkarılamaz.
     def _sayfa(self, cnv, doc):        # noqa: ARG002
         """
-        PAFTA ÇERÇEVESİ  —  ofisin kendi Excel paftasındaki düzen:
+        PAFTA ÇERÇEVESİ  —  ofisin kendi paftasındaki düzen:
         tüm hesap kalın bir çerçeve içinde, üstte tek başlık şeridi,
         altta sayfa numarası.  Dolgu yoktur; yalnız çizgi.
         """
@@ -766,9 +765,9 @@ def _trafik_bas(sonuc: dict, olcek: float):
 
 def _trafik_bas_ic(sonuc: dict, olcek: float):
     coklu = sonuc.get("tip") == "coklu"
-    # Başlıklar Excel'deki çıktı sayfalarının A1 hücreleriyle birebir aynıdır:
-    #   PAFTA        -> "ASANSÖR TRAFİK HESABI"
-    #   PAFTA-COKLU  -> "ÇOKLU ASANSÖR TRAFİK HESABI"
+    # Başlıklar ofis paftasınınkilerle aynıdır:
+    #   aynı tip   -> "ASANSÖR TRAFİK HESABI"
+    #   grup       -> "ÇOKLU ASANSÖR TRAFİK HESABI"
     baslik = "ÇOKLU ASANSÖR TRAFİK HESABI" if coklu else "ASANSÖR TRAFİK HESABI"
     buf = io.BytesIO()
     doc = _Belge(buf, baslik,

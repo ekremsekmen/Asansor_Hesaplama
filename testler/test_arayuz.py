@@ -13,7 +13,6 @@ import urllib.request
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, KOK)
 
-from exports import xlsx_export as XE           # noqa: E402
 from testler.ortak import Rapor      # noqa: E402
 
 BASE = os.environ.get("AVAN_TEST_URL", "http://127.0.0.1:8760")
@@ -161,12 +160,11 @@ def calistir():
         #  FORMUN BAŞINDAKİ AÇIKLAMA KUTULARI KALDIRILDI.  Ortak girdi
         #  köprüsü ve "bu bölüm uygulama projesine aittir" metni her açılışta
         #  girdilerin önünü kapatıyordu;  köprü zaten görünmez çalışıyor.
-        #  Excel hücre adresleri de ( "· B132" ) etiketten çıkarıldı — Excel
-        #  eşleşmesi SÖZLEŞMEDE duruyor, TEST 6 onu ayrıca doğruluyor.
+        #  Eski hücre adresleri de ( "· B132" ) etiketten çıkarıldı.
         r.kontrol("form açıklama kutusuyla başlamıyor",
                   "Ortak girdiler bir kez girilir" not in pg.inner_text("#m_form")
                   and "uygulama projesine" not in pg.inner_text("#m_form"))
-        r.esit("etiketlerde Excel hücre adresi yok",
+        r.esit("etiketlerde hücre adresi yok",
                pg.eval_on_selector_all(
                    "#m_form label",
                    "e=>e.filter(x=>/·\\s*[A-Z]{1,2}[0-9]{1,4}\\b/.test(x.textContent))"
@@ -796,6 +794,53 @@ def calistir():
         pg.wait_for_timeout(1600)
         r.esit("beyan yükü yeniden değişince tablo yine izliyor",
                pg.input_value("#m_kabin_agirligi"), "800")
+        #  SEÇİMİN HEMEN ARDINDAN YAZILAN DEĞER EZİLMEZ.  Beyan yükü seçilip
+        #  220 ms'lik gecikme dolmadan kabin ağırlığı yazılınca istek alanı boş
+        #  gönderiyor, dönen tablo değeri de yazılanın üstüne basılıyordu
+        #  ( bağımsız ELEport denemesinde çıktı:  950 yazıldı, kutu 800 oldu ).
+        pg.evaluate("""() => {
+            const by = document.getElementById('m_beyan_yuku');
+            by.value = '1000';
+            by.dispatchEvent(new Event('change', {bubbles: true}));
+            const gk = document.getElementById('m_kabin_agirligi');
+            gk.value = '950';
+            gk.dispatchEvent(new Event('input', {bubbles: true}));
+        }""")
+        pg.wait_for_timeout(1800)
+        r.esit("beyan yükünden hemen sonra yazılan kabin ağırlığı ekranda kalıyor",
+               pg.input_value("#m_kabin_agirligi"), "950")
+        r.esit("… ve hesaba o değer giriyor",
+               pg.evaluate("SON.m.girdi.kabin_agirligi"), 950)
+        pg.select_option("#m_beyan_yuku", "800")
+        pg.wait_for_timeout(1600)
+        #  YOLDAKİ ESKİ YANIT TAZELEMEYİ İPTAL ETMEZ.  Beyan yükü değiştirildiği
+        #  anda eski değerlerle giden bir istek yanıtlanınca bayrak kapanıyor ve
+        #  eski kütle kutuya yazılıyordu:  sonraki istek boş alan göndermediği
+        #  için 1000 kg'da kabin 950 yerine 800 kg kaldı ( bağımsız incelemede
+        #  yeniden üretildi ).  Yanıt 100 ms geciktirilerek yarış kurulur.
+        from engine.ortak import ofis as _OFK
+        _bek1000 = _OFK.bos_kabin_kutlesi(1000)
+        _yaris = pg.evaluate("""async () => {
+            const bek = ms => new Promise(r => setTimeout(r, ms));
+            const f0 = window.fetch;
+            window.fetch = async (...a) => { const r = await f0(...a);
+                if (String(a[0]).includes('/api/uygulama/coklu')) await bek(100);
+                return r; };
+            try {
+                hesapMukavemet();                                  // eski istek yolda
+                const by = document.getElementById('m_beyan_yuku');
+                by.value = '1000';
+                by.dispatchEvent(new Event('change', {bubbles: true}));
+                await bek(2500);
+            } finally { window.fetch = f0; }
+            return {kutu: document.getElementById('m_kabin_agirligi').value,
+                    hesap: SON.m.girdi.kabin_agirligi};
+        }""")
+        r.esit("yoldaki eski yanıt tazelemeyi iptal etmiyor — kutu tablo değerinde",
+               _yaris["kutu"], str(int(_bek1000)))
+        r.esit("… ve hesaba tablo değeri gidiyor", _yaris["hesap"], _bek1000)
+        pg.select_option("#m_beyan_yuku", "800")
+        pg.wait_for_timeout(1600)
         pg.fill("#m_kabin_agirligi", "700")
         pg.wait_for_timeout(1400)
         #  Standarda uyan kasnak korunuyor — testin geri kalanı temiz koşsun
@@ -810,8 +855,7 @@ def calistir():
                    "#s-uygproje .dugmeler .dg",
                    "e=>e.map(x=>x.textContent.trim())"),
                ["Projeyi kaydet", "Proje aç (.uygulama)", "Tümünü temizle",
-                "Uygulama Projesi PDF", "Uygulama Projesi Excel",
-                "Projeyi paketle (ZIP)"])
+                "Uygulama Projesi PDF", "Projeyi paketle (ZIP)"])
         _ind = pg.evaluate("""async () => {
             const dene = async uc => {
               const r = await fetch('/api/indir/'+uc, {method:'POST',
@@ -821,16 +865,11 @@ def calistir():
               return {tur: (r.headers.get('Content-Type')||'').split(';')[0],
                       boyut: b.byteLength};
             };
-            return {pdf: await dene('uygulama-pdf'),
-                    xlsx: await dene('uygulama-xlsx')};
+            return {pdf: await dene('uygulama-pdf')};
         }""")
         r.esit("arayüzden uygulama PDF iniyor", _ind["pdf"]["tur"], "application/pdf")
         r.kontrol("inen PDF boş değil", _ind["pdf"]["boyut"] > 20_000,
                   f"→ {_ind['pdf']['boyut']} bayt")
-        r.kontrol("arayüzden uygulama Excel iniyor",
-                  "spreadsheetml" in _ind["xlsx"]["tur"], f"→ {_ind['xlsx']['tur']}")
-        r.kontrol("inen Excel boş değil", _ind["xlsx"]["boyut"] > 100_000,
-                  f"→ {_ind['xlsx']['boyut']} bayt")
 
         #  Proje kimliği dosya adına giriyor mu  ( avan kapağı BASILMAMALI )
         #  Kimlik PROJE sekmesindedir:  bir kapak dört asansörü birden
@@ -857,7 +896,7 @@ def calistir():
                   pg.evaluate("Object.keys(mukavemetKimlik()).sort().join(',')")
                   == "owner,project_title,sheet_no")
 
-        #  REVİZYON AKIŞI:  Excel al → formu boz → dosyayı geri yükle
+        #  REVİZYON AKIŞI:  proje dosyası al → formu boz → dosyayı geri yükle
         pg.select_option("#m_beyan_yuku", "1000")
         pg.fill("#m_kabin_agirligi", "950")
         pg.click("#m_durak_ekle")
@@ -866,12 +905,7 @@ def calistir():
                             "ag: SON.m.girdi.kabin_agirligi, "
                             "durak: MUK_DURAK.length, ray: SON.m.ozet.ray_boyu})")
         _geri = pg.evaluate("""async () => {
-            const r = await fetch('/api/indir/uygulama-xlsx', {method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({kapak: mukavemetKimlik(),
-                                    girdiler: mukavemetGirdi(),
-                                    sabitler: ofisSabitleri()})});
-            const blob = await r.blob();
+            const govde = JSON.parse(JSON.stringify(projeGovdesi('uygulama')));
             //  formu boz
             document.getElementById('m_beyan_yuku').value = '450';
             document.getElementById('m_kabin_agirligi').value = '500';
@@ -879,21 +913,20 @@ def calistir():
             await new Promise(x=>setTimeout(x, 1500));
             const bozuk = {yuk: SON.m.girdi.beyan_yuku, durak: MUK_DURAK.length};
             //  dosyayı geri yükle
-            await xlsxYukle([new File([blob], 'muk.xlsx',
-              {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})]);
+            projeUygula(govde, 'muk.uygulama');
             await new Promise(x=>setTimeout(x, 2000));
             return {bozuk, sonra: {yuk: SON.m.girdi.beyan_yuku,
                     ag: SON.m.girdi.kabin_agirligi, durak: MUK_DURAK.length,
                     ray: SON.m.ozet.ray_boyu},
-                    ozet: document.getElementById('m_yukleme_ozeti').textContent};
+                    durum: document.getElementById('durum').textContent};
         }""")
         r.kontrol("form gerçekten bozulmuştu",
                   _geri["bozuk"]["yuk"] == 450 and _geri["bozuk"]["durak"] != _once["durak"],
                   f"→ {_geri['bozuk']}")
-        r.esit("Excel'den geri yükleme girdileri aynen döndürüyor",
+        r.esit("proje dosyasından geri yükleme girdileri aynen döndürüyor",
                _geri["sonra"], _once)
-        r.kontrol("yükleme özeti uygulama bölümünde görünüyor",
-                  "Mukavemet" in _geri["ozet"], f"→ {_geri['ozet'][:90]!r}")
+        r.kontrol("yükleme durum satırında bildiriliyor",
+                  "Proje açıldı" in _geri["durum"], f"→ {_geri['durum'][:90]!r}")
 
         #  Sayfa yenilenince girdiler duruyor mu  ( tarayıcıda saklama )
         pg.reload(wait_until="networkidle")
@@ -1487,7 +1520,7 @@ def calistir():
         r.kontrol("taşındı bilgi bandı kaldırıldı",
                   pg.query_selector("#sabit_tasindi") is None)
         r.esit("U ofis varsayılanı 380", pg.input_value("#of_U"), "380")
-        r.esit("çubuk adedi 4 ( Excel ile aynı )", pg.input_value("#of_cubuk_sayisi"), "4")
+        r.esit("çubuk adedi 4 ( ofis varsayılanı )", pg.input_value("#of_cubuk_sayisi"), "4")
 
         #  Avan ortak panelinden kalkmış olmalı
         pg.click('.sekme[data-sekme="avan"]')
@@ -1650,15 +1683,12 @@ def calistir():
         pg.click('.sekme[data-sekme="avan"]')
         pg.wait_for_timeout(400)
 
-        #  Şablon durumu — yanlış / eski Excel konmuşsa burada görünür
+        #  Excel şablonu kalktı:  Sabitler sekmesinde şablon durumu kartı yok
         pg.click('.sekme[data-sekme="sabitler"]')
         pg.wait_for_timeout(700)
-        _sd = pg.inner_text("#sablon_durumu")
-        r.kontrol("şablon durumu kartı dolu", len(_sd) > 100, f"→ {len(_sd)} karakter")
-        r.kontrol("iki şablon da doğrulandı", "doğrulandı" in _sd)
-        r.kontrol("şablon parmak izi gösteriliyor", "md5" in _sd)
-        r.kontrol("şablon dosya adları yazıyor",
-                  "ASANSOR_TRAFIK_HESABI" in _sd and "ASANSOR_AVAN_HESAPLARI" in _sd)
+        r.kontrol("şablon durumu kartı kaldırıldı",
+                  pg.query_selector("#sablon_durumu") is None
+                  and "ŞABLON" not in pg.inner_text("#s-sabitler"))
 
         #  Manuel k / manuel V ana akıştan kalktı — katlanır bölümde
         adetSec(pg, 2)
@@ -1815,12 +1845,12 @@ def calistir():
         # --- indirme düğmeleri gerçekten dosya veriyor
         #  Trafik tek gövdedir; 1 ve 2 asansör tanımıyla iki kez denenir —
         #  ilki PAFTA, ikincisi PAFTA-COKLU yolunu üretmelidir.
+        r.esit("arayüzde Excel düğmesi yok",
+               pg.eval_on_selector_all(
+                   "button", "e=>e.filter(x=>/xlsx|excel/i.test(x.textContent)).length"), 0)
         for adet, govde, metin, uzanti in ((1, "coklu", "PDF indir  (pafta)", ".pdf"),
-                                           (1, "coklu", "XLSX indir  (şablon)", ".xlsx"),
                                            (2, "coklu", "PDF indir  (pafta)", ".pdf"),
-                                           (2, "coklu", "XLSX indir  (şablon)", ".xlsx"),
-                                           (0, "avan", "PDF indir", ".pdf"),
-                                           (0, "avan", "XLSX indir  (şablon)", ".xlsx")):
+                                           (0, "avan", "PDF indir", ".pdf")):
             sekme = "trafik" if govde == "coklu" else govde
             if adet:
                 adetSec(pg, adet)
@@ -1852,40 +1882,25 @@ def calistir():
         except Exception as e:                           # noqa: BLE001
             r.kontrol("proje dosyası kaydetme", False, f"→ {e}")
 
-        # --- REVİZYON: Excel'den geri yükleme
-        #     Program sıfırlanır, indirilen Excel'ler geri yüklenir,
-        #     girdilerin yerine oturduğu doğrulanır.
-        import json as _json
+        # --- REVİZYON: proje dosyasından geri yükleme
+        #     Girdiler doldurulur, proje dosyası alınır, program sıfırlanır,
+        #     dosya geri yüklenir ve girdilerin yerine oturduğu doğrulanır.
         import tempfile as _tempfile
-        import urllib.request as _urlreq
         _D = _tempfile.mkdtemp(prefix="avan_arayuz_")
-        _proje = {"proje_adi": "Geri Yukleme Denemesi", "muhendis": "Test"}
-        _gt = {"bina_tipi": "Konut", "bina_yuksekligi": "39,98", "yapi_yuksekligi": "43",
-               "N": "11", "h": "3", "hizli1": "44", "hizli2": "3", "P": "10",
-               "bodrum": "2",
-               "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto."}
-        _ga = {"ortak": {"U": "380", "kappa": "56", "eps_max": "3", "temel_a": "26,55",
-                         "temel_b": "16,4", "beta": "150", "serit_L": "58,5",
-                         "cubuk_sayisi": "4", "mk_uzunluk": "0", "mk_genislik": "0"},
-               "asansorler": [{"aktif": True, "tanim": "İnsan", "kapasite": "10", "V": "1.6",
-                               "eta": "0,85", "Hk": "32,85", "kuyu_genisligi": "1800",
-                               "kabin_boyu": "1450", "kabin_genisligi": "1300", "gr": "17,91",
-                               "Fmk": "350", "Fsh": "100", "Nsc": "11", "S1": "6",
-                               "L1": "32,85", "S2": "6", "L2": "3", "kablo_tipi": "NHXMH FE180",
-                               "i_palanga": "1", "q_denge": "0,45"},
-                              {"aktif": False}, {"aktif": False}, {"aktif": False}],
-               "sabitler": {}}
-
-        def _indir(uc, govde, ad):
-            q = _urlreq.Request(BASE + "/api/indir/" + uc, data=_json.dumps(govde).encode(),
-                                headers={"Content-Type": "application/json"})
-            icerik = _urlreq.urlopen(q, timeout=60).read()
-            yol = os.path.join(_D, ad)
-            open(yol, "wb").write(icerik)
-            return yol
-
-        _tx = _indir("trafik-xlsx", {"mod": "tek", "girdiler": _gt, "proje": _proje}, "t.xlsx")
-        _ax = _indir("avan-xlsx", {"girdiler": _ga, "proje": _proje}, "a.xlsx")
+        pg.evaluate("""() => {
+            uygula({c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43',
+                    c_N:'11', c_h:'3', c_hizli1:'44', c_hizli2:'3', c_bodrum:'2',
+                    c_P1:'10', c_kg1:'900', c_kt1:'Merkezden Açılan Oto.',
+                    a_temel_a:'26,55', a_temel_b:'16,4', a_serit_L:'58,5',
+                    a_mk_yok:true, a_aktif1:true, a_tanim1:'İnsan', a_kapasite1:'10',
+                    a_V1:'1,6', a_eta1:'0,85', a_Hk1:'32,85', a_kuyu_genisligi1:'1800',
+                    a_kabin_boyu1:'1450', a_kabin_genisligi1:'1300',
+                    a_makine_tipi1:'Dişlisiz', a_i_palanga1:'1', a_q_denge1:'0,45',
+                    k_owner:'Kalıcılık Denemesi A.Ş.', __trafik_adet:1, __avan_ek:0});
+            yaz(); hesaplaHepsi();
+        }""")
+        pg.wait_for_timeout(1500)
+        _govde = pg.evaluate("JSON.parse(JSON.stringify(projeGovdesi('avan')))")
 
         pg.evaluate("localStorage.clear()")
         pg.reload(wait_until="networkidle")
@@ -1895,25 +1910,11 @@ def calistir():
         pg.wait_for_timeout(300)
         r.esit("sıfırlandıktan sonra N boş", pg.input_value("#c_N"), "")
 
-        pg.click('.sekme[data-sekme="proje"]')
-        pg.wait_for_timeout(200)
-        #  "Proje araçları" katlanır bölümü kapalı gelir — içindeki düğme ve
-        #  özet alanı ancak açıkken görünür.
-        pg.evaluate("document.querySelector('details.proje-araclari').open = true;")
-        pg.wait_for_timeout(200)
-        #  Sıfırlama kapağı da temizledi ( doğrusu bu ).  "XLSX yüklemesi
-        #  kapağı silmiyor" kontrolü anlamlı olsun diye alan yeniden dolduruluyor.
-        pg.fill("#k_owner", "Kalıcılık Denemesi A.Ş.")
-        pg.wait_for_timeout(500)
-        pg.set_input_files("#xlsx_ac", [_tx, _ax])
-        pg.wait_for_timeout(3200)
-        r.kontrol("yükleme özeti göründü",
-                  "yüklendi" in pg.inner_text("#yukleme_ozeti"))
-        #  XLSX geri yükleme HESAP GİRDİLERİNİ tazeler; proje kimliği artık
-        #  kapak sekmesindedir ve dosyadan gelmez.  Kritik olan, hesap
-        #  yüklemenin kapağı SİLMEMESİDİR — kullanıcı kapağı yeniden yazmak
-        #  zorunda kalmamalı.
-        r.esit("XLSX yüklemesi kapak alanını silmedi",
+        pg.evaluate("g => projeUygula(g, 'deneme.avan')", _govde)
+        pg.wait_for_timeout(2500)
+        r.kontrol("yükleme durum satırında bildiriliyor",
+                  "Proje açıldı" in pg.inner_text("#durum"), f"→ {pg.inner_text('#durum')[:80]}")
+        r.esit("proje dosyası kapak alanını da geri getiriyor",
                pg.input_value("#k_owner"), "Kalıcılık Denemesi A.Ş.")
         adetSec(pg, 1)
         pg.wait_for_timeout(400)
@@ -1936,7 +1937,7 @@ def calistir():
                pg.evaluate("avanAdedi() >= avanTaban()"), True)
         r.esit("2. asansör kartı trafik adedine göre",
                pg.is_checked("#a_aktif2"), _taban >= 2)
-        # Açılır listelerde ondalık ayracı tuzağı: Excel "1,6" verir, seçeneğin
+        # Açılır listelerde ondalık ayracı tuzağı: dosyada "1,6" durur, seçeneğin
         # değeri "1.6"dır.  Eşleşmezse seçim boş kalır ve panel sessizce boşalır.
         r.kontrol("ondalıklı hız açılır listeye oturdu",
                   pg.input_value("#a_V1") not in ("", None),
@@ -1951,21 +1952,16 @@ def calistir():
         r.kontrol("revizyon sonrası avan hesabı güncellendi",
                   "2,40" in _avan_metin, "→ kuyu genişliği 2400 mm = 2,40 m görünmeli")
 
-        # ilgisiz dosya anlaşılır hata vermeli
-        # (bu adımda sunucunun 422 dönmesi BEKLENEN davranıştır — konsol
-        #  denetimi bu noktadan öncesini kapsar)
-        _konsol_once = len(konsol)
-        _kotu = os.path.join(_D, "ilgisiz.xlsx")
-        open(_kotu, "wb").write(b"PK\x03\x04 bu bir excel degil")
+        # bozuk proje dosyası anlaşılır hata vermeli
+        _kotu = os.path.join(_D, "bozuk.avan")
+        open(_kotu, "wb").write(b"bu bir proje dosyasi degil")
         pg.click('.sekme[data-sekme="proje"]')
         pg.wait_for_timeout(200)
-        pg.set_input_files("#xlsx_ac", [_kotu])
-        pg.wait_for_timeout(2000)
-        r.kontrol("ilgisiz dosya için hata gösterildi",
-                  "uyari kirmizi" in pg.inner_html("#yukleme_ozeti"))
-        _yeni = [k for k in konsol[_konsol_once:] if "422" not in k]
-        r.kontrol("bozuk dosya beklenmedik konsol hatası üretmedi", not _yeni, f"→ {_yeni[:3]}")
-        del konsol[_konsol_once:]        # beklenen 422 kaydını temizle
+        pg.set_input_files("#dosya_ac", [_kotu])
+        pg.wait_for_timeout(1200)
+        r.kontrol("bozuk proje dosyası için hata gösterildi",
+                  "geçerli bir proje dosyası değil" in pg.inner_text("#durum"),
+                  f"→ {pg.inner_text('#durum')[:80]}")
 
         # --- dar ekran (telefon) düzeni bozulmuyor
         pg.set_viewport_size({"width": 390, "height": 844})
@@ -1990,29 +1986,25 @@ def calistir():
         _once = pg.evaluate("[1,2,3,4].map(i=>(document.getElementById('c_P'+i)||{}).value)")
         r.kontrol("üç kolon dolduruldu", _once[:3] == ["10", "16", "20"], f"→ {_once}")
 
-        _tekx = os.path.join(_D, "tek_tek.xlsx")
-        with open(_tekx, "wb") as _f:
-            _f.write(XE.trafik_xlsx("tek", {
-                "bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
-                "N": 11, "h": 3, "hizli1": 44, "hizli2": 3, "P": 10,
-                "kapi_genisligi": 900, "kapi_tipi": "Teleskopik Otomatik"}, {}))
-        pg.set_input_files("#xlsx_ac", _tekx)
+        pg.evaluate("""() => projeUygula({__mod:'avan', __surum:1, alanlar:{
+            c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43',
+            c_N:'11', c_h:'3', c_hizli1:'44', c_hizli2:'3',
+            c_P1:'10', c_kg1:'900', c_kt1:'Teleskopik Otomatik', __trafik_adet:1}}, 'tek.avan')""")
         pg.wait_for_timeout(3000)
         _sonra = pg.evaluate("[1,2,3,4].map(i=>(document.getElementById('c_P'+i)||{}).value)")
         r.kontrol("tek asansörlük dosya eski kolonları temizliyor",
                   not any(_sonra[1:]), f"→ {_sonra}")
         r.esit("tek asansörlük dosyada adet 1", pg.evaluate("TRAFIK_ADET"), 1)
 
-        #  Avan dosyasındaki kapasite / hız, formdaki eski trafikle EZİLMEMELİ
-        _avx = os.path.join(_D, "avan_16.xlsx")
-        with open(_avx, "wb") as _f:
-            _f.write(XE.avan_xlsx({
-                "ortak": {"temel_a": 26.55, "temel_b": 16.4, "mk_yok": True},
-                "asansorler": [{"tanim": "A", "kapasite": 16, "V": 2.5, "eta": 0.85,
-                                "Hk": 32.85, "kuyu_genisligi": 2000, "kabin_boyu": 1700,
-                                "kabin_genisligi": 1300, "makine_tipi": "Dişlisiz"}],
-                "sabitler": {}}, {}))
-        pg.set_input_files("#xlsx_ac", _avx)
+        #  Dosyadaki avan kapasitesi / hızı, formdaki trafikle EZİLMEMELİ
+        pg.evaluate("""() => projeUygula({__mod:'avan', __surum:1, alanlar:{
+            c_bina_tipi:'Konut', c_bina_yuksekligi:'39,98', c_yapi_yuksekligi:'43',
+            c_N:'11', c_h:'3', c_hizli1:'44', c_hizli2:'3',
+            c_P1:'10', c_kg1:'900', c_kt1:'Teleskopik Otomatik', __trafik_adet:1,
+            a_temel_a:'26,55', a_temel_b:'16,4', a_mk_yok:true,
+            a_aktif1:true, a_tanim1:'A', a_kapasite1:'16', a_V1:'2.5', a_eta1:'0,85',
+            a_Hk1:'32,85', a_kuyu_genisligi1:'2000', a_kabin_boyu1:'1700',
+            a_kabin_genisligi1:'1300', a_makine_tipi1:'Dişlisiz'}}, 'avan16.avan')""")
         pg.wait_for_timeout(3500)
         r.esit("yüklenen avan kapasitesi korunuyor",
                pg.evaluate("(document.getElementById('a_kapasite1')||{}).value"), "16")

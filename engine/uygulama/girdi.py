@@ -17,8 +17,7 @@ içinde çelişir.
 
 Bu yüzden:
   · Ortak girdiler YALNIZ mukavemet sözleşmesinde tanımlıdır
-    ( engine/mukavemet_girdi.ALANLAR ) — orası Excel'e karşı hücre hücre
-    doğrulanır, tek doğruluk kaynağıdır.
+    ( engine/uygulama/mukavemet_girdi.ALANLAR ) — tek doğruluk kaynağı odur.
   · Elektrik hesaplarının mukavemette KARŞILIĞI OLMAYAN girdileri burada,
     ayrı bir grupta tanımlanır.
   · Ortak olanlar `kopru()` ile mukavemet girdisinden TÜRETİLİR, kullanıcıya

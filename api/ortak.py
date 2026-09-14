@@ -91,8 +91,8 @@ class _BelirsizListesi(threading.local):
 
 _BELIRSIZ = _BelirsizListesi()
 #  BELİRSİZLİKTEN BAŞKA SEBEPLE REDDEDİLEN GİRDİLER ( negatif miktar, seçilmemiş
-#  kalem, şablon sınırını aşan satır … ).  Ayrı tutulur çünkü belirsiz-sayı
-#  açıklaması ( "binlik ayracı mı ondalık mı" ) bunlar için YANLIŞ olur.
+#  kalem … ).  Ayrı tutulur çünkü belirsiz-sayı açıklaması ( "binlik ayracı mı
+#  ondalık mı" ) bunlar için YANLIŞ olur.
 _RED = _BelirsizListesi()
 
 
@@ -134,15 +134,6 @@ AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "S1", "L1", "S2", "L2")
 
 
-#  EK NÜFUS SATIRLARI  —  BOZUK GİRDİ SESSİZCE SİLİNMEZ.
-#  Eskiden okunamayan miktar ( "1.200", "abc" ) satırı hesaptan tamamen
-#  çıkarıyordu:  1200 yazınca 11 asansör, 1.200 yazınca 2 asansör çıkıyor ve
-#  aradaki fark hiçbir yerde söylenmiyordu.  Belirsiz yazım zaten _BELIRSIZ
-#  listesine düşer ( ekran ve indirme aynı kapıdan geçer ); geri kalan bozuk
-#  ya da negatif satırlar için açık hata üretilir.
-EK_NUFUS_AZAMI = 11          # şablondaki satır adedi ( bkz. hucre_haritasi )
-
-
 def _sozluk_listesi(x):
     """Yalnız sözlük öğelerini geçiren güvenli liste — bozuk gövdede çökmez."""
     if not isinstance(x, (list, tuple)):
@@ -152,25 +143,15 @@ def _sozluk_listesi(x):
 
 def _proje_kimligi(veri):
     """
-    KAPAK SEKMESİNDEKİ PROJE KİMLİĞİ  →  indirilen dosyanın adı ve XLSX'in
-    dosya özellikleri.
+    KAPAK SEKMESİNDEKİ PROJE ADI  →  indirilen dosyanın adı.
 
-    Bu bağlanmadan önce her indirme "Asansor - Avan Hesaplari.xlsx" adıyla
-    iniyordu:  aynı klasördeki iki projenin dosyaları birbirinden ayırt
-    edilemiyor, ikincisi "(1)" olarak kaydediliyordu.  Pafta içeriği
-    değişmez — proje adı yalnız KAPAK sayfasında yazılıdır.
+    Bu bağlanmadan önce her indirme aynı adla iniyordu:  aynı klasördeki iki
+    projenin dosyaları birbirinden ayırt edilemiyor, ikincisi "(1)" olarak
+    kaydediliyordu.  Pafta içeriği değişmez — proje adı yalnız KAPAK
+    sayfasında yazılıdır.
     """
     k = veri.get("kapak") if isinstance(veri.get("kapak"), dict) else {}
-
-    def _birlestir(*alanlar):
-        return " ".join(str(k.get(x) or "").strip() for x in alanlar).strip()
-
-    return {"proje_adi": str(k.get("project_title") or "").strip(),
-            "isveren": str(k.get("owner") or k.get("contractor") or "").strip(),
-            "pafta_no": str(k.get("sheet_no") or "").strip(),
-            "tarih": "",
-            "muhendis": _birlestir("elec_name", "elec_surname")
-            or _birlestir("mech_name", "mech_surname")}
+    return {"proje_adi": str(k.get("project_title") or "").strip()}
 
 
 def _dosya_adi(proje, ek, uzanti):
@@ -185,36 +166,10 @@ def _indir(icerik: bytes, ad: str, tur: str):
         "Content-Disposition": f"attachment; filename*=UTF-8''{quote(ad)}"})
 
 
-XLSX_TUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
 #  "Projeyi paketle":  teslim paketi ile GERİ DÖNÜŞ NOKTASI aynı arşivde.
-#  Çıktılar ( PDF · XLSX · DXF/DWG ) projeyi anlatır, proje dosyası ise onu
-#  geri getirir.  İkisi ayrı yerlerde durursa arşivden dönmek imkânsızlaşır.
+#  Çıktılar ( PDF · DXF/DWG ) projeyi anlatır, proje dosyası ise onu geri
+#  getirir.  İkisi ayrı yerlerde durursa arşivden dönmek imkânsızlaşır.
 PROJE_UZANTI = {"avan": ".avan", "uygulama": ".uygulama"}
-
-
-#  Paketin EKSİK olduğunu arayüze söyleyen başlık notu ( X-Avan-Not içinde ).
-#  Pakete ayrıca bir metin dosyası konur;  not, kullanıcının ZIP'i açmadan
-#  da uyarılması içindir.
-PAKET_NOT_KITAP = "KITAP"
-
-
-def _uretilemeyen_dosya_notu(eksikler, dosya="URETILEMEYEN DOSYALAR.txt",
-                             aciklama="Aşağıdaki çalışma kitapları üretilemedi."):
-    """Pakete konan "neyin eksik olduğu" dosyası  →  ( ad , içerik ).
-
-    ÜRETİLEMEYEN KİTAP SESSİZCE ATLANAMAZ.  Paket dosyaları ( avan · trafik ·
-    uygulama ) eskiden kitap üretimi hata verince ``except Exception: pass``
-    ile devam ediyordu:  kullanıcı kitapsız bir ZIP indiriyor, farkına
-    varmıyordu.  Bütün paketler bu tek bildirimi kullanır.
-    """
-    return (dosya,
-            ("BU PAKETTE EKSİK VAR\r\n"
-             "====================\r\n\r\n"
-             f"{aciklama}\r\n"
-             "Paketteki dosyalar projenin TAMAMI DEĞİLDİR.\r\n\r\n"
-             + "\r\n".join(f"  •  {x}" for x in eksikler)
-             + "\r\n").encode("utf-8"))
 
 
 def _paket_ekleri(veri, mod):
@@ -238,11 +193,6 @@ def _uretilemedi(e: Exception):
     Dosya üretilemediğinde JSON hata döndürür.  Arayüz Content-Type'a bakarak
     bunu bozuk bir dosya olarak indirmek yerine ekranda mesaj olarak gösterir.
     """
-    ileti = str(e)
-    if isinstance(e, FileNotFoundError) or "No such file" in ileti:
-        ileti = ("Excel şablonu bulunamadı. XLSX çıktısı ofisin kendi Excel dosyasını "
-                 "şablon olarak kullanır — 'templates' klasöründeki iki dosya yerinde "
-                 "olmalıdır. (Ekrandaki hesap ve PDF çıktısı şablon olmadan da çalışır.)")
-    return JSONResponse({"hata": f"DOSYA ÜRETİLEMEDİ — {ileti}"}, status_code=422)
+    return JSONResponse({"hata": f"DOSYA ÜRETİLEMEDİ — {e}"}, status_code=422)
 
 

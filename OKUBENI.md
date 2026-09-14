@@ -1,7 +1,7 @@
 # ASANSÖR PROJE PROGRAMI
 
-Asansör projelerinin hesaplarını yapan, sonuçları **XLSX**, **PDF** ve **CAD**
-olarak veren yerel program.  Açılışta hangi projenin hazırlanacağı seçilir:
+Asansör projelerinin hesaplarını yapan, sonuçları **PDF** ve **CAD** olarak
+veren yerel program.  Açılışta hangi projenin hazırlanacağı seçilir:
 
 | Bölüm | Kapsam | Kaynak |
 |---|---|---|
@@ -42,8 +42,33 @@ makine dairesi ) ayrı bir grupta toplanmıştır.
 mukavemet bölüm 1 zaten MMO 208/7 §2.4'e göre hesaplar, kuvvetleri de bölüm 7-9
 verir. İkisini birden basmak paftada iki farklı motor gücü gösterirdi.
 
-Hesap motorları, ofisin mevcut Excel dosyalarındaki **her formülün birebir
-Python karşılığıdır** — değerler hücre hücre karşılaştırılarak doğrulanmıştır.
+Hesap motorları ofisin eski Excel dosyalarından yola çıkarak yazıldı, değerler
+hücre hücre karşılaştırılarak doğrulandı ve standardın gerektirdiği yerlerde
+TS EN 81-20 / TS EN 81-50'ye göre düzeltildi. **Bugün hesabın tek kaynağı
+programın kendisidir** — program Excel üretmez ve okumaz.
+
+**Sürüm 3.1** — **Excel tamamen kaldırıldı.  Her şey programdan yapılır.**
+
+| | Önce | Sonra |
+|---|---|---|
+| **Çıktılar** | PDF · CAD · XLSX ( ofisin Excel şablonları doldurularak ) | **PDF · CAD** — hesabın tek kaynağı motordur, çıktılar ondan üretilir |
+| **Revizyon** | Proje dosyası ya da programın ürettiği Excel'den geri yükleme | Yalnız **proje dosyası** ( `.avan` · `.uygulama` ) — girdileri taşır, hesap bilgisi taşımaz |
+| **Şablonlar** | `templates/` altında üç Excel şablonu, şablon denetimi, `araclar/` altında şablon betikleri | Kaldırıldı;  `templates/` yalnız CAD proje formatını ( `proje_formati.dxf` ) tutar |
+| **Kitaplık** | `openpyxl` | Gerekmiyor |
+| **Doğrulama** | TEST 1 ve 10 girdileri Excel'e yazıp LibreOffice ile hesaplatıyordu | Aynı senaryoların Excel ile doğrulanmış sonuçları **donduruldu** ( `testler/referans_*.json.gz` );  TEST 1 ve 10 motoru bu referansa karşı denetler, LibreOffice gerekmez |
+
+Neden:  aynı hesabı iki kez ( motorda ve Excel formüllerinde ) tutmak iki belgenin
+ayrışmasına yol açıyordu;  canlı formüllü bir çalışma kitabı teslim etmek de
+hesap aracının kendisini teslim etmek demekti.  PDF ve CAD sonucu gösterir,
+aracı vermez.
+
+Motorun ara değerleri artık Excel hücre adresiyle değil adıyla tutulur
+( `sonuc["ara"]["kabin_ray.c21.d1.sf"]` gibi );  standart gereği verilen hesap
+kararları 6. bölümdeki tabloda ve TEST 9'un kural denetimlerindedir.
+
+> Aşağıdaki eski sürüm notlarında ve 6. bölümün denetim kayıtlarında geçen
+> **XLSX · şablon · kitap · Excel'den geri yükleme** maddeleri Sürüm 3.1'den
+> öncesine aittir;  tarihçe olarak bırakılmıştır.
 
 **Sürüm 3.0** — **uygulama projesi eklendi.**
 
@@ -238,21 +263,21 @@ internet gerekmez; hiçbir veri dışarı gitmez.
 
 ## 2. Program nasıl çalışır
 
-| Sekme | Ne yapar | Excel karşılığı |
-|---|---|---|
-| **Proje Bilgileri** | Pafta antedi, proje kaydet/aç | — |
-| **1 · Trafik Hesabı** | **Adet 1** — tek tip asansör: kaç adet, kaç kişilik, hangi hız | `HESAPLAMA` → `PAFTA` |
-| **1 · Trafik Hesabı** | **Adet 2–4** — farklı kapasitede asansör grubunun kontrolü | `ÇOKLU ASANSÖR` → `PAFTA-COKLU` |
-| **2 · Avan Hesapları** | 1–4 asansör: motor, kuvvetler, aydınlatma, kurulu güç, gerilim düşümü + makine dairesi + topraklama | `1–4 NOLU ASANSÖR`, `MK.DAİRESİ AYD.`, `TOPRAKLAMA`, `ÖZET` |
-| **Sabitler / Ofis Standardı** | Palanga, denge faktörü, armatür, priz, cosφ… | `SABİTLER` B bölümü |
-| **Tablolar** | Kullanılan tüm tablolar ve kaynakları | `TABLOLAR` |
+| Sekme | Ne yapar |
+|---|---|
+| **Proje Bilgileri** | Pafta antedi, proje kaydet/aç |
+| **1 · Trafik Hesabı** | **Adet 1** — tek tip asansör: kaç adet, kaç kişilik, hangi hız |
+| **1 · Trafik Hesabı** | **Adet 2–4** — farklı kapasitede asansör grubunun kontrolü |
+| **2 · Avan Hesapları** | 1–4 asansör: motor, kuvvetler, aydınlatma, kurulu güç, gerilim düşümü + makine dairesi + topraklama |
+| **Sabitler / Ofis Standardı** | Palanga, denge faktörü, armatür, priz, cosφ… |
+| **Tablolar** | Kullanılan tüm tablolar ve kaynakları |
 
 **Uygulama projesi** modunda tek adım vardır:
 
-| Sekme | Ne yapar | Excel karşılığı |
-|---|---|---|
-| **1 · Uygulama Hesapları** | 82 girdi → 14–18 hesap bölümü. **Mukavemet ( 1–10 ):** motor gücü · makine konstrüksiyonu · kabin alanı · askı halatları · regülatör halatı · tahrik yeteneği · kabin kılavuz rayları · karşı ağırlık rayları · kuyu tabanı yükleri · sığınma alanları. **Elektrik ( 11– ):** kabin ve kuyu aydınlatması · kurulu güç cetveli · gerilim düşümü ve kesit kontrolü · makine dairesi aydınlatması · temel topraklama | `MUKAVEMET_HESABI.xlsx` → `Veri Girişi`, `11-Muk. Hesapları`, `Askı Tipleri`  ·  `ASANSOR_AVAN_HESAPLARI.xlsx` → `1 NOLU ASANSÖR`, `MK.DAİRESİ AYD.`, `TOPRAKLAMA` |
-| **Sabitler / Ofis Standardı** | Armatürler, priz, cosφ, U, κ, εmax, β, çubuk sayısı — elektrik ve topraklama hesapları buradan beslenir | `SABİTLER` B bölümü |
+| Sekme | Ne yapar |
+|---|---|
+| **1 · Uygulama Hesapları** | 82 girdi → 14–18 hesap bölümü. **Mukavemet ( 1–10 ):** motor gücü · makine konstrüksiyonu · kabin alanı · askı halatları · regülatör halatı · tahrik yeteneği · kabin kılavuz rayları · karşı ağırlık rayları · kuyu tabanı yükleri · sığınma alanları. **Elektrik ( 11– ):** kabin ve kuyu aydınlatması · kurulu güç cetveli · gerilim düşümü ve kesit kontrolü · makine dairesi aydınlatması · temel topraklama |
+| **Sabitler / Ofis Standardı** | Armatürler, priz, cosφ, U, κ, εmax, β, çubuk sayısı — elektrik ve topraklama hesapları buradan beslenir |
 
 Sonuçlar **yazdıkça** hesaplanır; kaydet düğmesi yoktur.
 **Sarı zeminli** alanlar sizin doldurduğunuz girdilerdir; boş bırakılan
@@ -273,26 +298,20 @@ opsiyonel alanlar tablo değerini kullanır.
    güncellenir**. Kuyu/kabin ölçüleri, ağırlıklar ve kablo bilgilerini girin.
    Trafik hesabına girmeyen ayrı bir yük ya da sedye asansörü varsa adedi
    elle artırın.
-4. **PDF indir** / **XLSX indir**.
+4. **PDF indir** ya da **Projeyi paketle** ( CAD + PDF + proje dosyası ).
 
 ### Uygulama projesi akışı
 
 1. Açılış ekranından **UYGULAMA PROJESİ**'ni seçin.
-2. **Proje kimliği** — proje adı, işveren, pafta no. ( Yalnız dosya adında ve
-   belge özelliklerinde kullanılır; uygulama projesi kapağı MMO'nun **ayrı**
+2. **Proje kimliği** — proje adı, işveren, pafta no. ( Dosya adında
+   kullanılır; uygulama projesi kapağı MMO'nun **ayrı**
    kitabına aittir, avan kapağı buraya basılmaz. )
 3. **Uygulama projesi girdileri** — on grup. İlk dokuzu mukavemet ( 71 alan ),
    sonuncusu yalnız elektrik hesaplarına ait olanlar ( kuyu genişliği, kablo
-   kesit ve uzunlukları, temel ölçüleri, makine dairesi ). Mukavemet alanlarının
-   etiketinin
-   yanında kaynak Excel'deki **hücre adresi** yazılıdır ( `C59`, `E73`… ), kâğıttan
-   giren için. Hücre adresi **olmayan** alanlar programın kendi eklediği
-   girdilerdir ( paten balatası uzunluğu, *"ofis verimi toplam sistem
-   verimidir"*, karşı ağırlıktaki güvenlik tertibatı, tertibatı devreye sokma
-   kuvveti ); teslim edilen kitaba ayrı bir blokta yazılır ve oradan geri okunur.
+   kesit ve uzunlukları, temel ölçüleri, makine dairesi ).
    **Durak yükseklikleri** kendi düzenleyicisindedir ( ekle / sil, en çok 20 ).
    *Seyir mesafesi* ve *son kat yüksekliği* bu listeden **kendiliğinden** dolar —
-   Excel'de ikisi de elle giriliyor ve sessizce çelişebiliyordu.
+   elle girilen iki değer sessizce çelişebilirdi.
    **Kabin ağırlığı da beyan yükünü izler:** yükü değiştirdiğinizde ofis
    tablosundan dolar ( 1275 kg → 1100 kg ). Elle yazdığınız değer, beyan yükünü
    yeniden değiştirene kadar korunur — avan tarafındaki *trafik → kapasite*
@@ -304,8 +323,8 @@ opsiyonel alanlar tablo değerini kullanır.
 4. Sağ panelde bütün bölümler, hangisinin takıldığı, **kuyu tabanına gelen
    yükler** ( inşaat projesine bildirilecek FKR · FAR · Fkt · Fat ), asansörün
    kurulu gücü, gerilim düşümü ve topraklama direnci görünür.
-5. **PDF** ( bütün hesaplar tek paftada ) / **Excel** ( uygulama projesinin
-   kendi kitabı ) / **CAD** indirin.
+5. **PDF** ( bütün hesaplar tek paftada ) ya da **Projeyi paketle** ( CAD + PDF +
+   `.uygulama` proje dosyası ) indirin.
 
 > Topraklama hesabı için temel ölçüleri, gerilim düşümü için kolon hattı
 > uzunluğu girilmelidir; boş bırakılırsa o bölümler paftaya girmez ve program
@@ -315,100 +334,34 @@ opsiyonel alanlar tablo değerini kullanır.
 
 ## 3. Çıktılar
 
-### Program Excel'e bağımlı mı?
-
-**Hesabın kendisi Excel'den tümüyle bağımsızdır.** MMO/697, TS EN 81-20,
+**Hesabın tek kaynağı programdır.** MMO/697, TS EN 81-20, TS EN 81-50,
 ISO 8100-32 ve IEC tablolarının tamamı ile her formül `engine/` klasöründe
-Python olarak yazılıdır. Bilgisayarda Excel kurulu olmasa bile program çalışır,
-sonuçları ekranda gösterir ve **PDF paftasını üretir**.
+Python olarak yazılıdır;  ekran, PDF ve CAD aynı hesap sonucundan üretilir ve
+bu yüzden ayrışamaz.  Program Excel üretmez, okumaz ve Excel'e ihtiyaç duymaz.
 
-Excel yalnız **tek bir yerde** devrededir: `templates/` klasöründeki üç dosya,
-**XLSX çıktısının şablonudur.** Program o dosyayı açıp girdi hücrelerini
-doldurur; sonuç değerlerini dosyanın kendi formülleri, siz Excel'de açtığınızda
-hesaplar.
-
-| | Şablon gerekir mi? | Excel kurulu olmalı mı? |
-|---|---|---|
-| Ekranda hesap | hayır | hayır |
-| PDF çıktısı | hayır | hayır |
-| XLSX çıktısı | **evet** — `templates/` içindeki üç dosya | hayır (üretmek için); açmak için Excel/LibreOffice/Numbers |
-
-Bu bilinçli bir tercihtir: çıktının ofis paftasıyla **birebir** kalmasını
-garanti eder ve Excel'inizde biçim değişikliği yaptığınızda program çıktısı da
-kendiliğinden değişir. Şablon dosyaları silinirse program çökmez — XLSX
-indirmede anlaşılır bir uyarı verir, hesap ve PDF çalışmaya devam eder.
-
-### XLSX — şablon yöntemi
-Program **sıfırdan tablo üretmez**. Ofisin kendi Excel dosyasını şablon olarak
-açar, yalnız girdi hücrelerini doldurur ve kaydeder. Böylece:
-
-- tüm sayfalar (`PAFTA`, `ÇOKLU ASANSÖR`, `1–4 NOLU ASANSÖR`, `ÖZET` …),
-  formüller, işlem adımları ve sayfa biçimi **birebir korunur**;
-- dosya Excel'de açıldığında **kendiliğinden yeniden hesaplanır**;
-- ofis şablonu değişirse program çıktısı da kendiliğinden değişir —
-  `templates/` klasöründeki dosyaları güncellemeniz yeterlidir.
-
-**Her projenin kendi çalışma kitabı vardır ve karışmaz:**
-
-| Proje | Çalışma kitabı |
+| Çıktı | Ne verir |
 |---|---|
-| Avan | `ASANSOR_TRAFIK_HESABI_v2_1.xlsx` · `ASANSOR_AVAN_HESAPLARI.xlsx` |
-| Uygulama | `MUKAVEMET_HESABI.xlsx` |
-
-Uygulama projesinin elektrik ve topraklama hesapları avan **motorunu** kullanır
-( kod kopyalanmadı ) ama avan **kitabını** çıktı olarak vermez — o kitap avan
-projesine aittir. Uygulama tarafında bu hesaplar ekranda ve **PDF paftasında**
-verilir.
-
-**Mukavemet çıktısında yöntem biraz farklıdır:** program yeni bir kitap kurmaz,
-**kaynak çalışma kitabının kendisini** teslim eder — girdiler "Veri Girişi"
-sayfasına yazılır, **1115 formül yerinde kalır**, dosya açıldığında Excel kendi
-hesabını yapar. Böylece projeci programın sonucunu kitabın kendi formülleriyle
-karşılaştırabilir; iki doğruluk kaynağı yaratılmamış olur.
-
-### PDF — baskıya hazır pafta
-Sayfa düzeni Excel'deki işlem akışını izler: başlık → girdi satırları →
-denklem → sayıların yerine konmuş hâli → sonuç → kontrol → notlar.
-Antet, kaynak referansları, sayfa numarası ve imza kutusu içerir.
+| **PDF** | Baskıya hazır pafta:  başlık → girdi satırları → denklem → sayıların yerine konmuş hâli → sonuç → kontrol → notlar.  Antet, kaynak referansları, sayfa numarası ve imza kutusu içerir. |
+| **CAD ( ZIP )** | Paftaların ofisin tip proje formatına yerleştirilmiş DXF / DWG çizimi, kaynak PDF'ler ve proje dosyası |
 
 ---
 
-## 4. Revizyon — Excel'den proje aç
+## 4. Revizyon — proje dosyasından aç
 
-**Programın ürettiği XLSX, girdileri de taşır.** Aylar sonra projede bir şey
-değiştiğinde (kat eklendi, kuyu genişledi, kapasite değişti) hiçbir şeyi baştan
-girmezsiniz:
+Aylar sonra projede bir şey değiştiğinde ( kat eklendi, kuyu genişledi,
+kapasite değişti ) hiçbir şeyi baştan girmezsiniz:
 
-1. **Proje Bilgileri** sekmesindeki bırakma alanına, proje klasörünüzdeki
-   Excel'i sürükleyin — trafik ve avan dosyalarını **birlikte** bırakabilirsiniz.
-   Uygulama projesinde aynı işi mukavemet sayfasındaki **"Revizyon — Excel'den
-   aç"** alanı yapar; oraya programın ürettiği mukavemet kitabını da,
-   elinizdeki **özgün** kitabı da bırakabilirsiniz — girdiler ikisinde de aynı
-   hücrelerdedir.
-2. Bütün girdiler yerine oturur, hesaplar anında yeniden yapılır.
+1. **Proje aç** ( avan projesinde Proje Kapağı → Proje araçları, uygulama
+   projesinde Proje sekmesi ) ile `.avan` ya da `.uygulama` dosyasını seçin.
+2. Bütün girdiler — ofis sabitleri, çoklu asansörler ve durak listesi dâhil —
+   yerine oturur, hesaplar anında yeniden yapılır.
 3. Değişen değeri düzeltin.
-4. Güncel **PDF ve XLSX**'i yeniden indirin, paftaya koyun.
+4. Güncel PDF'i ya da paketi yeniden indirin, **projeyi yeniden kaydedin**.
 
-Yeni indirdiğiniz dosya da aynı şekilde yüklenebilir — revizyon zinciri kapalıdır.
-
-> **Uygulama projesinin elektrik girdileri.** Kesitler, hat uzunlukları, temel
-> ölçüleri, makine dairesi ve paten balatası uzunluğu kaynak kitapta
-> **yoktur** — program bunları teslim kopyasında `Veri Girişi` sayfasının
-> sonuna, *"PROGRAMIN EKLEDİĞİ GİRDİLER"* başlığı altına yazar ve oradan geri
-> okur. **Elinizdeki özgün kitabı** yüklerseniz o satırlar bulunmadığı için bu
-> alanlar varsayılana döner; program hangilerinin döndüğünü **tek tek sayarak
-> söyler** — sessiz kalmaz.
-
-**Neden Excel, PDF değil?** Girdiler Excel'de *görünür hücrelerde* durur:
-gözle görürsünüz, gerekirse Excel'de elle düzeltirsiniz, program onu da okur.
-PDF'e gömülü gizli veri ise AutoCAD'e yerleştirme, yeniden yazdırma ya da bir
-PDF optimize edicisinden geçme sırasında sessizce silinebilir — ve siz bunu
-ancak yükleme başarısız olduğunda fark edersiniz. Tek ve görünür bir geri
-yükleme noktası olması, iki belirsiz noktadan iyidir.
-
-> Proje antedi (proje adı, işveren, pafta no, mühendis) şablonda bir hücreye
-> sahip olmadığı için dosyanın **özelliklerine** yazılır (Excel: Dosya → Bilgi →
-> Özellikler). Ofis şablonunun düzenine dokunulmaz, bilgi yine de dosyayla taşınır.
+Dosyada bulunmayan bir alan varsa ( eski bir sürümün dosyası ) program kaç
+alanın varsayılana döndüğünü **söyler** — sessiz kalmaz.  Doğrulama paketinin
+TEST 6'sı formdaki bütün alanların dosyaya yazılıp aynen geri geldiğini ve
+geri yüklenen projenin aynı hesap sonucunu verdiğini denetler.
 
 ---
 
@@ -416,7 +369,7 @@ yükleme noktası olması, iki belirsiz noktadan iyidir.
 
 ### Proje dosyası — girdilerin geri dönüş noktası
 
-**Projeyi kaydet** tüm girdileri tek dosyaya yazar. Ne PDF ne Excel ne CAD —
+**Projeyi kaydet** tüm girdileri tek dosyaya yazar. Ne PDF ne CAD —
 yalnız programın okuyup yazdığı veri. Aylar sonra revizyon gerektiğinde dosyayı
 yükler, değişeni düzeltir, çıktıları yeniden alırsınız.
 
@@ -446,7 +399,6 @@ noktasını **aynı arşive** koyar:
 Jan Mühendislik - Uygulama Projesi.dxf     ← CAD çizimi ( + DWG üretilebildiyse )
 pafta pdf/1 - Kapak.pdf
 pafta pdf/2 - Uygulama Projesi.pdf
-Jan Mühendislik - Uygulama Projesi.xlsx    ← çalışma kitabı
 Jan Mühendislik.uygulama                   ← GERİ DÖNÜŞ NOKTASI
 OKUBENI.txt
 ```
@@ -461,42 +413,47 @@ kaldığınız yerden devam edersiniz. **Avan ve uygulama ayrı kovalarda durur*
 biri diğerini görmez, **"Tümünü temizle" yalnız içinde bulunduğunuz projeyi
 siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 
-**Örnek proje yükle** düğmesi, Excel dosyalarınızdaki örnek değerleri yükler.
+**Örnek proje yükle** düğmesi ofisin örnek avan projesini yükler.
 
 ---
 
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-**21.788 kontrolün tamamı geçmiştir.**
+( 2026-09-14 ) **39.016 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
-| **1 · Excel uyumu** | 120 senaryo × ~40 hücre | **5.604 / 5.604** |
-| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **790 / 790** |
-| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları | **149 / 149** |
-| **4 · Çıktı bütünlüğü** | XLSX ve PDF açılabilirliği, içerik, **şablon denetimi**, uygulama paftası, **teslim edilen kitabın paftayla birebir aynı olduğu** ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **448 / 448** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **370 / 370** |
-| **6 · Geri yükleme** | girdiler → XLSX → geri okuma → aynı girdiler ( avan + mukavemet ) | **4.577 / 4.577** |
-| **7 · Altın çıktı** | 411 senaryonun tüm sonucu satır satır kilitli — refah kalkanı | **824 / 824** |
-| **8 · Mukavemet tabloları** | 15 tablo + 71 girdi alanı, kaynak Excel'e karşı hücre hücre;  Nequiv(t) **Çizelge 2'den türetilir** ( altı kesik V, standardın sınıflandırmasına uyarak **V satırından** okunur — kitap β satırından okuyordu, bkz. sapma ㉕ ) | **977 / 977** |
-| **9 · Mukavemet motoru** | 100 sonuç hücresi + **otuz iki sapmanın uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **ikinci · üçüncü · dördüncü · altıncı · yedinci · sekizinci denetimin her bulgusu yeniden üretilerek** + girdi reddi | **505 / 505** |
-| **10 · Mukavemet ↔ Excel** | **80 senaryo × 168 hücre** ( 52'si standart gereği sapan, ayrı denetlenen ) — girdi uzayının tamamı LibreOffice ile yeniden hesaplanır; standart gereği sapılan hücreler ayrı denetlenir; **düzeltilmiş ana kitap** da yeniden hesaplatılıp motorla karşılaştırılır. *( Sapma sayısı arttıkça bu testin doğrudan karşılaştırdığı hücre sayısı düşer — ayrılan hücreler 'kitapla aynı olmalı' döngüsünden çıkıp 'gerçekten ayrışıyor mu' döngüsüne geçer. )* | **7.297 / 7.297** |
-| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **birinci denetimde bulunan sekiz hatanın her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **uygulama paftasının CAD çıktısı** ( beşinci denetim ) | **247 / 247** |
+| **1 · Avan referans taraması** | 123 senaryo ( 87 tek · 12 grup · 24 avan ) × bütün sonuç değerleri, dondurulmuş referansa karşı | **5.599 / 5.599** |
+| **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile hesaplandığı**, **boş kabin kütlesi tablosu** | **841 / 841** |
+| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) | **120 / 120** |
+| **4 · Çıktı bütünlüğü** | PDF açılabilirliği ve içeriği, uygulama paftası, paketlerin içeriği ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **282 / 282** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **467 / 467** |
+| **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan ve **hesap sonucu** aynı | **846 / 846** |
+| **7 · Altın çıktı** | 432 senaryonun tüm sonucu satır satır kilitli — refactor kalkanı | **867 / 867** |
+| **8 · Mukavemet tabloları** | 9 tablo + ω + kanal tablosu, **ofisin kaynak tablolarının dondurulmuş kopyasına** karşı hücre hücre;  standarda göre genişletilen satırlar ayrıca;  Nequiv(t) **Çizelge 2'den türetilir**;  girdi sözleşmesinin varsayılanları ve seçenekleri | **838 / 838** |
+| **9 · Mukavemet motoru** | örnek projenin ara değerleri + **standart gereği verilen kararların her birinin uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **denetimlerin her bulgusu yeniden üretilerek** + girdi reddi | **505 / 505** |
+| **10 · Mukavemet referans taraması** | 152 senaryo ( girdi uzayı taraması · proje senaryoları · kanal / tahrik birleşimleri · geçersiz girdiler ) × **168 ara değer + bölüm hükümleri**, dondurulmuş referansa karşı | **28.245 / 28.245** |
+| **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **denetimlerde bulunan hataların her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **hesap → PDF → DXF zinciri** | **372 / 372** |
+| **12 · Dış referans paftaları** | ELEport ve "new block" paftalarının yayımlanmış sayıları | **34 / 34** |
 
-### Test 1 neden güçlü bir kanıt?
+### Referans taraması neden güçlü bir kanıt?
 
-Girdiler **ofisin kendi Excel şablonuna** yazılır, dosya **LibreOffice ile
-açılıp yeniden hesaplattırılır** — yani sonucu Excel'in kendi formülleri üretir,
-program değil — ve çıkan **her hücre** programın motoruyla karşılaştırılır.
-Kapsam: 10 bina tipinin tamamı (küçük ve büyük nüfusla), 9 kabin kapasitesi,
-10 kabin hızı, **yedi kapı genişliğinin tamamı × üç kapı tipi** (ara değerli
-1000 / 1200 / 700 mm dâhil), N = 1…30 kat sınırları, **bodrum durakları
-(0 – 10, Tablo-2 eşiğini aşan durumlar dâhil)**, Standart/Yükseltilmiş eşiği,
-elle süre ve adet girişleri, 1–4 asansörlü gruplar, farklı duraklı asansörler,
-**asansör bazında bodrum ve imalatçı süreleri**, **asansör bazında askı ve
-denge faktörü (dişlili + dişlisiz karışık proje)**, makine daireli/MRL
-sistemler ve topraklama varyasyonları.
+TEST 1 ve TEST 10'un senaryoları, program Excel kullanırken **ofisin kendi
+çalışma kitaplarına** yazılıp **LibreOffice ile yeniden hesaplatılıyor**du — yani
+sonucu Excel'in kendi formülleri üretiyor, program değil — ve çıkan her değer
+motorla karşılaştırılıyordu ( son koşu 2026-09-14:  5.548 ve 4.707 kontrol,
+hepsi geçti ).  Excel kaldırılırken bu doğrulanmış sonuçlar **donduruldu**;
+testler motoru artık o referansa karşı denetler.  Kapsam:  10 bina tipinin
+tamamı ( küçük ve büyük nüfusla ), bütün kabin kapasiteleri ve hızlar, **yedi
+kapı genişliğinin tamamı × kapı tipleri**, N = 1…30 kat sınırları, **bodrum
+durakları**, Standart / Yükseltilmiş eşiği, elle süre ve adet girişleri, 1–4
+asansörlü gruplar;  mukavemette bütün ray profilleri, halat çapları, kanal
+şekli × işleme × ofis açıları, güvenlik tertibatları, askı oranları, karşı
+ağırlık yeri, durak sayıları, kaçıklıklar, ofis sabitleri ve ELEport projesi.
+
+Kasıtlı bir hesap değişikliği referansı bozar;  farklar tek tek incelenip
+onaylandıktan sonra `python3 testler/tarama_uret.py` ile yeniden üretilir.
 
 ### Bağımsız denetimde bulunan ve düzeltilen hatalar
 
@@ -746,14 +703,15 @@ dışıydı ve iki hatayı birlikte gizliyordu.
 
 Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
-### Mukavemet kitabında bulunanlar ( uygulama projesi )
+### Standarda göre verilen hesap kararları ( uygulama projesi )
 
-Motor yazılırken kaynak çalışma kitabında bir dizi sorun çıktı. **Uyulması
-gereken standart TS EN 81-20 / TS EN 81-50'dir**; kitap yalnız bir başlangıç
-noktasıdır. Aşağıdaki **otuz iki** noktada kitap standarttan ( yalnız verim,
-moment ve denge oranı maddelerinde ofisin kendi kabulünden ) sapıyor — program
-standardı uyguluyor. Liste kodda tek yerde durur
-( `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` ) ve doğrulama testi oradan okur.
+Motor ofisin eski mukavemet çalışma kitabından yola çıkarak yazıldı ve kitapta
+bir dizi sorun çıktı. **Uyulması gereken standart TS EN 81-20 / TS EN 81-50'dir**;
+aşağıdaki noktalarda kitap standarttan ( yalnız verim, moment ve denge oranı
+maddelerinde ofisin kendi kabulünden ) sapıyordu — program standardı uygular.
+Her kuralın gerçekten uygulandığını TEST 9 ayrı ayrı denetler.  ( Program
+Sürüm 3.1'den beri Excel kullanmaz;  "kitabın yaptığı" sütunu kararın
+gerekçesi olarak tarihçede bırakılmıştır. )
 
 | # | Konu | Standart | Kitabın yaptığı | Programın yaptığı |
 |---|---|---|---|---|
@@ -938,67 +896,7 @@ ayrışmanın sebebi iki yerde iki kopya olmasıydı.
 projeyi haksız yere reddeder, kuyu boyunu gereksiz büyütür. **③ · ⑤ · ⑥ · ⑦ ·
 ⑨'da emniyetsiz tarafta** — hesabı olduğundan iyi gösteriyor.
 
-### Teslim edilen Excel de düzeltilir
-
-Program kitaptan ayrıldığı için, kitap **olduğu gibi** teslim edilseydi aynı
-projenin iki belgesi birbirini yalanlardı: pafta *"uygun değildir"* derken
-Excel *"uygundur"* derdi. Bu yüzden **teslim edilen kopyada ilgili formüller
-düzeltilir** — değerler değil, **formüller**; kitap kendi kendini hesaplamaya
-devam eder ve Excel'de girdi değiştirildiğinde de doğru sonucu verir.
-
-**Şablonun HESABINA dokunulmaz.** `templates/MUKAVEMET_HESABI.xlsx` içindeki
-formüller, değerler ve tablolar özgün hâlinde kalır; doğrulama testleri
-programı ona karşı denetlemeye devam eder. Doğrulama paketi hem şablonun
-hesabının değişmediğini hem de teslim kopyasının paftayla **hücre hücre
-birebir aynı** olduğunu denetler.
-
-Şablonda hesap dışı **tek** düzeltme yapılmıştır: *Veri Girişi* `B131`
-( **Ray Çeliği Rm** ) hücresinin 370 / 440 / 520 açılır listesi, Excel'in
-**uzantı biçiminde** ( `x14:dataValidation` ) yazılmıştı. openpyxl bu biçimi
-tanımıyor — okurken *"Data Validation extension is not supported and will be
-removed"* diye uyarıyor, kaydederken de **atıyordu**:  teslim edilen kitapta o
-tek açılır liste kayboluyor, kitabı elle açan biri Rm'ye listede olmayan bir
-sayı yazabiliyordu. Doğrulama artık kitabın **kendi düzenine uygun** normal
-biçimde duruyor ve sayfa-dışı listeyi `rayçeliğirm` adlandırılmış alanıyla
-gösteriyor — kitap `firmalistesi`, `tamponmarka` gibi dört listeyi zaten böyle
-kuruyor ve eski Excel sürümleri sayfa-dışı referansı ancak böyle kabul eder.
-Teslim edilen kopyada doğrulama sayısı **32 → 33** çıktı, uyarı da sustu.
-
-#### Ofisin ana kitabını düzeltmek
-
-Teslim edilen dosya düzeltiliyor, ama **ofisin masasındaki ana kitap**
-düzelmiyordu: onu açıp elle hesap yapan eski — bazıları emniyetsiz —
-sonuçları alıyordu. Düzeltilmiş bir kopya üretmek için:
-
-```bash
-python3 araclar/kaynak_excel_duzelt.py
-```
-
-`MUKAVEMET_HESABI_DUZELTILMIS.xlsx` çıkar. Ofis bunu yeni ana dosya olarak
-kullanabilir: içine **hiçbir projenin girdisi yazılmaz**, yalnız formüller
-düzeltilir, kitap kendi kendini hesaplamaya devam eder. İçinde bir
-**`DÜZELTMELER`** sayfası vardır — her sapmanın gerekçesi ve standart
-maddesi, artı **düzenlenen 71 hücrenin** tek tek "kitapta ne yazıyordu /
-şimdi ne yazıyor" dökümü. Dosya elden ele dolaşacağı için kayıt dosyanın
-İÇİNDE durur.
-
-Doğrulama paketi bu kitabı da denetler: LibreOffice ile yeniden hesaplatılır
-ve **motorun ürettiği 168 değerin tamamıyla** karşılaştırılır ( TEST 10 ).
-
-> **Şablon dosyasına dokunulmaz.** `templates/MUKAVEMET_HESABI.xlsx` özgün
-> hâlinde kalır — doğrulama paketinin tamamı motoru **ona** karşı denetler ve
-> sapmalarımızın gerekçesi kitabın o hücrelerde ne yaptığıdır. Düzeltilmiş
-> kitap **ayrı** bir dosyadır.
-
-Elle düzeltmek isterseniz hücreler şunlardır: `11!Q97` ( 30 → 40 ) ·
-`11!AO312` ( 0 → `=AH293` ) · `11!AU575` ( sütun 7 → 6 ) · `11!AK190`
-( `C61` → `C61*B100` ) · `11!AH105/AH106` ( sabit → girdi ) ·
-`11!Q380·Q385·Q477·Q482·Q538·Q596` ( `1+2*` → `ℓ+2*` ) · `11!AD354` ve
-`AB39` ( ω tablosu → EN 81-50 formülü ) · `11!AD636` ( 1200 → `=P639*1000` ) ·
-`11!AD647` ( 150 → 100 ) · `11!AQ22` ( 0,92 → makine tipi ve askı oranına
-bağlı formül ).
-
-#### Kitapta ayrıca bulunanlar
+#### Eski kitapta ayrıca bulunanlar
 
 | Bulgu | Ne yapıldı |
 |---|---|
@@ -1129,34 +1027,35 @@ kayış ) ve SIL devrelerini getiriyor — programın kapsamı dışında.
 
 ### Doğrulama paketi — kendiniz çalıştırabilirsiniz
 
-Program bir **test paketiyle** birlikte gelir. Şablonu değiştirdiğinizde ya da
-programa dokunulduğunda hesabın hâlâ Excel'le birebir olduğunu doğrulamak için:
+Program bir **test paketiyle** birlikte gelir. Programa dokunulduğunda hesabın
+değişmediğini ( ya da yalnız bilerek değiştiğini ) doğrulamak için:
 
 ```bash
 python3 testler/calistir.py          # tümü
-python3 testler/calistir.py hizli    # Excel taraması hariç (saniyeler)
+python3 testler/calistir.py 1 10     # yalnız seçilen testler
 ```
 
 macOS'ta programın kendi Python'unu kullanmak için `./.venv/bin/python3 testler/calistir.py`.
 
 | Test | Ne yapar |
 |---|---|
-| **1 · Excel uyumu** | 118 senaryoyu şablona yazar, **LibreOffice ile yeniden hesaplatır**, çıkan her hücreyi programla karşılaştırır. Yani hesabı Excel'in kendi formülleri yapar — program değil. |
+| **1 · Avan referans taraması** | Trafik ve avan motorunun sonuçlarını, Excel ile doğrulanıp dondurulmuş referansa karşı karşılaştırır. |
 | **2 · Kenar durumlar** | Tablo sınırları, yuvarlama kuralları, kapsam dışı girdiler, hata mesajları. |
 | **3 · Girdi dayanıklılığı** | Bozuk / boş / uç girdilerin binlerce birleşimi ve tüm API uçları — program çökmemeli. |
-| **4 · Çıktı bütünlüğü** | Üretilen XLSX ve PDF'ler açılabiliyor mu, hata hücresi var mı, Türkçe karakterler yerinde mi, doğru sayfalar mı? |
-| **5 · Arayüz** | Tarayıcıda tüm sekmeler, canlı hesap, aktarım, indirme düğmeleri, kalıcılık, dar ekran, Excel'den geri yükleme. |
-| **6 · Geri yükleme** | Her senaryoyu XLSX'e yazıp geri okur; girdilerin birebir döndüğünü doğrular. Excel'de elle düzenlenmiş dosya ve bozuk dosya senaryoları dâhil. |
+| **4 · Çıktı bütünlüğü** | Üretilen PDF'ler açılabiliyor mu, Türkçe karakterler yerinde mi, paketler ve CAD çizimi doğru mu? |
+| **5 · Arayüz** | Tarayıcıda tüm sekmeler, canlı hesap, aktarım, indirme düğmeleri, kalıcılık, dar ekran, proje dosyasından geri yükleme. |
+| **6 · Proje dosyası geri yükleme** | Formun her alanını değiştirir, projeyi kaydeder, programı sıfırlar, dosyayı yükler;  her alanın ve hesap sonucunun aynen döndüğünü doğrular. |
 | **7 · Altın çıktı** | Önceki sürümün tüm çıktısı sıkıştırılmış olarak saklanır; her koşuda satır satır karşılaştırılır. Refactor sırasında **hiçbir sayı sessizce değişemez**. |
-| **8 · Mukavemet tabloları** | `engine/uygulama/mukavemet_tablolari.py` içindeki her değeri kaynak Excel'e karşı doğrular. Tablolar makineyle aktarıldı; bir sütun kayması hiçbir hesap testinde görünmezdi — bu test **aktarmanın kendisini** denetler. |
-| **9 · Mukavemet motoru** | Excel'in kendi örneğindeki 100 sonuç hücresi; ayrıca geçersiz girdi yolları ve profil / hız / kanal varyantları. |
-| **10 · Mukavemet ↔ Excel** | **Girdi uzayını** tarar: 78 farklı girdi bileşimi kaynak kitaba yazılır, LibreOffice 1115 formülü yeniden hesaplar, motorun ürettiği 168 değer hücre hücre karşılaştırılır;  standart gereği sapılan 52 hücre ayrıca 'gerçekten ayrışıyor mu' diye denetlenir. |
-| **11 · Uygulama projesi** | **Ortak girdi köprüsünü** denetler: her ortak alan tek tek oynatılır ve elektrik sonucunun gerçekten değiştiği doğrulanır. Köprü sessizce kopabilir ( bir alan adı değişir, biri `None` kalır ) ve hiçbir hesap testi bunu göremez — iki motor da kendi içinde tutarlı çalışmaya devam eder. Ayrıca mukavemet sonucunun birlikte koşarken **kirlenmediği** kanıtlanır. |
+| **8 · Mukavemet tabloları** | `engine/uygulama/mukavemet_tablolari.py` içindeki her değeri ofisin kaynak tablolarının dondurulmuş kopyasına karşı doğrular. Tablolar makineyle aktarıldı; bir sütun kayması hiçbir hesap testinde görünmezdi — bu test **aktarmanın kendisini** denetler. |
+| **9 · Mukavemet motoru** | Örnek projenin ara değerleri, standart gereği verilen her kararın uygulandığı, standardın metnine karşı bağımsız sayılar, geçersiz girdi yolları ve profil / hız / kanal varyantları. |
+| **10 · Mukavemet referans taraması** | **Girdi uzayını** tarar:  152 senaryoda motorun 168 ara değeri ve bölüm hükümleri dondurulmuş referansla karşılaştırılır. |
+| **11 · Uygulama projesi** | **Ortak girdi köprüsünü** denetler: her ortak alan tek tek oynatılır ve elektrik sonucunun gerçekten değiştiği doğrulanır. Ayrıca mukavemet sonucunun birlikte koşarken **kirlenmediği** ve hesap → PDF → DXF zincirinin birebir olduğu kanıtlanır. |
+| **12 · Dış referans paftaları** | Motoru bizden bağımsız iki programın yayımlanmış paftalarına karşı denetler. |
 
-Test 1 ve 10 **LibreOffice**, Test 3 ve 5 **programın açık olmasını**, Test 5
-ayrıca **Playwright**, Test 4 ise **pypdf** ister. Eksik olan test **atlanır** —
-diğerleri yine çalışır, paket hata vermez. Bunlar programın çalışması için
-gerekli değildir; `requirements.txt` içinde isteğe bağlı olarak listelenmiştir:
+Test 3, 5 ve 6 **programın açık olmasını**, Test 5 ve 6 ayrıca **Playwright**,
+Test 4 ise **pypdf** ister. Eksik olan test **atlanır** — diğerleri yine
+çalışır, paket hata vermez. Bunlar programın çalışması için gerekli değildir;
+`requirements.txt` içinde isteğe bağlı olarak listelenmiştir:
 
 ```
 pip install playwright pypdf  &&  playwright install chromium
@@ -1172,7 +1071,7 @@ H = N − Σ(i/N)^P        (i = 1…N−1)
 S = N · ( 1 − ((N−1)/N)^P )
 ```
 
-Bu formüllerin Excel'deki tablo değerleriyle farkı en fazla **5×10⁻¹⁴**'tür.
+Bu formüllerin MMO/697'nin basılı tablo değerleriyle farkı en fazla **5×10⁻¹⁴**'tür.
 Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ---
@@ -1223,9 +1122,8 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 
 ### Uygulama projesi — mukavemet
 
-- **Kaynak kitaptan ayrılan otuz iki nokta** 6. bölümdeki tabloda sayılıdır; her
-  biri kodda `engine/uygulama/mukavemet.py` · `EXCEL_FARKLARI` içinde standart maddesiyle
-  birlikte durur ve ekranda bölüm başlığının yanındaki **( ! )** simgesinden
+- **Standart gereği verilen hesap kararları** 6. bölümdeki tabloda sayılıdır;
+  gerekçeleri ekranda bölüm başlığının yanındaki **( ! )** simgesinden
   okunabilir.
 - **Ek C'nin şekilleri ( C.1 – C.4 ) okunamadı** — PDF'te görsel olarak
   gömülüler. Geometrik işaret kabulleri madde metninden ve mekanikten
@@ -1246,7 +1144,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 - **Yardımcı donanım darbe katsayısı k3 bir OFİS SABİTİDİR.** EN 81-20
   Çizelge 14 k1 ve k2'nin değerini verir ama k3 için *"the value has to be
   determined by the manufacturer due to the actual installation"* der. Ofisin
-  varsayılanı **1,2**'dir ( kitabın kullandığı sayı ); paftada değeri ve
+  varsayılanı **1,2**'dir; paftada değeri ve
   "standart sayı vermez" notu birlikte basılır. Tesise özgü bir değer varsa
   ofis sabitlerinden değiştirilmelidir.
 - **Paten balatası uzunluğu ( ℓ )** flanş eğilmesine girer ( EN 81-50 m.5.10.5 ).
@@ -1254,9 +1152,9 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   türetilir — kare balata kabulüdür, gerilmeyi emniyetli tarafta ( büyük )
   bırakır. **Kesin değer paten imalatçısından alınmalıdır.**
 - **Sığınma alanı payları** ( kabin gövde yüksekliği 2400, kabin üstü kotu 2100,
-  revizyon kutusu 500, etek 400 / 950, ray altı 270 mm ) kaynak kitabın **ofis
-  kabulüdür — TS EN 81-20 sayısı değildir.** Farklı kabin imalatında
-  `engine/uygulama/mukavemet.py` içindeki `SIGINMA` sözlüğünden güncellenmelidir.
+  revizyon kutusu 500, etek 400 / 950, ray altı 270 mm ) **ofis kabulüdür —
+  TS EN 81-20 sayısı değildir.** Farklı kabin imalatında Sabitler sekmesinden
+  güncellenmelidir.
   Buna karşılık aynı sözlükteki **asgari açıklıklar** ( 100 · 500 · 500 · 100 ·
   100 · 300 mm ve sığınma hacimleri ) doğrudan **TS EN 81-20 m.5.2.5.7 /
   m.5.2.5.8**'dendir — her satırın karşısında madde numarası yazılıdır ve
@@ -1265,8 +1163,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   daha uzaktaki parçalar için sınır 0,30 m ( Xₕ = 0,30 ) ve 0,50 m
   ( Xₕ ≥ 0,50 ) olur.
 - **Sürtünme yükü Gs = 0**, **ST 37 emniyet gerilmesi σem = 130 N/mm²**,
-  **yan yatak mesnet payı 335 mm** kitabın kabulleridir; hepsi `SABIT`
-  sözlüğünde, yanlarında Excel hücre adresiyle durur. ( **Motor verimi η**
+  **yan yatak mesnet payı 335 mm** ofis kabulleridir ( Sabitler sekmesi ). ( **Motor verimi η**
   artık sabit değildir — makine tipinden gelir, bkz. sapma ⑨. )
 - **Motor gücü N kararlı rejim gücüdür.** Beyan hızındaki dengesiz yükü
   karşılar; **kalkış ( ivmelenme ) momenti** — kabin, karşı ağırlık, halat,
@@ -1283,8 +1180,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   Rm/1,8 = 205,6 N/mm²'nin yaklaşık yarısıdır. Güvenlik tertibatı tipi bu
   bölümü doğrudan büyütür ( k1 = 2 · 3 · 5 → kaide yükü 2,5 kata kadar ).
 - **Ray tablosunda bir tutarsızlık işaretlidir.** Atalet yarıçapı tanım
-  gereği i = √(I/A)'dır ( kaynak kitabın kendi 60. satırı da bunu formülle
-  hesaplar ). `125 x 82 x 16` profilinde `iy = 25,20` yazılı, ama aynı
+  gereği i = √(I/A)'dır. `125 x 82 x 16` profilinde `iy = 25,20` yazılı, ama aynı
   satırdaki I ve A `26,15` veriyor — %3,6. O satırda A, Ix ve ix birbiriyle
   tutarlıdır; tutmayan tek sayı `iy`'dir. **Değer değiştirilmedi**: küçük iy
   narinliği büyük gösterir, yani burkulma emniyetli tarafta hesaplanır.
@@ -1295,9 +1191,8 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   gösterir; öyle bir konstrüksiyonda λ elle iki katına çıkarılmalıdır.
 - **Acil frenleme yavaşlaması a**, TS EN 81-20 gereği **en çok 1 gn**'dir; program
   bunu denetler. Tam **a = 1 gn** sınırında kabin tarafındaki halat kuvveti
-  sıfırlanır — program tahrik yeteneğini *UYGUN DEĞİL* sayar ( kaynak Excel bu
-  noktada **#SAYI/0!** verir ).
-- **Kabin alanı tablosu** mukavemet kitabının kendi tablosudur ve avandakinden
+  sıfırlanır — program tahrik yeteneğini *UYGUN DEĞİL* sayar.
+- **Kabin alanı tablosu** EN 81-20 Çizelge 6'nın tablosudur ve avandakinden
   **bilerek ayrıdır** — 320 kg satırı burada vardır, avanın Tablo-11'inde yoktur.
 - **Boş kabin ağırlığı ( P ) bir TAHMİNDİR — standardın sayısı değildir.**
   TS EN 81-20 ve TS EN 81-50 P'yi geçtiği dokuz yerin hiçbirinde tablolamaz;
@@ -1397,8 +1292,8 @@ aittir — buradaki kullanım ödünçtür ve emniyetli taraftadır (σem = 130,
 standardın ST 37 için verdiği Rm/1,8 = 205,6 N/mm²'nin yaklaşık yarısı).
 Kiriş gereğinden kalın çıkıyorsa bakılacak yer burasıdır.
 
-Buradan değiştirdiğinizde **ekrandaki hesap, PDF paftası ve indirilen Excel
-birlikte** değişir — teslim edilen kitaptaki formüller de bu değerleri kullanır.
+Buradan değiştirdiğinizde **ekrandaki hesap ve PDF paftası birlikte** değişir;
+değerler proje dosyasına da yazılır.
 
 **Tablolar sekmesi de ayrıdır.** Uygulamanın 14 tablosu (ray profilleri, NPU
 kesitleri, halat ağırlıkları, ω burkulma, kabin alanları, kanal katsayıları …)
@@ -1411,15 +1306,15 @@ yüzden ekrandaki tablo ile hesaba giren tablo ayrışamaz.
 **Sabitler / Ofis Standardı** sekmesindeki değerler proje geneli için ortaktır
 (palanga, denge faktörü, ray sayısı, flexbil, montör, armatürler, priz, cosφ,
 UL, IΔn, çubuk boyu, aydınlatma verimi sütunu). Buradan değiştirdiğinizde hem
-ekrandaki hesap hem XLSX çıktısı birlikte değişir.
+ekrandaki hesap hem PDF paftası birlikte değişir.
 
 **Askı oranı (i) artık burada değil, asansörün kendi girdisidir** — avan
-sekmesinde makine tipiyle yan yana durur (Excel'de GİRİŞ 53. satır). Bir projede
+sekmesinde makine tipiyle yan yana durur. Bir projede
 dişlili ve dişlisiz makine ya da 1:1 ve 2:1 askı birlikte kullanılabildiği için
 bu değer, makine verimi η gibi, asansöre özeldir.
 
 **Denge faktörü (q)** ofis standardında kalır (uygulamada hep 0,50); gerekirse
-asansör bazında **"Denge faktörü"** bölümünden ezilebilir (GİRİŞ 54. satır).
+asansör bazında **"Denge faktörü"** bölümünden ezilebilir.
 
 ### Verim (η) nasıl kullanılıyor?
 
@@ -1459,7 +1354,7 @@ AVAN HESAPLAMA PROGRAMI/
 ├── baslat.command          ← macOS: çift tıklayın
 ├── baslat.bat              ← Windows: çift tıklayın
 ├── main.py                 ← sunucu kabuğu:  uygulamayı kurar, uç paketlerini
-│                              bağlar, ana sayfa · Excel yükleme · sağlık
+│                              bağlar, ana sayfa · sağlık
 ├── requirements.txt
 ├── OKUBENI.md              ← bu dosya
 │
@@ -1486,15 +1381,10 @@ AVAN HESAPLAMA PROGRAMI/
 ├── api/                    ← HTTP UÇLARI
 │   ├── ortak.py            ← sayı çevirme · belirsiz yazım denetimi ·
 │   │                          proje kimliği · dosya adı · indirme yanıtı
-│   ├── avan.py             ← trafik · avan · kapak ve çıktıları  ( 10 uç )
-│   └── uygulama.py         ← mukavemet + elektrik ve çıktıları  (  5 uç )
+│   ├── avan.py             ← trafik · avan · kapak ve çıktıları  (  7 uç )
+│   └── uygulama.py         ← mukavemet + elektrik ve çıktıları  (  4 uç )
 │
 ├── exports/                ← BELGE ÜRETİMİ
-│   ├── hucre_haritasi.py   ← girdi alanı ↔ Excel hücresi eşlemesi (TEK KAYNAK)
-│   ├── xlsx_export.py      ← avan şablonunu dolduran XLSX çıktısı
-│   ├── xlsx_import.py      ← avan Excel'inden geri yükleme ( revizyon )
-│   ├── mukavemet_xlsx.py   ← mukavemet kitabını doldurur, STANDARDA UYDURUR
-│   │                          ve geri okur
 │   ├── pdf_export.py       ← baskıya hazır PDF  ( trafik · avan · uygulama )
 │   ├── dxf_export.py       ← CAD çıktısı  ( ortak )
 │   └── kapak_export.py     ← avan proje kapağı
@@ -1504,24 +1394,23 @@ AVAN HESAPLAMA PROGRAMI/
 │   ├── style.css
 │   ├── ortak.js            ← biçimleme · sekme şeridi ve MOD anahtarı ·
 │   │                          çizim yardımcıları · indirme · kalıcılık ·
-│   │                          Excel'den proje açma · açılış ekranı
+│   │                          proje dosyası · açılış ekranı
 │   ├── avan.js             ← trafik · avan · ofis standardı · tablolar
 │   └── uygulama.js         ← mukavemet + elektrik  ·  en sonda kur() çağrısı
 │
 ├── testler/                ← doğrulama paketi
 │   ├── calistir.py         ← hepsini çalıştırır
-│   ├── test_excel_uyumu.py · test_kenar_durum.py · test_dayaniklilik.py
+│   ├── test_avan_tarama.py · test_kenar_durum.py · test_dayaniklilik.py
 │   ├── test_ciktilar.py · test_arayuz.py · test_geri_yukleme.py
 │   ├── test_altin.py       ← altın çıktı kalkanı
 │   ├── altin_uret.py       ← altın çıktıyı yeniden üretir
 │   ├── test_mukavemet_tablolari.py · test_mukavemet.py
-│   ├── test_mukavemet_excel.py
-│   └── test_uygulama.py    ← ortak girdi köprüsü
+│   ├── test_mukavemet_tarama.py · test_uygulama.py · test_referans_paftalar.py
+│   ├── tarama_uret.py      ← TEST 1 / 10 referansını yeniden üretir
+│   └── referans_*.json(.gz) ← dondurulmuş referans sonuçlar ve kaynak tablolar
 │
-├── templates/              ← OFİSİN KENDİ EXCEL ŞABLONLARI
-│   ├── ASANSOR_TRAFIK_HESABI_v2_1.xlsx  ┐ avan
-│   ├── ASANSOR_AVAN_HESAPLARI.xlsx      ┘
-│   └── MUKAVEMET_HESABI.xlsx            ← uygulama projesi
+├── templates/
+│   └── proje_formati.dxf   ← ofisin tip proje formatı ( CAD çıktısı )
 └── fonts/                  ← PDF için Türkçe karakter destekli yazı tipi
 ```
 
@@ -1544,24 +1433,16 @@ AVAN HESAPLAMA PROGRAMI/
 | **Tablolar** | Mukavemet kendi kaynağından gelir; kabin alanı tablosu bile bilerek ayrıdır. Her projenin kendi Tablolar sekmesi var |
 | **Veri kovası** | `avan_program_v1` · `uygulama_program_v1` — biri diğerini görmez, "Tümünü temizle" yalnız kendi projesini siler |
 | **Proje dosyası** | `.avan` · `.uygulama` — her biri yalnız kendi alanlarını taşır, yanlış moda yüklenmez |
-| Çalışma kitapları | Her proje kendi Excel'iyle teslim edilir |
 | Sekme şeridi ve girdi formları | Moda göre ayrılır. Sabitler ve Tablolar sekmeleri ikisinde de vardır ama **içerikleri ayrıdır** |
 
-### Şablonu güncellemek
-Excel dosyalarınızda **biçim, açıklama veya sayfa düzeni** değişirse
-`templates/` içindeki dosyaların üzerine yazmanız yeterlidir — XLSX çıktısı
-kendiliğinden yeni şablonu kullanır.
-
-**Formül veya tablo değeri** değişirse `engine/avan/tablolar.py` (tablo değerleri)
-ya da `engine/avan/trafik.py` / `engine/avan/hesap.py` (formüller) de
-güncellenmelidir; aksi
-hâlde ekrandaki sonuç ile XLSX çıktısı ayrışır.
-
-**Mukavemet kitabı** ( `MUKAVEMET_HESABI.xlsx` ) hem şablon hem de doğrulama
-kaynağıdır. Üzerine yeni bir sürüm yazarsanız `python3 testler/calistir.py 8 9 10 11`
-komutu, tablo ve formüllerin hâlâ tutup tutmadığını **tek seferde** söyler:
-tablolar aktarımıyla, motor da 78 senaryoda kitabın kendi hesabıyla
-karşılaştırılır. Tutmuyorsa ne değiştiğini hücre adresiyle bildirir.
+### Tabloyu ya da formülü değiştirmek
+Tablo değerleri `engine/avan/tablolar.py` ve `engine/uygulama/mukavemet_tablolari.py`,
+formüller `engine/avan/trafik.py` · `engine/avan/hesap.py` ·
+`engine/uygulama/mukavemet.py` içindedir.  Ekran, PDF ve CAD aynı motordan
+beslendiği için tek yerde değişiklik yeterlidir.  Değişiklikten sonra
+`python3 testler/calistir.py` hangi sonucun neden değiştiğini söyler;  kasıtlı
+bir değişiklikse altın çıktı ( `testler/altin_uret.py` ) ve referans taraması
+( `testler/tarama_uret.py` ) farklar gözle incelendikten sonra yeniden üretilir.
 
 ---
 
@@ -1589,9 +1470,8 @@ Tek dosyalık `.app` / `.exe` isterseniz PyInstaller ile paketlenebilir:
 | "Port kullanımda" | Program kendiliğinden boş bir porta geçer; adresi açılan pencerede yazar |
 | Program iki kez açıldı | İkinci kopya yeni pencere açmaz, var olan sekmeyi öne getirir |
 | PDF'de Türkçe karakter bozuk | `fonts/` klasöründeki iki `.ttf` dosyasının yerinde olduğundan emin olun |
-| XLSX'te değerler boş görünüyor | Excel/LibreOffice'te bir kez **F9** (yeniden hesapla) |
 | Sonuç "HESAP HATASI" diyor | Kırmızı kutudaki mesaj hangi girdinin eksik/kapsam dışı olduğunu söyler |
-| Hesabın doğruluğundan kuşkulandınız | `python3 testler/calistir.py` — Excel'e karşı 3.600+ kontrol koşar |
+| Hesabın doğruluğundan kuşkulandınız | `python3 testler/calistir.py` — doğrulama paketi koşar ( bkz. 6. bölüm ) |
 
 ---
 

@@ -2,7 +2,7 @@
 """
 TEST 2  —  KENAR DURUMLAR VE TABLO SINIRLARI
 
-Excel'e ihtiyaç duymaz; motorun kendi kurallarını sınar:
+Motorun kendi kurallarını sınar:
 tablo sınırları, yuvarlama kuralları, kapsam dışı girdiler, hata mesajları.
 """
 import os
@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.avan import hesap as AV
 from engine.avan import tablolar as T
 from engine.avan import trafik as TR   # noqa: E402
-from engine.ortak.steps import excel_round, tavana_yuvarla, yukari_yuvarla, tr as TRS  # noqa: E402
+from engine.ortak.steps import yuvarla, tavana_yuvarla, yukari_yuvarla, tr as TRS  # noqa: E402
 from testler.ortak import Rapor                              # noqa: E402
 
 TEMEL = dict(bina_tipi="Konut", bina_yuksekligi=39.98, yapi_yuksekligi=43, N=11,
@@ -43,10 +43,10 @@ def calistir():
     r = Rapor("Kenar durumlar")
 
     # ---------------------------------------------------- yuvarlama kuralları
-    # Excel ROUND yarımı YUKARI yuvarlar; Python'un round() bankacı yuvarlaması yapar.
+    # yuvarla() yarımı YUKARI yuvarlar; Python'un round() bankacı yuvarlaması yapar.
     for x, b, bek in ((865, -1, 870), (875, -1, 880), (2.5, 0, 3), (3.5, 0, 4),
                       (-2.5, 0, -3), (0.125, 2, 0.13)):
-        r.esit(f"excel_round({x},{b})", excel_round(x, b), bek)
+        r.esit(f"yuvarla({x},{b})", yuvarla(x, b), bek)
     for x, k, bek in ((63921.0, 10, 63930), (63930.0, 10, 63930), (0.1, 10, 10)):
         r.esit(f"tavana_yuvarla({x},{k})", tavana_yuvarla(x, k), bek)
     for x, bek in ((3.0001, 4), (3.0, 3), (2.9999, 3)):
@@ -232,7 +232,7 @@ def calistir():
     #  v2.8 — KİTAP DENETİMİ:  motor tabloları MMO/697 ile BİREBİR mi?
     #
     #  Bu, doğrulama zincirinin eskiden EKSİK olan halkasıdır.  Diğer testler
-    #  "Python ≡ Excel ≡ testlerdeki beklenen değer" der;  üçü de aynı
+    #  "motor ≡ referans ≡ testlerdeki beklenen değer" der;  üçü de aynı
     #  aktarımdan geldiği için bir tablo kitaptan YANLIŞ aktarılmışsa üçü de
     #  aynı yanlışı taşır ve hiçbir test görmez.
     #  Aşağıdaki değerler kitabın ( MMO/697, 2. Baskı, Ocak 2020 ) basılı
@@ -1098,7 +1098,7 @@ def calistir():
     r.esit("16 kişilik asansöre 15 kW seçildi", o16["Nsc"], 15.0)
     r.kontrol("otomatik seçim motor kontrolünü geçiyor", o16["motor_uygun"] is True)
     r.kontrol("otomatik seçim hesaplanan güçten büyük", o16["Nsc"] >= o16["N_hes"])
-    #  Elle girilen küçük değer korunur ama UYGUN DEĞİL der ( Excel'deki durum )
+    #  Elle girilen küçük değer korunur ama UYGUN DEĞİL der
     o16e = av(as_ek={"kapasite": 16, "Nsc": 11})["asansorler"][0]["ozet"]
     r.esit("elle girilen Nsç korunuyor", o16e["Nsc"], 11)
     r.kontrol("elle girilen küçük Nsç uygun değil", o16e["motor_uygun"] is False)
@@ -1131,15 +1131,18 @@ def calistir():
     r.kontrol("otomatik seçim hiçbir girdide kendini reddetmiyor", not _red,
               f"→ {_red[:3]}")
 
-    #  girdileri_coz — XLSX'e yazılacak çözülmüş girdi
-    c = AV.girdileri_coz({"ortak": dict(O_ORT), "asansorler": [dict(O_AS)],
-                          "sabitler": {}})
+    #  Boş bırakılan alanlar ofis varsayılanına çözülür
+    _S_of = AV.sabitler({})
     for anahtar, beklenen in (("gr", 17.91), ("Fmk", 350), ("Fsh", 100),
                               ("S1", 6), ("S2", 6), ("L2", 3),
-                              ("kablo_tipi", "NHXMH FE180"), ("L1", 42.0),
-                              #  Δη kalkınca N düştü:  11 → 7,5 kW kademesi
-                              ("Nsc", 7.5)):
-        r.esit(f"çözülmüş girdi {anahtar}", c["asansorler"][0][anahtar], beklenen)
+                              ("kablo_tipi", "NHXMH FE180")):
+        r.esit(f"çözülmüş girdi {anahtar}", AV._ofis_degeri(dict(O_AS), _S_of, anahtar)[0],
+               beklenen)
+    _oz_of = AV.hesapla({"ortak": dict(O_ORT), "asansorler": [dict(O_AS)],
+                         "sabitler": {}})["asansorler"][0]["ozet"]
+    #  Δη kalkınca N düştü:  11 → 7,5 kW kademesi
+    for anahtar, beklenen in (("L1", 42.0), ("Nsc", 7.5)):
+        r.esit(f"kullanılan değer {anahtar}", _oz_of[anahtar], beklenen)
     #  κ ofis varsayılanı TS HD 60364-5-52 EK-G'ye çekildi ( ρ1 = 1,25·ρ20
     #  → 0,0225 Ω·mm²/m ).  Sayıyı BURAYA ikinci kez yazmak yerine tek
     #  kaynaktan okunur;  değişirse test sessizce eskimez.
@@ -1147,13 +1150,13 @@ def calistir():
                               ("kappa", AV.sabitler(None)["kappa"]),
                               ("eps_max", 3),
                               ("beta", 150), ("cubuk_sayisi", 4)):
-        r.esit(f"çözülmüş ortak {anahtar}", c["ortak"][anahtar], beklenen)
+        r.esit(f"çözülmüş ortak {anahtar}", AV._ortak_degeri({}, _S_of, anahtar), beklenen)
     r.kontrol("çözme işlemi özgün girdiyi bozmuyor", "gr" not in O_AS)
 
     # ==================================================================
     #  v1.7 — GEÇERSİZ GİRDİ YOLLARI
     #  Bu altı bulgu bir dış denetimde ortaya çıktı: hesap "normal" girdilerde
-    #  Excel ile birebir tutuyordu, ama geçersiz girdi yollarında program
+    #  doğruydu, ama geçersiz girdi yollarında program
     #  yanlışlıkla "uygun" sonucu verebiliyordu.  Her biri için kalıcı test.
     # ==================================================================
     _gt = {"bina_tipi": "Konut", "bina_yuksekligi": 39.98, "yapi_yuksekligi": 43,
@@ -1266,41 +1269,6 @@ def calistir():
                   bool(_ru.get("uyarilar")), f"→ {_ru.get('uyarilar')}")
     r.kontrol("avan: geçerli girdide gereksiz uyarı yok", not (_av().get("uyarilar") or []))
 
-    #  ---------------------------------------------------------------
-    #  REDDEDİLEN DEĞER TESLİM EDİLEN EXCEL'E SIZMAMALI
-    #  ---------------------------------------------------------------
-    #  Motor aralık dışı bir Nsç / L1'i reddedip varsayılanı kullanıyor, ama
-    #  XLSX yazıcısı kendi süzgecini ( "girilen > 0" ) uyguladığı için
-    #  dosyaya REDDEDİLEN değeri yazıyordu:  ekran 7,5 kW derken indirilen
-    #  kitap 900 kW ile hesaplıyordu.  Artık tek kaynak ozet[k]'dir.
-    import io as _io2, openpyxl as _op3
-    from exports import xlsx_export as _XE2
-
-    def _xlsx_girdi(ek):
-        _asa = {"aktif": True, "tanim": "T", "Q_elle": 800, "V": 1, "Hk": 30,
-                "eta": 0.7, "kuyu_genisligi": 1900, "kabin_boyu": 1300,
-                "kabin_genisligi": 1100}
-        _asa.update(ek)
-        _v = {"ortak": {}, "asansorler": [_asa], "sabitler": {}, "trafik": {}}
-        _oz = AV.hesapla(_v)["asansorler"][0]["ozet"]
-        _ws = _op3.load_workbook(_io2.BytesIO(_XE2.avan_xlsx(_v)))["GİRİŞ"]
-        return _oz, _ws
-
-    for _ad, _ek in (("boş bırakılmış", {}),
-                     ("geçerli girilmiş", {"Nsc": 11, "L1": 40}),
-                     ("aralık dışı ( red )", {"Nsc": 900, "L1": 600}),
-                     ("negatif", {"Nsc": -5, "L1": -2}),
-                     ("sınırda 500", {"Nsc": 500, "L1": 500})):
-        _oz, _ws = _xlsx_girdi(_ek)
-        r.esit(f"XLSX Nsç = motorun kullandığı  ( {_ad} )", _ws["C43"].value, _oz["Nsc"])
-        r.esit(f"XLSX L1 = motorun kullandığı  ( {_ad} )", _ws["C45"].value, _oz["L1"])
-    #  Reddedilen değerin kendisi dosyada HİÇBİR yerde kalmamalı
-    _oz9, _ws9 = _xlsx_girdi({"Nsc": 900, "L1": 600})
-    r.kontrol("reddedilen 900 / 600 GİRİŞ sayfasında hiç yok",
-              not any(_c.value in (900, 600) for _sat in _ws9.iter_rows()
-                      for _c in _sat),
-              "→ reddedilen değer dosyada kalmış")
-
     # ==================================================================
     #  v1.8 — ŞERİT BOYU ( L ) TEMEL ÖLÇÜLERİNDEN TÜRETİLİR
     #  Ofiste temel için yalnız UZUNLUK ve GENİŞLİK giriliyor; band boyu
@@ -1371,14 +1339,10 @@ def calistir():
     r.kontrol("hata metni temel ölçülerini işaret ediyor",
               "uzunluk" in _ty["uyari"] and "genişlik" in _ty["uyari"])
 
-    #  XLSX yolu: türetilen boy GİRİŞ hücresine YAZILMALI, yoksa Excel
-    #  boş hücreyle hesaplar ve indirilen dosya ekrandakinden farklı çıkar.
     _v = {"ortak": dict(_TO, mk_yok=True), "asansorler": [dict(O_AS)], "sabitler": {}}
-    _c = AV.girdileri_coz(_v)
-    r.esit("türetilen L girdiye yazıldı", round(_c["ortak"]["serit_L"], 2), 118.80)
-    r.esit("elle girilen L girdide korunuyor",
-           AV.girdileri_coz({"ortak": dict(_TO, serit_L=58.5, mk_yok=True),
-                             "asansorler": [dict(O_AS)]})["ortak"]["serit_L"], 58.5)
+    r.esit("elle girilen L korunuyor",
+           AV.hesapla({"ortak": dict(_TO, serit_L=58.5, mk_yok=True),
+                       "asansorler": [dict(O_AS)], "sabitler": {}})["ozet"]["serit_L"], 58.5)
     r.esit("özette şerit boyu ve kaynağı var",
            (round(AV.hesapla(_v)["ozet"]["serit_L"], 2),
             AV.hesapla(_v)["ozet"]["serit_L_kaynak"]), (118.80, "türetilen"))
@@ -1402,10 +1366,8 @@ def calistir():
 
     #  ŞEBEKEDEN ÇEKİLEN AKIM motorun ELEKTRİK verimine de bölünür:
     #  Pşeb = P2 / ηm.  Program bir süre ηm'yi atlıyordu ve akımı %18 DÜŞÜK
-    #  gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.  Kaynak
-    #  kitabın elektrik sayfası ( 12-Elk.Hesapları!W35 ) ηm = 0,85 ile
-    #  bölerek doğrusunu yapıyor;  avan paftasındaki "4 x 25" ise ηm'siz
-    #  hesaplanmış eski değerdir ( bkz. EXCEL_FARKLARI ).
+    #  gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.  Eski
+    #  avan paftasındaki "4 x 25" ηm'siz hesaplanmış değerdir.
     _S0 = AV.sabitler({})
     _s = _av()["asansorler"][0]["ozet"]
     r.esit("motor akımı ηm'ye de bölünüyor", round(_s["I_motor"], 1),
@@ -1438,7 +1400,6 @@ def calistir():
     #  ( I ) için yapılmamıştı.  P_kurulu motorun MİL gücünü taşıyordu;  oysa
     #  I ≤ Iz kararı kolon hattına aittir ve o hatta Pşeb akar.  Yön
     #  EMNİYETSİZDİ:  kesit olduğundan küçük seçilebiliyordu.
-    #  Kaynak kitap bunu zaten doğru yapar ( 12-Elk.Hesapları!AT7 = W36×1000 ).
     _etam = _S0["motor_elektrik_verimi"]
     r.esit("B5  cetveldeki motor gücü = Pşeb  ( Nsç / ηm )",
            round(_cet[0]["guc"], 3), round(_s["Nsc"] * 1000 / _etam, 3))
@@ -1512,10 +1473,7 @@ def calistir():
                       for x in (_av({"kapasite": 25, "V": 2.5, "S2": 25,
                                      "S1": 50}).get("uyarilar") or [])))
     #  S2 YETERSİZSE BÖLÜM DE UYGUN DEĞİLDİR.
-    #  Bir süre yalnız ⚠ uyarı veriliyordu ( "XLSX ile ayrışmasın" diye );
-    #  yanlış bir kitaba sadakat uğruna hatalı bir sonuç bırakılamaz.  Teslim
-    #  edilen kitabın elektrik sayfası da artık aynı kontrolü yapıyor
-    #  ( bkz. exports/mukavemet_xlsx._elektrik_sayfasi ).
+    #  Bir süre yalnız ⚠ uyarı veriliyordu;  hatalı bir sonuç bırakılamaz.
     _b6i = [b for b in _ince["asansorler"][0]["bolumler"]
             if (b.get("sonuc") or {}).get("baslik", "").startswith("KONTROL      ε")][0]
     r.kontrol("S2 yetersizken pafta BÖLÜMÜ de uygun değil",

@@ -3,11 +3,9 @@
 TÜM TESTLERİ ÇALIŞTIR
 
     python3 testler/calistir.py            → hepsi
-    python3 testler/calistir.py hizli      → Excel taraması hariç (saniyeler)
     python3 testler/calistir.py 2 3        → yalnız 2. ve 3. testler
 
-Arayüz ve HTTP testleri için program açık olmalıdır (baslat.command).
-Excel uyum testi için LibreOffice kurulu olmalıdır.
+Arayüz testleri ( 5 · 6 ) için program açık olmalıdır ( baslat.command ).
 Eksik olan bileşenlerin testi atlanır, diğerleri yine çalışır.
 """
 import os
@@ -19,38 +17,34 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from testler.ortak import GRI, KIRMIZI, SIFIR, YESIL      # noqa: E402
 
 TESTLER = [
-    ("1", "Excel uyumu", "testler.test_excel_uyumu", True),
-    ("2", "Kenar durumlar", "testler.test_kenar_durum", False),
-    ("3", "Girdi dayanıklılığı", "testler.test_dayaniklilik", False),
-    ("4", "Çıktı bütünlüğü", "testler.test_ciktilar", False),
-    ("5", "Arayüz", "testler.test_arayuz", False),
-    ("6", "Geri yükleme", "testler.test_geri_yukleme", False),
-    ("7", "Altın çıktı", "testler.test_altin", False),
-    ("8", "Mukavemet tabloları", "testler.test_mukavemet_tablolari", False),
-    ("9", "Mukavemet motoru", "testler.test_mukavemet", False),
-    ("10", "Mukavemet ↔ Excel", "testler.test_mukavemet_excel", True),
-    ("11", "Uygulama projesi", "testler.test_uygulama", False),
+    ("1", "Avan referans taraması", "testler.test_avan_tarama"),
+    ("2", "Kenar durumlar", "testler.test_kenar_durum"),
+    ("3", "Girdi dayanıklılığı", "testler.test_dayaniklilik"),
+    ("4", "Çıktı bütünlüğü", "testler.test_ciktilar"),
+    ("5", "Arayüz", "testler.test_arayuz"),
+    ("6", "Proje dosyası geri yükleme", "testler.test_geri_yukleme"),
+    ("7", "Altın çıktı", "testler.test_altin"),
+    ("8", "Mukavemet tabloları", "testler.test_mukavemet_tablolari"),
+    ("9", "Mukavemet motoru", "testler.test_mukavemet"),
+    ("10", "Mukavemet referans taraması", "testler.test_mukavemet_tarama"),
+    ("11", "Uygulama projesi", "testler.test_uygulama"),
     #  Dış referanslar:  öteki testlerin hepsi motoru KENDİ kaynağımıza
-    #  ( Excel · altın çıktı ) karşı denetler;  bu, bizden bağımsız iki
-    #  programın yayımlanmış paftalarına karşı denetler.
-    ("12", "Dış referans paftaları", "testler.test_referans_paftalar", False),
+    #  ( dondurulmuş referans · altın çıktı ) karşı denetler;  bu, bizden
+    #  bağımsız iki programın yayımlanmış paftalarına karşı denetler.
+    ("12", "Dış referans paftaları", "testler.test_referans_paftalar"),
 ]
 
 
 def main(argv):
     secim = [a for a in argv if a.isdigit()]
-    hizli = "hizli" in argv or "hızlı" in argv
     print("\n" + "═" * 68)
     print("  ASANSÖR AVAN HESAPLAMA PROGRAMI  —  DOĞRULAMA PAKETİ")
     print("═" * 68)
 
     baslangic = time.time()
     sonuclar = []
-    for no, ad, modul_adi, yavas in TESTLER:
+    for no, ad, modul_adi in TESTLER:
         if secim and no not in secim:
-            continue
-        if hizli and yavas:
-            print(f"\n{GRI}TEST {no} — {ad}: hızlı kipte atlandı{SIFIR}")
             continue
         modul = __import__(modul_adi, fromlist=["calistir"])
         t0 = time.time()

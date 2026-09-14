@@ -3,7 +3,7 @@
 
    İki proje türünün de kullandığı kısım:  genel durum, biçimleme,
    sekme şeridi ve MOD anahtarı, çizim yardımcıları, indirme, kalıcılık,
-   Excel'den proje açma, açılış ekranı.
+   proje dosyası, açılış ekranı.
 
    Yükleme sırası ÖNEMLİDİR:   ortak.js → avan.js → uygulama.js
    kur() en sonda, uygulama.js'in ardından çağrılır.
@@ -140,7 +140,6 @@ async function kur(){
   document.body.addEventListener('input', _girdiOlayi);
   document.body.addEventListener('change', _girdiOlayi);
 
-  birakAlaniniKur();
   oku();
   cokluKolonlariGoster();
   avanKartlariGoster();
@@ -148,7 +147,6 @@ async function kur(){
   mkYokUygula();
   ofisTazele();
   etiketleriGuncelle();
-  sablonDurumu();
   hesaplaHepsi();
 }
 
@@ -276,16 +274,16 @@ const kutu = (et,dg,bi,sinif='') => `<div class="k ${sinif}"><div class="et">${e
 /* ═══════════════ OFİS STANDARDI  —  HESAP BAZINDA GRUPLU ═══════════════
    Sabitler iki ayrı yerde tutulur ve öyle kalmalıdır:
 
-     sb_*  →  Excel'in SABİTLER sayfasındaki B bölümüne yazılır
-     of_*  →  Excel'de SABİTLER'de karşılığı YOKTUR; GİRİŞ sayfasının kendi
-              girdi hücrelerine yazılır  ( bkz. engine/avan.py OFIS_VARSAYILAN )
+     sb_*  →  motorun "sabitler" sözlüğüne gider  ( engine/avan/hesap.py SABIT_B_VARSAYILAN )
+     of_*  →  asansör alanı boşsa kullanılan ofis varsayılanıdır
+              ( bkz. engine/avan/hesap.py OFIS_VARSAYILAN )
 
    Ama KULLANICI için bu ayrımın hiçbir anlamı yok; onun sorusu "bu sabit
    hangi hesaba giriyor".  Bu yüzden ekranda tek panel var ve alanlar
    HESABA göre gruplanıyor.  Kimlik ön ekleri ( sb_ / of_ ) değişmediği için
-   dışa aktarma ve geri yükleme tarafı bundan etkilenmez. */
+   proje dosyası bundan etkilenmez. */
 const SABIT_ETIKET = {
-  //  sb_*  ( Excel: SABİTLER sayfası )
+  //  sb_*
   i_palanga:['i — Palanga ( askı ) katsayısı','Doğrudan askı 1 / Palangalı 2'],
   q_denge:['q — Denge faktörü','karşı ağırlığın dengelediği yük oranı'],
   n_ray:['n — Kabin kılavuz ray sayısı','kabin daima iki raya oturur'],
@@ -303,7 +301,7 @@ const SABIT_ETIKET = {
   IDn:['IΔn — Kaçak akım rölesi (A)','300 mA = 0,30 A'],
   lc:['lç — Çubuk topraklayıcı boyu (m)',''],
   ayd_sutun:['Aydınlatma verimi sütunu (1-10)','Tablo-2 yansıma çifti'],
-  //  of_*  ( Excel: GİRİŞ sayfasının girdi hücreleri )
+  //  of_*
   U:['U — Şebeke gerilimi (V)','fazlar arası'],
   kappa:['κ — İletken iletkenliği','bakır 56 m/Ω·mm²'],
   eps_max:['εmax — İzin verilen gerilim düşümü (%)','yönetmelik sınırı'],
@@ -340,44 +338,6 @@ const SABIT_GRUP = [
    ['of:beta', 'of:cubuk_sayisi', 'of:goz_araligi', 'sb:lc', 'sb:UL', 'sb:IDn']],
 ];
 
-
-/* Şablon durumu — yanlış / eski Excel konmuşsa kullanıcı XLSX indirmeyi
-   denemeden önce görsün.  Hesap ve PDF bundan etkilenmez. */
-async function sablonDurumu(){
-  const k=$('sablon_durumu'); if(!k) return;
-  let d;
-  try{ d = await (await fetch('/api/sablon')).json(); }
-  catch(e){ k.innerHTML=`<div class="uyari sari">Şablon durumu okunamadı: ${kacis(e.message)}</div>`; return; }
-  let h='';
-  if(d.uygun){
-    h+=`<div class="uyari yesil"><b>Her iki şablon da doğrulandı.</b>
-        XLSX çıktısı ofisin kendi paftasını üretecek.</div>`;
-  }else{
-    h+=`<div class="uyari kirmizi"><b>ŞABLON UYUŞMUYOR.</b> Bu dosyalarla
-        <b>XLSX üretilmez</b> — sessizce yanlış pafta vermektense hiç vermemek doğrudur.
-        Doğru şablonu <code>templates/</code> klasörüne koyun.
-        <b>Hesap ve PDF çıktısı etkilenmez</b>, motor Excel'den bağımsızdır.</div>`;
-  }
-  (d.sablonlar||[]).forEach(s=>{
-    h+=`<div class="serit"><span>${kacis(s.baslik)}</span>
-        <span class="kaynak">${s.uygun?'doğrulandı':'uyuşmuyor'}</span></div>
-        <div class="notlar" style="margin:8px 0 12px">
-          <div><b>Dosya:</b> ${kacis(s.dosya)} &nbsp;·&nbsp; ${s.sayfa_sayisi} sayfa</div>
-          <div><b>Parmak izi ( md5 ):</b> <code>${kacis(s.md5||'—')}</code></div>`;
-    if(!s.uygun){
-      h+=`<div class="uyari kirmizi" style="margin-top:8px"><b>${s.hatalar.length} sorun:</b><ul style="margin:6px 0 0 18px">`
-        + s.hatalar.slice(0,12).map(x=>`<li>${kacis(x)}</li>`).join('')
-        + (s.hatalar.length>12?`<li>… ve ${s.hatalar.length-12} sorun daha</li>`:'')
-        + `</ul></div>`;
-    }
-    h+='</div>';
-  });
-  h+=`<div class="yardim" style="margin-top:4px">Komut satırından da bakabilirsiniz:
-      <code>python3 araclar/sablon_denetle.py</code> — saniyeler sürer.
-      Tam doğrulama ( LibreOffice ile yeniden hesaplatma ) için
-      <code>python3 testler/calistir.py</code>.</div>`;
-  k.innerHTML=h;
-}
 
 /*  ŞERİT BOYU  —  artık GİRDİ değil, TÜRETİLEN değerdir.
     Avan aşamasında elektrik projesinin topraklama planı çizilmemiş olur;
@@ -436,14 +396,10 @@ function sayiOku(x){
 
 
 /* ---------------------------------------------------------- indir */
-/*  Paket bir çalışma kitabını içeremediğinde gösterilen uyarı ( KITAP notu ).
-    Avan ve uygulama paketleri AYNI metni kullanır.                          */
-const M_KITAP_EKSIK = 'bazı çalışma kitapları üretilemedi — paket EKSİK. '
-  + 'Sebebi ZIP içindeki "URETILEMEYEN …" dosyasında yazıyor.';
 async function indir(uc){
   durum('Dosya hazırlanıyor…');
-  //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI ve
-  //  ( XLSX'te ) dosya özellikleri için kullanır — paftanın içeriği değişmez.
+  //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI için
+  //  kullanır — paftanın içeriği değişmez.
   const govde = uc==='kapak-pdf'
     ? {kapak:kapakGirdi()}
     : uc.startsWith('trafik')
@@ -476,13 +432,6 @@ async function indir(uc){
     const b = await r.blob(), u = URL.createObjectURL(b);
     const a = document.createElement('a'); a.href=u; a.download=ad; document.body.appendChild(a); a.click();
     a.remove(); setTimeout(()=>URL.revokeObjectURL(u),3000);
-    //  Paket eksikse ( sunucunun KITAP notu ) kullanıcı ZIP'i açmadan uyarılır.
-    const notlar = (r.headers.get('X-Avan-Not')||'').split(',');
-    if(notlar.includes('KITAP')){
-      const uy = 'DİKKAT: ' + M_KITAP_EKSIK;
-      durum('İndirildi: '+ad+'  '+uy, true); alert(uy);
-      return;
-    }
     durum('İndirildi: '+ad);
   }catch(e){ durum('İndirme başarısız: '+e.message, true); }
 }
@@ -544,8 +493,8 @@ function oku(){
   if(o) uygula(o);
 }
 /* Bir alana değer yazar.
-   Açılır listelerde ondalık ayracı farkı olabilir: Excel'den "1,6" gelir ama
-   seçeneğin değeri "1.6"dır.  Bu durumda sayısal karşılaştırma ile eşleştirilir;
+   Açılır listelerde ondalık ayracı farkı olabilir: kayıtlı dosyada "1,6"
+   durabilir ama seçeneğin değeri "1.6"dır.  Bu durumda sayısal karşılaştırma ile eşleştirilir;
    aksi hâlde seçim boş kalır ve hesap sessizce yapılamaz. */
 function alanaYaz(e, val){
   if(e.type==='checkbox'){ e.checked = !!val; return; }
@@ -629,15 +578,15 @@ function uygula(o){
     liste.forEach(s=>ekNufusEkle('c', s));
   });
   /* Asansör adedi: kaydedilmişse ondan, yoksa dolu çoklu kolon sayısından
-     türetilir — Excel'den geri yüklemede doğru gövde açılsın. */
+     türetilir — eski proje dosyalarında da doğru gövde açılsın. */
   let adet = parseInt(o.__trafik_adet, 10);
   if(!(adet>=1 && adet<=4)){
     const dolu=[1,2,3,4].filter(i=>$('c_P'+i) && $('c_P'+i).value!=='').length;
     adet = dolu>1 ? dolu : TRAFIK_ADET;
   }
   TRAFIK_ADET = Math.max(1, Math.min(4, adet));
-  /* Trafik grubu dışı asansör adedi: kaydedilmişse ondan, yoksa Excel'den
-     gelen "kullan" kutularından türetilir ( eski dosyalar için ). */
+  /* Trafik grubu dışı asansör adedi: kaydedilmişse ondan, yoksa "kullan"
+     kutularından türetilir ( eski dosyalar için ). */
   let ek = parseInt(o.__avan_ek, 10);
   if(!(ek>=0 && ek<=3)){
     const etkin=[1,2,3,4].filter(i=>$('a_aktif'+i) && $('a_aktif'+i).checked).length;
@@ -679,78 +628,8 @@ function uygula(o){
   etiketleriGuncelle();
 }
 
-/* ------------------------------------------------ Excel'den proje aç
-   Programın ürettiği XLSX girdileri de taşır.  Revizyonda proje
-   klasöründeki Excel'i yükleyip yalnız değişen değeri düzeltmek yeter. */
-const TUR_ADI = {tek:'1 · Trafik Hesabı  ( tek asansör )',
-                 coklu:'1 · Trafik Hesabı  ( asansör grubu )',
-                 avan:'2 · Avan Hesapları',
-                 mukavemet:'Uygulama Projesi · Mukavemet Hesabı'};
-
-async function xlsxYukle(dosyalar){
-  const liste=[...(dosyalar||[])].filter(f=>/\.xlsx$/i.test(f.name));
-  if(!liste.length){ durum('Yalnız .xlsx dosyası yüklenebilir', true); return; }
-  //  Özet, kullanıcının o an baktığı bölümde görünmeli
-  const ozet=$(MOD==='uygulama' ? 'm_yukleme_ozeti' : 'yukleme_ozeti');
-  ozet.innerHTML='';
-  const basarili=[];
-  for(const f of liste){
-    durum('Yükleniyor: '+f.name);
-    try{
-      const b64 = await new Promise((coz,red)=>{
-        const fr=new FileReader();
-        fr.onload=()=>coz(String(fr.result).split(',')[1]);
-        fr.onerror=()=>red(new Error('dosya okunamadı'));
-        fr.readAsDataURL(f);
-      });
-      const r = await fetch('/api/xlsx-yukle',{method:'POST',
-        headers:{'Content-Type':'application/json'}, body:JSON.stringify({icerik:b64})});
-      const veri = await r.json();
-      if(!r.ok || veri.hata){ throw new Error(veri.hata||('sunucu hatası '+r.status)); }
-
-      const uygulanacak = {...veri.alanlar, __tur: veri.tur};
-      if(veri.tur === 'mukavemet') uygulanacak.__muk_durak = veri.muk_durak || [];
-      if(veri.ek_nufus_hedef) uygulanacak['__eknufus_'+veri.ek_nufus_hedef] = veri.ek_nufus||[];
-      uygula(uygulanacak);
-      basarili.push({ad:f.name, tur:veri.tur, ozet:veri.ozet});
-    }catch(e){
-      ozet.innerHTML += `<div class="uyari kirmizi" style="margin-top:10px">
-        <b>${kacis(f.name)}</b><br>${kacis(e.message)}</div>`;
-    }
-  }
-  if(basarili.length){
-    yaz();
-    //  Uygulama projesinde avan hesapları koşturulmaz — orada asansör bile
-    //  tanımlı olmayabilir;  koşarsa boş sonuçla ekranı kirletir.
-    if(MOD === 'uygulama' || basarili.every(b=>b.tur === 'mukavemet')) await hesapMukavemet();
-    else await hesaplaHepsi();
-    ozet.innerHTML = `<div class="yuklendi">
-      <b>${basarili.length} dosya yüklendi</b>
-      ${basarili.map(b=>`<div class="satir2">▪ ${kacis(b.ad)} → <b>${TUR_ADI[b.tur]||b.tur}</b> &nbsp;(${kacis(b.ozet)})</div>`).join('')}
-      <div class="satir2" style="margin-top:6px">Değişen girdiyi ilgili sekmede düzeltip
-      güncel PDF / XLSX'i yeniden indirebilirsiniz.</div></div>` + ozet.innerHTML;
-    durum(basarili.length+' dosya yüklendi');
-  }
-}
-
-function birakAlaniniKur(){
-  _birakma('birak_alani', 'xlsx_ac');
-  _birakma('m_birak_alani', 'm_xlsx_ac');
-}
-function _birakma(alanId, secId){
-  const a=$(alanId); if(!a) return;
-  a.onclick=()=>$(secId).click();
-  ['dragenter','dragover'].forEach(o=>a.addEventListener(o,e=>{
-    e.preventDefault(); e.stopPropagation(); a.classList.add('uzerinde'); }));
-  ['dragleave','drop'].forEach(o=>a.addEventListener(o,e=>{
-    e.preventDefault(); e.stopPropagation(); a.classList.remove('uzerinde'); }));
-  a.addEventListener('drop',e=>xlsxYukle(e.dataTransfer.files));
-  // Sayfanın herhangi bir yerine bırakılan dosya tarayıcıda açılmasın
-  ['dragover','drop'].forEach(o=>window.addEventListener(o,e=>{
-    if(!a.contains(e.target)) e.preventDefault(); }));
-}
 /* ═══════════════════════════ PROJE DOSYASI ═══════════════════════════
-   Projenin bütün girdilerinin GERİ DÖNÜŞ NOKTASI.  Ne PDF ne Excel ne DXF —
+   Projenin bütün girdilerinin GERİ DÖNÜŞ NOKTASI.  Ne PDF ne DXF —
    yalnız programın okuyup yazdığı veri.  Aylar sonra revizyon gerektiğinde
    dosya yüklenir, değişen düzeltilir, çıktılar yeniden alınır.
 
@@ -860,11 +739,11 @@ function ornekYukle(){
     a_makine_tipi2:'Dişlisiz', a_i_palanga2:'2',
     a_kuyu_genisligi2:'2650', a_kabin_boyu2:'1350', a_kabin_genisligi2:'2100',
     a_aktif3:false, a_aktif4:false, __eknufus_c:[],
-    /* Ofisin Excel örneği 10 + 16 kişilik İKİ asansörlük bir gruptur —
+    /* Ofisin örnek projesi 10 + 16 kişilik İKİ asansörlük bir gruptur —
        trafik adedi 2, avanda trafik dışı asansör yok. */
     __trafik_adet:2, __avan_ek:0};
   uygula(O); yaz(); hesaplaHepsi();
-  durum('Örnek proje yüklendi — Excel dosyanızdaki değerler');
+  durum('Örnek proje yüklendi');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

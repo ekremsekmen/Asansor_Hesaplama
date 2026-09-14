@@ -3,13 +3,10 @@
 ASANSÖR AVAN PROJE HESAPLARI
   MMO/697 (2. Baskı, Ocak 2020) s.18-21  ·  TS EN 81-20  ·  IEEE Std 80
 
-"ASANSOR AVAN HESAPLARI.xlsx" dosyasındaki
-  · GİRİŞ / SABİTLER / TABLOLAR
-  · 1-4 NOLU ASANSÖR   (6 hesap bölümü)
-  · MK.DAİRESİ AYD.
-  · TOPRAKLAMA
-  · ÖZET
-sayfalarının birebir Python karşılığıdır.
+  · 1-4 nolu asansör   ( 6 hesap bölümü )
+  · makine dairesi aydınlatması
+  · temel topraklama
+  · özet
 """
 import math
 from engine.avan import tablolar as T
@@ -101,11 +98,8 @@ SABIT_B_ARALIK = {
 
 # =====================================================================
 #  C )  OFİS VARSAYILANLARI
-#  Asansörden asansöre, projeden projeye DEĞİŞMEYEN ama Excel'de SABİTLER
-#  sayfasında değil GİRİŞ sayfasının kendi girdi hücrelerinde duran değerler.
-#  Program bunları burada bir kez tutar; asansör alanı boş bırakılırsa
-#  buradan gelir ve XLSX'e yine aynı GİRİŞ hücresine yazılır — bu yüzden
-#  Excel şablonunda HİÇBİR değişiklik gerekmez.
+#  Asansörden asansöre, projeden projeye DEĞİŞMEYEN değerler.  Program
+#  bunları burada bir kez tutar;  asansör alanı boş bırakılırsa buradan gelir.
 #
 #  Bir asansörde farklı bir değer gerekiyorsa ( ör. daha ağır bir makine )
 #  o asansörün kartından girilir; girilen değer buradakini ezer.
@@ -512,7 +506,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #      boş  kabin AŞAĞI   →  dengesiz yük =        q ·Q   ( karşı ağırlık ağır )
     #  Motor İKİSİNİN BÜYÜĞÜNE göre seçilir.  MMO/697 s.21 formülü Q/2 ile
     #  çalışır, yani q = 0,50 kabulüdür ve orada iki yön EŞİTTİR — bu genelleme
-    #  kitapla birebir aynı sonucu verir.  Fark yalnız q > 0,50 girildiğinde
+    #  kitabın formülüyle birebir aynı sonucu verir.  Fark yalnız q > 0,50 girildiğinde
     #  çıkar:  program eskiden HAFİF yönü hesaplıyor ve motoru olduğundan küçük
     #  seçiyordu ( q = 0,55 · 800 kg · 1 m/s · 2:1'de 5,5 kW yerine 7,5 kW gerekir ).
     dengesiz = max(1 - q, q)
@@ -760,8 +754,6 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  ve kolon hattında akan da odur.  Program cetvele mil gücünü yazıyor,
     #  I ve ε1'i ondan hesaplıyordu — kolon hattı akımı %18 DÜŞÜK çıkıyor,
     #  kesit ve sigorta OLDUĞUNDAN KÜÇÜK seçilebiliyordu.
-    #  Kaynak kitap bunu zaten doğru yapar:  12-Elk.Hesapları!AT7 = W36×1000 ve
-    #  W36 = W30/W35 = Pm/ηm;  kolon hattı gücü PTAS ( W31 ) o toplamdan gelir.
     #  Makine besleme hattı için düzeltme daha önce yapılmıştı;  kolon hattında
     #  açık kalmıştı.
     _eta_m = S["motor_elektrik_verimi"]
@@ -773,15 +765,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     g_priz = S["priz_adedi"] * S["priz_gucu"]
     P_kurulu = g_motor + g_kuyu + g_kabin + g_priz
 
-    #  MOTOR KORUMA CİHAZI  —  şablonda sabit metin ( "4 x 25" ) olarak
-    #  duruyordu; her güçte aynı yazıyordu.  Motor anma akımından seçiliyor:
+    #  MOTOR KORUMA CİHAZI  —  her güçte aynı sabit metin ( "4 x 25" ) değil,
+    #  motor anma akımından seçilir:
     #  In = P2 / ( √3 · U · cosφ ),  kademe = katsayı · In üstündeki ilk
     #  standart değer.  Ofisin 11 kW örneğinde sonuç yine "4 x 25" çıkar.
     #  ŞEBEKEDEN ÇEKİLEN AKIM.  Motorun MİL gücü değil, şebekeden çektiği
     #  güç akar:  Pşeb = P2 / ηm.  Program bir süre ηm'yi atlıyordu ve akımı
     #  %18 DÜŞÜK gösteriyordu — kablo ve sigorta olduğundan küçük seçiliyordu.
-    #  Kaynak kitabın elektrik sayfası ( 12-Elk.Hesapları!W35 ) ηm = 0,85 ile
-    #  bölerek doğrusunu yapıyordu;  ekran ile kitap bu yüzden ayrışıyordu.
     I_motor = (g_motor / (math.sqrt(3) * U_sebeke * S["cosfi"])
                if all(sayi_mi(x) and x > 0
                       for x in (U_sebeke, S["cosfi"])) else None)
@@ -816,8 +806,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         if all(sayi_mi(x) and x > 0 for x in (kappa, S1, U_sebeke)) else None
     #  ε2 DE ŞEBEKEDEN ÇEKİLEN GÜÇLE HESAPLANIR.  ε bağıntısı ( 100·P·L /
     #  (κ·S·U²) ) hattan akan AKTİF GÜÇTEN türetilir;  mil gücü kullanmak
-    #  gerilim düşümünü de %18 düşük gösteriyordu.  Kitap burada da doğrusunu
-    #  yapar:  12-Elk.Hesapları!W46 = W36×1000 ( Pşeb ).
+    #  gerilim düşümünü de %18 düşük gösteriyordu.
     P_motor_W = g_motor
     eps2 = (100 * P_motor_W * L2 / (kappa * S2 * U_sebeke ** 2)) \
         if all(sayi_mi(x) and x > 0 for x in (kappa, S2, U_sebeke)) else None
@@ -838,9 +827,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  besleme hattı hiç denetlenmiyordu — yalnız gerilim düşümüne ( ε2 )
     #  giriyordu ve ε2 kısa bir hatta çok ince kesitte bile küçük çıkar.
     #  Sonuç: 37 kW motor + S2 = 1,5 mm² ( I2 = 62 A, kablo 17,5 A )
-    #  birleşimi "uygundur" görünüyordu.  Bu kontrol ofisin Excel'inde de
-    #  yok; pafta ve XLSX ayrışmasın diye SONUÇ SATIRI DEĞİŞTİRİLMEDİ,
-    #  yetersizlik ⚠ UYARI olarak bildiriliyor.
+    #  birleşimi "uygundur" görünüyordu.  Artık bölüm sonucuna girer
+    #  ( bkz. aşağıda "MAKİNE BESLEME HATTI" ).
     Iz2, Iz2_kesin = T.kablo_iz_sinir(S2)
     I2 = I_motor
     akim2_uygun = sayi_mi(I2) and sayi_mi(Iz2) and I2 <= Iz2
@@ -947,10 +935,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
              _pe_kaynak(S2, SPE2_ham, SPE2_yuv), 1),
     ]
     #  MAKİNE BESLEME HATTI ( S2 ) DA SONUCA GİRER.
-    #  Kaynak Excel bu kontrolü hiç yapmaz ve program bir süre yalnız ⚠ uyarı
-    #  veriyordu:  37 kW motora 1,5 mm² kabloyla bölüm "uygundur" diyordu.
-    #  Yanlış bir kitaba sadakat uğruna hatalı bir sonuç bırakılamaz — teslim
-    #  edilen Excel de aynı kontrolü yapacak biçimde düzeltilir.
+    #  Program bir süre yalnız ⚠ uyarı veriyordu:  37 kW motora 1,5 mm²
+    #  kabloyla bölüm "uygundur" diyordu.
     s2_kontrol = sayi_mi(I2)
     tumu = eps_uygun and akim_uygun and (akim2_uygun or not s2_kontrol)
     b6["sonuc"] = {
@@ -1370,60 +1356,6 @@ def _trafik_tutarlilik(trafik, asansorler_girdi):
                          f"( Hk {tr(Hk)} − seyahat {tr(seyahat)} ) olağandışı büyük — kat "
                          "sayısı ya da Hk girdisi güncel olmayabilir.")
     return u
-
-
-def girdileri_coz(veriler: dict) -> dict:
-    """
-    Ofis varsayılanlarını ve otomatik belirlenen değerleri GİRDİNİN İÇİNE yazar.
-
-    Yalnız XLSX çıktısında kullanılır: Excel'in kendi formülleri boş bir girdi
-    hücresiyle çalışamaz, bu yüzden dosyaya PROGRAMIN KULLANDIĞI değer
-    yazılmalıdır — aksi hâlde indirilen dosya ekrandakinden farklı hesaplar.
-
-    Hesap yolunda KULLANILMAZ; orada girdi ham hâliyle kalır ki paftada
-    değerin nereden geldiği ( GİRİŞ / OFİS VARSAYILANI / otomatik ) yazılabilsin.
-    """
-    veriler = veriler if isinstance(veriler, dict) else {}
-    S = sabitler(veriler.get("sabitler"))
-    ortak = dict(veriler.get("ortak") or {})
-    for k in OFIS_ORTAK_ALANLARI:
-        ortak[k] = _ortak_degeri(ortak, S, k)
-
-    sonuc = hesapla(veriler)
-    hesaplanan = {h.get("no"): h for h in (sonuc.get("asansorler") or []) if h}
-
-    #  Şerit boyu boş bırakılmışsa temel ölçülerinden türetilir; Excel'in
-    #  TOPRAKLAMA sayfası GİRİŞ!C13'ü okuduğu için hücre boş kalamaz —
-    #  programın kullandığı değer dosyaya da yazılmalıdır.
-    tp = sonuc.get("topraklama") or {}
-    if not (sayi_mi(ortak.get("serit_L")) and ortak["serit_L"] > 0) and sayi_mi(tp.get("L")):
-        ortak["serit_L"] = tp["L"]
-
-    cozulmus = []
-    for i, a in enumerate(veriler.get("asansorler") or [], 1):
-        if not a:
-            cozulmus.append(a)
-            continue
-        y = dict(a)
-        for k in OFIS_ASANSOR_ALANLARI:
-            y[k] = _ofis_degeri(a, S, k)[0]
-        oz = (hesaplanan.get(i) or {}).get("ozet") or {}
-        #  MOTORUN GERÇEKTEN KULLANDIĞI DEĞER YAZILIR — girdinin kabul edilip
-        #  edilmediğine BURADA yeniden karar verilmez.  Eskiden koşul
-        #  "girilen > 0" idi;  aralık dışı bir değer ( L1 = 600 m, Nsç =
-        #  900 kW ) bu süzgeci geçtiği için motor onu REDDEDİP varsayılanı
-        #  kullanırken dosyaya yine 600 / 900 yazılıyordu:  ekran ve teslim
-        #  edilen Excel ayrışıyordu.  ozet[k] zaten kullanılan değerdir
-        #  ( girdi geçerliyse girdinin kendisi ), tek kaynak odur.
-        for k in ("L1", "Nsc"):
-            if sayi_mi(oz.get(k)):
-                y[k] = oz[k]
-        cozulmus.append(y)
-
-    yeni = dict(veriler)
-    yeni["ortak"] = ortak
-    yeni["asansorler"] = cozulmus
-    return yeni
 
 
 def hesapla(veriler: dict) -> dict:

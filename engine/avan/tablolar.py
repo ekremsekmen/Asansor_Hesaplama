@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 MMO/697 (2. Baskı, Ocak 2020), TS EN 81-20, ISO 8100-32:2020 ve IEC 60364-5-52
-kaynaklı tablolar.  Değerler ASANSOR_TRAFIK_HESABI_v2_1.xlsx ve
-ASANSOR AVAN HESAPLARI.xlsx dosyalarındaki tablolarla BİREBİR aynıdır.
+kaynaklı tablolar.
 """
 from engine.ortak import ofis as _OFIS
 from engine.ortak.steps import sayi_mi
@@ -96,7 +95,7 @@ KAPI_TIPLERI = [
 #     1000 mm  =  ( 900 + 1100 ) / 2
 #     1200 mm  =  ( 1100 + 1300 ) / 2
 #  "Kabin İçi Oto. Kat K.Ç." sütunu 1300 mm'de tabloda yoktur; dolayısıyla
-#  1200 mm için de enterpolasyon yapılamaz — bu iki hücre boş bırakılmıştır
+#  1200 mm için de enterpolasyon yapılamaz — bu iki değer boş bırakılmıştır
 #  ve program imalatçı değerinin elle girilmesini ister.
 TABLO_4 = {
     #  genişlik : { kapı tipi : (ta, tk) }
@@ -325,14 +324,14 @@ def ayd_verim(k, sutun=2):
 #  gösteriliyordu — yanlış atıf. )
 GK_TABLOSU = [tuple(satir) for satir in _OFIS.GK_TABLOSU]
 
-#  Geriye dönük ad ( şablon denetimi ve testler bu adı kullanır )
+#  Geriye dönük ad ( arayüz ve testler bu adı kullanır )
 TABLO_11 = GK_TABLOSU
 
 GK_KAYNAGI = _OFIS.GK_KAYNAGI
 
 
 def tablo11_Gk(Q):
-    """Ara yükler doğrusal enterpolasyonla; sonuç 10 kg'a yuvarlanır (Excel ROUND)."""
+    """Ara yükler doğrusal enterpolasyonla; sonuç 10 kg'a, yarımı yukarı yuvarlanır."""
     return _OFIS.bos_kabin_kutlesi(Q) if sayi_mi(Q) else None
 
 
@@ -468,61 +467,6 @@ def topraklama_iletkeni_kesiti(en_buyuk_pe):
     if en_buyuk_pe >= TOPRAKLAMA_KORUNMUS:
         return _ust_standart(en_buyuk_pe), "m.9-e  ( koruma iletkeni kesiti )"
     return float(TOPRAKLAMA_KORUNMUS), "Çizelge-4a  ( 16 mm² Cu )"
-
-
-def koruma_iletkeni_formulu(S_hucre, merdiven, koruma=None):
-    """Çizelge-8'i EXCEL FORMÜLÜ olarak kurar  —  kitap kendini hesaplasın diye.
-
-        S_hucre   faz kesitini tutan hücre      ( ör. "E123" )
-        merdiven  standart kesit merdiveninin MUTLAK aralığı
-                  ( ör. "TABLOLAR!$L$2:$L$18" )
-        koruma    doluysa formül bu koşula sarılır ( sayfanın kendi
-                  "asansör etkin mi" kalkanı, ör. 'GİRİŞ!$C$27=""' )
-
-    MATCH( … ; 1 ) sıralı listede ham değerden KÜÇÜK EŞİT en büyük satırı
-    verir;  o satır ham'dan küçükse bir alta geçilir.  Yani her zaman
-    "ham'dan küçük olmayan en küçük standart kesit" seçilir — Çizelge-8'in
-    altındaki "bir üst standart kesitli iletken kullanılmak zorundadır"
-    hükmü budur.  Merdivenin üstüne taşan değerde INDEX #REF! verir;
-    IFERROR onu boş bırakır ( motor da None döner ).
-    """
-    ham = f'IF({S_hucre}<=16,{S_hucre},IF({S_hucre}<=35,16,{S_hucre}/2))'
-    f = ust_standart_formulu(ham, merdiven)
-    if koruma:
-        f = f'IF({koruma},"",{f})'
-    return "=" + f
-
-
-def ust_standart_formulu(ham, merdiven):
-    """"ham'dan küçük olmayan en küçük standart kesit" — Excel ifadesi.
-
-    ``ham`` bir Excel İFADESİDİR ( hücre adı da olabilir ), ``merdiven``
-    standart kesit merdiveninin mutlak aralığı.  Başına "=" KONULMAZ;
-    çağıran kendi formülüne gömer.
-
-    MATCH( … ; 1 ) sıralı listede ham'dan küçük eşit en büyük satırı verir;
-    o satır ham'dan küçükse bir alta geçilir.  Merdivenin üstüne taşan
-    değerde INDEX #REF! verir, IFERROR onu boş bırakır.
-    """
-    yer = f'MATCH({ham},{merdiven},1)'
-    return (f'IFERROR(INDEX({merdiven},{yer}'
-            f'+IF(INDEX({merdiven},{yer})<{ham},1,0)),"")')
-
-
-def ana_potansiyel_dengeleme_formulu(pe_ifade, merdiven, koruma=None):
-    """Sapd Excel formülü  —  0,5 · PE , en az 6 , en çok 25 mm²."""
-    ham = f'MIN({APD_UST_SINIR},MAX({APD_ASGARI},{pe_ifade}/2))'
-    f = f'IF(N({pe_ifade})<=0,"",{ust_standart_formulu(ham, merdiven)})'
-    return "=" + (f'IF({koruma},"",{f})' if koruma else f)
-
-
-def topraklama_iletkeni_formulu(pe_ifade, koruma=None):
-    """Stopr Excel formülü  —  m.9-e değeri ile 16 mm²'nin büyüğü.
-
-    PE zaten standart merdivenden geldiği için yuvarlama gerekmez.
-    """
-    f = f'IF(N({pe_ifade})<=0,"",MAX({pe_ifade},{TOPRAKLAMA_KORUNMUS}))'
-    return "=" + (f'IF({koruma},"",{f})' if koruma else f)
 
 
 def koruma_iletkeni_kesiti(S):
@@ -669,9 +613,8 @@ BODRUM_NOTU = (
 #  göre ölçeklenmiyor ve η küçükken η′'yü negatife düşürüyordu.
 #
 #  Yukarıdaki değerler artık TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı
-#  içlerindedir.  İmalatçı kataloğu da bu büyüklüğü verir;  EN 81-20/50
-#  şablonları buna η_ins ( installation efficiency ) der ve askı oranını ayrıca
-#  cezalandırmaz.  Askı oranı motor gücüne HİÇBİR yoldan girmez.
+#  içlerindedir.  İmalatçı kataloğu da bu büyüklüğü verir ( η_ins,
+#  installation efficiency ) ve askı oranını ayrıca cezalandırmaz.  Askı oranı motor gücüne HİÇBİR yoldan girmez.
 #  Makine verimi tablosu artık ORTAK ofis standardındadır:  uygulama projesi
 #  ( mukavemet ) de aynı sayıları okur.  Bir süre iki yerde ayrı durdu ve
 #  ayrıştı — bkz. engine/ortak/ofis.py.
@@ -745,8 +688,7 @@ MOTOR_NOTU = ("Seçilen motor gücü, hesaplanan güçten büyük ilk STANDART a
 
 # =====================================================================
 #  MOTOR KORUMA CİHAZI ( SİGORTA / ŞALTER ) ANMA AKIMI KADEMELERİ
-#  IEC 60269 / TS EN 60269 gG serisi.  Şablonda bu değer sabit metin
-#  ( "4 x 25" ) olarak duruyordu; motor akımından seçilmesi için eklendi.
+#  IEC 60269 / TS EN 60269 gG serisi.  Motor akımından seçilmesi için.
 # =====================================================================
 SIGORTA_KADEMELERI = (6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125,
                       160, 200, 250, 315, 400, 500, 630)

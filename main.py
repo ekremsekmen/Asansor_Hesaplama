@@ -10,17 +10,15 @@ Tarayıcı kendiliğinden açılır (http://127.0.0.1:8760).
 Program tümüyle bilgisayarınızda çalışır, internet gerektirmez.
 """
 import json
-import math
 import hashlib
 import os
 import re
 import sys
 import threading
 import webbrowser
-from datetime import date
 
-from fastapi import Body, FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -56,10 +54,6 @@ BELIRSIZ_SAYI = re.compile(r"^[+-]?[1-9]\d{0,2}[.,]\d{3}$")
 from api import avan as UC_AVAN
 from api import uygulama as UC_UYGULAMA
 from api.ortak import (_BELIRSIZ, _RED, _sayi, belirsiz_sayi_mi)   # noqa: F401
-from exports import mukavemet_xlsx as X_MXLS
-from exports import xlsx_import as X_IMP
-from engine.uygulama import girdi as E_UGR
-from engine.uygulama import mukavemet_girdi as E_MGR
 
 #  UÇLAR İKİ PAKETTE:  avan projesi ve uygulama projesi ayrı dosyalarda
 #  ( bkz. api/avan.py · api/uygulama.py ).  Ortak yardımcılar api/ortak.py.
@@ -88,86 +82,6 @@ def _statik_damga():
         except OSError:
             h.update(ad.encode())
     return h.hexdigest()[:12]
-
-
-@app.post("/api/xlsx-yukle")
-def api_xlsx_yukle(veri: dict = Body(...)):
-    """
-    Programın ürettiği bir XLSX dosyasından girdileri geri yükler.
-
-    Revizyon akışı:  proje klasöründeki Excel'i yükle → değişen girdiyi
-    düzelt → güncel PDF ve XLSX'i yeniden indir.
-
-    Dosya, arayüz tarafından base64 olarak gönderilir; böylece programın
-    ek bir Python paketine ( multipart ) ihtiyacı olmaz.
-    """
-    import base64
-    try:
-        ham = (veri or {}).get("icerik") or ""
-        if isinstance(ham, str) and "," in ham[:80] and ham.strip().startswith("data:"):
-            ham = ham.split(",", 1)[1]              # data: URL başlığını at
-        icerik = base64.b64decode(ham, validate=False)
-    except Exception:                                         # noqa: BLE001
-        return JSONResponse({"hata": "Dosya içeriği okunamadı."}, status_code=422)
-    if len(icerik) < 1000:
-        return JSONResponse({"hata": "Dosya boş veya çok küçük."}, status_code=422)
-    if len(icerik) > 25 * 1024 * 1024:
-        return JSONResponse({"hata": "Dosya çok büyük (en fazla 25 MB)."}, status_code=422)
-    #  MUKAVEMET ÇALIŞMA KİTABI  ( uygulama projesi ).  Avan içe aktarıcısı
-    #  bu dosyayı tanımaz;  önce o denetlenir, yoksa "tanınmayan dosya"
-    #  hatası verirdi.  Dönen yapı avanınkiyle aynıdır — arayüzün uygula()
-    #  işlevi ikisini de aynı yoldan işler.
-    try:
-        if X_MXLS.mukavemet_dosyasi_mi(icerik):
-            g, ek_blok = X_MXLS.xlsx_oku_ayrintili(icerik)
-            alanlar, durak = {}, []
-            for anahtar, _h, _e, _b, tur, _s2, _v in E_MGR.ALANLAR:
-                if anahtar not in g:
-                    continue
-                if tur == "liste":
-                    durak = [str(x) for x in g[anahtar]]
-                    continue
-                alanlar[f"m_{anahtar}"] = g[anahtar]
-            #  Uygulama projesinin elektrik / topraklama alanları.  Bunlar
-            #  kaynak kitapta yoktur;  program kendi ürettiği dosyaya yazar
-            #  ( X_MXLS.EK_GIRDI_HUCRELERI ).  Döngüye alınmazsa revizyonda
-            #  SESSİZCE kaybolur ve kesitler varsayılana dönerdi.
-            for anahtar in X_MXLS.EK_GIRDI_ANAHTARLARI:
-                if anahtar in g:
-                    alanlar[f"m_{anahtar}"] = g[anahtar]
-            #  Elden gelen ÖZGÜN kitapta bu blok hiç yoktur;  o zaman kayıp
-            #  alanlar tek tek sayılıp söylenir — sessiz kısmi geri yükleme
-            #  projeciyi yanıltır.  Blok VARSA boş hücre "girilmemiş" demektir,
-            #  kayıp değildir:  uyarı çıkmaz.
-            ozet = (f"Mukavemet hesabı — {len(durak)} durak, "
-                    f"{len(alanlar)} girdi geri yüklendi.")
-            if not ek_blok:
-                ozet += ("  Bu dosya programın ürettiği kopya değil:  "
-                         "elektrik ve topraklama alanları taşınmadı, "
-                         "VARSAYILANA döndüler — "
-                         + " · ".join(et for _a3, _s3, et, _b3
-                                      in X_MXLS.EK_GIRDI_HUCRELERI) + ".")
-            #  PROJE KİMLİĞİ de geri gelir:  dosyanın özelliklerinde yazılıdır.
-            #  Okunmazsa ekranda ÖNCEKİ projenin adı kalıyor ve bir sonraki
-            #  çıktı onun adıyla iniyordu.
-            kimlik = X_MXLS.proje_kimligi_oku(icerik)
-            proje = {f"mk_{k}": v for k, v in (
-                ("proje_adi", kimlik.get("proje_adi")),
-                ("isveren", kimlik.get("isveren")),
-                ("pafta_no", kimlik.get("pafta_no"))) if v}
-            alanlar.update(proje)
-            return JSONResponse({
-                "tur": "mukavemet", "alanlar": alanlar, "muk_durak": durak,
-                "proje": kimlik, "ozet": ozet})
-    except Exception as e:                                    # noqa: BLE001
-        return JSONResponse({"hata": f"Mukavemet dosyası okunamadı: {e}"},
-                            status_code=422)
-    try:
-        return JSONResponse(X_IMP.xlsx_oku(icerik))
-    except X_IMP.YuklemeHatasi as e:
-        return JSONResponse({"hata": str(e)}, status_code=422)
-    except Exception as e:                                    # noqa: BLE001
-        return JSONResponse({"hata": f"Dosya yüklenemedi: {e}"}, status_code=422)
 
 
 @app.get("/api/saglik")

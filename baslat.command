@@ -32,7 +32,7 @@ fi
 #  Program güncellendiğinde yeni bir kitaplık eklenmiş olabilir
 #  ( CAD çıktısı için ezdxf + pdfminer.six gibi ).  Her açılışta
 #  hızlıca bakılır: eksik yoksa hiçbir şey yapılmaz, bekletmez.
-if ! ./.venv/bin/python -c "import importlib.util as u; assert all(u.find_spec(m) for m in ('fastapi','uvicorn','openpyxl','reportlab')); import ezdxf; from pdfminer.high_level import extract_pages" >/dev/null 2>&1; then
+if ! ./.venv/bin/python -c "import importlib.util as u; assert all(u.find_spec(m) for m in ('fastapi','uvicorn','reportlab')); import ezdxf; from pdfminer.high_level import extract_pages" >/dev/null 2>&1; then
   echo "  Eksik kitaplıklar kuruluyor (~1 dakika)…"
   if ./.venv/bin/python -m pip install -r requirements.txt -q; then
     echo "  Kurulum tamamlandı."

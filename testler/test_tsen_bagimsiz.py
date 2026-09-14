@@ -4,7 +4,7 @@
 Kaynak: https://liftescalatorlibrary.org/paper_indexing/papers/00000063.pdf
 Bu yayın standardın kendisi değildir; 2014 baskısını açıklayan örneklerdir.
 Tam TS baskısı doğrulaması yerine geçmez. Üretim kodunu değiştirmez.
-Beklenen değerler Excel/altın çıktıdan alınmaz. Kalan testler açık bulgudur.
+Beklenen değerler altın çıktıdan alınmaz. Kalan testler açık bulgudur.
 """
 import math
 import re
@@ -32,13 +32,13 @@ class BagimsizDenetim(unittest.TestCase):
             "_ofis": {"kanal_gama_v": 50, "q_denge": 0.45},
         })
         self.assertTrue(s["aktif"], s.get("hata"))
-        self.assertAlmostEqual(s["_h"]["V116"], 7)
+        self.assertAlmostEqual(s["ara"]["aski.Nequiv"], 7)
         # Yayında Sf tam sayıya yuvarlanarak 16 verilmiş.
         self.assertAlmostEqual(s["ozet"]["Sf"], 16, delta=0.5)
         self.assertAlmostEqual(s["ozet"]["S_gercek"], 19, delta=0.1)
         # Yayın §4.2: sürtünme katsayısı ve kritik oran; 1.87 yuvarlatılmıştır.
-        self.assertAlmostEqual(s["_h"]["AS190"], 1 / 12)
-        self.assertAlmostEqual(s["_h"]["O257"], 1.87, delta=0.02)
+        self.assertAlmostEqual(s["ara"]["tahrik.mu_fren"], 1 / 12)
+        self.assertAlmostEqual(s["ara"]["tahrik.fren_alt.sinir"], 1.87, delta=0.02)
 
     def test_yayin_ray_egilmesi_cekirdegi(self):
         # Yayının T127-1/B kesiti katalogda yok: yalnız sayısal çekirdek testi.
@@ -64,14 +64,14 @@ class BagimsizDenetim(unittest.TestCase):
 
     def test_burkulmada_en_kucuk_atalet_yaricapi(self):
         s = M.hesapla()
-        g, h = s["girdi"], s["_h"]
+        g, h = s["girdi"], s["ara"]
         p = g["kabin_ray_profili"]
         imin = min(T.ray(p, "ix"), T.ray(p, "iy"))
         lam = math.ceil(g["kabin_konsol_arasi"] / imin)
         # Bu test yarıçap seçimini ayırır; yukarı yuvarlama aynen korunur.
         omega = 0.00016887 * lam ** 2
-        expected = h["AL354"] / h["AD354"] * omega
-        self.assertAlmostEqual(h["AL354"], expected, places=6)
+        expected = h["kabin_ray.sigma_k"] / h["kabin_ray.omega"] * omega
+        self.assertAlmostEqual(h["kabin_ray.sigma_k"], expected, places=6)
 
     def test_narinlik_250_sinirinin_asimi_burkulmayi_dusurmeli(self):
         # ix=20.9; iy=14.0. Gerçek narinlik 3600/14 = 257.143 > 250.
@@ -103,7 +103,7 @@ class BagimsizDenetim(unittest.TestCase):
         #  yani onların da y kolu 200 mm'dir.
         expected = (2 * 9.81 * (g["beyan_yuku"] * (200 + g["kabin_genisligi"] / 8)
                     + P_std(s) * 200) / g["kabin_paten_arasi"])
-        self.assertAlmostEqual(s["_h"]["K344"], expected, places=6)
+        self.assertAlmostEqual(s["ara"]["kabin_ray.c21.d2.Fy"], expected, places=6)
 
     #  ------------------------------------------------------------------
     #  ACİL FRENLEME  —  EN 81-50 Ek D'nin ÇÖZÜMLÜ ÖRNEĞİ  ( 2:1, dengeleme
@@ -158,8 +158,8 @@ class BagimsizDenetim(unittest.TestCase):
             T1 = t["Mcwt"] / 2 * (gn + a) + t["MSRcwt"] * (gn + 2 * a) + kas_cwt - FRcwt / 2
             T2 = ((t["P"] + t["MTrav"]) / 2 * (gn - a) + t["MSRcar"] * (gn - 2 * a)
                   - kas_car + FRcar / 2)
-        hucre = "K257" if durum == "fren_alt" else "K271"
-        return s["_h"][hucre], max(T1, T2) / min(T1, T2)
+        hucre = "tahrik.fren_alt.oran" if durum == "fren_alt" else "tahrik.fren_ust.oran"
+        return s["ara"][hucre], max(T1, T2) / min(T1, T2)
 
     def test_fren_alt_ek_D_ile_ayni(self):
         motor, ek_d = self._ekD("fren_alt")
@@ -252,13 +252,13 @@ class BagimsizDenetim(unittest.TestCase):
     def test_kuyu_tabani_kuvveti_tampon_adedine_bolunur(self):
         """m.5.2.1.8.5:  kuvvet tampon sayısına eşit dağılır."""
         s = M.hesapla({"kabin_tampon_adedi": 2, "agirlik_tampon_adedi": 4})
-        h = s["_h"]
+        h = s["ara"]
         g, gn = s["girdi"], 9.81
         #  m.5.2.1.8.5:  F = 4·gn·( P + Q ) — oradaki P boş kabin DEĞİL,
         #  "empty car and components supported by the car, i.e. part of the
         #  travelling cable, compensating ropes/chains (if any)".
         Fkt = 4 * gn * (P_std(s) + g["beyan_yuku"])
-        self.assertAlmostEqual(h["AF621"], Fkt, places=6)
+        self.assertAlmostEqual(h["kuyu.Fkt"], Fkt, places=6)
         b9 = next(b for b in s["bolumler"] if b["kimlik"] == "kuyu_tabani")
         tekil = [a["deger"] for a in b9["adimlar"]
                  if "Fkt1" in str(a.get("formul") or "")]
@@ -327,9 +327,9 @@ class BagimsizDenetim(unittest.TestCase):
         """
         s = M.hesapla({"acil_frenleme_a": 9.81})       # a = 1 gn
         self.assertTrue(s["aktif"], s.get("hata"))
-        h = s["_h"]
-        self.assertLess(h["AJ255"], 0, "bu girdide T2 negatife düşmeli")
-        self.assertLess(h["K257"], 0, "oran da negatif çıkmalı")
+        h = s["ara"]
+        self.assertLess(h["tahrik.fren_alt.T2"], 0, "bu girdide T2 negatife düşmeli")
+        self.assertLess(h["tahrik.fren_alt.oran"], 0, "oran da negatif çıkmalı")
         b6 = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
         self.assertFalse(b6["sonuc"]["uygun"],
                          "negatif halat kuvvetiyle bölüm uygun sayılamaz")
@@ -344,7 +344,7 @@ class BagimsizDenetim(unittest.TestCase):
 class UcDuzeltmeDenetimi(unittest.TestCase):
     """2026-09-10'da bulunan üç hatanın standart tarafından doğrulanması.
 
-    Beklenen değerler kaynak Excel'den ya da altın çıktıdan ALINMAZ;  her
+    Beklenen değerler altın çıktıdan ya da motordan ALINMAZ;  her
     test standardın kendi cümlesinden ya da fizikten türetilir.
     """
 
@@ -378,7 +378,7 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
             s = M.hesapla({"beyan_yuku": Q, "_ofis": {"q_denge": q}})
             self.assertTrue(s["aktif"], s.get("hata"))
             #  Gmax = Gden + Gs + MSR − MCR + MTrav;  Gden = q·Q olmalı
-            Gmax = s["_h"]["AQ9"]
+            Gmax = s["ara"]["motor.Gmax"]
             self.assertGreaterEqual(Gmax, q * Q, f"q = {q}")
             self.assertLess(Gmax, q * Q + 200, f"q = {q}  ( artık terimler )")
 
@@ -386,8 +386,8 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
     def _ust_acikliklar(self, **ek):
         s = M.hesapla(dict(ek))
         self.assertTrue(s["aktif"], s.get("hata"))
-        h = s["_h"]
-        return [h["AI635"], h["AI636"], h["AI637"], h["AI638"]]
+        h = s["ara"]
+        return [h["siginma.ust_paten_ray"], h["siginma.kabin_ustu_tavan"], h["siginma.revizyon_tavan"], h["siginma.paten_tavan"]]
 
     def test_agirlik_tampon_acikligi_ust_bosluktan_dusulur(self):
         """Çizelge 2:  kabinin en üst konumu = ağırlık TAM EZİLMİŞ tampon üzerinde.
@@ -419,8 +419,8 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
         """Kuyu dibi ölçüleri KABİN tampon üzerindeyken alınır — ağırlık tamponu girmez."""
         s1 = M.hesapla()
         s2 = M.hesapla({"agirlik_carpma_arasi": 260, "agirlik_tampon_ezilme": 140})
-        for hucre in ("AI645", "AI646", "AI647", "AI648"):
-            self.assertAlmostEqual(s1["_h"][hucre], s2["_h"][hucre], places=9,
+        for hucre in ("siginma.kuyu_tabani_kabin", "siginma.etek", "siginma.ray_kabin_alt", "siginma.regulator_kabin"):
+            self.assertAlmostEqual(s1["ara"][hucre], s2["ara"][hucre], places=9,
                                    msg=hucre)
 
     def test_paten_tavan_siniri_standardin_yazdigi_gibi(self):
@@ -428,7 +428,7 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
         for v in (0.63, 1.0, 1.6, 2.5):
             s = M.hesapla({"beyan_hizi": v})
             self.assertTrue(s["aktif"], s.get("hata"))
-            self.assertEqual(s["_h"]["AD638"], 100, f"v = {v}")
+            self.assertEqual(s["ara"]["siginma.paten_tavan_asgari"], 100, f"v = {v}")
 
     #  ── 3)  BURKULMA ZAYIF EKSENDE ─────────────────────────────────
     def test_kaide_burkulmasi_en_kucuk_atalet_yaricapindan(self):
@@ -439,15 +439,15 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
                 continue
             s = M.hesapla({"dikine_kiris": olcu})
             self.assertTrue(s["aktif"], f"{olcu}: {s.get('hata')}")
-            self.assertAlmostEqual(s["_h"]["AB38"], min(ix, iy) * 10, places=9,
+            self.assertAlmostEqual(s["ara"]["makine.imin"], min(ix, iy) * 10, places=9,
                                    msg=f"NPU {olcu}")
 
     def test_zayif_eksende_narinlik_buyur(self):
         """iy < ix olan profilde λ, güçlü eksenden bulunandan BÜYÜK olmalı."""
         s = M.hesapla({"dikine_kiris": 120})
         L1 = s["girdi"]["sase_yuksekligi"]
-        self.assertGreater(s["_h"]["O71"], L1 / (T.npu(120, "ix") * 10))
-        self.assertAlmostEqual(s["_h"]["O71"], L1 / (T.npu(120, "iy") * 10),
+        self.assertGreater(s["ara"]["makine.lam_ham"], L1 / (T.npu(120, "ix") * 10))
+        self.assertAlmostEqual(s["ara"]["makine.lam_ham"], L1 / (T.npu(120, "iy") * 10),
                                places=9)
 
     def test_mesnet_beyani_gucli_eksene_dondurur(self):
@@ -455,7 +455,7 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
         s = M.hesapla({"dikine_kiris": 120,
                        "_ofis": {"kaide_zayif_eksen_mesnetli": 1}})
         self.assertTrue(s["aktif"], s.get("hata"))
-        self.assertAlmostEqual(s["_h"]["AB38"], T.npu(120, "ix") * 10, places=9)
+        self.assertAlmostEqual(s["ara"]["makine.imin"], T.npu(120, "ix") * 10, places=9)
 
     def test_zayif_eksen_kucuk_profilde_karari_cevirir(self):
         """NPU 40x20 ve 50x25:  güçlü eksende 'uygun', zayıf eksende değil."""
@@ -476,7 +476,7 @@ class UcDuzeltmeDenetimi(unittest.TestCase):
 class PveMRLDenetimi(unittest.TestCase):
     """2026-09-10 · ikinci tur:  P'nin tanımı, regülatör kataloğu, MRL.
 
-    Beklenen değerler kaynak Excel'den ya da altın çıktıdan ALINMAZ;  her
+    Beklenen değerler altın çıktıdan ya da motordan ALINMAZ;  her
     test standardın kendi cümlesinden türetilir.
     """
 
@@ -486,7 +486,7 @@ class PveMRLDenetimi(unittest.TestCase):
             s = M.hesapla({"denge_zinciri": zincir})
             self.assertTrue(s["aktif"], s.get("hata"))
             Q = s["girdi"]["beyan_yuku"]
-            self.assertAlmostEqual(s["_h"]["AF621"],
+            self.assertAlmostEqual(s["ara"]["kuyu.Fkt"],
                                    4 * 9.81 * (P_std(s) + Q), places=6,
                                    msg=f"zincir {zincir}")
 
@@ -495,7 +495,7 @@ class PveMRLDenetimi(unittest.TestCase):
         q = U.VARSAYILAN["q_denge"]
         s = M.hesapla()
         Q = s["girdi"]["beyan_yuku"]
-        self.assertAlmostEqual(s["_h"]["AI627"], 4 * 9.81 * (P_std(s) + q * Q),
+        self.assertAlmostEqual(s["ara"]["kuyu.Fat"], 4 * 9.81 * (P_std(s) + q * Q),
                                places=6)
 
     def test_denge_zinciri_ray_kuvvetini_buyutur(self):
@@ -503,8 +503,8 @@ class PveMRLDenetimi(unittest.TestCase):
         yok = M.hesapla({"denge_zinciri": "Yok"})
         var = M.hesapla({"denge_zinciri": "Var"})
         self.assertGreater(P_std(var), P_std(yok))
-        for hucre in ("AU351", "AF621", "AX611"):
-            self.assertGreater(var["_h"][hucre], yok["_h"][hucre], msg=hucre)
+        for hucre in ("kabin_ray.Fk", "kuyu.Fkt", "kuyu.FKR"):
+            self.assertGreater(var["ara"][hucre], yok["ara"][hucre], msg=hucre)
 
     def test_motor_bolumu_P_std_KULLANMAZ(self):
         """Bölüm 1'in F1'i kabin tarafındaki GERÇEK yüktür — zincir oraya
@@ -520,14 +520,14 @@ class PveMRLDenetimi(unittest.TestCase):
     def test_regulator_katalog_kopma_yuku_tabloyu_ezer(self):
         tablo = M.hesapla({"reg_halat_capi": 6})
         katalog = M.hesapla({"reg_halat_capi": 6, "reg_halat_kopma_kN": 28})
-        self.assertAlmostEqual(tablo["_h"]["AI136"], T.halat_kopma(6), places=6)
-        self.assertAlmostEqual(katalog["_h"]["AI136"], 28_000.0, places=6)
-        self.assertGreater(katalog["_h"]["AI136"], tablo["_h"]["AI136"])
+        self.assertAlmostEqual(tablo["ara"]["regulator.Tmin"], T.halat_kopma(6), places=6)
+        self.assertAlmostEqual(katalog["ara"]["regulator.Tmin"], 28_000.0, places=6)
+        self.assertGreater(katalog["ara"]["regulator.Tmin"], tablo["ara"]["regulator.Tmin"])
 
     def test_regulator_katalog_birim_kutlesi_tabloyu_ezer(self):
         tablo = M.hesapla({"reg_halat_capi": 6})
         katalog = M.hesapla({"reg_halat_capi": 6, "reg_halat_birim_kutle": 0.30})
-        self.assertGreater(katalog["_h"]["AI134"], tablo["_h"]["AI134"])
+        self.assertGreater(katalog["ara"]["regulator.gh"], tablo["ara"]["regulator.gh"])
 
     #  ── MAKİNE YÜKÜNÜN YOLU  ( m.5.7.2.3.7 · m.5.2.1.8.4 ) ─────────────
     def test_makine_raya_binince_Maux_turetilir(self):
@@ -540,39 +540,39 @@ class PveMRLDenetimi(unittest.TestCase):
         self.assertTrue(s["aktif"], s.get("hata"))
         g = s["girdi"]
         Gm, Tst, n = g["makine_agirligi"], s["ozet"]["Tst_hesap"], g["kabin_ray_sayisi"]
-        self.assertAlmostEqual(s["_h"]["AH292"], (Gm + Tst) * 9.81 / n, places=6)
+        self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], (Gm + Tst) * 9.81 / n, places=6)
 
     def test_Maux_ray_sayisina_bolunur(self):
         """Ray sayısı iki katına çıkınca bir raya düşen yük YARIYA iner."""
         iki = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "kabin_ray_sayisi": 2})
         dort = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "kabin_ray_sayisi": 4})
-        self.assertAlmostEqual(dort["_h"]["AH292"] * 2, iki["_h"]["AH292"], places=6)
+        self.assertAlmostEqual(dort["ara"]["kabin_ray.MY"] * 2, iki["ara"]["kabin_ray.MY"], places=6)
 
     def test_imalatci_degeri_ray_basina_okunur(self):
         """Elle girilen sayı ZATEN bir raya düşen yüktür — bölünmez."""
         for n in (2, 4):
             s = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY,
                            "raya_binen_yuk": 800, "kabin_ray_sayisi": n})
-            self.assertAlmostEqual(s["_h"]["AH292"], 800 * 9.81, places=6,
+            self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], 800 * 9.81, places=6,
                                    msg=f"n = {n}")
 
     def test_makine_raya_binmezse_ofis_kabulu_kalir(self):
         s = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU[0]})
-        self.assertAlmostEqual(s["_h"]["AH292"], M.SABIT["MY_kabin"], places=9)
+        self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], M.SABIT["MY_kabin"], places=9)
 
     def test_imalatci_degeri_turetmeyi_ezer(self):
         turetilen = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
         elle = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "raya_binen_yuk": 1000})
-        self.assertAlmostEqual(elle["_h"]["AH292"], 1000 * 9.81, places=6)
-        self.assertNotAlmostEqual(elle["_h"]["AH292"], turetilen["_h"]["AH292"])
+        self.assertAlmostEqual(elle["ara"]["kabin_ray.MY"], 1000 * 9.81, places=6)
+        self.assertNotAlmostEqual(elle["ara"]["kabin_ray.MY"], turetilen["ara"]["kabin_ray.MY"])
 
     def test_makine_raya_binince_kuyu_tabani_da_buyur(self):
         """m.5.2.1.8.4 kalemi adıyla anar:  'load on traction sheave due to
         rebound when machine on rails'."""
         yok = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU[0]})
         var = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
-        self.assertGreater(var["_h"]["AX611"], yok["_h"]["AX611"])
-        self.assertGreater(var["_h"]["AL354"], yok["_h"]["AL354"])
+        self.assertGreater(var["ara"]["kuyu.FKR"], yok["ara"]["kuyu.FKR"])
+        self.assertGreater(var["ara"]["kabin_ray.sigma_k"], yok["ara"]["kabin_ray.sigma_k"])
 
     def test_MRL_de_kaide_bolumu_uygunluk_beyan_etmez(self):
         for mrl, beklenen in ((False, True), (True, None)):
@@ -585,9 +585,9 @@ class PveMRLDenetimi(unittest.TestCase):
         """Makine dairesi varsa makine kendi kaidesindedir ( bölüm 2 );  aynı
         yükü bir de raya bindirmek onu İKİ KEZ saymaktır."""
         md = M.hesapla({"mk_yok": False, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
-        self.assertAlmostEqual(md["_h"]["AH292"], M.SABIT["MY_kabin"], places=9)
+        self.assertAlmostEqual(md["ara"]["kabin_ray.MY"], M.SABIT["MY_kabin"], places=9)
         mrl = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
-        self.assertGreater(mrl["_h"]["AH292"], md["_h"]["AH292"])
+        self.assertGreater(mrl["ara"]["kabin_ray.MY"], md["ara"]["kabin_ray.MY"])
 
     def test_yok_sayilan_secim_sessiz_kalmaz(self):
         from engine.uygulama import mukavemet_girdi as MG
@@ -621,7 +621,7 @@ class PveMRLDenetimi(unittest.TestCase):
                              for a in b["adimlar"]))
 
     def test_eski_onay_bicimi_okunmaya_devam_eder(self):
-        """Eski .uygulama dosyaları ve Excel kitapları True / 'EVET' taşır."""
+        """Eski .uygulama dosyaları True / 'EVET' taşır."""
         from engine.uygulama import mukavemet_girdi as MG
         for eski, beklenen in ((True, True), ("EVET", True),
                                (False, False), ("HAYIR", False)):
@@ -639,10 +639,6 @@ class KuyuTabaniK3Denetimi(unittest.TestCase):
     stopping ( e.g. load on traction sheave due to REBOUND when machine on
     rails )"  der.  Geri tepmenin katsayısı m.5.7.4.3'ün k3'üdür.
     """
-
-    #  Ray tarafı ( bölüm 7 · 8 ) ile taban tarafı ( bölüm 9 ) hücreleri
-    KABIN = ("AX611", "AH292")      # FKR  ·  MY_kabin
-    AGIRLIK = ("AN616", "AH555")    # FAR  ·  MY_agirlik
 
     def _bilesenler(self, s, kimlik):
         b = next(x for x in s["bolumler"] if x["kimlik"] == kimlik)
@@ -663,9 +659,9 @@ class KuyuTabaniK3Denetimi(unittest.TestCase):
                 k3, MY, Fgt = a["k3"]["deger"], a["MY"]["deger"], a["Fgt"]["deger"]
                 LR, Gr = a["LR"]["deger"], T.ray(s["girdi"]["kabin_ray_profili"], "Gr")
                 bek = M.SABIT["gn"] * Gr * LR / 1000.0 + k3 * MY + Fgt
-                self.assertAlmostEqual(s["_h"]["AX611"], bek, places=6)
+                self.assertAlmostEqual(s["ara"]["kuyu.FKR"], bek, places=6)
                 #  çarpansız hâl artık YANLIŞ olmalı  ( k3 > 1 olduğu sürece )
-                self.assertNotAlmostEqual(s["_h"]["AX611"], bek - (k3 - 1) * MY,
+                self.assertNotAlmostEqual(s["ara"]["kuyu.FKR"], bek - (k3 - 1) * MY,
                                           places=3)
 
     def test_bolum_7_ile_bolum_9_ayni_k3_ve_MY(self):
@@ -685,10 +681,10 @@ class KuyuTabaniK3Denetimi(unittest.TestCase):
         iki = M.hesapla({"mk_yok": True,
                          "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY,
                          "_ofis": {"k3_yardimci": 2.0}})
-        MY = bir["_h"]["AH292"]
-        self.assertAlmostEqual(iki["_h"]["AX611"] - bir["_h"]["AX611"],
+        MY = bir["ara"]["kabin_ray.MY"]
+        self.assertAlmostEqual(iki["ara"]["kuyu.FKR"] - bir["ara"]["kuyu.FKR"],
                                (2.0 - 1.2) * MY, places=6)
-        self.assertGreater(iki["_h"]["AL354"], bir["_h"]["AL354"])
+        self.assertGreater(iki["ara"]["kabin_ray.sigma_k"], bir["ara"]["kabin_ray.sigma_k"])
 
     def test_FAR_da_k3_tasir(self):
         """Karşı ağırlık rayının tabanı da aynı maddeye tabidir."""
@@ -698,7 +694,7 @@ class KuyuTabaniK3Denetimi(unittest.TestCase):
         Gr = T.ray(s["girdi"]["agirlik_ray_profili"], "Gr")
         LR = a["LR"]["deger"]
         taban_ray = M.SABIT["gn"] * Gr * LR / 1000.0
-        self.assertAlmostEqual(s["_h"]["AN616"],
+        self.assertAlmostEqual(s["ara"]["kuyu.FAR"],
                                taban_ray + k3 * M.SABIT["MY_agirlik"], places=6)
 
     def test_pafta_islemi_kendi_sonucunu_verir(self):
@@ -830,8 +826,8 @@ class CiftSarimBlokeDenetimi(unittest.TestCase):
         """( T1/T2 , e^(f·α) , α derece ) — motorun yazdığı ham sayılar."""
         s = M.hesapla(dict(ek or {}))
         self.assertTrue(s["aktif"], s.get("hata"))
-        h = s["_h"]
-        return h["K285"], h["O285"], h["S184"], s
+        h = s["ara"]
+        return h["tahrik.bloke.oran"], h["tahrik.bloke.sinir"], h["tahrik.alfa_derece"], s
 
     def test_blokede_buyuk_aci_kontrolu_ZORLASTIRIR(self):
         """m.5.11.2.1:  bloke  T1/T2 ≥ e^(f·α).  α ↑  →  sağ taraf ↑."""
@@ -865,8 +861,8 @@ class CiftSarimBlokeDenetimi(unittest.TestCase):
             cift = M.hesapla(dict(ek, kanal_sekli=CIFT, sarilma_acisi=350))
             if not (tek["aktif"] and cift["aktif"]):
                 continue
-            ot, st = tek["_h"]["K285"], tek["_h"]["O285"]
-            oc, sc = cift["_h"]["K285"], cift["_h"]["O285"]
+            ot, st = tek["ara"]["tahrik.bloke.oran"], tek["ara"]["tahrik.bloke.sinir"]
+            oc, sc = cift["ara"]["tahrik.bloke.oran"], cift["ara"]["tahrik.bloke.sinir"]
             if None in (ot, st, oc, sc):
                 continue
             #  m.5.11.2.1:  hüküm  e^(f·α) ≤ T1/T2
@@ -906,7 +902,7 @@ class CiftSarimBlokeDenetimi(unittest.TestCase):
         s = M.hesapla({"kanal_sekli": "Yarım Daire Kanal", "sarilma_acisi": 180})
         b = next(x for x in s["bolumler"] if x["kimlik"] == "tahrik_yetenegi")
         self.assertIsNone(b.get("eksik_hesap"))
-        oran, sinir = s["_h"]["K285"], s["_h"]["O285"]
+        oran, sinir = s["ara"]["tahrik.bloke.oran"], s["ara"]["tahrik.bloke.sinir"]
         satir = [a for a in b["adimlar"] if isinstance(a, dict)
                  and a.get("deger") in ("UYGUN", "UYGUN DEĞİL", "HESAP EKSİK")]
         #  Hüküm m.5.11.2.1'in kendisinden yeniden türetilir.
@@ -972,38 +968,38 @@ class SarilmaAcisiDenetimi(unittest.TestCase):
     """
 
     @staticmethod
-    def _h(ek=None):
+    def _ara(ek=None):
         s = M.hesapla(dict(ek or {}))
         assert s["aktif"], s.get("hata")
-        return s["_h"]
+        return s["ara"]
 
     def test_aci_buyuyunce_sinir_buyur(self):
         """e^(f·α) α ile artar — iki eşitsizlikte ZIT etki yapar."""
-        kucuk = self._h({"sarilma_acisi": 140})
-        buyuk = self._h({"sarilma_acisi": 180})
-        self.assertLess(kucuk["S184"], buyuk["S184"])
+        kucuk = self._ara({"sarilma_acisi": 140})
+        buyuk = self._ara({"sarilma_acisi": 180})
+        self.assertLess(kucuk["tahrik.alfa_derece"], buyuk["tahrik.alfa_derece"])
         #  f aynı kaldığına göre sınır yalnız α ile büyümeli
-        self.assertAlmostEqual(kucuk["AE216"], buyuk["AE216"], places=9)
-        for hucre in ("O242", "O257", "O271", "O285"):
+        self.assertAlmostEqual(kucuk["tahrik.f_bloke"], buyuk["tahrik.f_bloke"], places=9)
+        for hucre in ("tahrik.yukleme.sinir", "tahrik.fren_alt.sinir", "tahrik.fren_ust.sinir", "tahrik.bloke.sinir"):
             self.assertLess(kucuk[hucre], buyuk[hucre], hucre)
 
     def test_kucuk_aci_yuklemede_EMNIYETLI_blokede_EMNIYETSIZ(self):
         """m.5.11.2.1:  yükleme  T1/T2 ≤ e^(fα) ·  bloke  T1/T2 ≥ e^(fα)."""
-        kucuk = self._h({"sarilma_acisi": 140})
-        buyuk = self._h({"sarilma_acisi": 180})
+        kucuk = self._ara({"sarilma_acisi": 140})
+        buyuk = self._ara({"sarilma_acisi": 180})
         #  Yüklemede sınır DARALIR  →  geçmek zorlaşır  ( emniyetli taraf )
-        self.assertLessEqual(kucuk["O242"], buyuk["O242"])
+        self.assertLessEqual(kucuk["tahrik.yukleme.sinir"], buyuk["tahrik.yukleme.sinir"])
         #  Blokede de sınır küçülür, ama orada ölçüt  sınır ≤ oran  olduğu
         #  için küçük sınır geçmeyi KOLAYLAŞTIRIR  ( emniyetsiz taraf ).
-        self.assertLessEqual(kucuk["O285"], buyuk["O285"])
+        self.assertLessEqual(kucuk["tahrik.bloke.sinir"], buyuk["tahrik.bloke.sinir"])
         #  Aynı oranla iki hüküm:  küçük açı blokede daha kolay geçiyor.
-        oran = kucuk["K285"]
-        self.assertTrue(kucuk["O285"] <= oran or buyuk["O285"] > oran)
+        oran = kucuk["tahrik.bloke.oran"]
+        self.assertTrue(kucuk["tahrik.bloke.sinir"] <= oran or buyuk["tahrik.bloke.sinir"] > oran)
 
     def test_beyan_edilen_aci_modeli_EZER(self):
-        self.assertAlmostEqual(self._h({"sarilma_acisi": 155})["S184"], 155.0)
-        #  radyan hücresi de takip etmeli — bütün e^(f·α) satırları ona bakar
-        self.assertAlmostEqual(self._h({"sarilma_acisi": 155})["AA184"],
+        self.assertAlmostEqual(self._ara({"sarilma_acisi": 155})["tahrik.alfa_derece"], 155.0)
+        #  radyan değeri de takip etmeli — bütün e^(f·α) satırları ona bakar
+        self.assertAlmostEqual(self._ara({"sarilma_acisi": 155})["tahrik.alfa"],
                                math.radians(155.0), places=9)
 
     def test_tek_sarimda_180_ustu_reddedilir(self):
@@ -1027,14 +1023,14 @@ class SarilmaAcisiDenetimi(unittest.TestCase):
 
     def test_ELEport_acisiyla_sinir_yayindaki_gibi(self):
         """α = 180° · V kanal sertleştirilmiş · γ = 38°  →  f = 0,2/sin19°."""
-        h = self._h({"sarilma_acisi": 180, "kanal_sekli": "V Kanal",
+        h = self._ara({"sarilma_acisi": 180, "kanal_sekli": "V Kanal",
                      "kanal_isleme": "Sertleştirilmiş",
                      "_ofis": {"kanal_gama_v": 38}})
         f_bloke = 0.2 / math.sin(math.radians(38) / 2)
-        self.assertAlmostEqual(h["AE216"], f_bloke, places=6)
+        self.assertAlmostEqual(h["tahrik.f_bloke"], f_bloke, places=6)
         #  ELEport aynı girdilerde 6,89 basıyor
-        self.assertAlmostEqual(h["O285"], math.exp(f_bloke * math.pi), places=6)
-        self.assertAlmostEqual(h["O285"], 6.89, delta=0.01)
+        self.assertAlmostEqual(h["tahrik.bloke.sinir"], math.exp(f_bloke * math.pi), places=6)
+        self.assertAlmostEqual(h["tahrik.bloke.sinir"], 6.89, delta=0.01)
 
 
 class GenelHukumDenetimi(unittest.TestCase):

@@ -48,7 +48,7 @@ def arayuz_tablolari(ofis=None):
 
     t.append({
         "ad": "Kılavuz ray profilleri",
-        "kaynak": "ISO 7465  ·  kaynak çalışma kitabı TABLOLAR!I60:S65",
+        "kaynak": "ISO 7465",
         "aciklama": "Ray hesabının bütün kesit değerleri buradan okunur.",
         "basliklar": ["Profil", "b  ( balata yarı gen. )", "A  ( mm² )",
                       "Ix  ( mm⁴ )", "Iy  ( mm⁴ )", "Wx  ( mm³ )", "Wy  ( mm³ )",
@@ -67,14 +67,13 @@ def arayuz_tablolari(ofis=None):
         "kaynak": "TS EN 81-20 Çizelge 15  ( A5 > %12 )",
         "aciklama": "σperm = Rm / St;  St = 2,25 normal · 1,8 güvenlik tertibatı.",
         "basliklar": ["Rm  ( N/mm² )", "σperm normal", "σperm güv. tertibatı"],
-        "satirlar": _satirlar(MT.RAY_CELIGI),
+        "satirlar": [[rm, round(n, 2), round(gv, 2)] for rm, n, gv in MT.RAY_CELIGI],
     })
     t.append({
         "ad": "ω  —  burkulma katsayısı",
         "kaynak": "TS EN 81-50 m.5.10.3",
         "aciklama": ("λ = 20…250 için Rm = 370 ve 520 eğrileri;  aradaki "
-                     "dayanımlarda doğrusal ara değer alınır.  Kaynak kitabın "
-                     "tek tablosu yalnız 370 eğrisiydi ( sapma ⑤ )."),
+                     "dayanımlarda doğrusal ara değer alınır."),
         "basliklar": ["λ", "ω  ( Rm = 370 )", "ω  ( Rm = 440 )", "ω  ( Rm = 520 )"],
         "satirlar": [[lam,
                       round(MT.omega_en8150(lam, 370), 4),
@@ -85,7 +84,7 @@ def arayuz_tablolari(ofis=None):
     })
     t.append({
         "ad": "NPU profilleri  ( makine kaidesi )",
-        "kaynak": "kaynak çalışma kitabı TABLOLAR",
+        "kaynak": "NPU profil tablosu  ( ofis )",
         "aciklama": ("240 · 280 · 300 satırlarında atalet yarıçapı ix BOŞTUR; "
                      "program bu seçimi açık mesajla reddeder."),
         "basliklar": ["Ölçü", "A  ( cm² )", "Wx", "Wy", "Ix", "Iy", "ix", "iy", "e"],
@@ -111,9 +110,8 @@ def arayuz_tablolari(ofis=None):
         "ad": "Tahrik kanalı",
         "kaynak": "TS EN 81-50 m.5.11.2.3.1  ·  m.5.12.2.2 Çizelge 2",
         "aciklama": ("γ ve β OFİS SABİTLERİDİR ( Sabitler sekmesi );  Nequiv(t) "
-                     "onlardan Çizelge 2'ye göre hesaplanır.  Kaynak kitap bu "
-                     "sütunları çiviliyordu:  ofis açısı değişse bile tablo ve "
-                     "pafta eski sayıyı yazmaya devam ediyordu."),
+                     "onlardan Çizelge 2'ye göre hesaplanır;  ofis açısı "
+                     "değişince tablo ve pafta da değişir."),
         "basliklar": ["Kanal şekli", "Tür", "γ  ( ° )", "β  ( ° )", "Nequiv(t)"],
         "satirlar": [[ad,
                       {"V": "V kanal", "VK": "V kanal, altı kesik",
@@ -162,21 +160,21 @@ def arayuz_tablolari(ofis=None):
     })
     t.append({
         "ad": "Karşı ağırlık malzemesi",
-        "kaynak": "kaynak çalışma kitabı TABLOLAR!U61:W62",
+        "kaynak": "ofis tablosu",
         "aciklama": "Malzeme → özgül ağırlık ve blok yüksekliği.",
         "basliklar": ["Malzeme", "γ", "h  ( mm )"],
         "satirlar": _satirlar(MT.AGIRLIK_MALZEMESI),
     })
     t.append({
         "ad": "Gezici kablo  ( bükülgen )",
-        "kaynak": "kaynak çalışma kitabı TABLOLAR",
+        "kaynak": "ofis tablosu",
         "aciklama": "Kablo tipi → ağırlık · çap · kesit.",
         "basliklar": ["Tip", "Ağırlık", "Çap", "Kesit"],
         "satirlar": _satirlar(MT.BUKULGEN_KABLO),
     })
     t.append({
         "ad": "Kat kapısı  →  kablo tipi",
-        "kaynak": "kaynak çalışma kitabı  ( 'Veri Girişi'!B108 türetilir )",
+        "kaynak": "ofis kabulü",
         "aciklama": "İkinci gezici kablo, kat kapısı tipinden belirlenir.",
         "basliklar": ["Kapı tipi", "Kablo"],
         "satirlar": _satirlar(MT.KAPI_KABLO),

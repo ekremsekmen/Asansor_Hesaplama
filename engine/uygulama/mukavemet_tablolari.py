@@ -2,9 +2,10 @@
 """
 UYGULAMA PROJESİ  —  MUKAVEMET HESABI TABLOLARI
 
-Kaynak:  MUKAVEMET_FİNAL.xlsx  ( TABLOLAR · TEKNİK · Veri Girişi sayfaları )
-Değerler o dosyadan MAKİNE İLE aktarılmıştır, elle yazılmamıştır;
-testler/test_mukavemet_tablolari.py aynı dosyaya karşı birebir doğrular.
+Tablolar ofisin mukavemet hesabından makine ile aktarıldı ( elle
+yazılmadı ) ve standarda göre tamamlandı;  testler/test_mukavemet_tablolari.py
+aktarılan değerleri dondurulmuş kaynağa ( testler/referans_tablolar.json )
+karşı birebir doğrular.
 
 AVAN MODÜLÜNDEN AYRIDIR.  Avan tarafı MMO/697'yi uygular ( engine/tables.py );
 burası uygulama projesinin kendi kaynağını uygular.  İki tarafın ortak konuları
@@ -19,7 +20,7 @@ def _sayi(x):
 
 
 def _ara(tablo, anahtar, sutun=1):
-    """Excel'in DÜŞEYARA( … ; 0 ) karşılığı — birebir eşleşme, yoksa None."""
+    """Birebir anahtar eşleşmesi;  yoksa None."""
     for satir in tablo:
         if satir[0] == anahtar:
             return satir[sutun]
@@ -27,7 +28,7 @@ def _ara(tablo, anahtar, sutun=1):
 
 
 # =====================================================================
-#  KILAVUZ RAY PROFİLLERİ  ( ISO 7465 )        [ TABLOLAR!I60:S65 ]
+#  KILAVUZ RAY PROFİLLERİ  ( ISO 7465 )
 #  Hesabın EN ÇOK okuduğu tablo — 49 atıf.
 #      Gr kg/m · A mm² · Ix mm⁴ · Iy mm⁴ · Wx mm³ · Wy mm³ · ix mm · iy mm
 #      c mm ( flanş ) · e mm
@@ -71,7 +72,7 @@ def ray(profil, ozellik):
 
 
 # =====================================================================
-#  RAY PROFİLİ — FLANŞ GEOMETRİSİ             [ TABLOLAR!I69:N74 ]
+#  RAY PROFİLİ — FLANŞ GEOMETRİSİ
 #      f mm · b mm · h1 mm · (h1−b−f) mm · (h1−f) mm
 # =====================================================================
 #
@@ -102,7 +103,7 @@ def ray_geo(profil, ozellik):
 
 
 # =====================================================================
-#  ASKI HALATLARI  ( TS 12385-5 )              [ TABLOLAR!A32:F43 ]
+#  ASKI HALATLARI  ( TS 12385-5 )
 #      çap mm · 1 m ağırlık kg · en küçük kopma yükü N · tip · sınıf
 # =====================================================================
 HALAT = (
@@ -138,66 +139,9 @@ def halat_tipi(cap):
 
 
 # =====================================================================
-#  BURKULMA KATSAYISI  ω   ( λ = 20 … 250, adım 1 )   [ TABLOLAR!A47:B277 ]
+#  BURKULMA KATSAYISI  ω   ( λ = 20 … 250 )
 # =====================================================================
 OMEGA_LAMBDA_MIN, OMEGA_LAMBDA_MAX = 20, 250
-OMEGA = (
-    1.04, 1.04, 1.04, 1.05, 1.05, 1.06,
-    1.06, 1.06, 1.07, 1.08, 1.08, 1.09,
-    1.09, 1.1, 1.1, 1.11, 1.11, 1.12,
-    1.13, 1.13, 1.14, 1.14, 1.15, 1.16,
-    1.16, 1.17, 1.18, 1.19, 1.19, 1.2,
-    1.21, 1.22, 1.23, 1.23, 1.24, 1.25,
-    1.26, 1.27, 1.28, 1.29, 1.3, 1.31,
-    1.32, 1.33, 1.34, 1.35, 1.36, 1.37,
-    1.39, 1.4, 1.41, 1.42, 1.44, 1.45,
-    1.46, 1.48, 1.49, 1.5, 1.52, 1.53,
-    1.55, 1.56, 1.58, 1.59, 1.61, 1.62,
-    1.64, 1.66, 1.68, 1.69, 1.71, 1.73,
-    1.74, 1.76, 1.78, 1.8, 1.82, 1.84,
-    1.86, 1.88, 1.9, 1.92, 1.94, 1.96,
-    1.98, 2, 2.02, 2.05, 2.07, 2.09,
-    2.11, 2.14, 2.16, 2.18, 2.21, 2.23,
-    2.27, 2.31, 2.35, 2.39, 2.43, 2.47,
-    2.51, 2.55, 2.6, 2.64, 2.68, 2.72,
-    2.77, 2.81, 2.85, 2.9, 2.94, 2.99,
-    3.03, 3.08, 3.12, 3.17, 3.22, 3.26,
-    3.31, 3.36, 3.41, 3.45, 3.5, 3.55,
-    3.6, 3.65, 3.7, 3.75, 3.8, 3.85040487,
-    3.90157248, 3.9530778300000002, 4.00492092, 4.05710175, 4.10962032, 4.1624766300000005,
-    4.21567068, 4.26920247, 4.323072, 4.37727927, 4.43182428, 4.48670703,
-    4.54192752, 4.59748575, 4.65338172, 4.70961543, 4.76618688, 4.82309607,
-    4.880343, 4.93792767, 4.99585008, 5.05411023, 5.11270812, 5.17164375,
-    5.23091712, 5.29052823, 5.35047708, 5.41076367, 5.471388, 5.53235007,
-    5.59364988, 5.6552874300000004, 5.71726272, 5.77957575, 5.84222652, 5.90521503,
-    5.96854128, 6.03220527, 6.096207, 6.16054647, 6.22522368, 6.29023863,
-    6.35559132, 6.42128175, 6.48730992, 6.55367583, 6.62037948, 6.68742087,
-    6.7548, 6.82251687, 6.89057148, 6.95896383, 7.02769392, 7.09676175,
-    7.1661673200000005, 7.23591063, 7.30599168, 7.37641047, 7.447167, 7.51826127,
-    7.58969328, 7.66146303, 7.73357052, 7.80601575, 7.87879872, 7.95191943,
-    8.02537788, 8.09917407, 8.173308, 8.24777967, 8.32258908, 8.39773623,
-    8.47322112, 8.54904375, 8.62520412, 8.70170223, 8.77853808, 8.85571167,
-    8.933223, 9.01107207, 9.089258880000001, 9.16778343, 9.24664572, 9.325845750000001,
-    9.40538352, 9.48525903, 9.56547228, 9.64602327, 9.726912, 9.80813847,
-    9.88970268, 9.97160463, 10.05384432, 10.13642175, 10.21933692, 10.30258983,
-    10.38618048, 10.47010887, 10.554375,
-)
-
-
-
-def omega(lam):
-    """Kaynak Excel'in ω tablosundan okur  ( YALNIZ Rm = 370 eğrisi ).
-
-    Yeni kodda kullanmayın — ω çeliğin çekme dayanımına göre değişir,
-    bkz. omega_en8150().  Bu işlev tabloyu Excel'e karşı doğrulayan test
-    için ve geriye dönük uyum için duruyor.
-    """
-    if not _sayi(lam):
-        return None
-    lam = int(lam)
-    if OMEGA_LAMBDA_MIN <= lam <= OMEGA_LAMBDA_MAX:
-        return OMEGA[lam - OMEGA_LAMBDA_MIN]
-    return None
 
 
 # ---------------------------------------------------------------------
@@ -212,10 +156,9 @@ def omega(lam):
 #  Standardın kendi notu:  işlenmiş raylarda 440 N/mm² yaygın olduğu için
 #  bu ara değerleme "her zaman yapılmalıdır".
 #
-#  KAYNAK EXCEL'İN TABLOSU YALNIZ Rm = 370 EĞRİSİDİR ( 231/231 değeri
-#  aşağıdaki OMEGA_370 formülleriyle birebir çıkar ).  Excel bu tabloyu
-#  ray çeliğinden bağımsız kullanır;  440 ve 520 için ω'yı %23 ve %50
-#  DÜŞÜK verir, yani burkulma gerilmesini olduğundan küçük gösterir.
+#  Tek bir Rm = 370 tablosunu ray çeliğinden bağımsız kullanmak 440 ve 520
+#  için ω'yı %23 ve %50 DÜŞÜK verir, yani burkulma gerilmesini olduğundan
+#  küçük gösterir.
 OMEGA_370 = ((60, 0.00012920, 1.89, 1.0),
              (85, 0.00004627, 2.14, 1.0),
              (115, 0.00001711, 2.35, 1.04),
@@ -250,11 +193,9 @@ def omega_en8150(lam, rm=OMEGA_RM_ALT):
 
 
 # =====================================================================
-#  NPU / NPI PROFİLLERİ  ( makine kaidesi kirişleri )  [ TABLOLAR!M36:AH53 ]
+#  NPU / NPI PROFİLLERİ  ( makine kaidesi kirişleri )
 #      A cm² · G kg/m · Ix cm⁴ · Wx cm³ · ix cm · Iy cm⁴ · Wy cm³ · iy cm
-#  NOT:  Excel'de AB38 satırı "Imin — eylemsizlik momenti" diye etiketli ama
-#  okuduğu sütun ix'tir ( atalet yarıçapı ) ve λ = L1 / imin'de öyle kullanılır.
-#  Buradaki ad matematiğe göre verilmiştir.
+#  ix / iy atalet YARIÇAPIDIR ( λ = L1 / imin'de öyle kullanılır ).
 # =====================================================================
 NPU_PROFIL = (
     ('30x15', 2.21, 1.74, 2.21, 1.69, 1.07, 0.38, 0.39, 0.42),
@@ -290,16 +231,13 @@ def npu(olcu, ozellik):
 
 # =====================================================================
 #  KABİN ALANI  ( beyan yükü → kişi · en büyük · en küçük alan )
-#                                               [ TABLOLAR!H78:K99 ]
-#  DİKKAT:  Avan modülünün MMO/697 Tablo-11'i ile 22 satırın 21'i AYNIDIR;
-#  tek fark burada 320 kg satırının BULUNMASIDIR ( kitapta yok ).  İki tablo
-#  bilerek ayrı tutulur — biri kitabı, diğeri bu hesabın kaynağını uygular.
+#
+#  DİKKAT:  Avan modülünün MMO/697 Tablo-11'i ile ortak satırları AYNIDIR;
+#  ama iki tablo bilerek ayrı tutulur — biri MMO/697'yi, diğeri EN 81-20
+#  Çizelge 6'yı uygular.
 # =====================================================================
-#  KAYNAK KİTABIN TABLOSU EKSİKTİ.  EN 81-20 Çizelge 6'nın 28 beyan yükünden
-#  7'si kitapta yoktu ( 100 · 1050 · 1250 · 1350 · 1425 · 1500 · 2500 kg ) ve
-#  açılır liste kapalı olduğu için o yüklerde HİÇ hesap yapılamıyordu — 1250
-#  ve 1500 kg yaygın asansörlerdir.  Tablo standarda tamamlandı;  eklenen
-#  satırlar aşağıda ★ ile işaretlidir.
+#  EN 81-20 Çizelge 6'nın 28 beyan yükünün tamamı;  ofisin eski listesinde
+#  olmayan satırlar ★ ile işaretlidir ( 1250 ve 1500 kg yaygın asansörlerdir ).
 #
 #  Sütunlar:  beyan yükü · kişi · azami alan ( Çiz.6 ) · asgari alan ( Çiz.8 )
 #  Kişi sayısı m.5.4.2.3.1 a):  Q/75, aşağı yuvarlanır.
@@ -341,9 +279,8 @@ KABIN_ALANI = (
 #  ---------------------------------------------------------------------
 #  RAY TABLOSUNUN KENDİ TUTARLILIĞI
 #  ---------------------------------------------------------------------
-#  Atalet yarıçapı tanımı gereği  i = √( I / A )  olmalıdır.  Kaynak kitabın
-#  kendi 60. satırı bunu FORMÜLLE hesaplar ( =ROUND(SQRT(L60/K60),2) ), yani
-#  ofisin tanımı da budur;  ama iki satırda elle yazılmış değerler tutmuyor:
+#  Atalet yarıçapı tanımı gereği  i = √( I / A )  olmalıdır;  ama iki satırda
+#  tablonun değerleri tutmuyor:
 #
 #      70 x 65 x 9      ix  20,90   √(Ix/A) = 20,84   %0,3
 #      125 x 82 x 16    iy  25,20   √(Iy/A) = 26,15   %3,6
@@ -375,6 +312,56 @@ def ray_tutarsizliklari(tolerans=0.005):
     return bulunan
 
 
+#  ---------------------------------------------------------------------
+#  ASANSÖR TİPİ  →  kapı eşiği kuvvetinin katsayısı   ( EN 81-20 m.5.7.2.3.6 )
+#      Fs = 0,4 · gn · Q   insan asansörü
+#      Fs = 0,6 · gn · Q   yük-insan asansörü
+#  ( Taşıma aracının ağırlığı beyan yüküne katılmayan ağır taşıma araçlı
+#    yük-insan asansörü için madde 0,85 verir;  o tip bu programın kapsamı
+#    dışında bırakıldı. )
+#  ---------------------------------------------------------------------
+ASANSOR_TIPLERI = ("İnsan asansörü", "Yük-insan asansörü")
+ESIK_KUVVETI_KATSAYISI = {"İnsan asansörü": 0.4, "Yük-insan asansörü": 0.6}
+
+
+def esik_katsayisi(tip):
+    """m.5.7.2.3.6 katsayısı;  tanınmayan / boş tip insan asansörü sayılır."""
+    return ESIK_KUVVETI_KATSAYISI.get(tip, ESIK_KUVVETI_KATSAYISI[ASANSOR_TIPLERI[0]])
+
+
+#  ---------------------------------------------------------------------
+#  EN 81-20 ÇİZELGE 8  —  yolcu sayısı → kullanılabilir EN KÜÇÜK alan  ( m² )
+#  20 kişiden sonra her kişi için + 0,115 m².
+#  m.5.4.2.3.1:  yolcu sayısı "Q / 75 ( aşağı yuvarlanır ) ile Çizelge 8'in
+#  KÜÇÜĞÜDÜR".  Çizelge 8 bir ret ölçütü değildir:  alanı küçük bir kabin
+#  uygunsuz olmaz, üzerine daha az kişi yazılır.
+#  ---------------------------------------------------------------------
+CIZELGE_8 = (0.28, 0.49, 0.60, 0.79, 0.98, 1.17, 1.31, 1.45, 1.59, 1.73,
+             1.87, 2.01, 2.15, 2.29, 2.43, 2.57, 2.71, 2.85, 2.99, 3.13)
+CIZELGE_8_KISI_BASI = 0.115
+
+
+def cizelge8_alan(kisi):
+    """Çizelge 8:  bu kadar yolcu için kullanılabilir en küçük alan  ( m² )."""
+    if kisi is None or kisi < 1:
+        return None
+    kisi = int(kisi)
+    if kisi <= len(CIZELGE_8):
+        return CIZELGE_8[kisi - 1]
+    return CIZELGE_8[-1] + CIZELGE_8_KISI_BASI * (kisi - len(CIZELGE_8))
+
+
+def cizelge8_kisi(alan):
+    """Çizelge 8'in tersi:  bu alanın taşıyabileceği EN ÇOK yolcu  ( 0 olabilir )."""
+    import math as _m
+    if alan is None:
+        return None
+    if alan + 1e-9 >= CIZELGE_8[-1]:
+        return len(CIZELGE_8) + int(_m.floor((alan - CIZELGE_8[-1]) / CIZELGE_8_KISI_BASI
+                                              + 1e-9))
+    return sum(1 for a in CIZELGE_8 if a <= alan + 1e-9)
+
+
 def kabin_kisi(beyan_yuku):
     return _ara(KABIN_ALANI, beyan_yuku, 1)
 
@@ -390,16 +377,15 @@ def kabin_asgari_alan(beyan_yuku):
 
 
 # =====================================================================
-#  TAHRİK KASNAĞI KANAL ŞEKLİ            [ TABLOLAR!D47:G52 ]
+#  TAHRİK KASNAĞI KANAL ŞEKLİ
 # =====================================================================
 #  KANAL AÇISI ARTIK TABLODA DEĞİL, OFİS SABİTİDİR.
 #
-#  Kitabın tablosu her kanal şeklinin karşısına TEK bir açı ve TEK bir
-#  Nequiv(t) yazar ( V → 38° / 12 ,  altı kesik → 90° / 5 ).  O sütun
-#  aslında iki ayrı büyüklüğü karıştırır:  V kanalda γ ( kanal açısı ),
-#  altı kesik kanalda β ( alt kesilme açısı ).  Üstelik ikisi de DONDURULMUŞ:
-#  ofis sabitlerinden γ = 45° seçilse bile tablo 38 yazmaya, Nequiv(t) 12
-#  kalmaya devam ediyordu — pafta hesabın kullandığı sayıyı yazmıyordu.
+#  Kanal şeklinin karşısına TEK bir açı ve TEK bir Nequiv(t) yazan bir
+#  tablo ( V → 38° / 12 ,  altı kesik → 90° / 5 ) iki ayrı büyüklüğü
+#  karıştırır:  V kanalda γ ( kanal açısı ), altı kesik kanalda β ( alt
+#  kesilme açısı ).  Üstelik ofis sabitlerinden γ = 45° seçilse bile 38 ve
+#  12 kalır — pafta hesabın kullandığı sayıyı yazmaz.
 #
 #  TS EN 81-50 m.5.12.2.2 Çizelge 2 Nequiv(t)'yi doğrudan bu açıların
 #  fonksiyonu verir ve "çizelgede olmayan açılar için doğrusal ara değer"
@@ -475,8 +461,8 @@ def _dogrusal_ara(tablo, x):
 def kanal_acisi(sekil, gama_v=None, gama_yd=None):
     """Hesapta KULLANILAN γ  ( kanal açısı ).  Alt kesilme açısı β değildir.
 
-    Kitabın tablosu altı kesik kanallarda bu sütuna β yazıyordu;  pafta
-    "γ = 90°" basıp hesapta 38° kullanıyordu.
+    Altı kesik kanallarda β'yı γ diye basmak paftada "γ = 90°" yazıp hesapta
+    38° kullanmak olurdu.
     """
     tur = kanal_turu(sekil)
     if tur is None:
@@ -505,9 +491,8 @@ def kanal_beta(sekil, beta=None):
 #        ağırlık bloke ( ikisinde de )              :  f = μ / sin(γ/2)
 #        γ asansörlerde 35°'den küçük olamaz.
 #
-#  Kaynak kitap kanal şeklinden BAĞIMSIZ olarak hep V kanal bağıntısını
-#  kullanıyordu;  yarım daire seçilebildiği hâlde onun maddesi hiç
-#  uygulanmıyordu ( bkz. EXCEL_FARKLARI ).
+#  Kanal şeklinden bağımsız hep V kanal bağıntısı kullanılamaz:  yarım
+#  dairenin kendi maddesi vardır.
 KANAL_YARIM_DAIRE = tuple(a for a, t, _g in KANAL_SEKLI if t in ("U", "UK"))
 #  Altı kesik olanlar:  β = alt kesilme açısı;  ötekilerde β = 0.
 KANAL_ALTI_KESIK = tuple(a for a, t, _g in KANAL_SEKLI if t in ("VK", "UK"))
@@ -524,9 +509,8 @@ def kanal_alti_kesik_mi(sekil):
 def kanal_nequiv_t(sekil, gama_v=None, beta=None):
     """Kasnakların eşdeğer sayısı Nequiv(t)  ( TS EN 81-50 Çizelge 2 ).
 
-    Kitap bunu kanalın ADINA bağlı sabit bir tablodan okuyordu;  ofis
-    sabiti γ ya da β değiştiğinde kımıldamıyordu.  Çizelge 2 ise Nequiv(t)'yi
-    doğrudan o açıların fonksiyonu verir.
+    Kanalın ADINA bağlı sabit bir değer değildir:  Çizelge 2 Nequiv(t)'yi
+    doğrudan γ ve β'nın fonksiyonu verir;  ofis sabiti değişince o da değişir.
     """
     tur = kanal_turu(sekil)
     if tur is None:
@@ -539,9 +523,9 @@ def kanal_nequiv_t(sekil, gama_v=None, beta=None):
         #  daire" kanalları, m.5.11.2.3.1.2 ise "V kanallar"ı ele alır ve
         #  altı kesik V açıkça ikincisinin içindedir ( "sertleştirilmemişse
         #  alt kesme gereklidir" ).  m.5.12.2'nin girişi de kanalları "U- ya
-        #  da V-" diye ikiye ayırır.  Kitap altı kesik V'yi β satırından
-        #  okuyordu:  γ = 38° için 12 yerine β = 90° için 5,0 — Nequiv küçük
-        #  çıkıyor, gereken güvenlik katsayısı da küçülüyordu ( emniyetsiz ).
+        #  da V-" diye ikiye ayırır.  Altı kesik V'yi β satırından okumak
+        #  γ = 38° için 12 yerine β = 90° için 5,0 verir — Nequiv küçük,
+        #  gereken güvenlik katsayısı da küçük çıkar ( emniyetsiz ).
         taban = _dogrusal_ara(NEQUIV_V, gama_v)
     elif tur == "UK":
         taban = _dogrusal_ara(NEQUIV_U_ALTI_KESIK, beta)
@@ -551,7 +535,7 @@ def kanal_nequiv_t(sekil, gama_v=None, beta=None):
 
 
 # =====================================================================
-#  DARBE KATSAYISI  k1   ( TS EN 81-20 Çizelge 14 )   [ TABLOLAR!H32:K35 ]
+#  DARBE KATSAYISI  k1   ( TS EN 81-20 Çizelge 14 )
 #  Bu tablo GÜVENLİK TERTİBATI TİPİNE bakar.  Avan modülü aynı çizelgeyi
 #  HIZA göre okur ( MMO/697 Çizelge-1 iki sütunu yan yana verir ).  Normal
 #  kurulumda ikisi aynı değeri üretir;  düşük hızlı bir asansöre kademeli
@@ -577,7 +561,7 @@ K2_NORMAL_KULLANMA = 1.2
 
 
 # =====================================================================
-#  BÜKÜLGEN ( GEZİCİ ) KABLO                        [ TABLOLAR!D61:G64 ]
+#  BÜKÜLGEN ( GEZİCİ ) KABLO
 # =====================================================================
 #  Kabin ile kuyu arasındaki asma kablo.  MTrav ( gezici kablo indirgenmiş
 #  kütlesi ) hesabına girer.
@@ -592,10 +576,10 @@ KABLO_TIPLERI = tuple(r[0] for r in BUKULGEN_KABLO)
 
 
 # =====================================================================
-#  KAT KAPISI TİPİ  →  2. BÜKÜLGEN KABLO      [ Veri Girişi!M39:R40 ]
+#  KAT KAPISI TİPİ  →  2. BÜKÜLGEN KABLO
 # =====================================================================
-#  Kaynak kitapta 2. kablo tipi GİRDİ DEĞİLDİR:  kat kapısı tipinden
-#  HLOOKUP ile türetilir ( manuel kapıda daha ince kablo ).
+#  2. kablo tipi GİRDİ DEĞİLDİR:  kat kapısı tipinden türetilir ( manuel
+#  kapıda daha ince kablo ).
 KAPI_KABLO = (
     ('Manuel Sağ', '12 x 0,75'),
     ('Manuel Sol', '12 x 0,75'),
@@ -626,14 +610,10 @@ def kablo_yukseklik(tip):
 
 
 # =====================================================================
-#  KARŞI AĞIRLIK MALZEMESİ  ( derinlik · yükseklik mm )  [ TABLOLAR!U61:W62 ]
+#  KARŞI AĞIRLIK MALZEMESİ  ( derinlik · yükseklik mm )
 # =====================================================================
-#  NOT:  Excel'deki VLOOKUP aralığı U61:W63'tür, ama 63. satır bir tablo
-#  satırı değil — orada duran =( C80-150 )/... formülü yalnızca U64'e
-#  girer, U64'ü de hiçbir hesap okumaz.  Ölü artık; tabloya alınmadı.
-#  KARŞI AĞIRLIK MALZEMESİ.  Kaynak kitap bu tablodan karşı ağırlığın
-#  DERİNLİĞİNİ ( Barit 150 · Pik döküm 100 mm ) ve yüksekliğini türetiyordu.
-#  Derinlik artık GİRDİDİR ( bkz. aşağıdaki "KALDIRILDI" notu ):  ölçü
+#  KARŞI AĞIRLIK MALZEMESİ  ( Barit 150 · Pik döküm 100 mm derinlik ).
+#  Derinlik GİRDİDİR ( bkz. aşağıdaki "KALDIRILDI" notu ):  ölçü
 #  malzemenin değil, imal edilen çerçevenin özelliğidir ve TS EN 81-50
 #  Ek C.2.2 onu veri olarak ister.  Sayı sütunları BAŞLANGIÇ DEĞERİ olarak
 #  kaldı — form açılırken derinliğe barit çerçevenin alışılmış ölçüsü gelir;
@@ -646,44 +626,25 @@ AGIRLIK_MALZEMESI = (
 AGIRLIK_MALZEMELERI = tuple(r[0] for r in AGIRLIK_MALZEMESI)
 
 
-# =====================================================================
-#  AĞIRLIK RAY ARASI → GENİŞLİK TABLOSU  ·  KALDIRILDI
-# =====================================================================
-#  Kaynak Excel karşı ağırlık genişliğini ray arasından türetiyordu:
-#      HLOOKUP( 'Veri Girişi'!B119 ; TABLOLAR!X59:Z60 ; 2 ; 0 )
-#      ray arası   700 · 1050 · 1400   →   genişlik   660 · 960 · 1320
-#  TAM EŞLEŞME arandığı için girdi üç değere kilitliydi;  oysa ray arası her
-#  tesiste ÖLÇÜLEN bir mesafedir.
-#
-#  BÖYLE BİR BAĞINTI YOK.  Araştırıldı ( 2026-09-09 ):
-#    · TS EN 81-20 / TS EN 81-50 kapsamındaki ray hesabı kılavuzu karşı
-#      ağırlığın ölçülerini VERİ olarak alır:  "Gx = 130 mm, Gy = 960 mm
-#      Counterweight dimensions",  XG = %10 × Gx,  YG = %5 × Gy.  Ray arası
-#      bu hesaba hiç girmez.
-#    · Referans uygulama projesi ( ELEport ) de karşı ağırlığın Dx ve Dy'sini
-#      DOĞRUDAN sorar;  karşı ağırlık ray arasını hiç sormaz.  Aynı belgede
-#      kabin için Dy = 1350 mm ( kabin genişliği ) iken ray arası DBG =
-#      1550 mm'dir — yani D, bileşenin KENDİ ölçüsüdür, ray arası değil.
-#    · Ofisin öteki mukavemet kitabında ( 690 formül ) karşı ağırlık
-#      genişliği diye bir kavram yoktur;  orada ray arası KİRİŞ AÇIKLIĞI
-#      olarak kullanılır.
-#    · Oran da tutmuyor:  kabin 0,871 · tablo 0,943 / 0,914 / 0,943.
-#  Tablodaki üç değer üç ayrı KATALOG ÇERÇEVESİDİR ( kitabın ölü U63
-#  formülü her birine ayrı dolgu bloğu kütlesi bağlar:  Barit 30/42/60 kg,
-#  Pik döküm 84/123/169 kg ) — bir eğrinin noktaları değil.
-#
-#  Bu yüzden genişlik ve derinlik artık GİRDİDİR;  program kabin tarafında
-#  zaten böyle yapıyordu ( kabin_genisligi · kabin_derinligi ).
+#  KARŞI AĞIRLIĞIN GENİŞLİĞİ DE GİRDİDİR.  Ray arasından türetilemez:  TS EN
+#  81-50 Ek C.2.2 ölçüleri veri olarak ister ( ray hesabı kılavuzu:  "Gx =
+#  130 mm, Gy = 960 mm Counterweight dimensions", XG = %10 × Gx, YG = %5 ×
+#  Gy ) ve ELEport da karşı ağırlığın Dx · Dy'sini doğrudan sorar.  Program
+#  kabin tarafında da böyle yapar ( kabin_genisligi · kabin_derinligi ).
 
 # =====================================================================
-#  KILAVUZ RAY ÇELİĞİ  Rm → izin verilen gerilmeler    [ TEKNİK!P2:R4 ]
+#  KILAVUZ RAY ÇELİĞİ  Rm → izin verilen gerilmeler
 #      σperm normal kullanma · σperm güvenlik tertibatı çalışması  ( N/mm² )
 # =====================================================================
-RAY_CELIGI = (
-    (370, 165, 205),
-    (440, 195, 244),
-    (520, 230, 288),
-)
+#  STANDARDIN BAĞINTISI:  σperm = Rm / St  ( EN 81-20 m.5.7.4.5 ).
+#  St Çizelge 15'ten, A5 > %12 çelik için:  normal işletme ve yükleme 2,25 ·
+#  güvenlik tertibatı çalışması 1,8.  Tam sayıya yuvarlanmış bir tablo
+#  ( 165 · 205 · … ) Rm 370'te normal işletmede 164,44 yerine 165 alır —
+#  EMNİYETSİZ yönde %0,3.  Tablo bağıntının kendisidir.
+RAY_EMNIYET_NORMAL = 2.25
+RAY_EMNIYET_GUVENLIK = 1.8
+RAY_CELIGI = tuple((rm, rm / RAY_EMNIYET_NORMAL, rm / RAY_EMNIYET_GUVENLIK)
+                   for rm in (370, 440, 520))
 
 RAY_CELIKLERI = tuple(s[0] for s in RAY_CELIGI)
 
@@ -697,27 +658,13 @@ def sigma_perm_guvenlik(rm):
 
 
 # =====================================================================
-#  KANAL İŞLEME ŞEKLİ → SÜRTÜNME ÇARPANI  f     [ Veri Girişi!T42:W43 ]
-#      yükleme · durdurma tertibatı ( fren ) · kabinin bloke edilmesi
+#  KANAL İŞLEME ŞEKLİ
 # =====================================================================
-#  DİKKAT — BU SÜTUNLAR μ DEĞİL f'DİR.  Kitap satırı "sürtünme katsayısı μ"
-#  diye adlandırır ama içindeki sayılar sürtünme ÇARPANIDIR:  sertleştirilmiş
-#  kanalın yükleme değeri 0,30716 = 0,1 / sin( 38° / 2 ), yani μ = 0,1'in
-#  f'ye dönüşmüş hâlidir.  ( μ'nün kendisi 0,1 · 0,1/(1+v/10) · 0,2'dir ve
-#  SABIT sözlüğünde durur. )
-#
-#  DEĞERLER ÇİVİLİDİR:  γ = 38° ve β = 90° ile hesaplanmışlardır.  Ofis
-#  sabitleri değişince bunlar değişmez — bu yüzden motor bu tabloyu HİÇ
-#  kullanmaz, f'yi her seferinde m.5.11.2.3.1'den kendisi hesaplar
-#  ( mukavemet._tahrik ).  Tablo yalnız kitabın hücreleriyle karşılaştırma
-#  testi için durur;  ekrandaki tablo da f'yi ofis sabitlerinden üretir
+#  Sürtünme çarpanı f tabloda DEĞİLDİR:  kanal şekline ve ofis açılarına
+#  bağlıdır, motor onu her seferinde m.5.11.2.3.1'den hesaplar
+#  ( mukavemet._tahrik ).  Ekrandaki tablo da ofis sabitlerinden üretilir
 #  ( engine/uygulama/tablolar_gorunum.py ).
-KANAL_ISLEME = (
-    ('Sertleştirilmemiş', 0.20525235013903476, 0.1865930455809407, 0.6143106973514485),
-    ('Sertleştirilmiş', 0.30715534867572425, 0.27923213515974926, 0.6143106973514485),
-)
-
-KANAL_ISLEME_SEKILLERI = tuple(s[0] for s in KANAL_ISLEME)
+KANAL_ISLEME_SEKILLERI = ("Sertleştirilmemiş", "Sertleştirilmiş")
 
 
 # =====================================================================
@@ -760,17 +707,6 @@ def tampon(ad):
         if t[0] == ad:
             return t
     return TAMPON_TIPLERI[1]        # tanınmayan ad: poliüretan sayılır
-_SURTUNME_SUTUN = {"yukleme": 1, "fren": 2, "bloke": 3}
-
-
-def surtunme(isleme_sekli, durum):
-    """Kitabın çivili f değeri  ( γ = 38° · β = 90° ).  durum: yukleme | fren | bloke
-
-    Yeni kodda kullanmayın:  f kanal şekline ve ofis açılarına bağlıdır,
-    bkz. mukavemet._tahrik.  Bu işlev yalnız kitabın hücrelerini doğrulayan
-    test için durur.
-    """
-    return _ara(KANAL_ISLEME, isleme_sekli, _SURTUNME_SUTUN[durum])
 
 
 # =====================================================================
@@ -811,9 +747,9 @@ def siginma_hacmi(tip, konum="dip"):
     """Sığınma hacmi ölçüleri  ( a , b , c )  —  metre.
 
     konum "dip" ise ( a , b ) = ( kısa , uzun ) ,  "ust" ise ( uzun , kısa ).
-    Bu SIRALAMA standardın bir kuralı değildir;  kaynak çalışma kitabının
-    kabin üstü ve kuyu dibi kontrollerinde dikdörtgeni hangi eksene
-    oturttuğunu birebir korur ( bkz. mukavemet._siginma ).
+    Bu SIRALAMA standardın bir kuralı değildir;  kabin üstü ve kuyu dibi
+    kontrollerinde dikdörtgenin hangi eksene oturtulduğunu belirler
+    ( bkz. mukavemet._siginma ).
     Tanınmayan tip için None döner.
     """
     for ad, a, b, c in SIGINMA_HACMI:

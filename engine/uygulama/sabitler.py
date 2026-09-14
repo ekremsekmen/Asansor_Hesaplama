@@ -2,8 +2,7 @@
 """
 UYGULAMA PROJESİNİN OFİS STANDARDI            ( avandan AYRI )
 
-Avan ve uygulama ayrı projelerdir:  ayrı mühendis, ayrı çıktı, ayrı çalışma
-kitabı.  Kabulleri de aynı olmak ZORUNDA DEĞİLDİR — avan ön tasarımdır ve
+Avan ve uygulama ayrı projelerdir:  ayrı mühendis, ayrı çıktı.  Kabulleri de aynı olmak ZORUNDA DEĞİLDİR — avan ön tasarımdır ve
 genel, emniyetli kabullerle çalışır;  uygulama kesin tasarımdır ve elinde
 imalatçı verisi vardır.  Dişlisiz makine için avanda 0,85 kabulü yeterliyken
 uygulamada makinenin kataloğundaki 0,88 kullanılabilir.
@@ -39,9 +38,9 @@ VARSAYILAN = {
     #  bütün projeleri birden düzeltir.  Paftada λ satırında görünür.
     #  Tam dengeleme için gereken zincir:  askı oranı × halat kg/m × adet.
     "denge_zinciri_orani": 100,  # λ, %                       ( zincir VARSA )
-    "Gs":               0,      # Sürtünme yükü, kg          ( 11!AQ8 )
-    "q_denge":          0.50,   # Karşı ağırlık denge oranı  ( 11!AA627 )
-    "halat_pay_m":      5,      # Halat boyu payı, m         ( 11!AQ19 )
+    "Gs":               0,      # Sürtünme yükü, kg
+    "q_denge":          0.50,   # Karşı ağırlık denge oranı
+    "halat_pay_m":      5,      # Halat boyu payı, m
 
     #  ── TAHRİK KANALI GEOMETRİSİ ─────────────────────────────────────
     #  Kasnak kanalının açıları imalatçıdan gelir;  proje bazında
@@ -59,7 +58,7 @@ VARSAYILAN = {
     #  taraftadır — σem = 130, aynı standardın ST 37 için verdiği
     #  Rm/1,8 = 205,6 N/mm²'nin yaklaşık yarısıdır.  Ekranda durmalarının
     #  sebebi budur:  ofis bunları gözden geçirebilmelidir.
-    "sigma_em":         130,    # ST 37 emniyet gerilmesi, N/mm²  ( 11!AB40 )
+    "sigma_em":         130,    # ST 37 emniyet gerilmesi, N/mm²
     "k1_kaymali":       2,      # Kaymalı güvenlik tertibatı
     "k1_makarali":      3,      # Ani frenlemeli makaralı
     "k1_ani":           5,      # Ani frenlemeli
@@ -67,9 +66,9 @@ VARSAYILAN = {
     #  ( k2 = 1,2 ), k3 için ise çizelge "the value has to be determined by
     #  the manufacturer due to the actual installation" der — yani standardın
     #  verdiği bir sayı YOKTUR.  Bu yüzden k3 ofis sabitidir, motorda çivili
-    #  değildir;  kitabın kullandığı 1,2 varsayılan olarak korunur.
+    #  değildir;  varsayılanı 1,2'dir.
     "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
-    "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm     ( 11!S58 )
+    "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm
     #  BURKULMA EKSENİ.  Çubuk EN KÜÇÜK atalet yarıçapına sahip eksende
     #  burkulur;  program bu yüzden min( ix ; iy ) kullanır.  Şase, dikine
     #  kirişi zayıf ekseninde yanal olarak MESNETLİYORSA burkulma o eksende
@@ -116,7 +115,7 @@ VARSAYILAN = {
     #  Yüzde, o taraftaki GÖVDENİN frenleme sırasındaki ağırlık kuvvetine
     #  uygulanır:  kabin ( P + Q + MCR + MTrav )·( gn ± a ) ,  karşı ağırlık
     #  ( Mcwt + MCR )·( gn ∓ a ).  ELEport ve new block da böyle kurar.
-    #  %2 / %1,5 new block'un ve kaynak kitabın değeridir;  ELEport ağırlık
+    #  %2 / %1,5 new block'un ve ofisin değeridir;  ELEport ağırlık
     #  tarafında %2 alır.  Frenlemede sürtünme LEHE çalıştığı için küçük değer
     #  emniyetli taraftır.  Asgari sürtünme sağlanamıyorsa 0 yazılır.
     "kuyu_surtunme_kabin":   2,    # %
@@ -140,9 +139,7 @@ VARSAYILAN = {
     #  Bu hesaplar avan motorunda koşar ve köprü oraya yalnız DEĞİŞTİRİLEN
     #  değeri geçirir ( bkz. girdi._avan_sabitleri );  boş bırakılan alanı
     #  motor KENDİ varsayılanıyla hesaplar.  Burada ayrı bir sayı yazmak,
-    #  ekranda ve teslim kitabında motorun kullanmadığı bir değeri göstermek
-    #  demekti:  κ burada 56 kalmıştı, pafta 44,4 ile hesaplıyordu ve teslim
-    #  kitabı 56 ile — aynı projede ε %0,97 ile %0,77.
+    #  ekranda motorun kullanmadığı bir değeri göstermek olurdu.
     **{k: _AVAN_VARSAYILAN[k] for k in (
         # ── ④ AYDINLATMA
         "kabin_armatur_W", "kabin_armatur_lm", "kabin_ustu_armatur",
@@ -260,7 +257,7 @@ ETIKET = {
                             "zincir VARSA halat dengesizliğinin yüzde kaçını "
                             "karşıladığı — %100 = tam dengeleme"),
     "Gs": ("Sürtünme yükü Gs (kg)", "Gmax = F1 + Gs − Ga"),
-    "q_denge": ("Denge faktörü q", "karşı ağırlık = P + q·Q;  kitabın tamamı q = 0,50 üzerine kuruludur"),
+    "q_denge": ("Denge faktörü q", "karşı ağırlık = P + q·Q;  0,50 yükün yarısını dengeler"),
     "halat_pay_m": ("Halat boyu payı (m)", "kuyu boyuna eklenen pay"),
     "kanal_gama_v": ("V kanal açısı γ (°)",
                      "TS EN 81-50 m.5.11.2.3.1.2 — asansörlerde 35°'den küçük olamaz"),

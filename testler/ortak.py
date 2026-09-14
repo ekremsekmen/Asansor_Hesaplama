@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """Test paketi için ortak yardımcılar."""
 import os
-import shutil
-import subprocess
 import sys
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,56 +51,6 @@ class Rapor:
             if len(self.hatalar) > 25:
                 print(f"       {GRI}… ve {len(self.hatalar)-25} tane daha{SIFIR}")
         return self.kaldi == 0
-
-
-# ------------------------------------------------------------- LibreOffice
-def soffice_yolu():
-    for c in ("soffice", "libreoffice",
-              "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-              "/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice",
-              r"C:\Program Files\LibreOffice\program\soffice.exe"):
-        if os.path.isabs(c):
-            if os.path.exists(c):
-                return c
-        elif shutil.which(c):
-            return shutil.which(c)
-    return None
-
-
-def yeniden_hesapla(dosyalar, cikti_klasoru, zaman_asimi=600):
-    """
-    Verilen xlsx dosyalarını LibreOffice ile açıp yeniden hesaplatarak kaydeder.
-    Excel'in kendi formül motoruna en yakın bağımsız doğrulamadır.
-    """
-    exe = soffice_yolu()
-    if not exe:
-        return False
-    os.makedirs(cikti_klasoru, exist_ok=True)
-    dosyalar = list(dosyalar)
-    for i in range(0, len(dosyalar), 8):
-        subprocess.run([exe, "--headless", "--norestore", "--convert-to", "xlsx",
-                        "--outdir", cikti_klasoru] + dosyalar[i:i + 8],
-                       capture_output=True, timeout=zaman_asimi)
-    return True
-
-
-HATA_HUCRELERI = ("#REF!", "#VALUE!", "#DIV/0!", "#N/A", "#NAME?", "#NUM!", "#NULL!")
-
-
-def hata_hucresi_ara(xlsx_yolu):
-    """Çalışma kitabında Excel hata değeri taşıyan hücreleri döndürür."""
-    import openpyxl
-    bulunan = []
-    wb = openpyxl.load_workbook(xlsx_yolu, data_only=True)
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for c in row:
-                if c.value is not None and isinstance(c.value, str):
-                    for h in HATA_HUCRELERI:
-                        if h in c.value:
-                            bulunan.append(f"{ws.title}!{c.coordinate} = {c.value}")
-                            break
-    return bulunan
 
 
 def P_std(sonuc):

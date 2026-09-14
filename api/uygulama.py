@@ -6,23 +6,20 @@ Mukavemet + elektrik + topraklama hesabı ve çıktıları.  Avandan bağımsız
 elektrik hesapları avan MOTORUNU çağırır ( engine/uygulama/hesap.py ), ama
 uçlar ayrıdır.
 """
-import io
 import json
 import os
-import zipfile
 
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from api.ortak import (PAKET_NOT_KITAP, _BELIRSIZ, _RED, _belirsiz_hata,
-                       _dosya_adi, _indir, _paket_ekleri, _proje_kimligi, _sayi,
-                       _uretilemedi, _uretilemeyen_dosya_notu, belirsiz_sayi_mi)
+from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
+                       _paket_ekleri, _proje_kimligi, _sayi, _uretilemedi,
+                       belirsiz_sayi_mi)
 from engine.uygulama import girdi as E_UGR
 from engine.uygulama import sabitler as E_US
 from engine.uygulama import tablolar_gorunum as E_UTB
 from engine.uygulama import hesap as E_UYG
 from engine.uygulama import mukavemet_girdi as E_MGR
-from exports import mukavemet_xlsx as X_MXLS
 from exports import kapak_export as X_KAPAK
 from exports import pdf_export as X_PDF
 
@@ -102,7 +99,7 @@ def _girdi_coz(v, veri):
         if belirsiz_sayi_mi(ham):
             _BELIRSIZ.append(f"{_et} = {str(ham).strip()}")
         g[anahtar] = _sayi(ham)
-    for anahtar, _h, etiket, _b, tur, secenekler, _var in E_MGR.ALANLAR:
+    for anahtar, etiket, _b, tur, secenekler, _var in E_MGR.ALANLAR:
         if tur == "hesap" or anahtar not in v:
             continue
         ham = v[anahtar]
@@ -210,7 +207,7 @@ def api_uygulama_coklu(veri: dict = Body(...)):
         if yanit is not None:
             return yanit
         for a in s.get("asansorler") or []:
-            a.pop("_h", None)          # Excel hücre haritası arayüze gerekmez
+            a.pop("ara", None)         # ara değerler testler içindir, arayüze gerekmez
         return JSONResponse(json.loads(json.dumps(s, default=str)))
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"aktif": False, "hata": [f"HESAP HATASI: {e}"]},
@@ -229,85 +226,6 @@ def indir_uygulama_pdf(veri: dict = Body(...)):
                       "application/pdf")
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
-
-
-@router.post("/api/indir/uygulama-xlsx")
-def indir_uygulama_xlsx(veri: dict = Body(...)):
-    """MUKAVEMET çalışma kitabı, kullanıcının girdileriyle doldurulmuş hâlde."""
-    try:
-        #  Hesap durduran girdiyle XLSX üretilmez:  formüller #YOK / #SAYI/0!
-        #  dolu bir dosya teslim etmek, hatayı gizlemekten başka işe yaramaz.
-        _p = _proje_kimligi(veri)
-        #  MUKAVEMET ÇALIŞMA KİTABI TEK ASANSÖRLÜKTÜR.  Şablonda tek sayfa
-        #  takımı vardır ( 'Veri Girişi' · '11-Muk. Hesapları' … ) ve formüller
-        #  sayfa adlarına bağlıdır;  sayfa çoğaltmak her çapraz atfı yeniden
-        #  yazmayı gerektirirdi.  Çoklu projede bu yüzden ASANSÖR BAŞINA AYRI
-        #  KİTAP üretilir ve hepsi tek ZIP'te verilir.
-        s, yanit = _coklu_sonuc(veri)
-        if yanit is not None:
-            return yanit
-        #  HESAP TEK YOLDAN GEÇTİ;  adede göre değişen yalnız PAKETLEMEDİR.
-        if s["adet"] > 1:
-            ad = _dosya_adi(_p, "Mukavemet Hesaplari", "zip")
-            paket = io.BytesIO()
-            with zipfile.ZipFile(paket, "w", zipfile.ZIP_DEFLATED) as z:
-                for k in _asansor_kitaplari(s, _p):
-                    z.writestr(k[0], k[1])
-            return _indir(paket.getvalue(), ad, "application/zip")
-        return _indir(X_MXLS.mukavemet_xlsx(s["asansorler"][0]["girdi"], _p),
-                      _dosya_adi(_p, "Mukavemet Hesaplari", "xlsx"),
-                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    except FileNotFoundError as e:
-        return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
-    except Exception as e:                                    # noqa: BLE001
-        return _uretilemedi(e)
-
-
-def _asansor_kitaplari(s, proje):
-    """Çoklu projede asansör başına mukavemet çalışma kitabı.
-
-    Döner:  [ ( dosya adı , içerik ) … ].
-
-    EKSİK KİTAP SESSİZCE ATLANAMAZ.  Bir asansörün kitabı üretilemediğinde
-    eskiden yalnız ``continue`` vardı:  kullanıcı iki asansörlük bir projede
-    tek kitaplı — hatta boş — bir ZIP indiriyor ve eksiğin farkına
-    varmıyordu.  Üretilemeyen asansörler artık paketin İÇİNE konan bir
-    metin dosyasında adıyla ve sebebiyle yazılır;  paket yine çıkar ama
-    eksik görünür olur.
-    """
-    kitaplar, eksikler = [], []
-    for a in s.get("asansorler") or []:
-        if not a.get("aktif"):
-            eksikler.append(f"{a.get('no')} - {a.get('tanim') or ''}:  "
-                            "asansör hesaplanamadı ( girdiler eksik ya da geçersiz )")
-            continue
-        etiket = _dosya_parcasi(f"{a.get('no')} - {a.get('tanim') or ''}")
-        try:
-            kitaplar.append((f"Mukavemet Hesaplari - {etiket}.xlsx",
-                             X_MXLS.mukavemet_xlsx(a["girdi"], proje)))
-        except Exception as e:                                # noqa: BLE001
-            eksikler.append(f"{etiket}:  {e}")
-    if eksikler:
-        kitaplar.append(_uretilemeyen_notu(eksikler))
-    return kitaplar
-
-
-def _uretilemeyen_notu(eksikler):
-    """Pakete konan "neyin eksik olduğu" dosyası  →  ( ad , içerik ).
-
-    Çoklu ve tekli paket AYNI bildirimi kullanır;  eskiden tekli pakette
-    kitap üretilemezse ``except Exception: pass`` vardı ve kullanıcı kitapsız
-    bir ZIP indirip farkına varmıyordu.
-    """
-    return _uretilemeyen_dosya_notu(
-        eksikler, dosya="URETILEMEYEN ASANSORLER.txt",
-        aciklama="Aşağıdaki asansörlerin mukavemet çalışma kitabı üretilemedi.")
-
-
-def _dosya_parcasi(metin):
-    """Dosya adında kullanılabilir hâle getirir."""
-    ad = "".join(c if (c.isalnum() or c in " -_") else "-" for c in str(metin))
-    return " ".join(ad.split()).strip(" -") or "asansor"
 
 
 @router.post("/api/indir/uygulama-dwg")
@@ -333,27 +251,12 @@ def indir_uygulama_dwg(veri: dict = Body(...)):
             paftalar.append(("Kapak", X_KAPAK.pdf_bytes(kapak)))
         paftalar.append(("Uygulama Projesi", X_PDF.uygulama_pdf(s)))
         ad = _dosya_adi(_p, "Uygulama Projesi", "zip")
-        #  Pakete çalışma kitabı ve PROJE DOSYASI da girer:  teslim paketi ile
-        #  geri dönüş noktası aynı arşivde dursun.  ÇOKLU PROJEDE ASANSÖR
-        #  BAŞINA AYRI KİTAP girer — mukavemet şablonu tek asansörlüktür.
-        ekler = list(_paket_ekleri(veri, "uygulama"))
-        if s["adet"] > 1:
-            ekler += _asansor_kitaplari(s, _p)
-        else:
-            #  Kitap üretilemezse paket yine çıkar — ama EKSİK SÖYLENİR.
-            _tek = s["asansorler"][0]
-            try:
-                ekler.append((os.path.splitext(ad)[0] + ".xlsx",
-                              X_MXLS.mukavemet_xlsx(_tek["girdi"], _p)))
-            except Exception as e:                            # noqa: BLE001
-                ekler.append(_uretilemeyen_notu(
-                    [f"{_tek.get('no')} - {_tek.get('tanim') or ''}:  {e}"]))
+        #  Pakete PROJE DOSYASI da girer:  teslim paketi ile geri dönüş
+        #  noktası aynı arşivde dursun.
         paket, sebep, tasti = X_DXF.proje_paketi(
-            paftalar, os.path.splitext(ad)[0], ekler)
+            paftalar, os.path.splitext(ad)[0], list(_paket_ekleri(veri, "uygulama")))
         yanit = _indir(paket, ad, "application/zip")
-        notlar = ((["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
-                  + ([PAKET_NOT_KITAP] if any(a == "URETILEMEYEN ASANSORLER.txt"
-                                              for a, _ in ekler) else []))
+        notlar = (["DXF"] if sebep else []) + (["TASMA"] if tasti else [])
         if notlar:
             yanit.headers["X-Avan-Not"] = ",".join(notlar)
         return yanit

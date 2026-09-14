@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Asansör avan proje kapağını doğrudan vektör PDF olarak üretir.
 
-Bu modül hesap, Excel şablonu ve mevcut PDF raporlarından bağımsızdır. Pafta
+Bu modül hesap motorundan ve mevcut PDF raporlarından bağımsızdır. Pafta
 çizgileri ile metinler tek adımda ReportLab tarafından çizilir; kaynak PDF,
 arka plan veya ikinci bir katman kullanılmaz.
 """

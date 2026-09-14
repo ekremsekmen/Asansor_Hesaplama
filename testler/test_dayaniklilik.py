@@ -214,8 +214,7 @@ def calistir():
                 r.kontrol(f"{yol} {str(govde)[:30]} istisna", False, f"→ {e}")
 
     # indirme uçları bozuk gövdeyle de dosya üretmeli ya da düzgün hata dönmeli
-    for yol in ("/api/indir/trafik-pdf", "/api/indir/trafik-xlsx",
-                "/api/indir/avan-pdf", "/api/indir/avan-xlsx"):
+    for yol in ("/api/indir/trafik-pdf", "/api/indir/avan-pdf"):
         for govde in ({"mod": "tek", "girdiler": {"bina_tipi": "Konut"}, "proje": {}},
                       {"girdiler": {"ortak": {}, "asansorler": []}, "proje": {}}):
             try:
@@ -225,29 +224,23 @@ def calistir():
                 #  v2.9 — İKİ KABUL EDİLEBİLİR SONUÇ VAR:
                 #    (a) geçerli dosya          — hesap tamamsa
                 #    (b) düzgün JSON hata       — hesap reddedildiyse
-                #  Kabul EDİLMEYEN:  çökme ya da BOZUK dosya.  ( XLSX artık
-                #  hatalı hesapta üretilmiyor:  Excel şablonu Python'a özgü
-                #  denetimleri taşımadığı için reddedilen hesap dosyada
-                #  sorunsuz görünüyordu. )
+                #  Kabul EDİLMEYEN:  çökme ya da BOZUK dosya.
                 _json_mu = icerik.lstrip()[:1] == b"{"
                 if _json_mu:
                     import json as _j
                     r.kontrol(f"{yol} hata gövdesi düzgün JSON",
                               bool(_j.loads(icerik.decode("utf-8")).get("hata")),
                               f"→ {icerik[:80]!r}")
-                elif yol.endswith("pdf"):
+                else:
                     r.kontrol(f"{yol} geçerli PDF",
                               icerik[:4] == b"%PDF" and len(icerik) > 500)
-                else:
-                    r.kontrol(f"{yol} geçerli XLSX",
-                              icerik[:2] == b"PK" and len(icerik) > 500)
             except Exception as e:                                  # noqa: BLE001
                 r.kontrol(f"{yol} boş girdi", False, f"→ {e}")
 
     # ---------------------------------------------------- v1.9: EKRAN = İNDİRME
     #  Belirsiz sayı yazımı ( "1.200" ) ekranda reddediliyordu ama İNDİRME
-    #  uçlarının bir kısmı aynı girdiyle dosya üretiyordu: hücre boş kalıyor,
-    #  kullanıcı eksik girdili bir paftayı teslim edebilir hâlde alıyordu.
+    #  uçlarının bir kısmı aynı girdiyle dosya üretiyordu:  kullanıcı eksik
+    #  girdili bir paftayı teslim edebilir hâlde alıyordu.
     #  Artık her uç aynı kapıdan geçer.
     _BT = dict(TEMEL, P="1.200")
     _BA = {"ortak": {"temel_a": "26,55", "temel_b": "16,4", "mk_yok": True},
@@ -258,14 +251,13 @@ def calistir():
            "sabitler": {}}
     for _yol, _gov in (("/api/trafik", {"mod": "tek", "girdiler": _BT}),
                        ("/api/indir/trafik-pdf", {"mod": "tek", "girdiler": _BT, "proje": {}}),
-                       ("/api/indir/trafik-xlsx", {"mod": "tek", "girdiler": _BT, "proje": {}}),
                        ("/api/avan", {"girdiler": _BA}),
                        ("/api/indir/avan-pdf", {"girdiler": _BA, "proje": {}}),
-                       ("/api/indir/avan-xlsx", {"girdiler": _BA, "proje": {}})):
+                       ):
         try:
             _k, _ic, _b = istek(_yol, _gov)
             _hata = ""
-            if _ic[:4] not in (b"%PDF",) and _ic[:2] != b"PK":
+            if _ic[:4] != b"%PDF":
                 try:
                     _hata = (json.loads(_ic) or {}).get("hata") or ""
                 except Exception:                                   # noqa: BLE001
@@ -278,7 +270,8 @@ def calistir():
     #  Temiz girdide indirme yine çalışmalı — denetim fazla sıkı olmamalı
     for _yol, _gov, _im in (
             ("/api/indir/trafik-pdf", {"mod": "tek", "girdiler": dict(TEMEL), "proje": {}}, b"%PDF"),
-            ("/api/indir/trafik-xlsx", {"mod": "tek", "girdiler": dict(TEMEL), "proje": {}}, b"PK")):
+            ("/api/indir/avan-pdf", {"girdiler": dict(_BA, asansorler=[dict(_BA["asansorler"][0], Hk="38,5")]),
+                                     "proje": {}}, b"%PDF")):
         _k, _ic, _b = istek(_yol, _gov)
         r.kontrol(f"{_yol} temiz girdide yine üretiyor", _ic[:len(_im)] == _im)
 
@@ -293,57 +286,43 @@ def calistir():
               or "%2F" not in cd)
     r.kontrol("proje adlı PDF üretildi", kod == 200 and icerik[:4] == b"%PDF")
 
-    # ---------------------------------------------------------- /api/sablon
-    #  Şablon denetimi ucu: yanlış / eski Excel konmuşsa arayüz bunu açılışta
-    #  gösterir.  Uç her zaman JSON dönmeli, çökmemeli.
+    #  EXCEL UÇLARI KALDIRILDI:  program Excel üretmez ve okumaz.
+    for _yol in ("/api/indir/trafik-xlsx", "/api/indir/avan-xlsx",
+                 "/api/indir/uygulama-xlsx", "/api/xlsx-yukle"):
+        try:
+            _k, _ic, _b = istek(_yol, {"girdiler": {}})
+            r.kontrol(f"{_yol} artık yok", _k in (404, 405), f"→ HTTP {_k}")
+        except urllib.error.HTTPError as e:
+            r.kontrol(f"{_yol} artık yok", e.code in (404, 405), f"→ HTTP {e.code}")
     try:
-        _sd = json.loads(urllib.request.urlopen(BASE + "/api/sablon", timeout=30).read())
-        r.kontrol("/api/sablon JSON dönüyor", isinstance(_sd, dict) and "sablonlar" in _sd)
-        r.esit("/api/sablon iki şablon bildiriyor", len(_sd.get("sablonlar") or []), 2)
-        for _s in (_sd.get("sablonlar") or []):
-            for _a in ("tur", "baslik", "uygun", "dosya", "md5", "sayfa_sayisi", "hatalar"):
-                r.kontrol(f"/api/sablon alanı var: {_a}", _a in _s)
-        r.kontrol("/api/sablon şablonları uygun bildiriyor", _sd.get("uygun") is True)
-    except Exception as e:                                    # noqa: BLE001
-        r.kontrol("/api/sablon çalışıyor", False, f"→ {e}")
+        urllib.request.urlopen(BASE + "/api/sablon", timeout=30).read()
+        r.kontrol("/api/sablon artık yok", False, "→ uç hâlâ yanıt veriyor")
+    except urllib.error.HTTPError as e:
+        r.kontrol("/api/sablon artık yok", e.code == 404, f"→ HTTP {e.code}")
 
 
     # ---------------------------------------------- PROJE KİMLİĞİ  ( denetim 2.5 )
-    #  Kusur:  indirilen her dosya "Asansor - Avan Hesaplari.xlsx" adıyla
+    #  Kusur:  indirilen her dosya "Asansor - Avan Hesaplari.pdf" adıyla
     #  iniyordu — aynı klasördeki iki projenin dosyaları ayırt edilemiyordu.
-    #  Kapak sekmesindeki proje adı artık dosya adına ve XLSX'in
-    #  ÖZELLİKLERİNE geçer;  paftanın İÇERİĞİ değişmez.
+    #  Kapak sekmesindeki proje adı artık dosya adına geçer;  paftanın
+    #  İÇERİĞİ değişmez.
     _KP = {"project_title": "ÇAĞDAŞ KONUTLARI B BLOK", "owner": "Örnek Yapı A.Ş.",
            "sheet_no": "EL-04", "elec_name": "Ekrem", "elec_surname": "Sekmen"}
     _pk = UC_ORTAK._proje_kimligi({"kapak": _KP})
     r.esit("kapak → proje adı", _pk["proje_adi"], "ÇAĞDAŞ KONUTLARI B BLOK")
-    r.esit("kapak → işveren", _pk["isveren"], "Örnek Yapı A.Ş.")
-    r.esit("kapak → pafta no", _pk["pafta_no"], "EL-04")
-    r.esit("kapak → mühendis", _pk["muhendis"], "Ekrem Sekmen")
     r.kontrol("dosya adı proje adıyla başlıyor",
-              UC_ORTAK._dosya_adi(_pk, "Avan Hesaplari", "xlsx")
+              UC_ORTAK._dosya_adi(_pk, "Avan Hesaplari", "pdf")
               .startswith("ÇAĞDAŞ KONUTLARI B BLOK"))
     #  kapak gönderilmezse ( eski istemci / boş kapak ) eski davranış sürer
     r.esit("kapaksız istek eski adı verir",
-           UC_ORTAK._dosya_adi(UC_ORTAK._proje_kimligi({}), "Avan Hesaplari", "xlsx"),
-           "Asansor - Avan Hesaplari.xlsx")
+           UC_ORTAK._dosya_adi(UC_ORTAK._proje_kimligi({}), "Avan Hesaplari", "pdf"),
+           "Asansor - Avan Hesaplari.pdf")
     #  dosya adına yol ayracı / üst dizin sızmamalı
     _kotu = UC_ORTAK._dosya_adi(
         UC_ORTAK._proje_kimligi({"kapak": {"project_title": "../../etc/passwd"}}),
-        "Avan Hesaplari", "xlsx")
+        "Avan Hesaplari", "pdf")
     r.kontrol("dosya adında yol ayracı yok",
               "/" not in _kotu and ".." not in _kotu, f"→ {_kotu}")
-    #  XLSX bu kimliği taşıyıp geri veriyor mu
-    try:
-        from exports import xlsx_export as _XE, xlsx_import as _XI
-        _ham = _XE.avan_xlsx({"ortak": {"U": 380}, "asansorler": [{"kapasite": 10}]}, _pk)
-        _geri = (_XI.xlsx_oku(_ham) or {}).get("proje") or {}
-        for _alan in ("proje_adi", "isveren", "pafta_no", "muhendis"):
-            r.esit(f"XLSX proje kimliğini taşıyor: {_alan}",
-                   _geri.get(_alan), _pk[_alan])
-    except Exception as e:                                    # noqa: BLE001
-        r.kontrol("XLSX proje kimliği gidiş-dönüşü", False, f"→ {e}")
-
     return r
 
 

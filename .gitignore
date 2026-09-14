@@ -2,10 +2,8 @@
 .venv/
 __pycache__/
 *.pyc
-.gecici_mukavemet/
 
-#  araclar/kaynak_excel_duzelt.py çıktısı — üretilen dosya, kaynak değil.
-#  Depoya konursa koddaki düzeltmelerden sessizce geri kalır.
+#  Program Excel kullanmadığı günlerden kalan üretilmiş kopya — silinebilir.
 MUKAVEMET_HESABI_DUZELTILMIS.xlsx
 
 #  ÜRETİLEN VE GEÇİCİ KLASÖRLER — depoya girmezler.

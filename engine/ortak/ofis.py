@@ -4,8 +4,7 @@ OFİS STANDARDI  —  HER İKİ PROJENİN ORTAK KABULLERİ
 
 Burada yalnız AVAN ve UYGULAMA projelerinin İKİSİNİN BİRDEN kullandığı,
 projeye değil OFİSE ait kabuller durur.  İki proje ayrı klasörlerdedir
-( engine/avan · engine/uygulama ) ve ayrı çalışma kitapları kullanır;  ama
-aynı fiziksel büyüklüğün iki yerde iki farklı sayı olması hata demektir.
+( engine/avan · engine/uygulama );  ama aynı fiziksel büyüklüğün iki yerde iki farklı sayı olması hata demektir.
 
 NİÇİN AYRI DOSYA:
     Makine verimi η bir süre iki yerde ayrı ayrı duruyordu — avan tarafında
@@ -18,10 +17,9 @@ NİÇİN AYRI DOSYA:
 import math
 
 
-#  Makine tipine göre TOPLAM SİSTEM VERİMİ  ( ofis kabulü ).  Anahtarlar,
-#  mukavemet çalışma kitabının 'Veri Girişi'!B130 açılır listesindeki
-#  metinlerle AYNI olmalıdır ( "Dişli,Dişlisiz" ) — yoksa Excel'den gelen
-#  değer tabloda bulunamaz.
+#  Makine tipine göre TOPLAM SİSTEM VERİMİ  ( ofis kabulü ).  Anahtarlar
+#  arayüzün seçenekleridir ve kayıtlı proje dosyalarında da bu metinlerle
+#  durur — değiştirilirse eski projeler tabloda bulunamaz.
 MAKINE_VERIMLERI = {
     "Dişlisiz": 0.85,
     "Dişli":    0.50,
@@ -47,8 +45,7 @@ MAKINE_VERIMLERI = {
 #
 #  Yerine geçen kural:  buradaki değerler ve GİRİŞ'ten girilen η artık
 #  TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı zaten içindedir, ikinci
-#  kez uygulanmaz.  İmalatçı kataloğu da bu büyüklüğü verir ( ör. EN 81-20/50
-#  şablonlarındaki η_ins ), yani girilen sayı ile hesaplanan sayı aynı şeydir.
+#  kez uygulanmaz.  İmalatçı kataloğu da bu büyüklüğü verir ( η_ins ), yani girilen sayı ile hesaplanan sayı aynı şeydir.
 #
 #  DİKKAT — 0,85 / 0,50 değerleri eskiden MAKİNE verimi olarak tanımlıydı.
 #  Toplam sistem verimi olarak okunduklarında 2:1 askıda İYİMSERDİRLER
@@ -56,9 +53,9 @@ MAKINE_VERIMLERI = {
 #  varsayılanı katalog verisiyle güncellemelidir;  asansör bazında girilen
 #  η zaten bunları ezer.
 
-#  Tanınmayan makine tipinde kullanılacak verim.  Kaynak mukavemet kitabının
-#  11!AQ22 hücresindeki eski sabittir;  yalnız GERİYE DÖNÜK uyum içindir,
-#  yeni hesaplarda makine tipi her zaman girilir.
+#  Tanınmayan makine tipinde kullanılacak verim.  Yalnız GERİYE DÖNÜK uyum
+#  içindir ( makine tipi taşımayan eski projeler );  yeni hesaplarda makine
+#  tipi her zaman girilir.
 VARSAYILAN_VERIM = 0.92
 
 
@@ -96,8 +93,8 @@ GK_ALT, GK_UST = GK_TABLOSU[0][0], GK_TABLOSU[-1][0]
 def bos_kabin_kutlesi(Q):
     """Anma yüküne göre ortalama boş kabin kütlesi  ( kg ) — TAHMİNDİR.
 
-    Ara yükler doğrusal ara değerle bulunur ve 10 kg'a yuvarlanır ( kaynak
-    çalışma kitabının ROUND'u ).  Aralık dışında uç değere sabitlenir.
+    Ara yükler doğrusal ara değerle bulunur ve 10 kg'a, yarımı yukarı
+    yuvarlanır.  Aralık dışında uç değere sabitlenir.
     """
     if not isinstance(Q, (int, float)) or isinstance(Q, bool):
         return None
@@ -108,7 +105,7 @@ def bos_kabin_kutlesi(Q):
     for (x0, y0), (x1, y1) in zip(GK_TABLOSU, GK_TABLOSU[1:]):
         if x0 <= Q <= x1:
             y = y0 + (Q - x0) * (y1 - y0) / (x1 - x0)
-            #  Excel'in ROUND'u yarımı YUKARI yuvarlar;  Python'unki bankacı
+            #  Yarım YUKARI yuvarlanır;  Python'un round()'u bankacı
             #  yuvarlaması yapar ( 865 → 860 ).  Fark 10 kg'lık kademede
             #  görünür, o yüzden elle yapılır.
             return float(math.floor(y / 10.0 + 0.5) * 10)

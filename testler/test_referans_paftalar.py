@@ -8,8 +8,8 @@ paftalarına karşı doğrular:
     ELEport        ~/asansör projeleri/sample-project.pdf   ( PROJE 5 · Elevator 3 )
     "new block"    ~/asansör projeleri/new block-Model.pdf
 
-NİÇİN AYRI TEST:  öteki bütün testler ya motoru KENDİ kaynak Excel'imize ya da
-kendi altın çıktımıza karşı denetler.  İkisi de bizim yorumumuzdur — ikisinde
+NİÇİN AYRI TEST:  öteki bütün testler ya motoru KENDİ dondurulmuş referansımıza
+ya da kendi altın çıktımıza karşı denetler.  İkisi de bizim yorumumuzdur — ikisinde
 birden aynı yanlışı yapıyorsak hiçbiri bunu göremez.  Burada karşılaştırma
 noktası dışarıdadır:  aynı standardı uygulayan, bizden bağımsız yazılmış iki
 program.
@@ -68,23 +68,23 @@ ELEPORT = {
 ELEPORT_BEKLENEN = (
     #  Bunlar TANIM GEREĞİ aynı çıkmalı:  α doğrudan girdi, f ise
     #  m.5.11.2.3.1.2'nin kapalı bağıntısı ( μ / sin(γ/2) ).
-    ("α  ( derece )",        "S184",  180.0,   0.01, "doğrudan girdi"),
-    ("f  yükleme",           "AJ198",   0.307, 0.5,  "ELEport 3 haneye yuvarlıyor"),
-    ("f  bloke",             "AE216",   0.614, 0.5,  "ELEport 3 haneye yuvarlıyor"),
+    ("α  ( derece )",        "tahrik.alfa_derece",  180.0,   0.01, "doğrudan girdi"),
+    ("f  yükleme",           "tahrik.f_yukleme",   0.307, 0.5,  "ELEport 3 haneye yuvarlıyor"),
+    ("f  bloke",             "tahrik.f_bloke",   0.614, 0.5,  "ELEport 3 haneye yuvarlıyor"),
     #  Yükleme durumu STATİKTİR:  kasnak ataleti ve sürtünme girmez, iki
     #  program da aynı kütleleri aynı bağıntıya koyar → birebir tutmalı.
-    ("yükleme  T1",          "AF235", 9676.0,  0.05, "statik — ara kabul yok"),
-    ("yükleme  T2",          "AJ240", 6733.0,  0.05, "statik — ara kabul yok"),
-    ("yükleme  T1/T2",       "K242",     1.44, 0.5,  "ELEport 2 haneye yuvarlıyor"),
-    ("yükleme  e^(fα)",      "O242",     2.62, 0.5,  "ELEport 2 haneye yuvarlıyor"),
-    ("fren  e^(fα)",         "O271",     2.08, 0.5,  "ELEport 2 haneye yuvarlıyor"),
-    ("bloke  e^(fα)",        "O285",     6.89, 0.5,  "ELEport 2 haneye yuvarlıyor"),
+    ("yükleme  T1",          "tahrik.yukleme.T1", 9676.0,  0.05, "statik — ara kabul yok"),
+    ("yükleme  T2",          "tahrik.yukleme.T2", 6733.0,  0.05, "statik — ara kabul yok"),
+    ("yükleme  T1/T2",       "tahrik.yukleme.oran",     1.44, 0.5,  "ELEport 2 haneye yuvarlıyor"),
+    ("yükleme  e^(fα)",      "tahrik.yukleme.sinir",     2.62, 0.5,  "ELEport 2 haneye yuvarlıyor"),
+    ("fren  e^(fα)",         "tahrik.fren_ust.sinir",     2.08, 0.5,  "ELEport 2 haneye yuvarlıyor"),
+    ("bloke  e^(fα)",        "tahrik.bloke.sinir",     6.89, 0.5,  "ELEport 2 haneye yuvarlıyor"),
     #  FRENLEME:  sürtünme ELEport ile aynı yapıda ( kuyudaki kuvvet, / r );
     #  kalan küçük fark ağırlık tarafı oranıdır ( bizde %1,5, ELEport %2 ) —
     #  aşağıda ELEport'un kendi oranı ve kablosuyla birebir denetlenir.
-    ("fren alt  T1",         "AF250", 8987.82, 0.01, "sürtünme yapısı ELEport ile aynı"),
-    ("fren alt  T2",         "AJ255", 6514.24, 0.6,  "ağırlık sürtünmesi %1,5 ↔ %2"),
-    ("bloke  T1/T2",         "K285",    13.47, 2.0,  "halat kütlesi dağılımı kabulü"),
+    ("fren alt  T1",         "tahrik.fren_alt.T1", 8987.82, 0.01, "sürtünme yapısı ELEport ile aynı"),
+    ("fren alt  T2",         "tahrik.fren_alt.T2", 6514.24, 0.6,  "ağırlık sürtünmesi %1,5 ↔ %2"),
+    ("bloke  T1/T2",         "tahrik.bloke.oran",    13.47, 2.0,  "halat kütlesi dağılımı kabulü"),
 )
 
 
@@ -94,11 +94,11 @@ def _eleport(r):
               f"→ {s.get('hata')}")
     if not s.get("aktif"):
         return
-    h = s["_h"]
-    for ad, hucre, bek, tol, neden in ELEPORT_BEKLENEN:
-        v = h.get(hucre)
+    h = s["ara"]
+    for ad, anahtar, bek, tol, neden in ELEPORT_BEKLENEN:
+        v = h.get(anahtar)
         if v is None:
-            r.kontrol(f"ELEport · {ad}", False, f"→ {hucre} hesaplanmadı")
+            r.kontrol(f"ELEport · {ad}", False, f"→ {anahtar} hesaplanmadı")
             continue
         sapma = abs(v - bek) / abs(bek) * 100
         r.kontrol(f"ELEport · {ad}  ( ≤ %{tol} )", sapma <= tol,
@@ -135,10 +135,10 @@ def _eleport(r):
     #  tutmalı — kasnak ataleti, halat dağılımı, zincir ve sürtünme dâhil.
     s_e = MK.hesapla(dict(ELEPORT, kablo_birim_kutle=0.44,
                           _ofis=dict(ELEPORT["_ofis"], kuyu_surtunme_agirlik=2)))
-    for _ad, _h, _bek in (("fren alt T1", "AF250", 8987.82), ("fren alt T2", "AJ255", 6514.24),
-                          ("fren üst kabin", "AH264", 4641.92), ("fren üst ağırlık", "AF269", 6963.68),
-                          ("bloke T1", "AH278", 4802.29), ("bloke T2", "AF283", 356.5)):
-        _v = s_e["_h"][_h]
+    for _ad, _h, _bek in (("fren alt T1", "tahrik.fren_alt.T1", 8987.82), ("fren alt T2", "tahrik.fren_alt.T2", 6514.24),
+                          ("fren üst kabin", "tahrik.fren_ust.T1", 4641.92), ("fren üst ağırlık", "tahrik.fren_ust.T2", 6963.68),
+                          ("bloke T1", "tahrik.bloke.T1", 4802.29), ("bloke T2", "tahrik.bloke.T2", 356.5)):
+        _v = s_e["ara"][_h]
         r.kontrol(f"ELEport · kendi kablosu ve %2 ile {_ad} birebir  ( ≤ 0,05 N )",
                   abs(_v - _bek) <= 0.05, f"→ bizim {_v:.3f} · ELEport {_bek}")
 
@@ -151,9 +151,9 @@ def _eleport(r):
     #  yüzden iki paftada T1 ve T2 yer değişmiş GÖRÜNÜR.  Oran max(a/b, b/a)
     #  alındığı için hüküm ikisinde de aynıdır.  Aşağısı bunu KANITLAR:
     #  taraflar eşleştirilince sayılar tutar.
-    for ad, hucre, bek in (("kabin tarafı", "AH264", 4641.92),
-                           ("karşı ağırlık tarafı", "AF269", 6963.68)):
-        v = h.get(hucre)
+    for ad, anahtar, bek in (("kabin tarafı", "tahrik.fren_ust.T1", 4641.92),
+                           ("karşı ağırlık tarafı", "tahrik.fren_ust.T2", 6963.68)):
+        v = h.get(anahtar)
         sapma = abs(v - bek) / bek * 100 if v else 100
         r.kontrol(f"ELEport · fren üst {ad} ( taraf eşleşmesi )", sapma <= 2.0,
                   f"→ bizim {v:.2f} · ELEport {bek}  ( ELEport büyüğe T1 der, "

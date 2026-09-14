@@ -2,14 +2,12 @@
 """
 ASANSÖR TRAFİK HESABI  —  MMO/697, 2. Baskı, Ocak 2020, s.11-17
 
-ASANSOR_TRAFIK_HESABI_v2_1.xlsx dosyasındaki
-  · HESAPLAMA      sayfası  ->  hesapla_tek()      (çıktı: PAFTA)
-  · ÇOKLU ASANSÖR  sayfası  ->  hesapla_coklu()    (çıktı: PAFTA-COKLU)
-formüllerinin birebir Python karşılığıdır.
+  · aynı tip asansörler   ->  hesapla_tek()      ( MMO/697 s.11-12 )
+  · farklı tip asansörler ->  hesapla_coklu()    ( grup formülü, s.12 )
 """
 from engine.avan import tablolar as T
 from engine.ortak.steps import (Bolum, veri, hesap, tr, trn, yukari_yuvarla,
-                    excel_round, sayi_mi)
+                    yuvarla, sayi_mi)
 
 
 # =====================================================================
@@ -52,9 +50,8 @@ def _durak_oku(deger, N, on_ek=""):
 
 #  SÜRELERİN ÇÖZÜMÜ  —  ta / tk / tg / tp   ( tek ve çoklu hesapta AYNI kural )
 #
-#  Excel'de HESAPLAMA ve ÇOKLU ASANSÖR sayfaları bu değerleri AYNI TABLO-4 /
-#  TABLO-6 / TABLO-8 sayfalarından okur;  tablo tek kopyadır.  Python'da tablo
-#  OKUMA zaten ortaktı ( tables.py ) ama tablonun ETRAFINDAKİ katman —  elle
+#  Tek ve çoklu hesap bu değerleri AYNI Tablo-4 / Tablo-6 / Tablo-8'den okur.
+#  Tablo OKUMA zaten ortaktı ( tablolar.py ) ama tablonun ETRAFINDAKİ katman —  elle
 #  ezme, uyarı metinleri, kaynak yazısı — iki kez yazılmıştı ve ayrışmıştı:
 #  çoklu pafta, Tablo-4 / Tablo-8 ara değer uyarılarının KISALTILMIŞ hâlini
 #  basıyor, "imalatçı katalog değeri varsa manuel girin" öğüdünü hiç
@@ -185,7 +182,7 @@ def _nufus_satirlari(bina_tipi, hizli1, hizli2, ek_satirlar=None):
                 "ek": True,
             })
 
-    b = excel_round(sum(s["c"] for s in satirlar), 6)
+    b = yuvarla(sum(s["c"] for s in satirlar), 6)
     return satirlar, b
 
 
@@ -201,7 +198,7 @@ def _nufus_bolunmus(bina_tipi, hizli1, hizli2, b, nufus_satirlari=None):
     denetimde bu hesap hatası olarak okunur.
     """
     ek = [x for x in (nufus_satirlari or []) if x.get("ek")]
-    b_ana = (excel_round(sum(x["c"] for x in nufus_satirlari if not x.get("ek")), 6)
+    b_ana = (yuvarla(sum(x["c"] for x in nufus_satirlari if not x.get("ek")), 6)
              if nufus_satirlari else b)
     satirlar = [x for x in _nufus_aciklamasi(bina_tipi, hizli1, hizli2, b_ana) if x]
     if not satirlar:
@@ -1168,12 +1165,8 @@ def tekil_girdi(g: dict):
     ÖZDEŞ asansör listesini, HESAPLAMA sayfasının beklediği DÜZ girdi biçimine
     çevirir ( P / kapı / süreler / adet üst seviyeye taşınır ).
 
-    HEM HESAP HEM XLSX AKTARIMI BUNU KULLANIR.  Eşleme iki yerde ayrı yazılırsa
-    ekran ile dosya ayrışır — ayrışmıştı:  arayüz girdileri `asansorler`
-    listesinde gönderdiği için indirilen tek-asansör Excel'inde kapasite, kapı
-    genişliği, kapı tipi ve adet hücreleri BOŞ kalıyor, Excel de paftaya
-    "HESAP HATASI: ⑨ kapı genişliği listeden seçilmelidir" basıyordu.
-    Ekranda ise hesap doğru görünüyordu.
+    Arayüz girdileri `asansorler` listesinde gönderir;  tek asansör yolu
+    düz alanları bekler.  Eşleme yalnız burada yapılır.
 
     Dönen:  düz girdi sözlüğü;  asansörler ÖZDEŞ DEĞİLSE None ( çoklu yol ).
     """
@@ -1211,14 +1204,13 @@ def hesapla(g: dict) -> dict:
     Dönen sözlüğe iki alan eklenir:
 
         yol    : "tek" | "coklu"      —  kullanılan hesap yolu
-        pafta  : "PAFTA" | "PAFTA-COKLU"  —  üretilecek Excel çıktı sayfası
     """
     tekil = tekil_girdi(g)
     if tekil is not None:
         s = hesapla_tek(tekil)
-        s["yol"], s["pafta"] = "tek", "PAFTA"
+        s["yol"] = "tek"
         return s
 
     s = hesapla_coklu(g if isinstance(g, dict) else {})
-    s["yol"], s["pafta"] = "coklu", "PAFTA-COKLU"
+    s["yol"] = "coklu"
     return s

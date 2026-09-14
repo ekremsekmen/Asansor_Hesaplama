@@ -241,12 +241,6 @@ function mukavemetKimlik(){
           sheet_no: al('mk_pafta_no')};
 }
 
-/*  EXCEL HÜCRE ADRESİ ETİKETTE YAZILMAZ.  Bir süre her alanın yanında
-    "· B132" gibi duruyordu;  hesabı yapan mühendisin işine yaramıyor, yalnız
-    etiketi uzatıp okumayı zorlaştırıyordu.  Adres SÖZLEŞMEDE duruyor
-    ( mukavemet_girdi.ALANLAR ) ve Excel'e yazma / Excel'den geri okuma onu
-    oradan kullanmaya devam ediyor — görünümden kalkması o eşleşmeye
-    dokunmaz. */
 /*  ONAY ALANLARININ İKİ DÜĞMELİ GÖRÜNÜMÜ.
     { etiket , [ kapalı şıkkı , açık şıkkı ] }
 
@@ -397,10 +391,9 @@ function mDurakSil(){
   mDurakCiz(); mukavemetPlanla();
 }
 
-/*  Seyir mesafesi ve son kat yüksekliği durak listesinden TÜRETİLİR.  Excel'de
-    ikisi de elle giriliyor ve sessizce çelişebiliyordu;  burada listeden
-    dolduruluyor, kullanıcı yine de üzerine yazabilir ( motor tutarsızlığı
-    bildirir ). */
+/*  Seyir mesafesi ve son kat yüksekliği durak listesinden TÜRETİLİR.  Elle
+    girilen iki değer sessizce çelişebilirdi;  burada listeden dolduruluyor,
+    kullanıcı yine de üzerine yazabilir ( motor tutarsızlığı bildirir ). */
 function mTuretilenleriDoldur(){
   const say = MUK_DURAK.map(x=>Number(String(x).replace(',', '.')))
                        .filter(x=>isFinite(x));
@@ -420,6 +413,9 @@ function mTuretilenleriDoldur(){
     TABLO TARAYICIDA TUTULMAZ.  Alan boş gönderilir, sunucu doldurur ve
     dönen değer alana yazılır;  yoksa aynı tablonun ikinci bir kopyası
     JS'de durur ve motorunkiyle ayrışırdı. */
+//  false  ya da  TAZELENECEK ASANSÖRÜN SIRASI.  Yalnız "açık / kapalı"
+//  tutulduğunda beyan yükü değiştirilip hemen başka asansörün sekmesine
+//  geçilince tablo değeri o asansörün kabin ağırlığına basılabiliyordu.
 let MUK_GK_TAZELE = false;
 
 /* ==========================================================================
@@ -492,7 +488,7 @@ function mFormaYaz(harita, sec){
 
 function mukavemetGirdi(){
   const g = mFormOku();
-  if(MUK_GK_TAZELE) g.kabin_agirligi = '';      // sunucu tablodan doldursun
+  if(MUK_GK_TAZELE === MUK_AKTIF) g.kabin_agirligi = '';   // sunucu tablodan doldursun
   return g;
 }
 
@@ -538,7 +534,14 @@ function mMakineDairesiKutulari(){
 }
 
 function mukavemetPlanla(hedef){
-  if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = true;
+  if(hedef && hedef.id === 'm_beyan_yuku') MUK_GK_TAZELE = MUK_AKTIF;
+  //  KULLANICININ YAZDIĞI KABİN AĞIRLIĞI KAZANIR.  Beyan yükü seçilip hemen
+  //  ardından kabin ağırlığı yazılınca bayrak hâlâ açıktı:  istek alanı boş
+  //  gönderiyor, dönen tablo değeri de yazılan sayının ÜSTÜNE basılıyordu
+  //  ( 950 yazıldı, kutu ve hesap 800'e döndü ).  Elle giriş tazelemeyi iptal
+  //  eder;  yolda olan yanıt da artık kutuya dokunmaz.
+  if(hedef && hedef.id === 'm_kabin_agirligi' && MUK_GK_TAZELE === MUK_AKTIF)
+    MUK_GK_TAZELE = false;
   if(hedef && hedef.id === M_ID('agirlik_malzemesi')) mMalzemeDerinligi();
   mMakineDairesiKutulari();
   mIkiliTazele();
@@ -551,6 +554,13 @@ function mukavemetPlanla(hedef){
 async function hesapMukavemet(){
   if(!MUK) return;
   const sira = ++ISTEK.mukavemet;
+  //  TAZELEMEYİ YALNIZ ONU İSTEYEN İSTEK TAMAMLAR.  Bayrak yanıtta okunuyordu:
+  //  beyan yükü değiştirildiği sırada YOLDA olan eski bir istek ( kabin
+  //  ağırlığını eski değerle taşıyan ) yanıtlanınca bayrağı kapatıyor ve eski
+  //  kütleyi kutuya yazıyordu — sonraki istek artık boş alan göndermediği için
+  //  tablo değeri hiç gelmiyordu ( 800 → 1000 kg'da kabin 950 yerine 800 kaldı ).
+  //  Bayrak ( tazelenecek asansörün sırası ) İSTEK ANINDA yakalanır.
+  const tazele = MUK_GK_TAZELE;
   try{
     const c = await (await fetch('/api/uygulama/coklu', {method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -561,11 +571,19 @@ async function hesapMukavemet(){
     //  baktığı yer burasıdır;  çoklu sonuç SON.mc'de durur.
     const aktif = (c.asansorler || [])[MUK_AKTIF] || (c.asansorler || [])[0] || c;
     SON.m = aktif;
-    if(MUK_GK_TAZELE){
+    //  Boş alanla giden BU istekse ve bu arada kullanıcı o asansörün kutusuna
+    //  yazmadıysa ( yazınca bayrak kapanır ).  Değer HER ZAMAN tazelenen
+    //  asansöre yazılır;  kutuya yalnız o asansör açıksa basılır.
+    if(tazele !== false && MUK_GK_TAZELE === tazele){
       MUK_GK_TAZELE = false;
-      const gk = $('m_kabin_agirligi');
-      const yeni = aktif.girdi && aktif.girdi.kabin_agirligi;
-      if(gk && yeni !== null && yeni !== undefined){ gk.value = mSayi(yeni); yaz(); }
+      const hedef = (c.asansorler || [])[tazele] || (tazele === MUK_AKTIF ? aktif : null);
+      const yeni = hedef && hedef.girdi && hedef.girdi.kabin_agirligi;
+      if(yeni !== null && yeni !== undefined){
+        if(MUK_ASANSORLER[tazele]) MUK_ASANSORLER[tazele].kabin_agirligi = mSayi(yeni);
+        const gk = $('m_kabin_agirligi');
+        if(gk && tazele === MUK_AKTIF) gk.value = mSayi(yeni);
+        yaz();
+      }
     }
     cizMukavemet(aktif);
     //  Asansör listesi YALNIZ PROJE sekmesindedir.  Bir süre her asansörün
@@ -871,8 +889,9 @@ function mukavemetIstek(){
     g.durak_yukseklikleri = (d.__durak || []).slice();
     return g;
   });
-  //  Boş kabin kütlesi sunucudan tazelenecekse aktif asansörde boşaltılır.
-  if(MUK_GK_TAZELE && asansorler[MUK_AKTIF]) asansorler[MUK_AKTIF].kabin_agirligi = '';
+  //  Boş kabin kütlesi sunucudan tazelenecekse O ASANSÖRDE boşaltılır.
+  if(MUK_GK_TAZELE !== false && asansorler[MUK_GK_TAZELE])
+    asansorler[MUK_GK_TAZELE].kabin_agirligi = '';
   return {asansorler, proje_geneli: pg, sabitler: ofisSabitleri()};
 }
 

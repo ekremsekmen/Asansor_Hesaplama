@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-TEST 4  —  ÇIKTI BÜTÜNLÜĞÜ  (XLSX ve PDF)
+TEST 4  —  ÇIKTI BÜTÜNLÜĞÜ  (PDF ve CAD)
 
-Üretilen dosyalar gerçekten açılabiliyor mu, içinde Excel hata hücresi var mı,
-doğru sayfaları taşıyor mu, PDF geçerli ve Türkçe karakterler yerinde mi?
+Üretilen dosyalar gerçekten açılabiliyor mu, PDF geçerli ve Türkçe karakterler
+yerinde mi, CAD çizimi paftanın birebir aynısı mı?
 """
 import io
 import json as _js
@@ -15,19 +15,15 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import openpyxl                                            # noqa: E402
 from engine.avan import hesap as AV
 from engine.avan import trafik as TR               # noqa: E402
-from exports import hucre_haritasi as H                    # noqa: E402
 try:
     from exports import dxf_export as _DXF          # noqa: E402
 except Exception:                                   # noqa: BLE001
     _DXF = None            # CAD kitaplıkları yoksa paket testi atlanır
-from engine.uygulama import sabitler as _US2
 from exports import kapak_export as KPK
-from exports import pdf_export as PE, xlsx_export as XE    # noqa: E402
-from api.avan import XLSX_TUR                           # noqa: E402
-from testler.ortak import Rapor, hata_hucresi_ara, yeniden_hesapla, soffice_yolu  # noqa: E402
+from exports import pdf_export as PE    # noqa: E402
+from testler.ortak import Rapor  # noqa: E402
 
 # Geçici dosyalar sistemin temp klasörüne yazılır — proje klasörü kirlenmez
 # ve silme izni kısıtlı makinelerde test takılmaz.
@@ -56,75 +52,10 @@ TR_HARF = "ÇĞİÖŞÜçğıöşü"
 
 
 def calistir():
-    print("\n\033[1mTEST 4 — ÇIKTI BÜTÜNLÜĞÜ (XLSX ve PDF)\033[0m")
+    print("\n\033[1mTEST 4 — ÇIKTI BÜTÜNLÜĞÜ (PDF ve CAD)\033[0m")
     r = Rapor("Çıktı bütünlüğü")
     shutil.rmtree(GECICI, ignore_errors=True)
     os.makedirs(GECICI, exist_ok=True)
-
-    # ---------------------------------------------------------- XLSX
-    dosyalar = {
-        "tek": (XE.trafik_xlsx("tek", GT), ["HESAPLAMA", "PAFTA"], ["ÇOKLU ASANSÖR", "PAFTA-COKLU"], "PAFTA"),
-        "coklu": (XE.trafik_xlsx("coklu", GC), ["ÇOKLU ASANSÖR", "PAFTA-COKLU"], ["HESAPLAMA", "PAFTA"], "PAFTA-COKLU"),
-        "avan": (XE.avan_xlsx(AV_VERI),
-                 ["GİRİŞ", "ÖZET", "1 NOLU ASANSÖR", "2 NOLU ASANSÖR", "3 NOLU ASANSÖR",
-                  "4 NOLU ASANSÖR", "MK.DAİRESİ AYD.", "TOPRAKLAMA", "TABLOLAR", "SABİTLER"],
-                 [], "ÖZET"),
-    }
-    for ad, (icerik, olmali, olmamali, aktif) in dosyalar.items():
-        yol = os.path.join(GECICI, f"{ad}.xlsx")
-        open(yol, "wb").write(icerik)
-        r.kontrol(f"{ad}.xlsx ZIP imzası", icerik[:2] == b"PK")
-        r.kontrol(f"{ad}.xlsx makul boyut", 20_000 < len(icerik) < 5_000_000, f"→ {len(icerik)} bayt")
-        try:
-            wb = openpyxl.load_workbook(yol)
-        except Exception as e:                                   # noqa: BLE001
-            r.kontrol(f"{ad}.xlsx açılabiliyor", False, f"→ {e}")
-            continue
-        r.kontrol(f"{ad}.xlsx açılabiliyor", True)
-        for sh in olmali:
-            r.kontrol(f"{ad}.xlsx '{sh}' sayfası var", sh in wb.sheetnames)
-        for sh in olmamali:
-            r.kontrol(f"{ad}.xlsx '{sh}' sayfası ÇIKARILMIŞ", sh not in wb.sheetnames)
-        r.esit(f"{ad}.xlsx açılışta gelen sayfa", wb.active.title, aktif)
-        r.kontrol(f"{ad}.xlsx açılışta yeniden hesaplanacak",
-                  bool(getattr(wb.calculation, "fullCalcOnLoad", False)))
-        # tanımlı adlarda kırık başvuru olmamalı
-        kirik = [n for n, d in wb.defined_names.items() if "#REF" in str(d.value)]
-        r.kontrol(f"{ad}.xlsx tanımlı adlar sağlam", not kirik, f"→ {kirik}")
-
-        #  v1.9 — MOTOR SİGORTASI: şablonda her asansörde sabit "4 x 25"
-        #  yazıyordu.  Program motor akımından seçtiği kademeyi hücreye
-        #  yazmalı ki indirilen Excel ile ekrandaki pafta ayrışmasın.
-        if ad == "avan":
-            from engine.avan import hesap as _AV
-            _hes = _AV.hesapla(AV_VERI)
-            _bek = {h["no"]: (h["ozet"]["motor_sigorta"] if h.get("aktif") else None)
-                    for h in (_hes.get("asansorler") or []) if h}
-            for _i in range(1, 5):
-                _sayfa = f"{_i} NOLU ASANSÖR"
-                if _sayfa not in wb.sheetnames:
-                    continue
-                _okunan = wb[_sayfa]["G102"].value
-                r.esit(f"avan.xlsx {_sayfa}!G102 motor sigortası",
-                       _okunan, _bek.get(_i))
-                r.kontrol(f"avan.xlsx {_sayfa} şablondaki sabit metin kalmadı",
-                          not (_bek.get(_i) not in (None, "4 x 25") and _okunan == "4 x 25"))
-
-
-    # yeniden hesaplandığında hata hücresi kalmamalı
-    if soffice_yolu():
-        cikis = os.path.join(GECICI, "hesaplandi")
-        yeniden_hesapla([os.path.join(GECICI, f"{a}.xlsx") for a in dosyalar], cikis)
-        for ad in dosyalar:
-            y = os.path.join(cikis, f"{ad}.xlsx")
-            if not os.path.exists(y):
-                r.kontrol(f"{ad}.xlsx yeniden hesaplanabildi", False)
-                continue
-            hatalar = hata_hucresi_ara(y)
-            r.kontrol(f"{ad}.xlsx hesap sonrası hata hücresi yok", not hatalar,
-                      f"→ {hatalar[:4]}")
-    else:
-        r.atla("LibreOffice yok — XLSX yeniden hesaplama kontrolü atlandı")
 
     # ---------------------------------------------------------- PDF
     pdfler = {
@@ -348,46 +279,10 @@ def calistir():
     uzun = dict(PROJE, proje_adi="A" * 300, isveren="B" * 300)
     b = PE.trafik_pdf(TR.hesapla_tek(GT), uzun)
     r.kontrol("çok uzun proje adı PDF'i bozmadı", b[:4] == b"%PDF")
-    x = XE.trafik_xlsx("tek", dict(GT, ek_nufus=[
+    x = PE.trafik_pdf(TR.hesapla_tek(dict(GT, ek_nufus=[
         {"aciklama": "Kalem " + str(i), "miktar": 10, "kalem": "KONUT — Diğer oda"}
-        for i in range(30)]))
-    r.kontrol("30 ek nüfus satırı XLSX'i bozmadı", x[:2] == b"PK")
-
-    # ---------------------------------------------------------- şablon eksikse
-    #  Hesap ve PDF şablonsuz da çalışmalı; XLSX üretilemez ama kullanıcı
-    #  bozuk bir dosya indirmemeli — anlaşılır hata almalı.
-    #
-    #  ÖNEMLİ: bu kontrol gerçek şablon dosyalarına DOKUNMAZ.  Yalnız modülün
-    #  yol değişkenleri geçici olarak var olmayan bir dosyayı gösterir; test
-    #  bitince eski değerlerine döner.  Böylece silme izni kısıtlı makinelerde
-    #  de güvenle çalışır.
-    yok = os.path.join(tempfile.gettempdir(), "avan_olmayan_sablon.xlsx")
-    eski_trafik, eski_avan = XE.TRAFIK_SABLON, XE.AVAN_SABLON
-    XE.TRAFIK_SABLON = XE.AVAN_SABLON = yok
-    try:
-        s2 = TR.hesapla_tek(GT)
-        r.kontrol("şablonsuz hesap çalışıyor", s2.get("hata") is None and s2["ozet"]["TR"] > 0)
-        p2 = PE.trafik_pdf(s2, PROJE)
-        r.kontrol("şablonsuz PDF üretiliyor", p2[:4] == b"%PDF" and len(p2) > 10_000)
-        p3 = PE.avan_pdf(AV.hesapla(AV_VERI), PROJE)
-        r.kontrol("şablonsuz avan PDF üretiliyor", p3[:4] == b"%PDF")
-        for ad, fn in (("trafik", lambda: XE.trafik_xlsx("tek", GT)),
-                       ("avan", lambda: XE.avan_xlsx(AV_VERI))):
-            hata_alindi = False
-            try:
-                fn()
-            except Exception:                                # noqa: BLE001
-                hata_alindi = True
-            r.kontrol(f"şablonsuz {ad} XLSX açıkça hata veriyor "
-                      "(sessizce bozuk dosya değil)", hata_alindi)
-    finally:
-        XE.TRAFIK_SABLON, XE.AVAN_SABLON = eski_trafik, eski_avan
-    r.kontrol("şablon dosyaları yerinde ve okunabilir",
-              os.path.isfile(XE.TRAFIK_SABLON) and os.path.isfile(XE.AVAN_SABLON)
-              and os.path.getsize(XE.TRAFIK_SABLON) > 10_000
-              and os.path.getsize(XE.AVAN_SABLON) > 10_000)
-    r.kontrol("şablonla XLSX yeniden üretilebiliyor",
-              XE.trafik_xlsx("tek", GT)[:2] == b"PK")
+        for i in range(30)])), PROJE)
+    r.kontrol("30 ek nüfus satırı PDF'i bozmadı", x[:4] == b"%PDF")
 
     #  v2.9 — KAPAK ADRESİ SESSİZCE KIRPILMASIN.  Satır bütçesi 2'ye sabitti;
     #  124 karakterlik normal bir adreste "İstanbul Türkiye 34758" bölümü
@@ -428,7 +323,7 @@ def calistir():
         sys.path.insert(0, {_kok!r})
         sys.path.insert(0, {_gecici!r})
         from testler import calistir as K
-        K.TESTLER = [("9", "Çöken", "coken", False)]
+        K.TESTLER = [("9", "Çöken", "coken")]
         sys.exit(K.main(["9"]))
     """)
     _p = _sp.run([sys.executable, "-c", _kod], capture_output=True, text=True,
@@ -437,12 +332,7 @@ def calistir():
     r.kontrol("çöken test özet satırında bildiriliyor",
               "ÇALIŞTIRILAMAYAN" in _p.stdout, f"→ {_p.stdout[-160:]!r}")
 
-    #  v2.9 — EKRAN REDDEDİYORSA XLSX DE ÜRETİLMEZ.
-    #  PDF hatayı paftaya BASAR ( okunur belge çıkar ) ama Excel şablonu yalnız
-    #  girdi hücrelerini alır:  Python'a özgü denetimler ( "durak adedi N+1
-    #  olmalıdır" gibi ) şablonda yoktur, dolayısıyla ekranda reddedilen bir
-    #  hesap indirilen dosyada SORUNSUZ görünüyordu.
-    import json as _json
+    #  Hatalı hesapta PDF yine üretilir — hata paftaya basılır.
     from api import avan as _M
     _hatali = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
                             "yapi_yuksekligi": "43", "N": "11", "h": "3",
@@ -450,28 +340,8 @@ def calistir():
                             "asansorler": [{"P": "10", "kapi_genisligi": "900",
                                             "kapi_tipi": "Teleskopik Otomatik",
                                             "durak": "2"}]}}
-    _y = _M.indir_trafik_xlsx(_hatali)
-    _g = _json.loads(bytes(_y.body).decode("utf-8")) if "json" in _y.media_type else {}
-    r.kontrol("hatalı hesapta trafik XLSX üretilmiyor",
-              "json" in _y.media_type and "HESAP HATASI" in str(_g.get("hata")),
-              f"→ {_y.media_type}")
     r.kontrol("hatalı hesapta trafik PDF yine üretiliyor ( hata paftaya basılır )",
               _M.indir_trafik_pdf(_hatali).media_type == "application/pdf")
-    _saglam = _json.loads(_json.dumps(_hatali))
-    _saglam["girdiler"]["asansorler"][0].pop("durak")
-    r.kontrol("sağlam hesapta trafik XLSX üretiliyor",
-              _M.indir_trafik_xlsx(_saglam).media_type == XLSX_TUR)
-
-    _av_hatali = {"girdiler": {"ortak": {"mk_yok": True},
-                               "asansorler": [{"aktif": True, "kapasite": "10",
-                                               "V": "1,6", "eta": "9",
-                                               "Hk": "32,85", "kuyu_genisligi": "1800",
-                                               "kabin_boyu": "1450",
-                                               "kabin_genisligi": "1300"}],
-                               "sabitler": {}}}
-    _ya = _M.indir_avan_xlsx(_av_hatali)
-    r.kontrol("hatalı hesapta avan XLSX üretilmiyor", "json" in _ya.media_type,
-              f"→ {_ya.media_type}")
 
     #  v2.8 — PDF GENİŞLİK ÇARPANI İSTEK BAŞINA AYRI OLMALIDIR.
     #  Modül globaliyken, trafik paftası küçültülürken ( çarpan 1/0,9 )
@@ -495,15 +365,9 @@ def calistir():
     r.esit("PDF genişlik çarpanı iş parçacığına özel", _gorulen, {1.0})
     r.esit("çarpan varsayılanı 1.0", PE._OLCEK.gen, 1.0)
 
-    #  v2.8 — ARAYÜZÜN GÖNDERDİĞİ BİÇİMLE XLSX ÜRETİMİ.
-    #  Arayüz girdileri `asansorler` listesinde yollar; HESAPLAMA sayfası ise
-    #  DÜZ alanları ( P / kapı / süreler / adet ) okur.  Eşleme yalnız hesap
-    #  yolunda yapıldığı için indirilen tek-asansör Excel'inde bu hücreler BOŞ
-    #  kalıyor, Excel paftaya "HESAP HATASI: ⑨ kapı genişliği listeden
-    #  seçilmelidir" basıyordu — EKRANDA hesap doğru görünürken.
-    #  Testler bunu göremiyordu çünkü hepsi düz ( eski ) girdi biçimini
-    #  kullanıyordu;  bu kontrol GERÇEK arayüz biçiminden geçer.
-    from api import avan as _M
+    #  v2.8 — ARAYÜZÜN GÖNDERDİĞİ BİÇİM.  Arayüz girdileri `asansorler`
+    #  listesinde yollar;  özdeş asansörler tek yola düşmeli ve düz alanlar
+    #  ( P / kapı / bodrum / adet ) doğru eşlenmeli.
     for _adet, _bek_adet in ((1, None), (3, 3)):
         _ui = {"girdiler": {"bina_tipi": "Konut", "bina_yuksekligi": "39,98",
                             "yapi_yuksekligi": "43", "N": "11", "h": "3",
@@ -513,130 +377,11 @@ def calistir():
         _g = _M._trafik_girdi(_ui)
         _s = TR.hesapla(_g)
         r.esit(f"arayüz biçimi {_adet} asansör → tek yol", _s.get("yol"), "tek")
-        _ws = openpyxl.load_workbook(io.BytesIO(
-            XE.trafik_xlsx(_s["yol"], _g, {})))[H.TEK_SAYFA]
+        _tek = TR.tekil_girdi(_g)
         for _k, _bek in (("P", 10), ("kapi_genisligi", 900),
                          ("kapi_tipi", "Merkezden Açılan Oto."),
                          ("h", 3), ("bodrum", 2), ("manuel_adet", _bek_adet)):
-            r.esit(f"{_adet} asansör · XLSX {H.TEK[_k]} ({_k})",
-                   _ws[H.TEK[_k]].value, _bek)
-
-    #  v2.8 — ŞABLONUN SABİTLER B DEĞERLERİ MOTORLA AYNI OLMALIDIR.
-    #  Kullanıcı bir sabiti boş bırakırsa xlsx_export o hücreye HİÇBİR ŞEY
-    #  yazmaz; Excel şablonun kendi değeriyle hesaplar.  İkisi ayrışırsa
-    #  indirilen dosya ekrandakinden farklı sonuç verir ve bu ekranda hiç
-    #  görünmez.  ( Kuyu armatürü ışık akısı 2600 → 2100 değişiminde şablon
-    #    güncellenmeseydi tam olarak bu olurdu. )
-    _wb = openpyxl.load_workbook(XE.AVAN_SABLON)
-    _ws = _wb[H.AVAN_SABIT_SAYFA]
-    for _anahtar, _adres in H.AVAN_SABIT.items():
-        _motor = AV.SABIT_B_VARSAYILAN.get(_anahtar, AV.OFIS_VARSAYILAN.get(_anahtar))
-        if _motor is None:
-            continue
-        _sablon = _ws[_adres].value
-        if isinstance(_motor, (int, float)) and isinstance(_sablon, (int, float)):
-            _ok = abs(float(_motor) - float(_sablon)) < 1e-9
-        else:
-            _ok = str(_motor).strip() == str(_sablon).strip()
-        r.kontrol(f"şablon SABİTLER!{_adres} = motor ({_anahtar})", _ok,
-                  f"→ şablon {_sablon!r}, motor {_motor!r}")
-
-    # ------------------------------------------------ YANLIŞ / ESKİ ŞABLON
-    #  En sinsi hata: templates/ klasörüne yanlış ya da eski bir Excel konursa
-    #  program yine dosya üretir, hesap doğru olduğu için ekranda hiçbir
-    #  belirti çıkmaz, hata yalnız teslim edilen paftada görünür.
-    #
-    #  ÖNEMLİ: aşağıdaki senaryolar gerçek şablonlara DOKUNMAZ — geçici bir
-    #  klasöre KOPYALANIR, kopyalar bozulur ve modülün yol değişkenleri
-    #  geçici olarak oraya çevrilir.
-    import openpyxl as _op
-    from exports import sablon_denetim as SD
-
-    r.kontrol("gerçek trafik şablonu denetimden geçiyor",
-              SD.denetle(XE.TRAFIK_SABLON, "trafik", onbellek=False)["uygun"])
-    r.kontrol("gerçek avan şablonu denetimden geçiyor",
-              SD.denetle(XE.AVAN_SABLON, "avan", onbellek=False)["uygun"])
-    r.kontrol("denetim parmak izi ( md5 ) veriyor",
-              len(SD.denetle(XE.AVAN_SABLON, "avan", onbellek=False)["md5"] or "") == 32)
-
-    _D = tempfile.mkdtemp(prefix="avan_sablon_")
-
-    def _bozuk(kaynak, degisiklikler):
-        """Şablonun KOPYASINI bozar, yolunu döndürür."""
-        hedef = os.path.join(_D, "s%d.xlsx" % (len(os.listdir(_D)) + 1))
-        shutil.copy(kaynak, hedef)
-        wb = _op.load_workbook(hedef)
-        for sayfa, adres, deger in degisiklikler:
-            wb[sayfa][adres] = deger
-        wb.save(hedef)
-        return hedef
-
-    #  1) ESKİ trafik şablonu — Tablo-4'te 1000 mm satırı, Tablo-8'de 700 mm
-    #     sütunu v1.3'te eklenmişti; eski dosyada yoktur.
-    _eski = _bozuk(XE.TRAFIK_SABLON, [("TABLO-4", "A7", 1100),
-                                      ("TABLO-8", "B1", 800)])
-    _s = SD.denetle(_eski, "trafik", onbellek=False)
-    r.kontrol("eski trafik şablonu yakalanıyor", _s["uygun"] is False)
-    r.kontrol("eski şablon hatası TABLO-4'ü gösteriyor",
-              any("TABLO-4" in h for h in _s["hatalar"]))
-    r.kontrol("eski şablon hatası TABLO-8'i gösteriyor",
-              any("TABLO-8" in h for h in _s["hatalar"]))
-
-    #  2) Tablo DEĞERİ kaymış avan şablonu ( Tablo-11 boş kabin kütlesi )
-    _deger = _bozuk(XE.AVAN_SABLON, [("TABLOLAR", "B75", 1150)])
-    _s = SD.denetle(_deger, "avan", onbellek=False)
-    r.kontrol("tablo değeri kaymış avan şablonu yakalanıyor", _s["uygun"] is False)
-    r.kontrol("hata hangi hücre olduğunu söylüyor",
-              any("TABLOLAR!B75" in h for h in _s["hatalar"]))
-
-    #  3) YANLIŞ DOSYA — avan şablonu trafik yerine konmuş
-    _s = SD.denetle(XE.AVAN_SABLON, "trafik", onbellek=False)
-    r.kontrol("yanlış dosya ( avan → trafik ) yakalanıyor", _s["uygun"] is False)
-    r.kontrol("eksik sayfa olarak bildiriliyor",
-              any("Eksik sayfa" in h for h in _s["hatalar"]))
-
-    #  4) Excel bile olmayan dosya
-    _degil = os.path.join(_D, "degil.xlsx")
-    open(_degil, "w", encoding="utf-8").write("bu bir excel değil")
-    _s = SD.denetle(_degil, "avan", onbellek=False)
-    r.kontrol("Excel olmayan dosya yakalanıyor", _s["uygun"] is False)
-
-    #  5) Girdi hücresi BİRLEŞTİRİLMİŞ alana düşerse — yazılan değer kaybolur
-    _bir = os.path.join(_D, "birlesik.xlsx")
-    shutil.copy(XE.AVAN_SABLON, _bir)
-    _wb = _op.load_workbook(_bir)
-    _wb[H.AVAN_SAYFA].merge_cells("C23:C24")     # kapasite hücresini yut
-    _wb.save(_bir)
-    _s = SD.denetle(_bir, "avan", onbellek=False)
-    r.kontrol("birleştirilmiş alana düşen girdi hücresi yakalanıyor",
-              _s["uygun"] is False
-              and any("birleştirilmiş" in h for h in _s["hatalar"]))
-
-    #  6) DENETİMDEN GEÇMEYEN ŞABLONLA XLSX ÜRETİLMEZ
-    _eski_t, _eski_a = XE.TRAFIK_SABLON, XE.AVAN_SABLON
-    XE.TRAFIK_SABLON, XE.AVAN_SABLON = _eski, _deger
-    try:
-        for ad, fn in (("trafik", lambda: XE.trafik_xlsx("tek", GT)),
-                       ("avan", lambda: XE.avan_xlsx(AV_VERI))):
-            _mesaj = ""
-            try:
-                fn()
-            except SD.SablonHatasi as e:
-                _mesaj = str(e)
-            except Exception as e:                           # noqa: BLE001
-                _mesaj = "BEKLENMEYEN: " + type(e).__name__
-            r.kontrol(f"bozuk şablonla {ad} XLSX ÜRETİLMİYOR",
-                      "ŞABLON UYUŞMUYOR" in _mesaj, f"→ {_mesaj[:70]}")
-    finally:
-        XE.TRAFIK_SABLON, XE.AVAN_SABLON = _eski_t, _eski_a
-
-    #  Gerçek şablonlar bozulmadı mı — testin kendisi zarar vermemeli
-    r.kontrol("gerçek trafik şablonu hâlâ uygun",
-              SD.denetle(XE.TRAFIK_SABLON, "trafik", onbellek=False)["uygun"])
-    r.kontrol("gerçek avan şablonu hâlâ uygun",
-              SD.denetle(XE.AVAN_SABLON, "avan", onbellek=False)["uygun"])
-    r.kontrol("doğru şablonla XLSX yine üretiliyor",
-              XE.avan_xlsx(AV_VERI)[:2] == b"PK")
+            r.esit(f"{_adet} asansör · düz alan {_k}", _tek.get(_k), _bek)
 
     shutil.rmtree(GECICI, ignore_errors=True)
     # ==================================================================
@@ -1151,7 +896,6 @@ def calistir():
     from api import uygulama as _MM
     from engine.uygulama import mukavemet as _MK
     from engine.uygulama import mukavemet_girdi as _MG
-    from exports import mukavemet_xlsx as _MX
 
     _muk = _MK.hesapla()
     _mpdf = PE.mukavemet_pdf(_muk, PROJE)
@@ -1168,13 +912,13 @@ def calistir():
     _msn = _MK.hesapla()
     _ngucu = f"{_msn['ozet']['N_hesap']:.2f}".replace(".", ",")
     #  FKR de motordan okunur:  ray ağırlığı iki kez sayılmayı bırakınca
-    #  21.326 → 18.096 oldu ( bkz. EXCEL_FARKLARI ).
+    #  21.326 → 18.096 oldu.
     _fkr = f"{_msn['ozet']['FKR']:,.0f}".replace(",", ".")
     #  Sf de motordan okunur:  altı kesik V kanal Çizelge 2'nin V satırına
-    #  oturunca 17,63 → 23,61 oldu ( bkz. EXCEL_FARKLARI ).
+    #  oturunca 17,63 → 23,61 oldu.
     _sf = f"{_msn['ozet']['Sf']:.2f}".replace(".", ",")
     #  Kuyu tabanı tampon kuvveti de MOTORDAN okunur:  P'ye gezici kablo ve
-    #  denge zinciri girince 58.860 → 59.389 oldu ( bkz. EXCEL_FARKLARI ).
+    #  denge zinciri girince 58.860 → 59.389 oldu.
     _fkt = f"{_msn['ozet']['Fkt']:,.0f}".replace(",", ".")
     for _ara in (_ngucu, _sf, _fkr, _fkt):
         r.kontrol(f"mukavemet PDF sayısı {_ara}", _ara in _mm,
@@ -1193,274 +937,69 @@ def calistir():
     r.kontrol("hatalı girdide PDF sebebi yazıyor",
               "boş bırakılamaz" in _metin(_mbos), f"→ {_metin(_mbos)[:120]!r}")
 
-    #  XLSX:  şablonun kendisi, girdilerle doldurulmuş
-    if _MX.sablon_var():
-        _mx = _MX.mukavemet_xlsx({"beyan_yuku": 630, "kabin_agirligi": 600})
-        r.kontrol("mukavemet XLSX üretildi", len(_mx) > 100_000)
-        import openpyxl as _op
-        _wb = _op.load_workbook(io.BytesIO(_mx))
-        _ws = _wb["Veri Girişi"]
-        r.esit("XLSX: beyan yükü yazıldı", _ws["C59"].value, 630)
-        r.esit("XLSX: kabin ağırlığı yazıldı", _ws["C75"].value, 600)
-        r.kontrol("XLSX: hesaplanan hücreler FORMÜL kaldı",
-                  str(_ws["C80"].value).startswith("=")
-                  and str(_ws["F80"].value).startswith("="),
-                  f"→ C80={_ws['C80'].value!r}  F80={_ws['F80'].value!r}")
-        r.kontrol("XLSX: açılışta yeniden hesap açık", _wb.calculation.fullCalcOnLoad)
-        #  Proje kimliği dosya ÖZELLİKLERİNE yazılıyor mu  ( şablonda hücresi yok )
-        _mp = _op.load_workbook(io.BytesIO(
-            _MX.mukavemet_xlsx({}, {"proje_adi": "Yıldız Konutları",
-                                    "isveren": "ÇAĞDAŞ İnşaat",
-                                    "pafta_no": "MK-01"}))).properties
-        r.esit("XLSX: proje adı özelliklere yazıldı", _mp.title, "Yıldız Konutları")
-        r.esit("XLSX: işveren özelliklere yazıldı", _mp.subject, "ÇAĞDAŞ İnşaat")
-        r.esit("XLSX: pafta no özelliklere yazıldı", _mp.category, "MK-01")
-        #  UYGULAMA PROJESİNDEN AVAN KİTABI ÇIKMAZ.  İki çalışma kitabı iki
-        #  ayrı projeye aittir:  MUKAVEMET_HESABI.xlsx uygulama projesinin,
-        #  ASANSOR_AVAN_HESAPLARI.xlsx avan projesinin kitabıdır.  Elektrik
-        #  hesapları uygulama tarafında ekranda ve paftada verilir.
-        r.kontrol("uygulama projesinde avan kitabı ucu yok",
-                  not hasattr(_MM, "indir_uygulama_elektrik_xlsx"))
-        r.kontrol("XLSX: hesap sayfaları duruyor",
-                  "11-Muk. Hesapları" in _wb.sheetnames
-                  and "Askı Tipleri" in _wb.sheetnames)
-        #  TESLİM EDİLEN KİTAP PAFTAYLA ÇELİŞMEMELİ.
-        #  Program kaynak kitabın sekiz hesabından ayrılıyor;
-        #  kitap olduğu gibi verilseydi aynı projenin iki belgesi birbirini
-        #  yalanlardı ( pafta "uygun değil" derken Excel "uygundur" ).
-        #  Teslim kopyasında o FORMÜLLER düzeltilir — aşağıda gerçekten
-        #  düzeltildiği ve kitabın kendi hesabının motorla aynı çıktığı
-        #  denetlenir.
-        _duz = _op.load_workbook(io.BytesIO(
-            _MX.mukavemet_xlsx(_MK.hesapla()["girdi"])))["11-Muk. Hesapları"]
-        r.esit("teslim kopyasında Dt/dh eşiği 40", _duz["Q97"].value, 40)
-        r.esit("teslim kopyasında Durum 2 xQ = xc", _duz["AO312"].value, "=AH293")
-        r.kontrol("teslim kopyasında σ(My) Wx sütununa bakıyor",
-                  ",6,0)" in str(_duz["AU575"].value), f"→ {_duz['AU575'].value}")
-        r.kontrol("teslim kopyasında μ halat hızıyla",
-                  "B100" in str(_duz["AK190"].value), f"→ {_duz['AK190'].value}")
-        r.kontrol("teslim kopyasında flanş paydasında ℓ var",
-                  "(1+2*" not in str(_duz["Q380"].value).replace(" ", ""),
-                  f"→ {str(_duz['Q380'].value)[:90]}")
-        r.kontrol("teslim kopyasında ω ray çeliğine bağlı",
-                  "B131" in str(_duz["AD354"].value), f"→ {str(_duz['AD354'].value)[:90]}")
-        r.esit("teslim kopyasında kabin üstü sınırı sığınma yüksekliğinden",
-               _duz["AD636"].value, "=P639*1000")
-        r.esit("teslim kopyasında ray dibi açıklığı 100 mm",
-               _duz["AD647"].value, 100)
-        r.kontrol("teslim kopyasında η makine tipine bağlı formül",
-                  "B130" in str(_duz["AQ22"].value), f"→ {_duz['AQ22'].value!r}")
-        r.kontrol("teslim kopyasında η askı oranından BAĞIMSIZ  ( Δη kaldırıldı )",
-                  "B100" not in str(_duz["AQ22"].value),
-                  f"→ {_duz['AQ22'].value!r}")
-        _sb = _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]
-        r.esit("kaynak kitapta η sabit 0,92 idi", _sb["AQ22"].value, 0.92)
-        #  Elektrik sayfası programın girdilerini kullanıyor mu
-        _delk = _op.load_workbook(io.BytesIO(
-            _MX.mukavemet_xlsx(_MK.hesapla()["girdi"])))["12-Elk.Hesapları"]
-        _S0 = _US2.sabitler({})
-        r.esit("teslim kopyasında U programın değeri", _delk["W28"].value, _S0["U"])
-        r.esit("teslim kopyasında cosφ programın değeri", _delk["X58"].value, _S0["cosfi"])
-        #  Kesit değişince kapasite de değişmeli  ( kitapta 34 SABİTTİ )
-        _delk2 = _op.load_workbook(io.BytesIO(_MX.mukavemet_xlsx(
-            _MK.hesapla({"makine_kesit": 1.5})["girdi"])))["12-Elk.Hesapları"]
-        r.kontrol("teslim kopyasında kablo kapasitesi KESİTTEN geliyor",
-                  _delk2["Y65"].value != _delk["Y65"].value,
-                  f"→ 6 mm² {_delk['Y65'].value!r} · 1,5 mm² {_delk2['Y65'].value!r}")
-        r.esit("1,5 mm² kablonun kapasitesi", _delk2["Y65"].value, 17.5)
-        _sbe = _op.load_workbook(_MX.SABLON)["12-Elk.Hesapları"]
-        r.esit("kaynak kitapta kapasiteler ve gerilim SABİTTİ",
-               [str(_sbe["S60"].value), str(_sbe["Y65"].value), str(_sbe["W28"].value)],
-               ["43", "34", "400"])
-        r.esit("teslim kopyasında ray ağırlığı bir kez sayılıyor",
-               _duz["AO611"].value, "=AU351-AK351*AM351")
-        r.esit("kaynak kitapta bu sınırlar 1200 / 150 idi",
-               [_sb["AD636"].value, _sb["AD647"].value], [1200, 150])
-        #  ---------------------------------------------------------------
-        #  OFİSİN ANA KİTABININ DÜZELTİLMİŞ KOPYASI
-        #  ---------------------------------------------------------------
-        #  Teslim edilen dosya düzeltiliyordu ama ofisin masasındaki ANA kitap
-        #  düzelmiyordu:  onu açıp elle hesap yapan eski, bazıları emniyetsiz
-        #  sonuçları alıyordu.  araclar/kaynak_excel_duzelt.py o boşluğu
-        #  kapatır;  burada gerçekten düzeltilmiş VE doğru hesaplıyor mu diye
-        #  bakılır.
-        _usta = _MX.duzeltilmis_kaynak()
-        _uwb = _op.load_workbook(io.BytesIO(_usta))
-        _uws = _uwb["11-Muk. Hesapları"]
-        r.kontrol("düzeltilmiş kitap üretildi", len(_usta) > 200_000,
-                  f"→ {len(_usta)} bayt")
-        for _h, _bek in (("Q97", 40), ("AO312", "=AH293"),
-                         ("AD636", "=P639*1000"), ("AD647", 100)):
-            r.esit(f"düzeltilmiş kitap {_h}", _uws[_h].value, _bek)
-        for _h, _ara in (("AQ22", "B130"), ("AK190", "B100"),
-                         ("AD354", "B131"), ("AU575", ",6,0)")):
-            r.kontrol(f"düzeltilmiş kitap {_h} düzeltilmiş",
-                      _ara in str(_uws[_h].value), f"→ {str(_uws[_h].value)[:70]}")
-        r.kontrol("düzeltilmiş kitapta flanş paydasında ℓ var",
-                  "(1+2*" not in str(_uws["Q380"].value).replace(" ", ""))
-        #  HİÇBİR PROJENİN GİRDİSİ SIZMAMALI — bu boş bir usta kopyadır
-        _uvg = _uwb[_MX.GIRDI_SAYFASI]
-        r.kontrol("usta kopyada ek girdi satırları BOŞ",
-                  all(_uvg[f"B{_st}"].value in (None, "")
-                      for _a, _st, _e, _b in _MX.EK_GIRDI_HUCRELERI),
-                  "→ bir projenin girdisi sızmış")
-        #  Neyin niçin değiştiği kitabın İÇİNDE yazılı olmalı
-        r.kontrol("DÜZELTMELER sayfası var", _MX.DUZELTME_SAYFASI in _uwb.sheetnames,
-                  f"→ {_uwb.sheetnames}")
-        _dz = "\n".join(str(c.value) for _sat in _uwb[_MX.DUZELTME_SAYFASI].iter_rows()
-                         for c in _sat if c.value is not None)
-        for _ad, _md, _e2, _y2, _hc in _MK.EXCEL_FARKLARI:
-            r.kontrol(f"kayıtta '{_ad[:30]}' var", _ad in _dz)
-        for _h in ("Q97", "AQ22", "AD647", "AD636", "AO312"):
-            r.kontrol(f"kayıt düzenlenen {_h} hücresini sayıyor", _h in _dz)
+    #  ---------------------------------------------------------------
+    #  "PROJEYİ PAKETLE"  —  teslim paketi + geri dönüş noktası
+    #  ---------------------------------------------------------------
+    #  Çıktılar projeyi ANLATIR, proje dosyası onu GERİ GETİRİR.  İkisi
+    #  ayrı yerlerde durursa arşivden dönmek imkânsızlaşır;  bu yüzden
+    #  aynı ZIP'te olmaları denetlenir.
+    import zipfile as _zf
+    from api.ortak import _paket_ekleri as _PE
+    _pd = {"__mod": "uygulama", "__surum": 1,
+           "alanlar": {"m_beyan_yuku": "800", "uof_sigma_em": "150"}}
+    #  Kapak alanı sunucuda "project_title" adıyla gelir.
+    _ek = _PE({"kapak": {"project_title": "Jan Mühendislik"},
+               "proje_dosyasi": _pd}, "uygulama")
+    r.esit("paket eki bir dosya üretiyor", len(_ek), 1)
+    r.kontrol("proje dosyasının uzantısı moda göre",
+              _ek[0][0].endswith(".uygulama"), f"→ {_ek[0][0]}")
+    r.kontrol("proje dosyası adı proje adından",
+              "Jan Mühendislik" in _ek[0][0], f"→ {_ek[0][0]}")
+    _geri = _js.loads(_ek[0][1].decode("utf-8"))
+    r.esit("paketteki proje dosyası gövdeyi birebir taşıyor", _geri, _pd)
+    r.esit("avan modunda uzantı .avan",
+           _PE({"proje_dosyasi": _pd}, "avan")[0][0].endswith(".avan"), True)
+    r.esit("proje dosyası yoksa ek de yok", _PE({}, "avan"), [])
 
-        #  ---------------------------------------------------------------
-        #  "PROJEYİ PAKETLE"  —  teslim paketi + geri dönüş noktası
-        #  ---------------------------------------------------------------
-        #  Çıktılar projeyi ANLATIR, proje dosyası onu GERİ GETİRİR.  İkisi
-        #  ayrı yerlerde durursa arşivden dönmek imkânsızlaşır;  bu yüzden
-        #  aynı ZIP'te olmaları denetlenir.
-        import zipfile as _zf
-        from api.ortak import _paket_ekleri as _PE
-        _pd = {"__mod": "uygulama", "__surum": 1,
-               "alanlar": {"m_beyan_yuku": "800", "uof_sigma_em": "150"}}
-        #  Kapak alanı sunucuda "project_title" adıyla gelir.
-        _ek = _PE({"kapak": {"project_title": "Jan Mühendislik"},
-                   "proje_dosyasi": _pd}, "uygulama")
-        r.esit("paket eki bir dosya üretiyor", len(_ek), 1)
-        r.kontrol("proje dosyasının uzantısı moda göre",
-                  _ek[0][0].endswith(".uygulama"), f"→ {_ek[0][0]}")
-        r.kontrol("proje dosyası adı proje adından",
-                  "Jan Mühendislik" in _ek[0][0], f"→ {_ek[0][0]}")
-        _geri = _js.loads(_ek[0][1].decode("utf-8"))
-        r.esit("paketteki proje dosyası gövdeyi birebir taşıyor", _geri, _pd)
-        r.esit("avan modunda uzantı .avan",
-               _PE({"proje_dosyasi": _pd}, "avan")[0][0].endswith(".avan"), True)
-        r.esit("proje dosyası yoksa ek de yok", _PE({}, "avan"), [])
+    #  ZIP gerçekten hepsini taşıyor mu
+    if _DXF is not None:
+        _zip, _sebep, _tasti = _DXF.proje_paketi(
+            [("Kapak", None), ("Hesap", PE.mukavemet_pdf(_MK.hesapla(), PROJE))],
+            "Jan Mühendislik - Uygulama Projesi", _ek)
+        _z = _zf.ZipFile(io.BytesIO(_zip))
+        _adlar = _z.namelist()
+        r.kontrol("pakette DXF var", any(a.endswith(".dxf") for a in _adlar), f"→ {_adlar}")
+        r.kontrol("pakette pafta PDF'i var", any(a.endswith(".pdf") for a in _adlar))
+        r.kontrol("pakette PROJE DOSYASI var",
+                  any(a.endswith(".uygulama") for a in _adlar), f"→ {_adlar}")
+        r.kontrol("paket OKUBENİ proje dosyasını anlatıyor",
+                  "PROJE DOSYASI" in _z.read("OKUBENI.txt").decode("utf-8"))
 
-        #  ZIP gerçekten hepsini taşıyor mu
-        if _DXF is not None:
-            _zip, _sebep, _tasti = _DXF.proje_paketi(
-                [("Kapak", None), ("Hesap", PE.mukavemet_pdf(_MK.hesapla(), PROJE))],
-                "Jan Mühendislik - Uygulama Projesi", _ek)
-            _z = _zf.ZipFile(io.BytesIO(_zip))
-            _adlar = _z.namelist()
-            r.kontrol("pakette DXF var", any(a.endswith(".dxf") for a in _adlar), f"→ {_adlar}")
-            r.kontrol("pakette pafta PDF'i var", any(a.endswith(".pdf") for a in _adlar))
-            r.kontrol("pakette PROJE DOSYASI var",
-                      any(a.endswith(".uygulama") for a in _adlar), f"→ {_adlar}")
-            r.kontrol("paket OKUBENİ proje dosyasını anlatıyor",
-                      "PROJE DOSYASI" in _z.read("OKUBENI.txt").decode("utf-8"))
-
-            #  AVAN PAKETİNDE ÜRETİLEMEYEN KİTAP SESSİZ KALMAZ
-            #  Eskiden iki yerde ``except Exception: pass`` vardı;  trafik
-            #  hesabı hata döndürdüğünde de kitap iz bırakmadan düşüyordu.
-            #  Artık ZIP'e URETILEMEYEN DOSYALAR.txt girer ve başlıkta KITAP
-            #  notu gider ( arayüz kullanıcıyı ZIP'i açmadan uyarır ).
-            import api.avan as _AVP
-            import testler.altin_uret as _AU
-            _avan_g = next(iter(_AU.avan_senaryolar()))
-            _trf_gecerli = _trf_hatali = None
-            for _t in _AU.senaryolar():
-                _hata = _AVP.E_TRF.hesapla(_AVP._trafik_girdi({"girdiler": _t})).get("hata")
-                if _AVP._belirsiz_hata():
-                    continue
-                if _hata and _trf_hatali is None:
-                    _trf_hatali = _t
-                if not _hata and _trf_gecerli is None:
-                    _trf_gecerli = _t
-                if _trf_gecerli and _trf_hatali:
-                    break
-
-            def _avan_paket(trafik, bozuk=None):
-                asil = {k: getattr(_AVP.X_XLS, k) for k in ("avan_xlsx", "trafik_xlsx")}
-                if bozuk:
-                    def _hata(*_a, **_k):
-                        raise FileNotFoundError("şablon bulunamadı")
-                    setattr(_AVP.X_XLS, bozuk, _hata)
-                try:
-                    y = _AVP.indir_proje_dwg({"kapak": {"project_title": "Deneme"},
-                                              "girdiler": {"avan": _avan_g,
-                                                           "trafik": trafik}})
-                finally:
-                    for k, f in asil.items():
-                        setattr(_AVP.X_XLS, k, f)
-                z = _zf.ZipFile(io.BytesIO(y.body))
-                notu = "URETILEMEYEN DOSYALAR.txt"
-                return (y.headers.get("X-Avan-Not") or "").split(","), z.namelist(), \
-                    (z.read(notu).decode("utf-8") if notu in z.namelist() else "")
-
-            _n, _a, _b = _avan_paket(_trf_gecerli)
-            r.kontrol("[avan paketi] normalde iki kitap var, eksik notu yok",
-                      sum(x.endswith(".xlsx") for x in _a) == 2
-                      and "KITAP" not in _n and not _b, f"→ {_n} {_a}")
-            for _boz, _ad in (("avan_xlsx", "Avan çalışma kitabı"),
-                              ("trafik_xlsx", "Trafik çalışma kitabı")):
-                _n, _a, _b = _avan_paket(_trf_gecerli, _boz)
-                r.kontrol(f"[avan paketi] {_ad} üretilemezse başlıkta KITAP notu",
-                          "KITAP" in _n, f"→ {_n}")
-                r.kontrol(f"[avan paketi] {_ad} üretilemezse ZIP'te sebepli bildirim",
-                          _ad in _b and "şablon bulunamadı" in _b
-                          and "TAMAMI DEĞİLDİR" in _b, f"→ {_b[:120]!r}")
-                r.kontrol(f"[avan paketi] {_ad} bozukken paket yine çıkıyor",
-                          any(x.endswith(".dxf") for x in _a))
-            if _trf_hatali is not None:
-                _n, _a, _b = _avan_paket(_trf_hatali)
-                r.kontrol("[avan paketi] trafik hesabı hata verince kitabın yokluğu bildiriliyor",
-                          "KITAP" in _n and "trafik hesabı yapılamadı" in _b, f"→ {_n} {_b[:120]!r}")
-
-        r.kontrol("ŞABLON DOSYASINA DOKUNULMADI",
-                  _op.load_workbook(_MX.SABLON)["11-Muk. Hesapları"]["Q97"].value == 30,
-                  "→ şablon değişmiş;  doğrulama testleri dayanağını kaybeder")
-
-        #  LibreOffice ile yeniden hesaplandığında motorla aynı sonucu vermeli
-        if soffice_yolu():
-            _kk = os.path.join(GECICI, "muk_cikti")
-            _gg = os.path.join(GECICI, "muk_girdi")
-            os.makedirs(_gg, exist_ok=True)
-            _yol = os.path.join(_gg, "muk.xlsx")
-            with open(_yol, "wb") as _f:
-                _f.write(_MX.mukavemet_xlsx({"beyan_yuku": 630, "kabin_agirligi": 600}))
-            yeniden_hesapla([_yol], _kk)
-            _cy = os.path.join(_kk, "muk.xlsx")
-            if os.path.exists(_cy):
-                _s = _MK.hesapla({"beyan_yuku": 630, "kabin_agirligi": 600})
-                _cws = _op.load_workbook(_cy, data_only=True)["11-Muk. Hesapları"]
-                r.kontrol("XLSX: Excel motorla aynı motor gücünü buluyor",
-                          abs((_cws["AQ23"].value or 0) - _s["ozet"]["N_hesap"]) < 1e-6,
-                          f"→ Excel {_cws['AQ23'].value!r}, motor {_s['ozet']['N_hesap']!r}")
-                #  DÜZELTİLMİŞ KİTABIN HER HÜCRESİ MOTORLA AYNI OLMALI —
-                #  standart gereği saptığımız hücreler DÂHİL.  İki belge
-                #  arasında tek bir sayı bile ayrışmamalı.
-                _ayri = []
-                for _h, _v in sorted(_s["_h"].items()):
-                    _e = _cws[_h].value
-                    if _e is None or isinstance(_e, str):
-                        continue
-                    try:
-                        if abs(float(_v) - float(_e)) > 1e-6 * max(
-                                abs(float(_v)), abs(float(_e)), 1.0):
-                            _ayri.append((_h, _v, _e))
-                    except (TypeError, ValueError):
-                        pass
-                r.kontrol("teslim edilen Excel paftayla BİREBİR aynı", not _ayri,
-                          f"→ ayrışan {len(_ayri)} hücre: {_ayri[:3]}")
-                _hh = [h for h in hata_hucresi_ara(_cy)
-                       if h.startswith("11-Muk.") or h.startswith("Askı Tipleri")]
-                r.kontrol("XLSX: hesap sayfalarında hata hücresi yok", not _hh,
-                          f"→ {_hh[:3]}")
-            else:
-                r.kontrol("XLSX yeniden hesaplanabildi", False)
-    else:
-        r.atla("Mukavemet şablonu yok — XLSX çıktısı denenmedi")
+        #  AVAN PAKETİ:  çizim + proje dosyası;  çalışma kitabı YOK.
+        import api.avan as _AVP
+        import testler.altin_uret as _AU
+        _avan_g = next(iter(_AU.avan_senaryolar()))
+        _trf_g = next(_t for _t in _AU.senaryolar()
+                      if not _AVP.E_TRF.hesapla(_AVP._trafik_girdi({"girdiler": _t})).get("hata"))
+        _ya = _AVP.indir_proje_dwg({"kapak": {"project_title": "Deneme"},
+                                    "girdiler": {"avan": _avan_g, "trafik": _trf_g},
+                                    "proje_dosyasi": {"__mod": "avan", "alanlar": {}}})
+        _za = _zf.ZipFile(io.BytesIO(_ya.body)).namelist()
+        r.kontrol("[avan paketi] DXF ve .avan proje dosyası var",
+                  any(x.endswith(".dxf") for x in _za) and any(x.endswith(".avan") for x in _za),
+                  f"→ {_za}")
+        r.kontrol("[avan paketi] içinde Excel yok",
+                  not any(x.lower().endswith((".xlsx", ".xls")) for x in _za), f"→ {_za}")
 
     #  İndirme uçları
-    _mg = {a[0]: (list(a[6]) if a[4] == "liste" else a[6])
-           for a in _MG.ALANLAR if a[4] != "hesap"}
-    for _ad, _fn, _tur in (("pdf", _MM.indir_uygulama_pdf, "application/pdf"),
-                           ("xlsx", _MM.indir_uygulama_xlsx, XLSX_TUR)):
-        _y = _fn({"girdiler": _mg, "kapak": {"proje_adi": "DENEME"}})
-        r.esit(f"uygulama-{_ad} ucu dosya döndürüyor", _y.media_type, _tur)
+    _mg = {a[0]: (list(a[5]) if a[3] == "liste" else a[5])
+           for a in _MG.ALANLAR if a[3] != "hesap"}
+    _y = _MM.indir_uygulama_pdf({"girdiler": _mg, "kapak": {"proje_adi": "DENEME"}})
+    r.esit("uygulama-pdf ucu dosya döndürüyor", _y.media_type, "application/pdf")
+    import api.avan as _AVU
+    r.kontrol("Excel üreten uç kalmadı",
+              not any("xlsx" in ad for ad in dir(_MM) + dir(_AVU)),
+              f"→ {[ad for ad in dir(_MM) + dir(_AVU) if 'xlsx' in ad]}")
 
     #  UYGULAMA PROJESİ PAFTASI  —  mukavemet + elektrik + topraklama
     #  PAFTA ARTIK PROJE SONUCU ALIYOR ( hesapla_coklu ), tek asansörün
@@ -1491,9 +1030,9 @@ def calistir():
               "boş bırakılamaz" in _metin(_ubos))
 
     #  Hesap durduran girdide DOSYA DEĞİL, açık hata dönmeli
-    _yh = _MM.indir_uygulama_xlsx({"girdiler": dict(_mg, makine_agirligi=None)})
-    r.kontrol("hatalı girdide XLSX yerine hata dönüyor",
-              _yh.media_type != XLSX_TUR
+    _yh = _MM.indir_uygulama_pdf({"girdiler": dict(_mg, makine_agirligi=None)})
+    r.kontrol("hatalı girdide PDF yerine hata dönüyor",
+              _yh.media_type != "application/pdf"
               and "boş bırakılamaz" in _yh.body.decode("utf-8"),
               f"→ {_yh.media_type}")
 

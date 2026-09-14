@@ -29,7 +29,7 @@ rem  ── GEREKENLER TAM MI ────────────────�
 rem  Program guncellendiginde yeni bir kitaplik eklenmis olabilir
 rem  ( CAD ciktisi icin ezdxf + pdfminer.six gibi ).  Her acilista
 rem  hizlica bakilir: eksik yoksa hicbir sey yapilmaz, bekletmez.
-.venv\Scripts\python.exe -c "import importlib.util as u; assert all(u.find_spec(m) for m in ('fastapi','uvicorn','openpyxl','reportlab')); import ezdxf; from pdfminer.high_level import extract_pages" >nul 2>&1
+.venv\Scripts\python.exe -c "import importlib.util as u; assert all(u.find_spec(m) for m in ('fastapi','uvicorn','reportlab')); import ezdxf; from pdfminer.high_level import extract_pages" >nul 2>&1
 if errorlevel 1 (
   echo   Eksik kitapliklar kuruluyor ^(~1 dakika^)...
   .venv\Scripts\python.exe -m pip install -r requirements.txt -q || (

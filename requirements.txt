@@ -1,7 +1,6 @@
 #  PROGRAMIN ÇALIŞMASI İÇİN GEREKENLER
 fastapi>=0.110
 uvicorn>=0.27
-openpyxl>=3.1
 reportlab>=4.0
 
 #  "Avan Projesini DWG al" düğmesi için ( CAD çıktısı ):
@@ -16,7 +15,6 @@ pdfminer.six>=20221105
 #  "python3 testler/calistir.py" ile testleri koşturmak içindir.
 #  Eksik olan test ATLANIR, hata vermez:
 #
-#    Test 1 · Excel uyumu    → LibreOffice  ( pip paketi değil; soffice komutu )
 #    Test 4 · Çıktı bütünlüğü→ pypdf  +  pypdfium2   ( PDF üstverisi ve metni )
 #    Test 5 · Arayüz         → playwright  +  "playwright install chromium"
 #

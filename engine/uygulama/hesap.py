@@ -185,7 +185,7 @@ def hesapla(veriler=None):
         "sabitler": muk.get("sabitler"),
         "ozet": ozet,
         "uyarilar": uyarilar,
-        "_h": muk.get("_h", {}),
+        "ara": muk.get("ara", {}),
     }
 
 
@@ -263,7 +263,7 @@ def hesapla_coklu(asansorler=None, ortak=None):
         #  KULLANILAN YOL SONUCUN İÇİNDE YAZAR.  Çağıran taraf "bu proje tek
         #  mi çoklu mu" diye karar VERMEZ, sonuca bakar — avan trafik motoru
         #  da böyle yapar ( engine/avan/trafik.hesapla ).  Bir süre kararı API
-        #  veriyordu ve aynı dallanma PDF · Excel · ZIP uçlarında üç kez
+        #  veriyordu ve aynı dallanma PDF · CAD · ZIP uçlarında üç kez
         #  tekrarlanıyordu;  iki yol zamanla ayrıştı.
         "yol": "tek" if len(sonuclar) == 1 else "coklu",
         "hata": [h for s in sonuclar if not s.get("aktif")

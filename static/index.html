@@ -35,7 +35,7 @@
           <path d="M15 3v5h5M7 12h10M7 16h7M7 8h4"/>
         </svg>
         <span class="gk-ad">AVAN PROJE</span>
-        <span class="gk-alt">Trafik hesabı · avan hesapları · proje kapağı<br>PDF, Excel ve CAD çıktısı</span>
+        <span class="gk-alt">Trafik hesabı · avan hesapları · proje kapağı<br>PDF ve CAD çıktısı</span>
       </button>
 
       <button type="button" class="giris-kart" id="gk_uygulama" onclick="uygulamaAc('uygulama')">
@@ -100,25 +100,8 @@
 <!-- ═══════════════════════════ PROJE KAPAĞI ═══════════════════════════ -->
 <section id="s-proje" class="sayfa" hidden>
   <details class="proje-araclari">
-    <summary>Proje araçları <span>Excel'den aç · proje dosyası</span></summary>
+    <summary>Proje araçları <span>proje dosyası</span></summary>
     <div class="proje-araclari-ic">
-      <div class="kart">
-        <div class="kart-bas"><span>REVİZYON — EXCEL'DEN PROJE AÇ</span><span class="kaynak">girdiler dosyanın içindedir</span></div>
-        <div class="kart-ic">
-          <div class="yardim">Programın ürettiği <b>XLSX dosyası girdileri de taşır.</b> Proje klasörünüzdeki
-            Excel'i buraya bırakın — bütün girdiler yerine oturur, değişen değeri düzeltip
-            <b>güncel PDF ve XLSX'i yeniden indirirsiniz.</b> Hiçbir şeyi baştan girmenize gerek yok.</div>
-          <div id="birak_alani" class="birak">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div><b>Excel dosyasını buraya sürükleyin</b></div>
-            <div class="ipucu">ya da tıklayıp seçin &nbsp;·&nbsp; trafik ve avan dosyalarını birlikte seçebilirsiniz</div>
-          </div>
-          <input type="file" id="xlsx_ac" accept=".xlsx" multiple style="display:none" onchange="xlsxYukle(event.target.files); event.target.value=''">
-          <div id="yukleme_ozeti"></div>
-        </div>
-      </div>
       <div class="kart">
         <div class="kart-bas"><span>PROJE DOSYASI</span></div>
         <div class="kart-ic">
@@ -297,7 +280,6 @@
         <div class="kart-bas"><span>ÇIKTI</span></div>
         <div class="kart-ic"><div class="dugmeler">
           <button class="dg ana" onclick="indir('trafik-pdf')">PDF indir  (pafta)</button>
-          <button class="dg yesil" onclick="indir('trafik-xlsx')">XLSX indir  (şablon)</button>
           <button class="dg" onclick="window.print()">Yazdır</button>
         </div></div>
       </div>
@@ -409,7 +391,6 @@
         <div class="kart-bas"><span>ÇIKTI</span></div>
         <div class="kart-ic"><div class="dugmeler">
           <button class="dg ana" onclick="indir('avan-pdf')">PDF indir</button>
-          <button class="dg yesil" onclick="indir('avan-xlsx')">XLSX indir  (şablon)</button>
           <button class="dg" onclick="window.print()">Yazdır</button>
         </div></div>
       </div>
@@ -483,31 +464,12 @@
         </div>
       </div>
       <div class="kart">
-        <div class="kart-bas"><span>REVİZYON — EXCEL'DEN AÇ</span>
-          <span class="kaynak">girdiler dosyanın içindedir</span></div>
-        <div class="kart-ic">
-          <div class="yardim">Programın ürettiği <b>mukavemet çalışma kitabını</b>
-            ( ya da elinizdeki özgün kitabı ) buraya bırakın — "Veri Girişi"
-            sayfasındaki bütün girdiler forma oturur.</div>
-          <div id="m_birak_alani" class="birak">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div><b>Excel dosyasını buraya sürükleyin</b></div>
-            <div class="ipucu">ya da tıklayıp seçin</div>
-          </div>
-          <input type="file" id="m_xlsx_ac" accept=".xlsx" style="display:none"
-                 onchange="xlsxYukle(event.target.files); event.target.value=''">
-          <div id="m_yukleme_ozeti"></div>
-        </div>
-      </div>
-      <div class="kart">
         <div class="kart-bas"><span>PROJE DOSYASI</span>
           <span class="kaynak">.uygulama — girdilerin geri dönüş noktası</span></div>
         <div class="kart-ic">
           <div class="yardim">Girdiler tarayıcıda kendiliğinden saklanır. Ayrıca projeyi
-            <b>tek dosyada</b> arşivleyebilirsiniz (<b>.uygulama</b>): ne PDF ne Excel ne
-            CAD — yalnız programın okuyup yazdığı veri. Aylar sonra dosyayı yükleyip
+            <b>tek dosyada</b> arşivleyebilirsiniz (<b>.uygulama</b>): ne PDF ne CAD —
+            yalnız programın okuyup yazdığı veri. Aylar sonra dosyayı yükleyip
             değişeni düzeltir, çıktıları yeniden alırsınız.
             <b>Avan projesi dosyaları (.avan) buraya yüklenmez</b> — ayrı projelerdir.</div>
           <div class="dugmeler">
@@ -520,19 +482,15 @@
       </div>
       <div class="kart">
         <div class="kart-bas"><span>ÇIKTILAR</span>
-          <span class="kaynak">pafta · çalışma kitabı · CAD</span></div>
+          <span class="kaynak">pafta · CAD</span></div>
         <div class="kart-ic">
           <div class="yardim">PDF <b>bütün hesapları</b> tek paftada verir
-            ( mukavemet + elektrik + topraklama ). <b>Excel</b> çıktısı uygulama
-            projesinin kendi çalışma kitabıdır ( <b>MUKAVEMET_HESABI.xlsx</b> ) —
-            girdileriniz "Veri Girişi" sayfasına yazılır, formüller yerinde kalır,
-            dosya açıldığında Excel kendi hesabını yapar.
+            ( mukavemet + elektrik + topraklama ).
             <b>Projeyi paketle</b> hepsini tek ZIP'te verir: kapak + pafta PDF'i,
-            çalışma kitabı, DXF/DWG çizimi ve <b>.uygulama proje dosyası</b> —
+            DXF/DWG çizimi ve <b>.uygulama proje dosyası</b> —
             yani teslim paketi ile geri dönüş noktası aynı arşivde.</div>
           <div class="dugmeler">
             <button class="dg ana" onclick="indir('uygulama-pdf')">Uygulama Projesi PDF</button>
-            <button class="dg" onclick="indir('uygulama-xlsx')">Uygulama Projesi Excel</button>
             <button class="dg" id="dg_uygulama_dwg" onclick="indir('uygulama-dwg')">Projeyi paketle (ZIP)</button>
           </div>
         </div>
@@ -580,8 +538,7 @@
         <p>Bunlar <b>uygulama projesinin kendi</b> kabulleridir; avan projesininkinden
           ayrıdır ve aynı olmak zorunda değildir. Avan ön tasarımdır, genel ve emniyetli
           kabullerle çalışır; uygulama kesin tasarımdır ve elinizde imalatçı verisi vardır.</p>
-        <p>Buradan değiştirdiğinizde <b>ekrandaki hesap, PDF paftası ve indirilen Excel
-          birlikte</b> değişir — teslim edilen kitaptaki formüller de bu değerleri kullanır.</p>
+        <p>Buradan değiştirdiğinizde <b>ekrandaki hesap ve PDF paftası birlikte</b> değişir.</p>
         <p><b>② Mukavemet kabulleri</b> özellikle gözden geçirilmelidir: TS EN 81-20 makine
           kaidesi için yük modeli <b>vermez</b>, Çizelge 14 (k1) o standartta açıkça
           <b>kılavuz ray</b> hesabına aittir. Buradaki kullanım ödünçtür ve emniyetli
@@ -606,7 +563,7 @@
           <p>Projeden projeye <b>değişmeyen</b> değerler — bir kez ayarlanır, her yeni
             proje bunları kullanır. Alanlar <b>hangi hesaba girdiklerine göre</b>
             gruplanmıştır; bir sabiti ararken hangi hesapta kullanıldığına bakın.</p>
-          <p>Buradan değiştirdiğinizde ekrandaki hesap ve XLSX çıktısı <b>birlikte</b>
+          <p>Buradan değiştirdiğinizde ekrandaki hesap ve PDF paftası <b>birlikte</b>
             değişir. Geçersiz bir değer girilirse yok sayılır, varsayılana dönülür ve
             hangi alanın reddedildiği Avan sekmesinde bildirilir.</p>
           <p>Bir asansörde farklı bir değer gerekiyorsa o asansörün kartındaki
@@ -620,24 +577,6 @@
             <button class="dg" onclick="sabitleriSifirla()">Tümünü varsayılana döndür</button>
           </div>
         </div>
-      </div>
-      <div class="kart">
-        <div class="kart-bas"><span>ŞABLON DURUMU <span class="bilgi" tabindex="0" role="button"
-          aria-label="Açıklamayı göster" onclick="bilgiAc(this,event)"><span class="bilgi-im">!</span><span class="bilgi-balon">
-          <p><b>Hesap Excel'den bağımsızdır</b> — tüm tablolar ve formüller programın
-            içinde Python olarak yazılıdır. Excel yalnız <b>XLSX indirdiğinizde</b>
-            kullanılır: ofisin kendi dosyası şablon olarak açılır, girdi hücreleri
-            doldurulur ve kaydedilir. Böylece pafta düzeni birebir korunur.</p>
-          <p>Bu tasarımın tek riski <b>yanlış ya da eski bir dosyanın</b>
-            <code>templates/</code> klasörüne konmasıdır: hesap doğru olduğu için
-            ekranda hiçbir belirti çıkmaz, hata yalnız teslim edilen paftada görünür.
-            Program bunu üç katmanda denetler: <b>sayfalar</b>, <b>girdi hücreleri</b>
-            ( birleştirilmiş alana düşüp kaybolmuyor mu ) ve <b>şablonun içindeki
-            tablo değerleri</b> — Tablo-4, 7, 8, 9, 10, 11, aydınlatma verimi ve kablo
-            akım tablosu, motordaki değerlerle karşılaştırılır.</p>
-          <p>Denetimden geçmeyen bir şablonla <b>XLSX üretilmez</b>. Hesap ve PDF
-            çıktısı etkilenmez.</p></span></span></span><span class="kaynak">XLSX çıktısının kaynağı</span></div>
-        <div class="kart-ic"><div id="sablon_durumu"></div></div>
       </div>
     </div>
     <div>

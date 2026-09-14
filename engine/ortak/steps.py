@@ -2,12 +2,12 @@
 """
 Hesap adımı (Step) yapısı ve Türkçe sayı biçimlendirme yardımcıları.
 
-Excel'deki "işlem satırı" mantığı burada birebir korunur:
-    formul   ->  C sütunundaki sembolik denklem      (örn. "N = (1−q)·Q·V / (102·η)")
-    islem    ->  C sütunundaki sayıların yerine konmuş hâli
-    deger    ->  E sütunundaki sonuç
-    birim    ->  F sütunu
-    kaynak   ->  G sütunu
+Paftanın "işlem satırı":
+    formul   ->  sembolik denklem      (örn. "N = (1−q)·Q·V / (102·η)")
+    islem    ->  sayıların yerine konmuş hâli
+    deger    ->  sonuç
+    birim    ->  birim
+    kaynak   ->  standart maddesi / verinin kaynağı
 """
 import math
 
@@ -43,9 +43,9 @@ def trn(x, ondalik=2):
     return tr(f, ondalik)
 
 
-# ------------------------------------------------------- Excel eşleniği fn.
+# ------------------------------------------------------------ yuvarlama
 def yukari_yuvarla(x, basamak=0):
-    """Excel ROUNDUP."""
+    """Sıfırdan uzağa değil, YUKARI yuvarlar ( `basamak` ondalığa )."""
     if x is None:
         return None
     k = 10 ** basamak
@@ -53,14 +53,14 @@ def yukari_yuvarla(x, basamak=0):
 
 
 def tavana_yuvarla(x, katsayi):
-    """Excel CEILING(x; katsayi) — kuvvet hesaplarında 10 N'a yuvarlama."""
+    """`katsayi`nın bir üst katına yuvarlar — kuvvet hesaplarında 10 N'a yuvarlama."""
     if x is None:
         return None
     return math.ceil(x / katsayi - 1e-9) * katsayi
 
 
-def excel_round(x, basamak=0):
-    """Excel ROUND — yarımı yukarı (Python'un banker's rounding'i DEĞİL)."""
+def yuvarla(x, basamak=0):
+    """Yarımı yukarı yuvarlar ( Python'un round()'u bankacı yuvarlaması yapar )."""
     if x is None:
         return None
     k = 10 ** basamak
@@ -87,13 +87,13 @@ class Step(dict):
 
 
 def veri(sembol, aciklama, deger, birim="", kaynak="", ondalik=2):
-    """Excel'in 'A: B : C = E F  G' satırı — girdi/ara veri."""
+    """Veri satırı:  sembol · açıklama = değer birim · kaynak."""
     return Step(sembol=sembol, aciklama=aciklama, deger=deger, birim=birim,
                 kaynak=kaynak, tip="veri", ondalik=ondalik)
 
 
 def hesap(formul, islem, deger, birim="", kaynak="", ondalik=2, sembol=""):
-    """Excel'in iki satırlık işlem bloğu (denklem + sayıların yerine konmuş hâli)."""
+    """İki satırlık işlem bloğu ( denklem + sayıların yerine konmuş hâli )."""
     return Step(sembol=sembol, formul=formul, islem=islem, deger=deger,
                 birim=birim, kaynak=kaynak, tip="hesap", ondalik=ondalik)
 
@@ -137,7 +137,7 @@ def numarala(b, sira):
 
 class Bolum(dict):
     """
-    Numaralı hesap bölümü — Excel'deki '1 -  MOTOR GÜCÜ HESABI' başlığı.
+    Numaralı hesap bölümü — paftadaki '1 -  MOTOR GÜCÜ HESABI' başlığı.
 
     KİMLİK ve NUMARA AYRI ŞEYLERDİR.  ``kimlik`` bölümün değişmez adıdır
     ( "aski_halatlari" ) ve doğduğu yerde verilir;  başlıktaki numara ise
@@ -176,13 +176,12 @@ class Bolum(dict):
 #  ---------------------------------------------------------------------
 #  ONAY ( EVET / HAYIR ) ALANLARI  —  TEK YERDE
 #  ---------------------------------------------------------------------
-#  Aynı altı satır dört ayrı dosyada kopyalanmıştı ( avan · mukavemet ·
-#  girdi · xlsx ).  Onay alanı üç kanaldan gelir:  arayüzden True/False,
-#  Excel'den "EVET"/"HAYIR", eski proje dosyalarından "Var"/"Yok".  Kopyalar
-#  zamanla ayrışır ve aynı kutu bir yerde işaretli, öbüründe işaretsiz
-#  sayılırdı.
+#  Aynı altı satır birkaç dosyada kopyalanmıştı.  Onay alanı birden çok
+#  biçimde gelir:  arayüzden True/False, eski proje dosyalarından
+#  "EVET"/"HAYIR" ya da "Var"/"Yok".  Kopyalar zamanla ayrışır ve aynı kutu
+#  bir yerde işaretli, öbüründe işaretsiz sayılırdı.
 def evet_mi(x):
-    """Onay alanı işaretli mi  —  arayüz · Excel · eski dosya."""
+    """Onay alanı işaretli mi  —  arayüz · eski proje dosyası."""
     if isinstance(x, bool):
         return x
     if x is None:

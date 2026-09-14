@@ -303,22 +303,6 @@ html,body{max-width:100%;overflow-x:hidden}
 .kart,.kart-ic,.sayfa,.ikili>div{min-width:0}
 
 
-/* ---------------------------------------------------- Excel'den yükleme */
-.birak{
-  border:2px dashed var(--cizgi); border-radius:9px; padding:20px 16px; text-align:center;
-  color:var(--gri); cursor:pointer; transition:.15s; background:var(--mavi-cok-ac);
-}
-.birak:hover{border-color:var(--mavi2); color:var(--mavi); background:var(--mavi-ac)}
-.birak.uzerinde{border-color:var(--yesil); background:var(--yesil-ac); color:var(--yesil)}
-.birak svg{opacity:.55; margin-bottom:6px}
-.birak .ipucu{font-size:11px; color:#8A96A3; margin-top:3px}
-.yuklendi{
-  margin-top:10px; padding:9px 12px; border-radius:7px; font-size:12.5px; line-height:1.55;
-  background:var(--yesil-ac); border:1px solid #BFE0CB; color:var(--yesil);
-}
-.yuklendi b{color:#12492a}
-.yuklendi .satir2{color:var(--gri); font-size:11.5px; margin-top:3px}
-
 /* sekme uyarı rozeti */
 .sekme-rozet{display:inline-flex;align-items:center;justify-content:center;
   min-width:17px;height:17px;margin-left:7px;padding:0 5px;border-radius:9px;

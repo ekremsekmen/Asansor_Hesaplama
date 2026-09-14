@@ -2,7 +2,7 @@
 """
 AVAN PROJE UÇLARI
 
-Trafik hesabı, avan hesapları, proje kapağı ve bunların XLSX / PDF / CAD
+Trafik hesabı, avan hesapları, proje kapağı ve bunların PDF / CAD
 çıktıları.  Uygulama projesinden bağımsızdır.
 """
 import json
@@ -12,17 +12,14 @@ from datetime import date
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from api.ortak import (KOK, PAKET_NOT_KITAP, _BELIRSIZ, _RED, _belirsiz_hata,
-                       _dosya_adi, _indir, _paket_ekleri, _proje_kimligi, _sayi,
-                       _sozluk_listesi, _temiz, _uretilemedi,
-                       _uretilemeyen_dosya_notu, belirsiz_sayi_mi)
+from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
+                       _paket_ekleri, _proje_kimligi, _sayi, _sozluk_listesi, _temiz,
+                       _uretilemedi, belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
 from exports import kapak_export as X_KAPAK
 from exports import pdf_export as X_PDF
-from exports import sablon_denetim as X_DEN
-from exports import xlsx_export as X_XLS
 
 try:
     from exports import dxf_export as X_DXF
@@ -48,11 +45,6 @@ AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
                    "S1", "L1", "S2", "L2")
 
-XLSX_TUR = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-EK_NUFUS_AZAMI = 11          # şablondaki satır adedi ( bkz. hucre_haritasi )
-
-
 def _ek_nufus_oku(ham):
     """Ek nüfus satırlarını okur.  Bozuk satırlar `_BELIRSIZ` üzerinden bildirilir."""
     satirlar = []
@@ -76,11 +68,6 @@ def _ek_nufus_oku(ham):
                     "nüfus eksiltilemez")
             continue
         satirlar.append({"aciklama": s.get("aciklama"), "miktar": miktar, "kalem": kalem})
-    #  ŞABLON SINIRI:  fazlası Excel'e yazılamaz, sessizce düşerdi.
-    if len(satirlar) > EK_NUFUS_AZAMI:
-        _RED.append(f"ek nüfus satır adedi {len(satirlar)} — Excel şablonu en fazla "
-                    f"{EK_NUFUS_AZAMI} satır taşır; kalemleri birleştirin")
-        return satirlar[:EK_NUFUS_AZAMI]
     return satirlar
 
 
@@ -213,34 +200,6 @@ def api_avan(veri: dict = Body(...)):
         return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
 
 
-@router.post("/api/indir/trafik-xlsx")
-def indir_trafik_xlsx(veri: dict = Body(...)):
-    try:
-        g = _trafik_girdi(veri)
-        #  Ekranda reddedilen bir girdiyle DOSYA ÜRETİLMEZ.  Belirsiz sayı
-        #  yazımı ( "1.200" ) _sayi() tarafından boşa çevriliyor; denetim
-        #  olmadan hücre boş kalıyor ve dosya eksik girdiyle teslim edilebilir
-        #  hâlde çıkıyordu.  Ekran ile indirme aynı kapıdan geçmeli.
-        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
-        if belirsiz:
-            return JSONResponse({"hata": belirsiz}, status_code=200)
-        #  HESAP HATALIYSA XLSX ÜRETİLMEZ.  PDF hatayı paftaya BASAR ( okunur bir
-        #  belge çıkar ), ama Excel şablonu yalnız girdi hücrelerini alır:
-        #  Python'a özgü denetimler ( ör. "durak adedi N+1 olmalıdır" ) şablonda
-        #  yoktur, dolayısıyla ekranda reddedilen bir hesap dosyada SORUNSUZ
-        #  görünür.  Ekran neyi reddediyorsa indirme de reddeder.
-        _s = E_TRF.hesapla(g)
-        if _s.get("hata"):
-            return JSONResponse({"hata": _s["hata"]}, status_code=200)
-        mod = _s.get("yol", "tek")                    # yöntemi veri belirler
-        ek = "Trafik Hesabi (PAFTA)" if mod == "tek" else "Coklu Asansor Trafik (PAFTA-COKLU)"
-        _p = _proje_kimligi(veri)
-        return _indir(X_XLS.trafik_xlsx(mod, g, _p),
-                      _dosya_adi(_p, ek, "xlsx"), XLSX_TUR)
-    except Exception as e:                                    # noqa: BLE001
-        return _uretilemedi(e)
-
-
 @router.post("/api/indir/trafik-pdf")
 def indir_trafik_pdf(veri: dict = Body(...)):
     try:
@@ -253,48 +212,6 @@ def indir_trafik_pdf(veri: dict = Body(...)):
         _p = _proje_kimligi(veri)
         return _indir(X_PDF.trafik_pdf(s, _p),
                       _dosya_adi(_p, ek, "pdf"), "application/pdf")
-    except Exception as e:                                    # noqa: BLE001
-        return _uretilemedi(e)
-
-
-@router.get("/api/sablon")
-def sablon_durumu():
-    """
-    Şablon dosyalarının kimliği ve denetim sonucu.  Arayüz bunu açılışta
-    sorar; yanlış / eski bir şablon konulmuşsa kullanıcı XLSX indirmeyi
-    denemeden önce görür.
-    """
-    d = []
-    for tur, yol, ad in (("trafik", X_XLS.TRAFIK_SABLON, "Trafik hesabı şablonu"),
-                         ("avan", X_XLS.AVAN_SABLON, "Avan hesapları şablonu")):
-        try:
-            s = X_DEN.denetle(yol, tur)
-        except Exception as e:                                # noqa: BLE001
-            s = {"uygun": False, "dosya": os.path.basename(yol), "md5": None,
-                 "sayfa_sayisi": 0, "hatalar": [f"Denetim yapılamadı: {e}"]}
-        d.append({"tur": tur, "baslik": ad, **s})
-    return {"uygun": all(x["uygun"] for x in d), "sablonlar": d}
-
-
-@router.post("/api/indir/avan-xlsx")
-def indir_avan_xlsx(veri: dict = Body(...)):
-    try:
-        #  Ofis varsayılanlarının girdiye yazılması avan_xlsx içinde yapılır.
-        g = _avan_girdi(veri)
-        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
-        if belirsiz:
-            return JSONResponse({"hata": belirsiz}, status_code=200)
-        #  Hesap hatalıysa XLSX üretilmez ( gerekçe: bkz. trafik-xlsx ).
-        #  Avan tarafında hata, asansör kartının "aktif" olmamasıyla bildirilir.
-        _s = E_AVAN.hesapla(g)
-        _pasif = [a.get("uyari") for a in (_s.get("asansorler") or [])
-                  if a and not a.get("aktif") and a.get("uyari")
-                  and "TANIMLANMAMIŞ" not in str(a.get("uyari"))]
-        if _s.get("hata") or _pasif:
-            return JSONResponse({"hata": _s.get("hata") or _pasif[0]}, status_code=200)
-        _p = _proje_kimligi(veri)
-        return _indir(X_XLS.avan_xlsx(g, _p),
-                      _dosya_adi(_p, "Avan Hesaplari", "xlsx"), XLSX_TUR)
     except Exception as e:                                    # noqa: BLE001
         return _uretilemedi(e)
 
@@ -363,42 +280,16 @@ def indir_proje_dwg(veri: dict = Body(...)):
                          "ya da trafik / avan hesabını yapın."}, status_code=200)
 
         ad = _dosya_adi(_proje_kimligi(veri), "Avan Projesi", "zip")
-        #  Pakete ÇALIŞMA KİTAPLARI ve PROJE DOSYASI da girer:  teslim paketi
-        #  ile geri dönüş noktası aynı arşivde dursun.
+        #  Pakete PROJE DOSYASI da girer:  teslim paketi ile geri dönüş
+        #  noktası aynı arşivde dursun.
         kok = os.path.splitext(ad)[0]
         ekler = list(_paket_ekleri(veri, "avan"))
-        #  KİTAP ÜRETİLEMEZSE PAKET YİNE ÇIKAR — AMA EKSİK SÖYLENİR.
-        #  Eskiden iki yerde ``except Exception: pass`` vardı;  trafik hesabı
-        #  hata döndürdüğünde de kitap hiçbir bildirim olmadan atlanıyordu.
-        eksikler = []
-        if isinstance(trafik_ham, dict):
-            try:
-                _t = E_TRF.hesapla(g)
-                if _t.get("hata"):
-                    eksikler.append("Trafik çalışma kitabı:  trafik hesabı "
-                                    f"yapılamadı ( {_t.get('hata')} )")
-                else:
-                    ekler.append((f"{kok} - Trafik.xlsx",
-                                  X_XLS.trafik_xlsx(_t.get("yol", "tek"), g,
-                                                    _proje_kimligi(veri))))
-            except Exception as e:                            # noqa: BLE001
-                eksikler.append(f"Trafik çalışma kitabı:  {e}")
-        if isinstance(avan_ham, dict):
-            try:
-                ekler.append((f"{kok} - Avan.xlsx",
-                              X_XLS.avan_xlsx(a, _proje_kimligi(veri))))
-            except Exception as e:                            # noqa: BLE001
-                eksikler.append(f"Avan çalışma kitabı:  {e}")
-        if eksikler:
-            ekler.append(_uretilemeyen_dosya_notu(eksikler))
         paket, sebep, tasti = X_DXF.proje_paketi(paftalar, kok, ekler)
         yanit = _indir(paket, ad, "application/zip")
         #  Kullanıcının BİLMESİ GEREKENLER başlıkta taşınır:
         #    DXF   → DWG üretilemedi, pakette yalnız DXF var ( sebebi OKUBENI'de )
         #    TASMA → paftalar formatın çerçevesine sığmadı, taşan sayfalar var
-        #    KITAP → bir çalışma kitabı üretilemedi ( ZIP'te URETILEMEYEN … )
-        notlar = (([ "DXF" ] if sebep else []) + ([ "TASMA" ] if tasti else [])
-                  + ([PAKET_NOT_KITAP] if eksikler else []))
+        notlar = ((["DXF"] if sebep else []) + (["TASMA"] if tasti else []))
         if notlar:
             yanit.headers["X-Avan-Not"] = ",".join(notlar)
         return yanit
