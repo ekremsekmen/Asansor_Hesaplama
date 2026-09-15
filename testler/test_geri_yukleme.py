@@ -174,11 +174,14 @@ def _uygulama_hazirla(pg):
     pg.evaluate("mAsansorSekmesi(0)")
     pg.wait_for_timeout(600)
     adet = pg.evaluate(_DEGISTIR, "uygulama")
-    pg.evaluate("mDurakEkle()")
     pg.evaluate("mAsansorSekmesi(1)")
     pg.wait_for_timeout(800)
-    #  İkinci asansör birinciden farklı olsun:  alanları bir tur daha değiştir
+    #  İkinci asansör birinciden farklı olsun:  alanları bir tur daha değiştir.
+    #  Tur iki asansöre AYNI dönüşümü uygular ( ikincisi birincinin değişmemiş
+    #  kopyasıdır );  ayrışmaları için ikincinin seyir mesafesi ayrıca değişir.
     adet += pg.evaluate(_DEGISTIR, "uygulama")
+    pg.evaluate("document.getElementById('m_seyir_mesafesi').value = '37,5'")
+    adet += 1
     pg.evaluate("mAsansorSekmesi(0)")
     pg.wait_for_timeout(800)
     return adet

@@ -31,7 +31,6 @@ const ISTEK = {trafik: 0, avan: 0, mukavemet: 0};
     ayrılır.  MUK: mukavemet girdi sözleşmesi ( /api/mukavemet/alanlar ). */
 let MOD = 'avan';
 let MUK = null;
-let MUK_DURAK = [];
 const $  = id => document.getElementById(id);
 const el = (t,s,h)=>{const e=document.createElement(t); if(s)e.className=s; if(h!=null)e.innerHTML=h; return e;};
 
@@ -473,7 +472,6 @@ function tumGirdiler(mod){
     o[e.id] = e.type==='checkbox' ? e.checked : e.value;
   });
   if(m === 'uygulama'){
-    o.__muk_durak = MUK_DURAK.slice();
     //  ÇOKLU ASANSÖR.  Form yalnız AKTİF asansörü taşır;  ötekiler dizide
     //  durur.  Kaydetmeden önce form diziye işlenir, yoksa son düzenlemeler
     //  kaybolurdu.
@@ -548,7 +546,6 @@ function bolumuTemizle(tur){
     //  Dosyada BOŞ kalan alanlar, önceki projeden kalma değerle karışmasın:
     //  bölüm önce varsayılanlarına döner.
     for(const gr of MUK.gruplar) for(const f of gr.alanlar){
-      if(f.tur==='liste') continue;
       const e=$(M_ID(f.anahtar)); if(!e) continue;
       if(e.type === 'checkbox') e.checked = !!f.varsayilan;
       else alanaYaz(e, f.varsayilan===null||f.varsayilan===undefined ? '' : mSayi(f.varsayilan));
@@ -603,14 +600,6 @@ function uygula(o){
     ek = Math.max(0, etkin - TRAFIK_ADET);
   }
   AVAN_EK = Math.max(0, Math.min(3, ek));
-  /*  Durak listesi bir FORM ALANI DEĞİL, dizidir;  Object.entries döngüsü
-      onu yakalayamaz.  Form henüz kurulmamışsa ( kullanıcı avan modundayken
-      proje açtıysa ) değer yine de saklanır ve mukavemetGeriYukle() onu
-      form ayağa kalkarken yerine oturtur. */
-  if(Array.isArray(o.__muk_durak) && o.__muk_durak.length){
-    MUK_DURAK = o.__muk_durak.slice(0, (MUK && MUK.durak_azami) || 20).map(mSayi);
-    if($('m_durak_kutu')) mDurakCiz();
-  }
   /*  Çoklu asansör dizisi de bir form alanı DEĞİLDİR.  Proje dosyasından
       ( .uygulama ) geri yüklenirken buradan kurulur;  form ayaktaysa aktif
       asansör hemen basılır, değilse mukavemetKur() onu yerine oturtur. */

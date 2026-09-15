@@ -992,8 +992,7 @@ def calistir():
                   not any(x.lower().endswith((".xlsx", ".xls")) for x in _za), f"→ {_za}")
 
     #  İndirme uçları
-    _mg = {a[0]: (list(a[5]) if a[3] == "liste" else a[5])
-           for a in _MG.ALANLAR if a[3] != "hesap"}
+    _mg = {a[0]: a[5] for a in _MG.ALANLAR if a[3] != "hesap"}
     _y = _MM.indir_uygulama_pdf({"girdiler": _mg, "kapak": {"proje_adi": "DENEME"}})
     r.esit("uygulama-pdf ucu dosya döndürüyor", _y.media_type, "application/pdf")
     import api.avan as _AVU

@@ -548,23 +548,23 @@ class PveMRLDenetimi(unittest.TestCase):
         dort = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "kabin_ray_sayisi": 4})
         self.assertAlmostEqual(dort["ara"]["kabin_ray.MY"] * 2, iki["ara"]["kabin_ray.MY"], places=6)
 
-    def test_imalatci_degeri_ray_basina_okunur(self):
-        """Elle girilen sayı ZATEN bir raya düşen yüktür — bölünmez."""
-        for n in (2, 4):
-            s = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY,
-                           "raya_binen_yuk": 800, "kabin_ray_sayisi": n})
-            self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], 800 * 9.81, places=6,
-                                   msg=f"n = {n}")
+    def test_bir_raya_dusen_yuk_sorulmaz(self):
+        """Bir raya düşen makine yükü formda YOKTUR:  "bina yapısına"da hesaba
+        girmez, "kılavuz raylara"da ( Gm + Tst ) raylara eşit dağıtılır."""
+        self.assertNotIn("raya_binen_yuk", MG.ALAN)
+        self.assertEqual(MG.RAYA_BINEN_ALANLARI, ("makine_raya_biniyor",))
 
     def test_makine_raya_binmezse_ofis_kabulu_kalir(self):
         s = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU[0]})
         self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], M.SABIT["MY_kabin"], places=9)
 
-    def test_imalatci_degeri_turetmeyi_ezer(self):
-        turetilen = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
-        elle = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "raya_binen_yuk": 1000})
-        self.assertAlmostEqual(elle["ara"]["kabin_ray.MY"], 1000 * 9.81, places=6)
-        self.assertNotAlmostEqual(elle["ara"]["kabin_ray.MY"], turetilen["ara"]["kabin_ray.MY"])
+    def test_form_disi_ray_yuku_esit_dagilimi_ezmez(self):
+        """Form dışından gelen bir 'bir raya düşen yük' değeri eşit dağılımı
+        değiştirmez — hesap yalnız Gm + Tst ile ray sayısını kullanır."""
+        esit = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
+        disari = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY,
+                            "raya_binen_yuk": 1000})
+        self.assertAlmostEqual(disari["ara"]["kabin_ray.MY"], esit["ara"]["kabin_ray.MY"], places=9)
 
     def test_makine_raya_binince_kuyu_tabani_da_buyur(self):
         """m.5.2.1.8.4 kalemi adıyla anar:  'load on traction sheave due to

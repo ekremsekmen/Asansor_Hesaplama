@@ -29,7 +29,7 @@ kendiliğinden köprülenir:
 | Boş kabin ağırlığı | Gk |
 | Kabin derinliği | a ( kabin boyu ) |
 | Kabin genişliği | b |
-| Kuyu boyu ( durak listesinden ) | Hk |
+| Kuyu boyu ( seyir + son kat + kuyu dibi ) | Hk |
 | Motor gücü | Nsç |
 | Askı oranı | i |
 | Kabin rayı profili | gr ( ray metre ağırlığı ) |
@@ -65,6 +65,9 @@ programın kendisidir** — program Excel üretmez ve okumaz.
 | **Kablo akım taşıma kapasitesi ( Iz )** | Tablo IEC 60364-5-52 B.52.4 Yöntem C diyordu ama 25 mm² ve üstü o tablonun değerleri değildi ( 101 · 125 · 151 · 192 · 232 · 269 A ) — %4-5 fazla.  Örneğin 48 kW motor + 25 mm² kolon hattı ( I = 97,4 A ) "uygundur" çıkıyordu | B.52.4 Yöntem C:  **96 · 119 · 144 · 184 · 223 · 259 A**.  16 mm² ve altı zaten doğruydu |
 | **Makine dairesi aydınlatması** | Bölge indeksinde h = 1,0 m alınıyordu — kabinin ölçüm düzlemi ( döşemeden 1 m yukarıda ).  Makine dairesinde 200 lüks **döşeme seviyesinde** istenir;  k iki kat, armatür %20-30 az çıkıyordu ( 4 × 3 m daire:  4 yerine 5 armatür gerekir ) | h = **2,10 m** ( armatür–döşeme;  TS EN 81-20 m.5.2.1.4.2 · m.5.2.6.3.2.1 asgari net yükseklik ).  Kabin ve kuyu aynı kalır |
 | **Paftadaki işlem satırları** | Sonuç doğru, işlem satırı yanlış yazılmış altı bağıntı:  2:1 askıda halat boyunda köşeli parantez yoktu ( "… / 1000 + 5 × 2" ), \| Fx \| bağıntısına işaretli Fx yazılıyordu, bina nüfusu B ve kuvvetler ( P1 · P2 · PR · PK · Fs ) yuvarlanıyor ama satır bunu söylemiyordu, "Sapd = 0,5 · 4 = 6" asgariyi göstermiyordu, ε satırında κ = 44,4 "44" basılıyordu | Her satır yazılı sayılarıyla yeniden hesaplanınca basılan sonucu verir;  yuvarlama ve asgari adımları satırda yazılıdır |
+| **Kat yükseklikleri** | Her durak tek tek giriliyordu ( 15 katlı binada 15 kez "3000" ), seyir mesafesi ve son kat yüksekliği bu listeden türetiliyordu.  Hesap listeden yalnız TOPLAMI ( ray ve regülatör halatı boyu ) ve SON ELEMANI kullanıyordu | Liste kaldırıldı:  **seyir mesafesi + son kat yüksekliği** girilir ( ELEport'un ve TS EN 81-50'nin kullandığı büyüklük ).  Toplam = seyir × 1000 + son kat;  176 senaryonun hiçbirinde bir sayı değişmedi, yalnız iki pafta satırının yazımı "Σ durak" yerine "H × 1000 + son kat" oldu |
+| **Kabin kapısı ağırlığı** | Her asansörde ayrı bir kutuya elle giriliyordu ( varsayılan 75 kg, kaynağı yok ) | **Ofis standardına** taşındı ( ② mukavemet kabulleri ).  Değer imalatçı kataloğundan:  Fermator 40/10 PM otomatik kabin kapısı, 2 panel teleskopik, 800 × 2.000 mm, sac panel — **62 kg**.  Paftada ayrı satırda, kaynağı **KATALOG** yazar.  Kapı genişliği ağırlığı birkaç kg değiştirir ( ray gerilmesinde %1 mertebesi ), bu yüzden asansör bazında sorulmaz.  75 → 62 kg, kabin rayı sehimi sınırda olan dört senaryoda hükmü çevirdi ( δx 5,03 – 5,12 mm > 5 mm ) |
+| **Bir raya düşen makine yükü ( MRL )** | Makine yükünün yolu "Bina yapısına" seçiliyken de soruluyordu;  "Kılavuz raylara"da boş bırakılırsa eşit dağıtılıyor, doluysa imalatçı değeri olarak okunuyordu | Kutu **kaldırıldı**.  "Bina yapısına"da hesaba girmez;  "Kılavuz raylara"da makinenin yükü ( Gm + Tst ) kabin raylarına **eşit** dağıtılır ve paftada "( Gm + Tst ) / 2 ray" yazar |
 
 **Canlı hesap artık kalıcı olarak denetleniyor ( TEST 13 ).**  Tarayıcıda iki proje
 modunun her girdisi tek tek değiştirilir ve tohumlu rastgele değişiklik dizileri
@@ -343,9 +346,9 @@ opsiyonel alanlar tablo değerini kullanır.
 3. **Uygulama projesi girdileri** — on grup. İlk dokuzu mukavemet ( 71 alan ),
    sonuncusu yalnız elektrik hesaplarına ait olanlar ( kuyu genişliği, kablo
    kesit ve uzunlukları, temel ölçüleri, makine dairesi ).
-   **Durak yükseklikleri** kendi düzenleyicisindedir ( ekle / sil, en çok 20 ).
-   *Seyir mesafesi* ve *son kat yüksekliği* bu listeden **kendiliğinden** dolar —
-   elle girilen iki değer sessizce çelişebilirdi.
+   **Katlar tek tek girilmez:** *seyir mesafesi* ( en alt durak → en üst durak,
+   m ) ile *son kat yüksekliği* ( en üst durak → kuyu tavanı, mm ) yeter.
+   Kuyu boyu, kılavuz ray boyu ve regülatör halatı boyu bu ikisinden hesaplanır.
    **Kabin ağırlığı da beyan yükünü izler:** yükü değiştirdiğinizde ofis
    tablosundan dolar ( 1275 kg → 1100 kg ). Elle yazdığınız değer, beyan yükünü
    yeniden değiştirene kadar korunur — avan tarafındaki *trafik → kapasite*
@@ -387,7 +390,7 @@ kapasite değişti ) hiçbir şeyi baştan girmezsiniz:
 
 1. **Proje aç** ( avan projesinde Proje Kapağı → Proje araçları, uygulama
    projesinde Proje sekmesi ) ile `.avan` ya da `.uygulama` dosyasını seçin.
-2. Bütün girdiler — ofis sabitleri, çoklu asansörler ve durak listesi dâhil —
+2. Bütün girdiler — ofis sabitleri ve çoklu asansörler dâhil —
    yerine oturur, hesaplar anında yeniden yapılır.
 3. Değişen değeri düzeltin.
 4. Güncel PDF'i ya da paketi yeniden indirin, **projeyi yeniden kaydedin**.
@@ -454,23 +457,23 @@ siler**, ve aynı anda bir avan ile bir uygulama projesi tutabilirsiniz.
 ## 6. Hesabın doğruluğu
 
 Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
-( 2026-09-14 ) **40.420 kontrolün tamamı geçmiştir.**
+( 2026-09-15 ) **40.206 kontrolün tamamı geçmiştir.**
 
 | Test | Kapsam | Sonuç |
 |---|---|---|
 | **1 · Avan referans taraması** | 123 senaryo ( 87 tek · 12 grup · 24 avan ) × bütün sonuç değerleri, dondurulmuş referansa karşı | **5.599 / 5.599** |
 | **2 · Kenar durumlar** | tablo sınırları, yuvarlama, ofis varsayılanları, motor kademesi, manuel k, **geçersiz girdi yolları**, **kolon hattı akımının ηm ile, kurulu gücün etiket gücüyle hesaplandığı**, **boş kabin kütlesi tablosu**, **Iz tablosunun B.52.4 Yöntem C değerleri**, **makine dairesi aydınlatmasında döşeme düzlemi** | **849 / 849** |
-| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) + **ofis standardında belirsiz / okunamayan sayının sessizce varsayılana dönmediği** + **gizli alanın projeyi durdurmadığı** | **138 / 138** |
+| **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) + **ofis standardında belirsiz / okunamayan sayının sessizce varsayılana dönmediği** + **gizli alanın projeyi durdurmadığı** | **136 / 136** |
 | **4 · Çıktı bütünlüğü** | PDF açılabilirliği ve içeriği, uygulama paftası, paketlerin içeriği ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **282 / 282** |
-| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **471 / 471** |
-| **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan ve **hesap sonucu** aynı | **848 / 848** |
+| **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi** | **467 / 467** |
+| **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan ve **hesap sonucu** aynı | **826 / 826** |
 | **7 · Altın çıktı** | 432 senaryonun tüm sonucu satır satır kilitli — refactor kalkanı | **867 / 867** |
-| **8 · Mukavemet tabloları** | 9 tablo + ω + kanal tablosu, **ofisin kaynak tablolarının dondurulmuş kopyasına** karşı hücre hücre;  standarda göre genişletilen satırlar ayrıca;  Nequiv(t) **Çizelge 2'den türetilir**;  girdi sözleşmesinin varsayılanları ve seçenekleri | **840 / 840** |
-| **9 · Mukavemet motoru** | örnek projenin ara değerleri + **standart gereği verilen kararların her birinin uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **denetimlerin her bulgusu yeniden üretilerek** + girdi reddi | **509 / 509** |
-| **10 · Mukavemet referans taraması** | 155 senaryo ( girdi uzayı taraması · proje senaryoları · kanal / tahrik birleşimleri · geçersiz girdiler ) × **168 ara değer + bölüm hükümleri**, dondurulmuş referansa karşı | **28.744 / 28.744** |
+| **8 · Mukavemet tabloları** | 9 tablo + ω + kanal tablosu, **ofisin kaynak tablolarının dondurulmuş kopyasına** karşı hücre hücre;  standarda göre genişletilen satırlar ayrıca;  Nequiv(t) **Çizelge 2'den türetilir**;  girdi sözleşmesinin varsayılanları ve seçenekleri | **835 / 835** |
+| **9 · Mukavemet motoru** | örnek projenin ara değerleri + **standart gereği verilen kararların her birinin uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **denetimlerin her bulgusu yeniden üretilerek** + girdi reddi | **519 / 519** |
+| **10 · Mukavemet referans taraması** | 154 senaryo ( girdi uzayı taraması · proje senaryoları · kanal / tahrik birleşimleri · geçersiz girdiler ) × **168 ara değer + bölüm hükümleri**, dondurulmuş referansa karşı | **28.567 / 28.567** |
 | **11 · Uygulama projesi** | ortak girdi köprüsü, bölüm birleştirme, makine dairesi ve topraklama yolları, **kendi ofis standardı ve tabloları**, **denetimlerde bulunan hataların her biri**, **boş kabin kütlesinin iki projede aynı tablodan geldiği**, **asansörlerin sırasının sonucu değiştirmediği**, **hesap → PDF → DXF zinciri** | **402 / 402** |
 | **12 · Dış referans paftaları** | ELEport ve "new block" paftalarının yayımlanmış sayıları | **37 / 37** |
-| **13 · Canlı hesap tutarlılığı** | tarayıcıda avan ve uygulama formunun **her girdisi** değiştirilir + tohumlu rastgele hızlı değişiklik dizileri **yapay ağ gecikmesiyle**;  her seferinde ekrandaki sonuç = formun taze hesabı = indirilen çıktının girdisi, kabin ağırlığı son olayı izler | **815 / 815** |
+| **13 · Canlı hesap tutarlılığı** | tarayıcıda avan ve uygulama formunun **her girdisi** değiştirilir + tohumlu rastgele hızlı değişiklik dizileri **yapay ağ gecikmesiyle**;  her seferinde ekrandaki sonuç = formun taze hesabı = indirilen çıktının girdisi, kabin ağırlığı son olayı izler | **801 / 801** |
 | **14 · Pafta işlem satırları** | bütün senaryolarda ( ~34.000 hesap satırı ) işlem metni, basıldığı hanelerin yuvarlama payıyla **yeniden hesaplanır** ve basılan sonucu vermesi aranır;  bilinen bağıntıların gerçekten denetlendiği ayrıca doğrulanır | **19 / 19** |
 
 ### Referans taraması neden güçlü bir kanıt?
@@ -938,7 +941,7 @@ projeyi haksız yere reddeder, kuyu boyunu gereksiz büyütür. **③ · ⑤ · 
 |---|---|
 | Karşı ağırlık malzemesi açılır listesi **"Döküm"** yazıyor, arama tablosunun anahtarı **"Pik Döküm"** — Excel'de seçilirse **#YOK** | Tablo anahtarı esas alındı |
 | NPU **240 · 280 · 300** satırlarında atalet yarıçapı boş — seçilirse **#SAYI/0!** | Program bu seçimi **açık mesajla reddediyor** |
-| Seyir mesafesi ve son kat yüksekliği elle giriliyor, durak listesiyle **sessizce çelişebiliyor** | Programda listeden **türetiliyor** |
+| Seyir mesafesi ve son kat yüksekliği elle giriliyor, durak listesiyle **sessizce çelişebiliyor** | Durak listesi **kaldırıldı**:  iki değer doğrudan girilir, çelişecek ikinci bir kaynak yok |
 | `TABLOLAR!U63/U64` ve `X61:Z62` satırları hiçbir hesaba girmiyor | **Ölü artık** — tabloya alınmadı |
 | *"Ana Giriş Üstü Durak"* ve *"Makine Tipi"* girdileri hiçbir hesaba girmiyor | Girdi sözleşmesine **alınmadı** |
 | `AB38` hücresi "Imin — eylemsizlik momenti" der ama NPU tablosunun **atalet yarıçapı** sütununu okur | Matematiğe göre adlandırıldı — **EN 81-50 m.5.10.3** de λ = Lk/imin, imin = √(I/A) der |
@@ -1321,7 +1324,7 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
 |---|---|
 | ① Makine ve motor | dişlisiz / dişli verimi, palanga düşüşü, Gs, q, halat payı, **kanal açıları γ ve β** |
 | — | Boş kabin kütlesi tablosu **ekrandan değiştirilmez** ( `engine/ortak/ofis.py` · `GK_TABLOSU` ) — iki proje de aynı tablodan okur |
-| ② **Mukavemet kabulleri** | **σem**, **k1** (kaymalı · makaralı · ani), yan yatak mesnet payı |
+| ② **Mukavemet kabulleri** | **σem**, **k1** (kaymalı · makaralı · ani), k3, **kabin kapısı ağırlığı** ( katalog: 62 kg ), yan yatak mesnet payı |
 | ③ Sığınma payları | kabin gövde yüksekliği, kabin üstü kotu, tavan / etek / ray altı payları |
 | ④ Aydınlatma | kabin · kuyu armatürleri, azami aralık, tablo sütunu |
 | ⑤ Kurulu güç ve gerilim düşümü | U · κ · εmax · cosφ · priz · kablo tipi · sigorta katsayısı |

@@ -17,16 +17,13 @@ from engine.ortak import ofis as OFIS
 from engine.ortak.steps import evet_mi
 from engine.uygulama import mukavemet_tablolari as MT
 
-#  Kabin durak yükseklikleri tek tek değil, liste olarak alınır.
-DURAK_AZAMI = 20
-
 
 def _s(*d):
     return tuple(d)
 
 
 #  ( anahtar, etiket, birim, tür, seçenekler, varsayılan )
-#    tür:  "sayi" · "secim" · "liste" · "hesap"
+#    tür:  "sayi" · "secim" · "hesap"
 #    "hesap" alanları kullanıcıdan alınmaz — tamamla() üretir.
 ALANLAR = (
     # ── ASANSÖR TEKNİK BİLGİLERİ ──────────────────────────────────────
@@ -86,12 +83,19 @@ ALANLAR = (
     ("aski_kaciklik_y",   "Askı noktasının y kaçıklığı  ( ys )", "mm", "sayi", None, 0),
     ("agirlik_yeri",      "Karşı ağırlık yeri",                "—",    "secim",
      _s("Sağ", "Sol", "Arka"), "Sağ"),
-    ("kapi_agirligi",     "Kabin kapısı ağırlığı  ( F_D1 )",   "kg",   "sayi", None, 75),
+    #  Kabin kapısı ağırlığı burada SORULMAZ — ofis standardıdır
+    #  ( engine/uygulama/sabitler.py · kabin_kapisi_agirligi ).
     ("kapi_mekanizma_payi", "Kapı mekanizma ağ. mrk. payı",    "mm",   "sayi", None, 50),
 
     # ── DURAK VE KUYU ─────────────────────────────────────────────────
-    ("durak_yukseklikleri", "Durak yükseklikleri",          "mm",   "liste", None,
-     _s(3000, 3000, 3000, 3000, 3000, 3000, 3000, 3750)),
+    #  KATLAR TEK TEK SORULMAZ.  Hesap durak yüksekliklerinden yalnız
+    #  TOPLAMI ( ray boyu · regülatör halatı ) ve SON DURAĞINKİNİ ( kuyu
+    #  boyu · sığınma ) kullanıyordu;  toplam da  seyir mesafesi + son kat
+    #  yüksekliğidir.  Liste kaldırıldı:  15 katlı binaya 15 kez "3000"
+    #  yazdırıyor, sonuca hiçbir şey katmıyordu.  Farklı kat yükseklikleri
+    #  zaten seyir mesafesinin içindedir.
+    #
+    #  SON KAT YÜKSEKLİĞİ:  en üst durak döşemesinden kuyu tavanına.
     ("son_kat_yuksekligi", "Son kat yüksekliği",               "mm",   "sayi", None, 3750),
     ("kuyu_boyu",         "Kuyu boyu",                         "mm",   "hesap", None, None),
     ("kaide_yuksekligi",  "Kaide yüksekliği",                  "mm",   "sayi", None, 750),
@@ -239,15 +243,11 @@ ALANLAR = (
     #  ( Eski projeler True/'EVET' taşır;  MT.makine_raya_mi ikisini de anlar. )
     ("makine_raya_biniyor", "Makine yükünün yolu",
      "—",    "secim", MT.MAKINE_YUK_YOLU, MT.MAKINE_YUK_YOLU[0]),
-    #  RAY BAŞINA okunur — m.5.7.2.3.7 Maux'u "per guide rail" diye tanımlar.
-    #  Boş bırakılırsa ( Gm + Tst ) / ray sayısı olarak TÜRETİLİR:  makinenin
-    #  kendi ağırlığı + tahrik kasnağına gelen statik yük, iki kabin rayına
-    #  simetrik paylaşılmış kabul edilir.  Asimetrik bağlantıda ya da yükün
-    #  bir kısmı duvara gidiyorsa imalatçının verdiği BİR RAYA DÜŞEN sayı
-    #  buraya yazılır ( ELEport:  "calculated separately, the larger value
-    #  should be taken" ).
-    ("raya_binen_yuk",    "Bir raya düşen makine yükü  ( imalatçı — boşsa türetilir )",
-     "kg",   "sayi", None, None),
+    #  BİR RAYA DÜŞEN MAKİNE YÜKÜ SORULMAZ.  "Bina yapısına" seçildiğinde
+    #  hesaba hiç girmez;  "Kılavuz raylara" seçildiğinde makinenin yükü
+    #  ( Gm + Tst ) kabin raylarına EŞİT dağıtılır ( bkz. mukavemet.
+    #  _kabin_raylari ).  Eskiden imalatçının asimetrik değeri için ayrı bir
+    #  kutu vardı;  yük yolu "bina yapısına" iken de görünüyordu.
     ("makine_tst",        "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
      "kg", "sayi", None, None),
     #  TS EN 81-20 m.5.6.2.2.1.1 a):  devreye girme hızı beyan hızının en az
@@ -391,7 +391,7 @@ ACIL_FRENLEME_ASGARI = 0.5
 #  ADET alanları TAM SAYI olmalıdır:  6,5 halat ya da 2,5 ray diye bir şey
 #  yoktur, ama hesap böyle bir girdiyle sorunsuz koşup "UYGUN" veriyordu.
 TAM_SAYI_ALANLARI = ("halat_adedi", "kabin_ray_sayisi", "agirlik_ray_sayisi",
-                     "kasnak_tek_yon", "kasnak_ters_yon", "durak_sayisi")
+                     "kasnak_tek_yon", "kasnak_ters_yon")
 #  SIFIR OLAMAYAN alanlar:  bölen ya da uzunluk oldukları için 0 girildiğinde
 #  hesap teknik bir hatayla ( TypeError · ZeroDivisionError ) çöküyordu;
 #  kullanıcı hangi alanın sorunlu olduğunu göremiyordu.
@@ -399,7 +399,9 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "kabin_paten_arasi", "agirlik_paten_arasi",
                    "yan_yatak_boyu", "sase_yuksekligi", "tahrik_kasnak_capi",
                    "halat_capi", "reg_kasnak_capi", "reg_halat_capi",
-                   "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi")
+                   "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi",
+                   #  Eskiden listenin "her durak pozitif" kuralı sağlıyordu.
+                   "son_kat_yuksekligi")
 #  MAKİNE YERLEŞİMİNE GÖRE HESABA GİRMEYEN ALANLAR.  Ekranda gizlenirler;
 #  gizli bir alandaki değer projeyi DURDURMAMALI ( bkz. uygulanmayan ).
 #    · Makine dairesi kaidesi yalnız bölüm 2'ye girer — MRL'de o bölüm yoktur.
@@ -407,7 +409,7 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
 #      makine kendi kaidesindedir, yükü raya binmez.
 KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "dikine_kiris_tipi",
                   "yan_yatak", "yan_yatak_tipi", "yan_yatak_boyu")
-RAYA_BINEN_ALANLARI = ("makine_raya_biniyor", "raya_binen_yuk")
+RAYA_BINEN_ALANLARI = ("makine_raya_biniyor",)
 
 
 def uygulanmayan(g):
@@ -430,7 +432,6 @@ OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi",
                      "reg_devreye_hizi", "makine_tst",
                      "halat_birim_kutle", "halat_kopma_kN",
                      "reg_halat_birim_kutle", "reg_halat_kopma_kN",
-                     "raya_binen_yuk",
                      "saptirma_kasnak_min_capi", "kablo_birim_kutle")
 
 #  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
@@ -494,9 +495,9 @@ GRUPLAR = (
      ("kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
       "uzun_pervaz",
       "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
-      "agirlik_yeri", "kapi_agirligi", "kapi_mekanizma_payi")),
+      "agirlik_yeri", "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
-     ("durak_yukseklikleri", "son_kat_yuksekligi", "kaide_yuksekligi",
+     ("son_kat_yuksekligi", "kaide_yuksekligi",
       "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar",
       "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
@@ -505,7 +506,7 @@ GRUPLAR = (
       "saptirma_kasnak_min_capi", "sase_yuksekligi",
       "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
       "yan_yatak_boyu", "makine_tipi", "makine_tst",
-      "makine_raya_biniyor", "raya_binen_yuk")),
+      "makine_raya_biniyor")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
       "sarilma_acisi",
@@ -585,7 +586,7 @@ def arayuz_alanlari():
                 "anahtar": a, "etiket": etiket, "birim": birim,
                 "tur": tur,
                 "secenekler": list(secenekler) if secenekler is not None else None,
-                "varsayilan": list(varsayilan) if tur == "liste" else varsayilan,
+                "varsayilan": varsayilan,
             })
         gruplar.append({"ad": ad, "alanlar": alanlar})
     return {"gruplar": gruplar,
@@ -598,7 +599,6 @@ def arayuz_alanlari():
             #  Ek C.2.2 ölçüyü veri olarak ister ), ama seçim yapınca ekranda
             #  hiçbir şeyin değişmemesi sessiz bir tuzaktı.
             "malzeme_derinligi": {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI},
-            "durak_azami": DURAK_AZAMI,
             "hesaplanan": list(HESAPLANAN)}
 
 
@@ -608,7 +608,7 @@ def varsayilanlar():
     for anahtar, _e, _b, tur, _s2, var in ALANLAR:
         if tur == "hesap":
             continue
-        g[anahtar] = list(var) if tur == "liste" else var
+        g[anahtar] = var
     return tamamla(g)
 
 
@@ -653,9 +653,9 @@ def tamamla(g):
     q = _US.sabitler(g.get("_ofis"))["q_denge"]
     if _sayi(ka) and _sayi(by):
         g["karsi_agirlik"] = ka + q * by
-    sm, sk, kd = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi"), g.get("kuyu_dibi")
-    if _sayi(sm) and _sayi(sk) and _sayi(kd):
-        g["kuyu_boyu"] = sm * 1000.0 + sk + kd
+    _tavan, kd = alt_duraktan_tavana(g), g.get("kuyu_dibi")
+    if _tavan is not None and _sayi(kd):
+        g["kuyu_boyu"] = _tavan + kd
     #  2. bükülgen kablo kat kapısı tipinden türetilir
     g["kablo_tipi_2"] = MT.kapi_kablosu(g.get("kat_kapisi_tipi"))
     #  ESKİ BİÇİM:  makine yükünün yolu bir zamanlar ONAY KUTUSUYDU ve
@@ -684,17 +684,6 @@ def dogrula(g):
             continue
         d = g.get(anahtar)
         ad = f"{etiket} ({birim})" if birim not in ("—", "") else etiket
-        if tur == "liste":
-            if not isinstance(d, (list, tuple)) or not d:
-                hata.append(f"{ad}: en az bir durak yüksekliği girilmeli.")
-                continue
-            if len(d) > DURAK_AZAMI:
-                hata.append(f"{ad}: en çok {DURAK_AZAMI} durak girilebilir "
-                            f"( {len(d)} girildi ).")
-            for i, v in enumerate(d, 1):
-                if not _sayi(v) or v <= 0:
-                    hata.append(f"{ad}: {i}. durak yüksekliği pozitif bir sayı olmalı.")
-            continue
         if d is None or d == "":
             if anahtar not in OPSIYONEL_ALANLAR:
                 hata.append(f"{ad}: boş bırakılamaz.")
@@ -708,18 +697,6 @@ def dogrula(g):
         elif tur == "sayi" and d < 0 and anahtar not in ISARETLI_ALANLAR:
             hata.append(f"{ad}: negatif olmayan bir sayı olmalı ( {d!r} girildi ).")
 
-    #  Tutarlılık
-    dy = g.get("durak_yukseklikleri")
-    sk = g.get("son_kat_yuksekligi")
-    if isinstance(dy, (list, tuple)) and dy and _sayi(sk) and _sayi(dy[-1]) and dy[-1] != sk:
-        hata.append(f"Son kat yüksekliği ({sk} mm) ile son durak yüksekliği "
-                    f"({dy[-1]} mm) uyuşmuyor.")
-    sm = g.get("seyir_mesafesi")
-    if isinstance(dy, (list, tuple)) and dy and _sayi(sm) and all(_sayi(v) for v in dy):
-        bek = (sum(dy) - dy[-1]) / 1000.0
-        if abs(bek - sm) > 0.001:
-            hata.append(f"Seyir mesafesi ({sm} m) durak yüksekliklerinden çıkan "
-                        f"{bek:g} m ile uyuşmuyor.")
     #  SIFIR OLAMAYACAK ALANLAR.  Bunlar hesapta BÖLEN olarak geçer;  sıfır
     #  girilirse motor ZeroDivisionError ile çöker.  Kullanıcıya çökme değil
     #  neyi düzelteceği söylenmeli.
@@ -855,7 +832,6 @@ def dogrula(g):
                             ("reg_halat_birim_kutle", 0.02, 5.0),
                             ("reg_halat_kopma_kN", 5.0, 2000.0),
                             ("makine_tst", 100.0, 100000.0),
-                            ("raya_binen_yuk", 1.0, 50000.0),
                             ):
         _v = g.get(_ad)
         if _v is None or _v == "":
@@ -1083,12 +1059,22 @@ def uyarilar(g):
     return uyari
 
 
+def alt_duraktan_tavana(g):
+    """En alt durak döşemesinden kuyu tavanına ( mm )  =  seyir × 1000 + son kat.
+
+    Eski durak listesinin TOPLAMIYDI;  ray boyu, regülatör halatı ve kuyu
+    boyu bu tek sayıdan türer.  Girdiler sayı değilse None.
+    """
+    sm, sk = g.get("seyir_mesafesi"), g.get("son_kat_yuksekligi")
+    if not (_sayi(sm) and _sayi(sk)):
+        return None
+    return sm * 1000.0 + sk
+
+
 def toplam_ray_boyu(g):
-    """Kılavuz ray toplam boyu ( m )  =  ( Σ durak + kaide − 200 + kuyu dibi − 300 ) / 1000."""
-    dy = g.get("durak_yukseklikleri") or ()
-    if not all(_sayi(v) for v in dy) or not dy:
-        return None
+    """Kılavuz ray toplam boyu ( m )  =  ( seyir + son kat + kaide − 200 + kuyu dibi − 300 ) / 1000."""
+    tavan = alt_duraktan_tavana(g)
     ky, kd = g.get("kaide_yuksekligi"), g.get("kuyu_dibi")
-    if not (_sayi(ky) and _sayi(kd)):
+    if tavan is None or not (_sayi(ky) and _sayi(kd)):
         return None
-    return (sum(dy) + (ky - 200) + (kd - 300)) / 1000.0
+    return (tavan + (ky - 200) + (kd - 300)) / 1000.0

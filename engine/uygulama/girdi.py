@@ -121,7 +121,7 @@ EK_BOLUM_GRUBU = {
 #  bozuyordu — ölçüler kendi hesabının yanında, "Elektrik ve topraklama"
 #  grubunda durur.
 YERLESIM_GRUBU = (YERLESIM_GRUBU_ADI,
-                  ("mk_yok", "makine_raya_biniyor", "raya_binen_yuk"))
+                  ("mk_yok", "makine_raya_biniyor"))
 
 
 def arayuz_alanlari():
@@ -171,7 +171,7 @@ def uygulanmayan_alanlar(mk_yok):
     """Makine yerleşimine göre HESABA GİRMEYEN alanlar  —  ekranda gizlenirler.
 
     Gizli bir alanda kalmış değer ( makine dairesizde "4.000" yazılı makine
-    dairesi ölçüsü, makine dairelide "-3" yazılı raya binen yük ) projeyi
+    dairesi ölçüsü, makine dairelide geçersiz bir makine yükü yolu ) projeyi
     durduruyordu:  kullanıcı hatayı göremiyor, düzeltemiyordu.  API bu
     alanları okumaz, motor da doğrulamaz.
     """

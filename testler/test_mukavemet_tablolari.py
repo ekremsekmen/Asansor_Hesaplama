@@ -248,11 +248,10 @@ def _girdi_sozlesmesi(r, kaynak):
         #  örnek değerleri ve TEST 10'un taraması bu girdilere dayanır.
         if anahtar in kaynak["varsayilanlar"]:
             bek = kaynak["varsayilanlar"][anahtar]
-            bul = list(varsayilan) if tur == "liste" else varsayilan
             r.kontrol(f"girdi {anahtar}: varsayılan örnek projeyle aynı",
-                      bul == bek if tur == "liste" else _esit(bul, bek),
-                      f"→ modül {bul!r}, kaynak {bek!r}")
-        if secenekler is not None and tur != "liste":
+                      _esit(varsayilan, bek),
+                      f"→ modül {varsayilan!r}, kaynak {bek!r}")
+        if secenekler is not None:
             r.kontrol(f"girdi {anahtar}: varsayılan seçenek listesinde",
                       varsayilan is None or varsayilan in secenekler,
                       f"→ {varsayilan!r} ∉ {secenekler!r}")

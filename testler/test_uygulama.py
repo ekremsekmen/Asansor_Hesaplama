@@ -102,9 +102,6 @@ def calistir():
     for anahtar, eski, yeni, olcut, aciklama in OYNAT:
         ek = dict(TAM)
         ek[anahtar] = yeni
-        if anahtar == "seyir_mesafesi":     # durak listesiyle tutarlı olmalı
-            ek["durak_yukseklikleri"] = [3000] * 15 + [3750]
-            ek["son_kat_yuksekligi"] = 3750
         y = UY.hesapla(ek)
         if not r.kontrol(f"köprü senaryosu koşuyor: {anahtar}", y["aktif"],
                          f"→ {y.get('hata')}"):

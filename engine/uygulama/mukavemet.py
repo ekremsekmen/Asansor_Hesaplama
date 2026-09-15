@@ -953,7 +953,7 @@ def _regulator(g, o):
     mu, gama = g["reg_surtunme"], g["reg_kanal_acisi"]
     alfa = S["reg_sarilma_aci"]
     #  Regülatör halatı kuyu boyunca iki kat gider
-    boy = ((sum(g["durak_yukseklikleri"]) + g["kaide_yuksekligi"]
+    boy = ((MG.alt_duraktan_tavana(g) + g["kaide_yuksekligi"]
             - S["ray_kaide_payi"]) * 2) / 1000.0
     #  REGÜLATÖR HALATINDA DA KATALOG VERİSİ GEÇERLİDİR.  Askı halatında
     #  imalatçı alanları vardı, regülatörde yoktu ve değerler HER ZAMAN
@@ -1032,7 +1032,7 @@ def _regulator(g, o):
         veri("γ", "Kanal açısı", gama, "°", "GİRİŞ", 0),
         veri("α'", "Regülatör kasnağı sarılma açısı", alfa, "°", "Ofis kabulü", 0),
         veri("", "Regülatör halatı 1 m ağırlığı", gh_m, "kg/m", gh_kaynak),
-        hesap("gh = ( 1 m ağırlık ) × ( Σ durak + kaide − 200 ) × 2 / 1000",
+        hesap("gh = ( 1 m ağırlık ) × ( H × 1000 + son kat + kaide − 200 ) × 2 / 1000",
               f"{_trh(gh_m)} × {tr(boy)}", gh, "kg"),
         veri("Gra", "Regülatör alt ağırlığı ve kasnak kütlesi", Gra, "kg", "GİRİŞ"),
         veri("Fgt", "Güvenlik tertibatını devreye sokma kuvveti",
@@ -1879,14 +1879,10 @@ def _kabin_raylari(g, o):
     #   the guide rail Maux shall be considered".  150 N da ray başınadır ( şalter · kam · kanal ), o yüzden bölünmez.
     #
     #  TÜRETİLEN DEĞER İSE TOPLAMDIR:  Gm + Tst makinenin tamamının yüküdür.
-    #  Ray sayısına bölünür — makine iki kabin rayı arasındaki bir kirişe
-    #  oturur ve yük simetrik paylaşılır kabul edilir.
-    #
-    #  ASİMETRİK MONTAJDA İMALATÇI SAYISI YAZILIR.  ELEport aynı yerde şunu
-    #  der:  "the auxiliary equipment for both rails should be calculated
-    #  separately, and the LARGER value should be taken".  'raya_binen_yuk'
-    #  alanı bu yüzden RAY BAŞINA okunur:  imalatçı asimetrik bir bağlantı
-    #  veriyorsa büyük olan raya düşen yük girilir ve türetme ezilir.
+    #  Ray sayısına EŞİT bölünür — makine iki kabin rayı arasındaki bir
+    #  kirişe oturur ve yük simetrik paylaşılır kabul edilir.  Bir raya düşen
+    #  yük ayrıca SORULMAZ ( kullanıcı kararı:  imalatçının asimetrik değeri
+    #  için duran kutu kaldırıldı ).
     #  SEÇİM YALNIZ MAKİNE DAİRESİZ TESİSTE GEÇERLİDİR.  Makine dairesi
     #  varsa makine kendi kaidesinde durur ve yükü bölüm 2'de hesaplanır;
     #  aynı yükü bir de raya bindirmek onu İKİ KEZ saymaktır ve paftaya
@@ -1905,15 +1901,10 @@ def _kabin_raylari(g, o):
     MY = S["MY_kabin"]
     MY_kaynak = "Ofis kabulü"
     if _mrl and _raya:
-        _elle = g.get("raya_binen_yuk")
-        if _pozitif(_elle):
-            _kutle = float(_elle)
-            MY_kaynak = "GİRİŞ — imalatçı  ( bir raya düşen makine yükü )"
-        else:
-            _toplam = (g["makine_agirligi"] or 0.0) + (o.get("Tst_hesap") or 0.0)
-            _kutle = _toplam / n if n else _toplam
-            MY_kaynak = (f"( Gm + Tst ) / {trn(n, 0)} ray"
-                         "  ( makine raylara biniyor — m.5.7.2.3.7 )")
+        _toplam = (g["makine_agirligi"] or 0.0) + (o.get("Tst_hesap") or 0.0)
+        _kutle = _toplam / n if n else _toplam
+        MY_kaynak = (f"( Gm + Tst ) / {trn(n, 0)} ray"
+                     "  ( makine raylara biniyor — m.5.7.2.3.7 )")
         MY = _kutle * gn
     #  KUYU TABANI DA AYNI SAYIYI GÖRÜR.  m.5.2.1.8.4 kalemleri sayarken bunu
     #  ADIYLA anar:  "...any additional reaction (N) occurring during
@@ -1962,7 +1953,9 @@ def _kabin_raylari(g, o):
     #  KAPI DÜZELTMESİ BOŞ KABİN KÜTLESİNE GÖRE YAPILIR.  Kapı, kabinin
     #  KENDİ kütlesinin bir parçasıdır;  momenti boş kabin kütlesine bölünür.
     P_bos = o["P"]
-    xp_kapi = (g["kapi_agirligi"] * (D / 2.0 + g["kapi_mekanizma_payi"])) / P_bos
+    #  Kapı ağırlığı OFİS STANDARDIDIR ( asansör bazında sorulmaz ).
+    m_kapi = O["kabin_kapisi_agirligi"]
+    xp_kapi = (m_kapi * (D / 2.0 + g["kapi_mekanizma_payi"])) / P_bos
     xp_bos = xc - xp_kapi
     #  m.5.7.2.3.2:  "The acting point of the masses of the empty car and
     #  components supported by the car such as ram, part of travelling cable,
@@ -2056,8 +2049,10 @@ def _kabin_raylari(g, o):
              "OFİS STANDARDI  —  Çizelge 14 sayı vermez, imalatçı belirler", 1),
         veri("xc", "Kabin merkezinin x mesafesi", xc, "mm"),
         veri("yc", "Kabin merkezinin y mesafesi", yc, "mm"),
+        veri("", "Kabin kapısı ağırlığı  ( panel + mekanizma )", m_kapi, "kg",
+             "KATALOG", 0),
         veri("xp", "Boş kabin ağırlık merkezinin x mesafesi", xp, "mm",
-             f"xc − kapı katkısı  ( {trn(g['kapi_agirligi'], 0)} kg × "
+             f"xc − kapı katkısı  ( {trn(m_kapi, 0)} kg × "
              f"{trn(D / 2 + g['kapi_mekanizma_payi'], 0)} mm / {trn(P, 0)} kg )  ·  "
              "gövde kabin merkezinde kabul edilir"),
         veri("yp", "Boş kabin ağırlık merkezinin y mesafesi", yp, "mm"),
@@ -2665,7 +2660,7 @@ def _kuyu_tabani(g, o):
               f"{trn(o['P'], 0)} + {tr(o.get('MTrav') or 0)} + {tr(o.get('MCR') or 0)}",
               o["P_std"], "kg",
               "TS EN 81-20 m.5.2.1.8.5  ·  P'nin standarttaki tanımı"),
-        veri("LR", "Kılavuz ray boyu", LR, "mm", "Σ durak + kaide − 200 + kuyu dibi − 300", 0),
+        veri("LR", "Kılavuz ray boyu", LR, "mm", "H × 1000 + son kat + kaide − 200 + kuyu dibi − 300", 0),
         metin("Kabin raylarına gelen kuvvetler :"),
         hesap("FKR = gn × Gr × LR / 1000 + k3 × MY + Fgt" + ("  +  Fp" if Fp else ""),
               f"{tr(gn)} × {tr(Gr_k)} × {trn(LR, 0)} / 1000 + "

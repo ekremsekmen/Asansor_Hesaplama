@@ -196,13 +196,11 @@ def calistir():
             ("MRL · makine dairesi ölçüsü '-5'", {}, {"mk_yok": True, "mk_uzunluk": "-5"}, True),
             ("MRL · yan yatak boyu '1.400'", {"yan_yatak_boyu": "1.400"}, {"mk_yok": True}, True),
             ("MRL · dikine kiriş 'x'", {"dikine_kiris": "x"}, {"mk_yok": True}, True),
-            ("daireli · raya binen yük '1.000'", {"raya_binen_yuk": "1.000"}, _DAIRELI, True),
-            ("daireli · raya binen yük '-3'", {"raya_binen_yuk": "-3"}, _DAIRELI, True),
+            ("daireli · makine yükü yolu 'Kılavuz raylara' ( gizli )",
+             {"makine_raya_biniyor": "Kılavuz raylara"}, _DAIRELI, True),
             ("daireli · makine dairesi ölçüsü '4.000' ( görünür )", {},
              dict(_DAIRELI, mk_uzunluk="4.000"), False),
-            ("daireli · yan yatak boyu '1.400' ( görünür )", {"yan_yatak_boyu": "1.400"}, _DAIRELI, False),
-            ("MRL · raya binen yük '-3' ( görünür )", {"raya_binen_yuk": "-3",
-             "makine_raya_biniyor": "Kılavuz raylara"}, {"mk_yok": True}, False)):
+            ("daireli · yan yatak boyu '1.400' ( görünür )", {"yan_yatak_boyu": "1.400"}, _DAIRELI, False)):
         s = _uyg(asansor=asansor, pg=pg)
         r.kontrol(f"uygulama · {ad} → {'hesaplanır' if gecerli else 'reddedilir'}",
                   bool(s.get("aktif")) is gecerli, f"→ {s.get('hata')}")

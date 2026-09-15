@@ -19,7 +19,7 @@ değeri bir sonraki hesaba taşır.
      sonraki değişiklik de üst üste biner ).
   2. HIZLI DEĞİŞİKLİK DİZİLERİ  —  tohumlu rastgele eylemler ( alan
      değiştirme · beyan yükü · elle kabin ağırlığı · asansör adedi / sekmesi
-     · durak ekle / sil · makine dairesi · trafik adedi ) rastgele aralıklarla
+     · makine dairesi · trafik adedi ) rastgele aralıklarla
      ve YAPAY AĞ GECİKMESİYLE ( her yanıt 0 - 500 ms ) art arda uygulanır;
      her dizinin sonunda kural denetlenir.
   3. TÜRETİLEN ALAN  —  bir asansörde son olay beyan yükü değişikliğiyse o
@@ -247,7 +247,7 @@ def _uygulama_dizileri(r, pg, rnd):
         olaylar = []                        # hata iletisi için
         for _ in range(rnd.randint(3, 8)):
             eylem = rnd.choice(("beyan", "beyan", "elle", "alan", "alan", "adet",
-                                "sekme", "durak", "mrl"))
+                                "sekme", "mrl"))
             aktif = pg.evaluate("MUK_AKTIF")
             olaylar.append(f"{eylem}@{aktif + 1}")
             if eylem == "beyan":
@@ -282,8 +282,6 @@ def _uygulama_dizileri(r, pg, rnd):
                         son_olay[j] = son_olay[0]
             elif eylem == "sekme":
                 pg.evaluate("i => mAsansorSekmesi(Math.min(i, MUK_ADET - 1))", rnd.randint(0, 2))
-            elif eylem == "durak":
-                pg.evaluate("s => s ? mDurakEkle() : mDurakSil()", rnd.random() < 0.5)
             elif eylem == "mrl":
                 pg.evaluate("v => document.querySelector("
                             "`.secim-ikili[data-icin=\"m_mk_yok\"] .secim-dg[data-deger=\"${v}\"]`)"

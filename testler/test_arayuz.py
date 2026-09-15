@@ -278,10 +278,6 @@ def calistir():
         #  olduğu baştan bellidir, mühendis onu sayar — sırayla ekleyip
         #  silmez.  Form TEK KOPYADIR;  aktif asansörün değerleri onda durur.
         #  Asansör değişince değerler kaybolmamalı — asıl kontrol budur.
-        #  Denemede BAĞIMSIZ bir alan kullanılır:  seyir mesafesi ve son kat
-        #  yüksekliği durak listesinden TÜRETİLİR ( mTuretilenleriDoldur ),
-        #  asansör değişince yeniden hesaplanırlar — taşınmadıkları için
-        #  değil, türetildikleri için.
         r.esit("çoklu: açılışta tek asansör", pg.evaluate("MUK_ADET"), 1)
         pg.evaluate("mTumGruplariAc()")
         pg.fill("#m_asansor_adi", "İnsan 1")
@@ -404,7 +400,7 @@ def calistir():
                           "mFormOku", "mFormaYaz"):
             r.kontrol(f"ortak yardımcı var: {_yardimci}",
                       pg.evaluate(f"typeof {_yardimci} === 'function'"))
-        #  KAYDEDİLEN küme = OKUNAN küme − durak listesi − proje geneli.
+        #  KAYDEDİLEN küme = OKUNAN küme − proje geneli.
         #  İkisi ayrışırsa asansör değiştirince alan sessizce kaybolur.
         r.esit("kaydedilen ve okunan alan kümeleri tutarlı",
                pg.evaluate("""() => {
@@ -412,10 +408,7 @@ def calistir():
                    const tum = Object.keys(mukavemetGirdi());
                    const kayit = Object.keys(MUK_ASANSORLER[MUK_AKTIF])
                                        .filter(k => k[0] !== '_');
-                   const liste = mAlanlar(f => f.tur === 'liste')
-                                       .map(f => f.anahtar);
-                   const bek = tum.filter(k => !liste.includes(k)
-                                               && !mProjeGeneliMi(k));
+                   const bek = tum.filter(k => !mProjeGeneliMi(k));
                    return {eksik: bek.filter(k => !kayit.includes(k)),
                            fazla: kayit.filter(k => !bek.includes(k))};
                }"""), {"eksik": [], "fazla": []})
@@ -481,13 +474,15 @@ def calistir():
         #  Makine dairesi varsa makine kendi kaidesindedir;  aynı yükü raya da
         #  bindirmek onu iki kez saymak olur.
         r.kontrol("MRL'de makine yükü yolu soruluyor",
-                  pg.eval_on_selector("#m_makine_raya_biniyor", _gor)
-                  and pg.eval_on_selector("#m_raya_binen_yuk", _gor))
+                  pg.eval_on_selector("#m_makine_raya_biniyor", _gor))
+        #  BİR RAYA DÜŞEN YÜK SORULMAZ:  "bina yapısına"da hesaba girmez,
+        #  "kılavuz raylara"da makine yükü raylara eşit dağıtılır.
+        r.kontrol("bir raya düşen makine yükü kutusu yok",
+                  pg.evaluate("!document.getElementById('m_raya_binen_yuk')"))
         _mrl_sec(pg, False)
         pg.wait_for_timeout(1800)
         r.kontrol("makine dairesi varken makine yükü yolu SORULMUYOR",
-                  not pg.eval_on_selector("#m_makine_raya_biniyor", _gor)
-                  and not pg.eval_on_selector("#m_raya_binen_yuk", _gor))
+                  not pg.eval_on_selector("#m_makine_raya_biniyor", _gor))
         #  KURAL GİZLEMESİ ARAMA SÜZGECİYLE KAVGA ETMEMELİ.
         #  mTumGruplariAc() ve mAramaUygula() [hidden] üzerinde çalışır;  kural
         #  gizlemesi aynı niteliği kullanırsa grupları açmak gizlenen alanı
@@ -590,35 +585,15 @@ def calistir():
         pg.fill("#m_asansor_adi", "")
         pg.evaluate("mAsansorKaydet(); yaz()")
         pg.wait_for_timeout(700)
-        r.esit("varsayılan durak sayısı", pg.evaluate("MUK_DURAK.length"), 8)
-
-        #  DURAK DÜĞMELERİ ALTTAKİ ALANIN ÜSTÜNE TAŞMAMALI.
-        #  Bir kez taştılar:  trafikteki 31×29 px SABİT KARE ".adet-dg"
-        #  sınıfıyla yazılmışlardı, uzun Türkçe metin kutuya sığmayıp
-        #  "Son kat yüksekliği" etiketinin üzerine biniyordu.  Ölçü hem geniş
-        #  hem dar ekranda alınır — dar ekranda düğmeler alt alta sarar.
-        for _ad, _en in (("geniş ekran", 1440), ("dar ekran", 380)):
-            pg.set_viewport_size({"width": _en, "height": 950})
-            pg.wait_for_timeout(400)
-            _o = pg.evaluate("""() => {
-                const q = id => document.getElementById(id);
-                const kutu = e => e.getBoundingClientRect();
-                const ekle = q('m_durak_ekle'), sil = q('m_durak_sil');
-                const et = [...document.querySelectorAll('#m_form label')]
-                    .find(l => l.textContent.includes('Son kat yüksekliği'));
-                const alt = Math.max(kutu(ekle).bottom, kutu(sil).bottom);
-                return {bosluk: Math.round(kutu(et).top - alt),
-                        tasan: ekle.scrollWidth > ekle.clientWidth + 1
-                            || sil.scrollWidth > sil.clientWidth + 1,
-                        yukseklik: Math.round(kutu(ekle).height),
-                        genislik: Math.round(kutu(ekle).width)};
-            }""")
-            r.kontrol(f"durak düğmeleri alttaki alana taşmıyor ( {_ad} )",
-                      _o["bosluk"] >= 0, f"→ {_o['bosluk']} px örtüşme")
-            r.kontrol(f"durak düğmesi metni kutusuna sığıyor ( {_ad} )",
-                      not _o["tasan"], f"→ {_o}")
-            r.kontrol(f"durak düğmesi tek satır ( {_ad} )",
-                      _o["yukseklik"] <= 42, f"→ {_o['yukseklik']} px yüksek")
+        #  KATLAR TEK TEK SORULMAZ:  seyir mesafesi ve son kat yüksekliği
+        #  sıradan iki alandır;  durak kutusu ve ekle / sil düğmeleri yoktur.
+        r.esit("varsayılan seyir mesafesi", pg.input_value("#m_seyir_mesafesi"), "21")
+        r.esit("varsayılan son kat yüksekliği",
+               pg.input_value("#m_son_kat_yuksekligi"), "3750")
+        r.kontrol("durak listesi kutusu ve düğmeleri yok",
+                  pg.evaluate("!document.getElementById('m_durak_kutu') && "
+                              "!document.getElementById('m_durak_ekle') && "
+                              "typeof MUK_DURAK === 'undefined'"))
         pg.set_viewport_size({"width": 1440, "height": 1000})
         pg.wait_for_timeout(400)
         #  VARSAYILAN PROJE İKİ BÖLÜMDEN KALIR — ikisi de kaynak kitabın
@@ -738,17 +713,18 @@ def calistir():
                               "b.baslik.includes('KILAVUZ RAY')).length === 0"),
                   f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")
 
-        #  Durak düzenleyici + türetilen alanlar
-        pg.click("#m_durak_ekle")
+        #  Seyir mesafesi ve son kat yüksekliği kuyu boyuna ve ray boyuna iner
+        pg.fill("#m_seyir_mesafesi", "24,75")
+        pg.fill("#m_son_kat_yuksekligi", "4000")
         pg.wait_for_timeout(1400)
-        r.esit("durak eklendi", pg.evaluate("MUK_DURAK.length"), 9)
-        r.esit("seyir mesafesi kendiliğinden güncellendi",
-               pg.input_value("#m_seyir_mesafesi"), "24,75")
-        pg.click("#m_durak_sil")
+        r.esit("kuyu boyu = seyir + son kat + kuyu dibi",
+               pg.evaluate("SON.m.girdi.kuyu_boyu"), 24750 + 4000 + 1600)
+        r.esit("ray boyu seyir ve son kattan",
+               pg.evaluate("SON.m.ozet.ray_boyu"), (24750 + 4000 + 550 + 1300) / 1000)
+        pg.fill("#m_seyir_mesafesi", "21")
+        pg.fill("#m_son_kat_yuksekligi", "3750")
         pg.wait_for_timeout(1400)
-        r.esit("durak silindi", pg.evaluate("MUK_DURAK.length"), 8)
-        r.esit("seyir mesafesi geri döndü",
-               pg.input_value("#m_seyir_mesafesi"), "21")
+        r.esit("seyir mesafesi geri alındı", pg.evaluate("SON.m.girdi.kuyu_boyu"), 26350)
 
         #  BOŞ KABİN AĞIRLIĞI ARTIK ZORUNLU DEĞİL — boş bırakılırsa ofis
         #  tablosundan dolar ( beyan yükü 800 kg → 800 kg ) ve paftada
@@ -938,29 +914,30 @@ def calistir():
         #  REVİZYON AKIŞI:  proje dosyası al → formu boz → dosyayı geri yükle
         pg.select_option("#m_beyan_yuku", "1000")
         pg.fill("#m_kabin_agirligi", "950")
-        pg.click("#m_durak_ekle")
+        pg.fill("#m_seyir_mesafesi", "24,75")
         pg.wait_for_timeout(1600)
         _once = pg.evaluate("({yuk: SON.m.girdi.beyan_yuku, "
                             "ag: SON.m.girdi.kabin_agirligi, "
-                            "durak: MUK_DURAK.length, ray: SON.m.ozet.ray_boyu})")
+                            "seyir: SON.m.girdi.seyir_mesafesi, ray: SON.m.ozet.ray_boyu})")
         _geri = pg.evaluate("""async () => {
             const govde = JSON.parse(JSON.stringify(projeGovdesi('uygulama')));
             //  formu boz
             document.getElementById('m_beyan_yuku').value = '450';
             document.getElementById('m_kabin_agirligi').value = '500';
-            mDurakSil(); mDurakSil();
+            document.getElementById('m_seyir_mesafesi').value = '15';
+            mukavemetPlanla();
             await new Promise(x=>setTimeout(x, 1500));
-            const bozuk = {yuk: SON.m.girdi.beyan_yuku, durak: MUK_DURAK.length};
+            const bozuk = {yuk: SON.m.girdi.beyan_yuku, seyir: SON.m.girdi.seyir_mesafesi};
             //  dosyayı geri yükle
             projeUygula(govde, 'muk.uygulama');
             await new Promise(x=>setTimeout(x, 2000));
             return {bozuk, sonra: {yuk: SON.m.girdi.beyan_yuku,
-                    ag: SON.m.girdi.kabin_agirligi, durak: MUK_DURAK.length,
+                    ag: SON.m.girdi.kabin_agirligi, seyir: SON.m.girdi.seyir_mesafesi,
                     ray: SON.m.ozet.ray_boyu},
                     durum: document.getElementById('durum').textContent};
         }""")
         r.kontrol("form gerçekten bozulmuştu",
-                  _geri["bozuk"]["yuk"] == 450 and _geri["bozuk"]["durak"] != _once["durak"],
+                  _geri["bozuk"]["yuk"] == 450 and _geri["bozuk"]["seyir"] != _once["seyir"],
                   f"→ {_geri['bozuk']}")
         r.esit("proje dosyasından geri yükleme girdileri aynen döndürüyor",
                _geri["sonra"], _once)
@@ -974,8 +951,8 @@ def calistir():
         pg.wait_for_timeout(2200)
         r.esit("yenilemeden sonra beyan yükü duruyor",
                pg.input_value("#m_beyan_yuku"), "1000")
-        r.esit("yenilemeden sonra durak sayısı duruyor",
-               pg.evaluate("MUK_DURAK.length"), _once["durak"])
+        r.esit("yenilemeden sonra seyir mesafesi duruyor",
+               pg.input_value("#m_seyir_mesafesi"), "24,75")
         r.esit("yenilemeden sonra proje adı duruyor",
                pg.input_value("#mk_proje_adi"), "Güneş Apartmanı")
         #  ─────────── AVAN VE UYGULAMA AYRI KOVALARDA ───────────

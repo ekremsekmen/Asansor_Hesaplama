@@ -68,6 +68,15 @@ VARSAYILAN = {
     #  verdiği bir sayı YOKTUR.  Bu yüzden k3 ofis sabitidir, motorda çivili
     #  değildir;  varsayılanı 1,2'dir.
     "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
+    #  KABİN KAPISI AĞIRLIĞI  ( panel + kapı mekanizması ).  Kabin ray
+    #  hesabında boş kabinin ağırlık merkezini ( xp ) kapı tarafına kaydırır
+    #  ( TS EN 81-50 m.5.7.2.3.2 · Ek C.1.2 );  standart sayı vermez.
+    #  ASANSÖR BAZINDA SORULMAZ:  kapı genişliği ağırlığı birkaç kg
+    #  değiştirir, bu da ray gerilmesinde %1 mertebesidir.  Değer imalatçı
+    #  föyünden alınmıştır:  Fermator 40/10 PM otomatik kabin kapısı, 2 panel
+    #  teleskopik, 800 × 2.000 mm, sac panel — 62 kg ( DOC-FECMCBP10C00EN ).
+    #  Camlı ya da ağır kapı kullanan ofis değeri buradan değiştirir.
+    "kabin_kapisi_agirligi": 62,  # kg
     "yan_yatak_L_X":    335,    # Kaide kiriş mesnet payı, mm
     #  BURKULMA EKSENİ.  Çubuk EN KÜÇÜK atalet yarıçapına sahip eksende
     #  burkulur;  program bu yüzden min( ix ; iy ) kullanır.  Şase, dikine
@@ -164,7 +173,7 @@ ARALIK = {
     "kanal_gama_yd": (MT.GAMA_ASGARI_U, MT.GAMA_AZAMI),
     "kanal_beta": (0, MT.BETA_AZAMI),
     "sigma_em": (10, 400), "k1_kaymali": (1, 10), "k1_makarali": (1, 10),
-    "k1_ani": (1, 10), "k3_yardimci": (1, 10),
+    "k1_ani": (1, 10), "k3_yardimci": (1, 10), "kabin_kapisi_agirligi": (0, 1000),
     "yan_yatak_L_X": (0, 5000), "kaide_zayif_eksen_mesnetli": (0, 1),
     "kasnak_yogunluk": (1000, 20000), "kasnak_gobek_pay": (0, 500),
     "kasnak_kanal_payi": (0, 500), "kasnak_gobek_orani": (0, 1),
@@ -197,7 +206,7 @@ GRUPLAR = (
      "makine kaidesi ve ray hesabı — TS EN 81-20 bu yük modelini VERMEZ, "
      "aşağıdakiler ofis kabulüdür",
      ("sigma_em", "k1_kaymali", "k1_makarali", "k1_ani", "k3_yardimci",
-      "yan_yatak_L_X", "kaide_zayif_eksen_mesnetli")),
+      "kabin_kapisi_agirligi", "yan_yatak_L_X", "kaide_zayif_eksen_mesnetli")),
     ("②b KASNAK ATALETİ",
      "tahrik hesabındaki Σ( mP·iP·a )/r terimi — TS EN 81-50 kasnağın atalet "
      "momentini imalatçıdan ister;  aşağıdaki dört sayı kasnağı döküm disk "
@@ -246,6 +255,10 @@ ETIKET = {
                             "( P + Q + MCR + MTrav )·( gn ± a ) kuvvetinin yüzdesi"),
     "kuyu_surtunme_agirlik": ("Ağırlık tarafı kuyu sürtünmesi FRcwt (%)",
                               "( Mcwt + MCR )·( gn ∓ a ) kuvvetinin yüzdesi"),
+    "kabin_kapisi_agirligi": ("Kabin kapısı ağırlığı (kg)",
+                              "panel + mekanizma, kabin ray hesabında xp'ye girer — "
+                              "Fermator 40/10 PM · 2 panel teleskopik 800 × 2.000 mm "
+                              "sac panel: 62 kg"),
     "k3_yardimci": ("Yardımcı donanım darbe katsayısı k3",
                     "TS EN 81-20 Çizelge 14 k3'e SAYI VERMEZ — "
                     "'imalatçı tarafından, gerçek tesise göre belirlenir'"),

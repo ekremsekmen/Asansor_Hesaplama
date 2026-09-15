@@ -35,16 +35,14 @@ from testler.ortak import Rapor                                   # noqa: E402
 #  ELEPORT  —  sample-project.pdf  ·  "PROJE 5 / Elevator 3"
 # =====================================================================
 #  Girdiler paftanın "CALCULATION OF STEEL ROPES IN ROPE-TRACTION ELEVATORS"
-#  başlıklı sayfasındaki girdi bloğundan alındı.  Durak yükseklikleri orada
-#  yoktur;  seyir mesafesi 29,0 m olacak şekilde 11 × 2.900 mm kuruldu
-#  ( seyir = ( durak sayısı − 1 ) × kat yüksekliği ).
+#  başlıklı sayfasındaki girdi bloğundan alındı.  Son kat yüksekliği orada
+#  yoktur;  2.900 mm alındı ( ELEport'un kuyu boyu hesabına girmez ).
 ELEPORT = {
     "beyan_yuku": 800,                  # Actual Load Q : 800 kg
     "kabin_agirligi": 900,              # Empty Cabin Mass P : 900 kg
     "beyan_hizi": 1.6,                  # Cabin Speed V : 1.6 m/s
     "aski_orani": 2,                    # Roping Type 2/1 · r : 2
     "seyir_mesafesi": 29.0,             # Travel Distance Htravel : 29.0 m
-    "durak_yukseklikleri": [2900] * 11,
     "son_kat_yuksekligi": 2900,
     "tahrik_kasnak_capi": 240,          # Traction Sheave Diameter Dt : 240 mm
     "saptirma_kasnak_capi": 294,        # Average diameter Dp : 294 mm

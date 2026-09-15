@@ -48,9 +48,9 @@ def tarama_senaryolari():
         s.append((ad, g))
 
     def durak(n, h=3000, son=3750):
-        dy = [h] * (n - 1) + [son]
-        return {"durak_yukseklikleri": dy, "son_kat_yuksekligi": son,
-                "seyir_mesafesi": (n - 1) * h / 1000.0}
+        #  n durak, katlar arası h:  seyir ( n − 1 ) · h.  Adlar referans
+        #  dosyasının anahtarıdır — "12 durak" olarak kalırlar.
+        return {"son_kat_yuksekligi": son, "seyir_mesafesi": (n - 1) * h / 1000.0}
 
     E("varsayılan")
     #  Sarılma açısı zorunlu girdidir ve varsayılanı yoktur:  öteki
@@ -118,7 +118,7 @@ def tarama_senaryolari():
     E("ray-kapı arası 830  ( xc = 0 )", ray_kapi_arasi=830)
     E("ray-kapı arası 1200 ( xc < 0 )", ray_kapi_arasi=1200)
     E("kabin kaçıklığı 60", kabin_kaciklik=60)
-    E("ağır kabin kapısı", kapi_agirligi=180, kapi_mekanizma_payi=90)
+    E("ağır kabin kapısı", _ofis={"kabin_kapisi_agirligi": 180}, kapi_mekanizma_payi=90)
     E("dar konsol aralığı", kabin_konsol_arasi=2000, agirlik_konsol_arasi=2000)
     E("küçük kabin  ( Çizelge 8 )", beyan_yuku=1000, kabin_agirligi=900,
       kabin_genisligi=1300, kabin_derinligi=1500)
@@ -151,8 +151,6 @@ PROJE_SENARYOLARI = (
     ("makine daireli + eski 'raylara' seçimi",
      dict(_B, makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY)),
     ("MRL makine raylarda", dict(_B, mk_yok=True, makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY)),
-    ("MRL makine raylarda · imalatçı yükü",
-     dict(_B, mk_yok=True, makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY, raya_binen_yuk=600)),
     ("zincir + ağırlıkta tertibat", dict(_B, denge_zinciri="Var",
                                         agirlik_guvenlik_tertibati="Kaymalı")),
     ("zincir + ağırlıkta ani tertibat + Fp",
@@ -199,7 +197,7 @@ PROJE_SENARYOLARI = (
     #  ELEport örnek projesi, arayüzden girildiği gibi  ( bkz. TEST 12 ).
     ("ELEport projesi", dict(
         beyan_yuku=800, kabin_agirligi=900, beyan_hizi=1.6, aski_orani=2,
-        durak_yukseklikleri=[2900] * 10 + [5000], son_kat_yuksekligi=5000,
+        son_kat_yuksekligi=5000,
         seyir_mesafesi=29.0, kaide_yuksekligi=500, kuyu_dibi=1500,
         kabin_genisligi=1350, kabin_derinligi=1400, ray_kapi_arasi=970,
         aski_kaciklik_x=250, aski_kaciklik_y=50, motor_gucu=11.3, makine_tst=3400,
@@ -208,7 +206,7 @@ PROJE_SENARYOLARI = (
         kasnak_belgesi="Var", kanal_sekli="V Kanal", kanal_isleme="Sertleştirilmiş",
         sarilma_acisi=180, kasnak_tek_yon=2, kasnak_ters_yon=0, acil_frenleme_a=0.5,
         denge_zinciri="Var", kablo_birim_kutle=0.44, mk_yok=True,
-        makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY, raya_binen_yuk=1000,
+        makine_raya_biniyor=MT.MAKINE_YUK_YOLU_RAY,
         kabin_ray_profili="75 x 62 x 10", agirlik_ray_profili="70 x 65 x 9",
         kabin_konsol_arasi=2000, agirlik_konsol_arasi=1200, ray_celigi_rm=440,
         kabin_paten_arasi=3300, agirlik_paten_arasi=1500, paten_balata_boyu=140,

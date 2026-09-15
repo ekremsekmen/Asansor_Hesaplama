@@ -127,16 +127,6 @@ def _girdi_coz(v, veri, atla=frozenset()):
             g[anahtar] = None
             continue
         ham = v[anahtar]
-        if tur == "liste":
-            liste = []
-            for x in (ham if isinstance(ham, list) else []):
-                if x is None or str(x).strip() == "":
-                    continue
-                if belirsiz_sayi_mi(x):
-                    _BELIRSIZ.append(f"{etiket}: {str(x).strip()}")
-                liste.append(_sayi(x))
-            g[anahtar] = liste
-            continue
         if belirsiz_sayi_mi(ham):
             _BELIRSIZ.append(f"{etiket} = {str(ham).strip()}")
         if secenekler is None:

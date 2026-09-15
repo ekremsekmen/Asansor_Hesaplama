@@ -655,8 +655,7 @@ def _denetim_bulgulari(r):
                   _yakin(_t["MSRcar"] + _t["MSRcwt"], _tam, 1e-6),
                   f"→ {_t['MSRcar'] + _t['MSRcwt']:.3f} ≠ {_tam:.3f}")
     #  Yüksek binada karar değişiyor — düzeltmenin emniyet etkisi
-    _y = {"seyir_mesafesi": 76.0, "durak_yukseklikleri": [4000] * 19 + [3000],
-          "son_kat_yuksekligi": 3000, "halat_capi": 13, "halat_adedi": 8,
+    _y = {"seyir_mesafesi": 76.0, "son_kat_yuksekligi": 3000, "halat_capi": 13, "halat_adedi": 8,
           "aski_orani": 1, "tahrik_kasnak_capi": 640,
           "saptirma_kasnak_capi": 640, "motor_gucu": 30}
     _sy = MK.hesapla(_y)
@@ -1345,7 +1344,9 @@ def _denetim_bulgulari(r):
 
     #  Kapının kabin merkezine göre katkısı:  mkapı·( D/2 + pay ) / P
     _gv = _MG.tamamla(_MG.varsayilanlar())
-    _kapi = _gv["kapi_agirligi"] * (1400 / 2 + _gv["kapi_mekanizma_payi"]) / 650
+    from engine.uygulama import sabitler as _USk
+    _mkapi = _USk.sabitler(None)["kabin_kapisi_agirligi"]
+    _kapi = _mkapi * (1400 / 2 + _gv["kapi_mekanizma_payi"]) / 650
 
     #  m.5.7.2.3.2:  P'nin etki noktası, P'yi oluşturan kütlelerin ORTAK
     #  ağırlık merkezidir.  Kapı düzeltmesi boş kabin kütlesine göre yapılır;
@@ -1354,6 +1355,25 @@ def _denetim_bulgulari(r):
     def _xp_bek(_xc, _s):
         _Pb, _Ps = 650.0, _P_std(_s)
         return (_Pb * (_xc - _kapi) + (_Ps - _Pb) * _xc) / _Ps
+
+    #  KABİN KAPISI AĞIRLIĞI OFİS STANDARDIDIR — asansör formunda sorulmaz.
+    #  Değer imalatçı kataloğundan gelir ( Fermator 40/10 PM · 2 panel
+    #  teleskopik · 800 × 2.000 mm · sac panel: 62 kg );  paftada kaynağı
+    #  "KATALOG" yazar.  Ofis değeri değiştirirse xp aynı bağıntıyla izler.
+    r.kontrol("E2  kabin kapısı ağırlığı asansör formunda yok",
+              "kapi_agirligi" not in _MG.ALAN)
+    r.esit("E2  kabin kapısı ağırlığı ofis standardı = 62 kg ( katalog )", _mkapi, 62)
+    _xcK, _xpK, _sK = _xcxp(ray_kapi_arasi=650)
+    _bK = [x for x in _sK["bolumler"] if x["baslik"].startswith("7 ")][0]
+    _satirK = next((a for a in _bK["adimlar"]
+                    if str(a.get("aciklama", "")).startswith("Kabin kapısı ağırlığı")), None)
+    r.kontrol("E2  paftada kapı ağırlığı satırı: 62 kg · KATALOG",
+              _satirK is not None and _satirK["deger"] == 62 and _satirK["kaynak"] == "KATALOG",
+              f"→ {_satirK}")
+    _, _xp120, _s120 = _xcxp(ray_kapi_arasi=650, _ofis={"kabin_kapisi_agirligi": 120})
+    _P120 = _P_std(_s120)
+    r.esit("E2  ofis kapı ağırlığı 120 kg → xp aynı bağıntıyla kayıyor",
+           _xp120, _xpK - (120 - 62) * (1400 / 2 + _gv["kapi_mekanizma_payi"]) / _P120)
 
     _degerler = []
     for _rk in (500, 650, 830, 1000):
@@ -1413,9 +1433,9 @@ def _denetim_bulgulari(r):
         _xc, _xq, _fx, _ = _b7(ray_kapi_arasi=_rk)
         _gv = _MG.tamamla(_MG.varsayilanlar())
         _arti_xq = _xc + 1400 / 8
-        _arti_yon = abs(630 * _arti_xq + 650 * (_xc - _gv["kapi_agirligi"]
+        _arti_yon = abs(630 * _arti_xq + 650 * (_xc - _mkapi
                                               * (700 + _gv["kapi_mekanizma_payi"]) / 650))
-        _bizim = abs(630 * _xq + 650 * (_xc - _gv["kapi_agirligi"]
+        _bizim = abs(630 * _xq + 650 * (_xc - _mkapi
                                         * (700 + _gv["kapi_mekanizma_payi"]) / 650))
         r.kontrol(f"E3  RK={_rk}: seçilen yön yalnız + yönünkinden küçük DEĞİL",
                   _bizim >= _arti_yon - 1e-9, f"→ bizim {_bizim:.0f}, + yön {_arti_yon:.0f}")
@@ -1460,8 +1480,22 @@ def _girdi_yollari(r):
               any("Beyan yükü" in x for x in (s.get("hata") or [])),
               f"→ {s.get('hata')}")
 
-    s = MK.hesapla({"durak_yukseklikleri": []})
-    r.kontrol("boş durak listesi hesabı durduruyor", not s["aktif"])
+    #  KATLAR TEK TEK SORULMAZ:  seyir mesafesi ile son kat yüksekliği yeter.
+    #  Eskiden "her durak pozitif" kuralı son kat yüksekliğini de koruyordu.
+    s = MK.hesapla({"seyir_mesafesi": None})
+    r.kontrol("boş seyir mesafesi hesabı durduruyor", not s["aktif"])
+    for _sk in (0, -500, None):
+        s = MK.hesapla({"son_kat_yuksekligi": _sk})
+        r.kontrol(f"son kat yüksekliği {_sk!r} hesabı durduruyor", not s["aktif"],
+                  f"→ {s.get('hata')}")
+    s = MK.hesapla({"seyir_mesafesi": 45, "son_kat_yuksekligi": 4200,
+                    "kaide_yuksekligi": 750, "kuyu_dibi": 1600})
+    r.esit("kuyu boyu = seyir · 1000 + son kat + kuyu dibi",
+           s["girdi"]["kuyu_boyu"], 45000 + 4200 + 1600)
+    r.esit("ray boyu = ( seyir · 1000 + son kat + kaide − 200 + kuyu dibi − 300 ) / 1000",
+           s["ozet"]["ray_boyu"], (45000 + 4200 + 550 + 1300) / 1000)
+    r.kontrol("form durak listesi göndermiyor",
+              all(a[3] != "liste" and "durak" not in a[0] for a in MK.MG.ALANLAR))
 
     s = MK.hesapla({"acil_frenleme_a": 12})
     r.kontrol("a > 1 gn reddediliyor", not s["aktif"])

@@ -20,7 +20,7 @@ const M_ID = a => 'm_' + a;
     FORM TEK KOPYADIR.  Dört kopya DOM ( 4 × 86 alan ) hem ağır olurdu hem de
     akordeonu dörde katlardı.  Bunun yerine aktif asansörün değerleri formda
     durur;  asansör değişince form kaydedilip ötekinin değerleri yüklenir.
-    MUK_ASANSORLER[i] = { alan anahtarı: değer , __durak: [ … ] } */
+    MUK_ASANSORLER[i] = { alan anahtarı: değer } */
 //  MUK_ASANSORLER her zaman 4 haritaya kadar tutar;  MUK_ADET kaçının
 //  KULLANILDIĞINI söyler.  Adedi azaltmak veri SİLMEZ — 3→2→3 yapan mühendis
 //  girdilerini geri bulur.
@@ -72,11 +72,6 @@ async function mukavemetKur(){
   for(const [i, g] of MUK.gruplar.entries()){
     let ic = '', acik = [];
     for(const f of g.alanlar){
-      if(f.tur === 'liste'){
-        if(acik.length){ ic += mSatir(acik); acik = []; }
-        ic += mDurakKutusu(f);
-        continue;
-      }
       acik.push(mAlan(f));
       if(acik.length === 2){ ic += mSatir(acik); acik = []; }
     }
@@ -93,14 +88,10 @@ async function mukavemetKur(){
           </div>`;
   }
   $('m_form').innerHTML = h;
-  //  Varsayılan durak listesi
-  const d = MUK.gruplar.flatMap(g=>g.alanlar).find(f=>f.tur==='liste');
-  MUK_DURAK = (d && d.varsayilan ? d.varsayilan : [3000]).map(mSayi);
   //  Uygulamanın KENDİ ofis sabitleri ve KENDİ tabloları — avanınkinden ayrı.
   uygulamaSabitFormuKur();
   uygulamaTablolariKur();
   mukavemetGeriYukle();
-  mDurakCiz();
   //  Son bakılan grup açık gelsin — sayfa yenilenince baştan başlamasın.
   let _g0 = 0; try{ _g0 = Number(localStorage.getItem('m_grup')) || 0; }catch(e){}
   mGrupAc(_g0 < MUK.gruplar.length ? _g0 : 0, true);
@@ -133,7 +124,7 @@ function mukavemetGeriYukle(){
   //  anahtarıyla değil;  o yüzden burada mFormaYaz kullanılamaz.  Gezinti
   //  yine ortak, yalnız kaynağı ve boş-değer kuralı farklı:  kovada boş
   //  duran alan formdakini EZMEZ.
-  for(const f of mAlanlar(f => f.tur !== 'liste')){
+  for(const f of mAlanlar()){
     const e = $(M_ID(f.anahtar));
     if(!e || o[e.id] === undefined) continue;
     //  Kovada BOŞ duran alan formdakini ezmez ( onay kutusu hariç:  orada
@@ -151,8 +142,6 @@ function mukavemetGeriYukle(){
     if(e.type === 'checkbox') e.checked = !!o[e.id];
     else alanaYaz(e, o[e.id]);
   });
-  if(Array.isArray(o.__muk_durak) && o.__muk_durak.length)
-    MUK_DURAK = o.__muk_durak.slice(0, MUK.durak_azami).map(mSayi);
   //  Çoklu asansör dizisi.  Form kurulduktan SONRA aktif olan basılır
   //  ( bkz. mukavemetKur ) — burada yalnız durum geri alınır.
   if(Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length){
@@ -347,63 +336,6 @@ function mAlan(f){
   return `<div class="alan"><label>${et}</label>${giris}</div>`;
 }
 
-/* ---- durak yükseklikleri ---- */
-function mDurakKutusu(f){
-  return `<div class="alan" style="grid-column:1/-1">
-      <label>${kacis(f.etiket)} <span class="ipucu">(${kacis(f.birim)} — en çok ${MUK.durak_azami} durak)</span>
-        ${bilgiSimgesi([
-          'Her durağın kat yüksekliği. Toplamları kılavuz ray boyuna, son durağınki ise kuyu üst boşluğu ve sığınma alanı hesaplarına girer.',
-          'Seyir mesafesi ve son kat yüksekliği bu listeden kendiliğinden doldurulur; elle değiştirirseniz program tutarsızlığı bildirir.'])}</label>
-      <div id="m_durak_kutu"></div>
-      <div class="dugmeler" style="margin-top:2px">
-        <button type="button" class="dg" id="m_durak_ekle"
-                onclick="mDurakEkle()">+ durak ekle</button>
-        <button type="button" class="dg" id="m_durak_sil"
-                onclick="mDurakSil()">− son durağı sil</button>
-      </div>
-    </div>`;
-}
-
-function mDurakCiz(){
-  const k = $('m_durak_kutu'); if(!k) return;
-  k.innerHTML = '<div class="satir i4">' + MUK_DURAK.map((d,i)=>
-    `<div class="alan"><label>${i+1}. durak</label>
-      <input id="m_durak_${i}" class="girdi" value="${kacis(d)}"
-             oninput="mDurakYaz(${i}, this.value)"></div>`).join('') + '</div>';
-  mTuretilenleriDoldur();
-}
-
-function mDurakYaz(i, deger){
-  MUK_DURAK[i] = deger;
-  mTuretilenleriDoldur();
-}
-
-function mDurakEkle(){
-  if(MUK_DURAK.length >= MUK.durak_azami){
-    durum(`En çok ${MUK.durak_azami} durak girilebilir.`, true); return;
-  }
-  MUK_DURAK.push(MUK_DURAK[MUK_DURAK.length-1] || '3000');
-  mDurakCiz(); mukavemetPlanla();
-}
-
-function mDurakSil(){
-  if(MUK_DURAK.length <= 1){ durum('En az bir durak kalmalı.', true); return; }
-  MUK_DURAK.pop();
-  mDurakCiz(); mukavemetPlanla();
-}
-
-/*  Seyir mesafesi ve son kat yüksekliği durak listesinden TÜRETİLİR.  Elle
-    girilen iki değer sessizce çelişebilirdi;  burada listeden dolduruluyor,
-    kullanıcı yine de üzerine yazabilir ( motor tutarsızlığı bildirir ). */
-function mTuretilenleriDoldur(){
-  const say = MUK_DURAK.map(x=>Number(String(x).replace(',', '.')))
-                       .filter(x=>isFinite(x));
-  if(say.length !== MUK_DURAK.length || !say.length) return;
-  const son = $('m_son_kat_yuksekligi'), seyir = $('m_seyir_mesafesi');
-  if(son)   son.value   = mSayi(say[say.length-1]);
-  if(seyir) seyir.value = mSayi((say.reduce((a,b)=>a+b,0) - say[say.length-1]) / 1000);
-}
-
 /* ---- hesap ---- */
 /*  BOŞ KABİN AĞIRLIĞI BEYAN YÜKÜNÜ İZLER.
     Beyan yükü değiştiğinde kabin ağırlığı ofis tablosundan yenilenir
@@ -464,14 +396,13 @@ function mAlanlar(sec){
   return c;
 }
 
-/*  ASANSÖRE AİT alan:  durak listesi ayrı taşınır ( __durak ), proje geneli
-    alanlar binaya aittir ve asansörden asansöre kopyalanmaz. */
-const M_ASANSOR_ALANI = f => f.tur !== 'liste' && !mProjeGeneliMi(f.anahtar);
+/*  ASANSÖRE AİT alan:  proje geneli alanlar binaya aittir ve asansörden
+    asansöre kopyalanmaz. */
+const M_ASANSOR_ALANI = f => !mProjeGeneliMi(f.anahtar);
 
 /*  Tek alanın değeri.  Alan formda yoksa undefined döner — çağıran o
     anahtarı hiç yazmaz, "boş string" ile karıştırmasın. */
 function mAlanOku(f){
-  if(f.tur === 'liste') return MUK_DURAK.slice();
   const e = $(M_ID(f.anahtar));
   if(!e) return undefined;
   return (e.type === 'checkbox') ? e.checked : e.value;
@@ -479,12 +410,6 @@ function mAlanOku(f){
 
 /*  Tek alana değer basar.  Yazma her yerde alanaYaz() üzerinden gider. */
 function mAlanYaz(f, deger){
-  if(f.tur === 'liste'){
-    if(!Array.isArray(deger) || !deger.length) return;
-    MUK_DURAK = deger.slice();
-    if($('m_durak_kutu')) mDurakCiz();
-    return;
-  }
   const e = $(M_ID(f.anahtar));
   if(e) alanaYaz(e, deger);
 }
@@ -896,18 +821,12 @@ function mAdetDegisti(n){
 
 function mAsansorKaydet(){
   if(!MUK || !Array.isArray(MUK_ASANSORLER) || !MUK_ASANSORLER[MUK_AKTIF]) return;
-  const d = mFormOku(M_ASANSOR_ALANI);
-  d.__durak = (typeof MUK_DURAK !== 'undefined' ? MUK_DURAK : []).slice();
-  MUK_ASANSORLER[MUK_AKTIF] = d;
+  MUK_ASANSORLER[MUK_AKTIF] = mFormOku(M_ASANSOR_ALANI);
 }
 
 function mAsansorYukle(i){
   const d = MUK_ASANSORLER[i]; if(!d) return;
   mFormaYaz(d, M_ASANSOR_ALANI);
-  if(Array.isArray(d.__durak) && d.__durak.length){
-    MUK_DURAK = d.__durak.slice();
-    if($('m_durak_kutu')) mDurakCiz();
-  }
 }
 
 function mAsansorSec(i){
@@ -923,12 +842,7 @@ function mukavemetIstek(){
   mAsansorKaydet();
   const pg = mFormOku(f => mProjeGeneliMi(f.anahtar));
   //  Adedin ÜSTÜNDEKİ haritalar dizide durur ama hesaba GİRMEZ.
-  const asansorler = MUK_ASANSORLER.slice(0, MUK_ADET).map(d=>{
-    const g = {...d};
-    delete g.__durak;
-    g.durak_yukseklikleri = (d.__durak || []).slice();
-    return g;
-  });
+  const asansorler = MUK_ASANSORLER.slice(0, MUK_ADET).map(d=>({...d}));
   //  Boş kabin kütlesi sunucudan tazelenecekse O ASANSÖRLERDE boşaltılır.
   for(const s of Object.keys(MUK_GK_TAZELE))
     if(asansorler[s]) asansorler[s].kabin_agirligi = '';
