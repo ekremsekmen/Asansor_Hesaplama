@@ -1120,5 +1120,39 @@ class GenelHukumDenetimi(unittest.TestCase):
         self.assertEqual(o["genel_sonuc"], "UYGUN DEĞİLDİR.")
 
 
+class NequivEkEDenetimi(unittest.TestCase):
+    """TS EN 81-50 Ek E'nin iki çözümlü örneği — Nps BOŞ bırakılarak.
+
+    Nps boşsa askı oranından gelir ( 1:1 → 1, 2:1 → 2 ).  Beklenen sayılar
+    standardın metnindeki örneklerdir;  altın çıktıdan alınmaz.
+    """
+    def _nequiv(self, **g):
+        s = M.hesapla(dict({"halat_capi": 10, "sarilma_acisi": 180}, **g))
+        self.assertTrue(s["aktif"], s.get("hata"))
+        return s["ara"]
+
+    def test_sekil_e1_2e1_v_kanal(self):
+        # Şekil E.1 — 2:1 · V kanal γ = 40° · Dt 600 · Dp 500
+        #   Nequiv(t) = 10 · Kp = (600/500)⁴ = 2,07 · Nequiv(p) = 2,07·(2+0) = 4,14
+        #   Nequiv = 14,14   ( "No reversed bend because of moving pulley" )
+        a = self._nequiv(aski_orani=2, tahrik_kasnak_capi=600, saptirma_kasnak_capi=500,
+                         kanal_sekli="V Kanal", kanal_isleme="Sertleştirilmiş",
+                         _ofis={"kanal_gama_v": 40})
+        self.assertAlmostEqual(a["aski.Nequiv_t"], 10)
+        self.assertAlmostEqual(a["aski.Nequiv_p"], 4.14, delta=0.01)
+        self.assertAlmostEqual(a["aski.Nequiv"], 14.14, delta=0.01)
+
+    def test_sekil_e2_1e1_alti_kesik_u(self):
+        # Şekil E.2 — 1:1 · alt kesikli U kanal β = 90° · Dt 600 · Dp 400
+        #   Nequiv(t) = 5 · Kp = (600/400)⁴ = 5,06 · Nequiv(p) = 5,06·(1+0) = 5,06
+        #   Nequiv = 10,06
+        a = self._nequiv(aski_orani=1, tahrik_kasnak_capi=600, saptirma_kasnak_capi=400,
+                         kanal_sekli="Altı Kesik Yarım Daire Kanal",
+                         _ofis={"kanal_beta": 90})
+        self.assertAlmostEqual(a["aski.Nequiv_t"], 5)
+        self.assertAlmostEqual(a["aski.Nequiv_p"], 5.06, delta=0.01)
+        self.assertAlmostEqual(a["aski.Nequiv"], 10.06, delta=0.01)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

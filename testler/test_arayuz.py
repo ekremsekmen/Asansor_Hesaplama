@@ -157,6 +157,17 @@ def calistir():
         pg.wait_for_timeout(1200)
         r.kontrol("asansör sekmesi hesap formunu açıyor",
                   pg.is_visible("#s-mukavemet") and not pg.is_visible("#s-uygproje"))
+        #  YENİ PROJEDE KABİN AĞIRLIĞI TABLODAN.  Alan Gelişmiş'te gizli durur;
+        #  örnek projenin 700 kg'ıyla açılınca 800 kg yükte "elle girilmiş"
+        #  sayılıyor ve farkına varılmadan tablo dışı bir kütleyle hesap yapılıyordu.
+        pg.wait_for_function("() => SON.m && SON.m.aktif && $('m_kabin_agirligi').value !== ''",
+                             timeout=8000)
+        from engine.ortak import ofis as _OFg
+        r.esit("yeni projede kabin ağırlığı ofis tablosundan",
+               pg.input_value("#m_kabin_agirligi"),
+               str(int(_OFg.bos_kabin_kutlesi(int(pg.input_value("#m_beyan_yuku"))))))
+        r.kontrol("yeni projede kabin ağırlığının kaynağı tablo",
+                  "OFİS TABLOSU" in (pg.evaluate("SON.m.girdi.kabin_agirligi_kaynak") or ""))
         #  FORMUN BAŞINDAKİ AÇIKLAMA KUTULARI KALDIRILDI.  Ortak girdi
         #  köprüsü ve "bu bölüm uygulama projesine aittir" metni her açılışta
         #  girdilerin önünü kapatıyordu;  köprü zaten görünmez çalışıyor.
@@ -260,6 +271,86 @@ def calistir():
         pg.evaluate("mGruplariKapat()")
         r.esit("hepsi kapalıyken okunan girdi kümesi değişmiyor",
                pg.evaluate("Object.keys(mukavemetGirdi()).length"), _ga)
+
+        #  ── GELİŞMİŞ BÖLÜMLERİ  ( ofisin / ürünün hep aynı girilen değerleri )
+        #  Grubun altında KAPALI durur;  alanlar okunur ve hesaba girer.
+        #  Gizli değer sessiz kalmamalı:  sayaç · işaret · hatada açılma · arama.
+        from engine.uygulama import mukavemet_girdi as _MGg
+        r.esit("gelişmiş: her gelişmiş alan kapalı bölümde",
+               pg.evaluate("mAlanlar(f=>f.gelismis).filter(f=>{const e=$(M_ID(f.anahtar));"
+                           "return !e || !e.closest('.m-gelismis-ic');}).map(f=>f.anahtar)"), [])
+        r.esit("gelişmiş: görünür alan gelişmiş bölümde değil",
+               pg.evaluate("mAlanlar(f=>!f.gelismis).filter(f=>{const e=$(M_ID(f.anahtar));"
+                           "return e && e.closest('.m-gelismis-ic');}).map(f=>f.anahtar)"), [])
+        for _yok in ("kuyu_derinligi", "agirlik_ray_duvar", "dikine_kiris_tipi",
+                     "yan_yatak_tipi"):
+            r.kontrol(f"gelişmiş: kaldırılan '{_yok}' formda yok",
+                      pg.query_selector(f"#m_{_yok}") is None)
+        _gi = pg.evaluate("MUK.gruplar.findIndex(g=>g.ad==='Askı halatları')")
+        pg.evaluate(f"mGrupAc({_gi})")
+        pg.wait_for_timeout(200)
+        r.kontrol("gelişmiş: grup açılınca görünür alan görünüyor, gelişmiş kapalı",
+                  pg.is_visible("#m_halat_capi") and not pg.is_visible("#m_acil_frenleme_a"))
+        _bas = f'#m_form .m-gelismis[data-grup="{_gi}"] .m-gelismis-bas'
+        pg.click(_bas)
+        pg.wait_for_timeout(200)
+        _acik = pg.is_visible("#m_acil_frenleme_a")
+        pg.click(_bas)
+        pg.wait_for_timeout(200)
+        r.kontrol("gelişmiş: başlığa tıklamak açıp kapatıyor",
+                  _acik and not pg.is_visible("#m_acil_frenleme_a"))
+        r.esit("gelişmiş: kapalıyken okunan girdi kümesi değişmiyor",
+               pg.evaluate("Object.keys(mukavemetGirdi()).length"), _ga)
+        _sayac = f'#m_form .m-gelismis[data-grup="{_gi}"] .m-gelismis-sayac'
+        _once = pg.inner_text(_sayac).strip()
+        pg.evaluate("(()=>{const e=$('m_acil_frenleme_a');const v=e.value;"
+                    "e.value = (v==='0,5'?'0,6':'0,5');"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_timeout(300)
+        _sonra = pg.evaluate(f"document.querySelector('{_sayac}').textContent")
+        r.kontrol("gelişmiş: değer değişince sayaç artıyor ve alan işaretleniyor",
+                  _sonra != _once and "değiştirildi" in _sonra
+                  and pg.evaluate("$('m_acil_frenleme_a').closest('.alan')"
+                                  ".classList.contains('degisti')"),
+                  f"→ {_once!r} → {_sonra!r}")
+        pg.evaluate("(()=>{const e=$('m_acil_frenleme_a');e.value='0,8';"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_timeout(300)
+        r.kontrol("gelişmiş: varsayılana dönünce işaret kalkıyor",
+                  not pg.evaluate("$('m_acil_frenleme_a').closest('.alan')"
+                                  ".classList.contains('degisti')"))
+        #  Nps boş = askı oranından ( varsayılan ) — değiştirilmiş sayılmaz
+        r.kontrol("gelişmiş: Nps boş açılıyor ve değiştirilmiş sayılmıyor",
+                  pg.input_value("#m_kasnak_tek_yon") == ""
+                  and not pg.evaluate("$('m_kasnak_tek_yon').closest('.alan')"
+                                      ".classList.contains('degisti')"),
+                  f"→ {pg.input_value('#m_kasnak_tek_yon')!r}")
+        #  HESABI DURDURAN HATA GİZLİ ALANDAYSA bölüm kendiliğinden açılır
+        pg.evaluate("mGruplariKapat(); mGelismisleriKapat()")
+        _kpa = pg.input_value("#m_kabin_paten_arasi")
+        pg.evaluate("(()=>{const e=$('m_kabin_paten_arasi');e.value='-5';"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_function("() => SON.m && SON.m.aktif === false", timeout=8000)
+        r.kontrol("gelişmiş: gizli alandaki hata bölümünü açıyor",
+                  pg.evaluate("!$('m_kabin_paten_arasi').closest('.m-gelismis-ic').hidden"))
+        pg.evaluate(f"(()=>{{const e=$('m_kabin_paten_arasi');e.value={_kpa!r};"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_function("() => SON.m && SON.m.aktif === true", timeout=8000)
+        #  ARAMA GİZLİ ALANLARI DA BULUR, temizlenince bölüm yine kapanır
+        pg.evaluate("mGelismisleriKapat();"
+                    "document.getElementById('m_ara').value='regülatör kanal';mAramaUygula()")
+        r.kontrol("gelişmiş: arama gizli alanı buluyor",
+                  pg.is_visible("#m_reg_kanal_acisi"))
+        pg.evaluate("document.getElementById('m_ara').value='';mAramaUygula()")
+        r.kontrol("gelişmiş: arama temizlenince bölüm kapanıyor",
+                  pg.evaluate("$('m_reg_kanal_acisi').closest('.m-gelismis-ic').hidden"))
+        r.esit("gelişmiş: tüm grupları aç gelişmişleri de açıyor",
+               pg.evaluate("mTumGruplariAc(); [...document.querySelectorAll("
+                           "'#m_form .m-gelismis-ic')].filter(x=>x.hidden).length"), 0)
+        pg.evaluate("mGelismisleriKapat(); mGruplariKapat()")
+        r.esit("gelişmiş: sözleşmedeki gelişmiş alan sayısı formda",
+               pg.evaluate("mAlanlar(f=>f.gelismis).length"),
+               len(_MGg.GELISMIS_ALANLAR) + len(_UGrp.EK_GELISMIS))
         #  BÖLÜMLERİN HEPSİ TIKLANABİLİR.  Elektrik bölümleri bir süre
         #  eşlemede yoktu:  mukavemet satırları girdisine götürüyor,
         #  aydınlatma ve gerilim düşümü satırları ölü duruyordu.
@@ -348,8 +439,9 @@ def calistir():
         #  kaldırıldı.  Malzeme seçimi artık yalnız kutuyu DOLDURUR — hesap
         #  her hâlükârda kutudaki sayıyı okur.
         pg.evaluate("mTumGruplariAc()")
-        r.esit("ray arası serbest kutu",
-               pg.eval_on_selector("#m_agirlik_ray_arasi", "e=>e.tagName"), "INPUT")
+        #  Ağırlık ray arası sorulmaz:  hesaba da paftaya da girmiyordu.
+        r.kontrol("ağırlık ray arası kutusu yok",
+                  pg.query_selector("#m_agirlik_ray_arasi") is None)
         r.kontrol("karşı ağırlık ölçüleri formda",
                   pg.eval_on_selector_all("#m_agirlik_genisligi", "e=>e.length") == 1
                   and pg.eval_on_selector_all("#m_agirlik_derinligi", "e=>e.length") == 1)
@@ -363,19 +455,9 @@ def calistir():
         pg.wait_for_timeout(1800)
         r.esit("elle girilen ölçü tabloyu eziyor",
                pg.evaluate("SON.m.girdi.agirlik_derinligi"), 180)
-        #  Tablo dışı bir ray arası artık hesabı ETKİLEMEZ ve UYARI ÜRETMEZ
-        _once = pg.evaluate("SON.m.bolumler.find(b=>b.kimlik==='agirlik_raylari')"
-                            ".adimlar.map(a=>a.deger)")
-        pg.fill("#m_agirlik_ray_arasi", "1234")
-        pg.wait_for_timeout(1800)
-        _sonra = pg.evaluate("SON.m.bolumler.find(b=>b.kimlik==='agirlik_raylari')"
-                             ".adimlar.map(a=>a.deger)")
-        r.esit("ray arası ray gerilmesini değiştirmiyor",
-               [x for x in _once if x != 1050], [x for x in _sonra if x != 1234])
         #  TEMİZLİK — sonraki kontrolleri bozmasın
         pg.select_option("#m_agirlik_malzemesi", "Barit")
         pg.wait_for_timeout(600)
-        pg.fill("#m_agirlik_ray_arasi", "1050")
         pg.fill("#m_agirlik_genisligi", "960")
         pg.wait_for_timeout(1800)
 

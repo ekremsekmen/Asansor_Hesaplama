@@ -215,6 +215,7 @@ def calistir():
               MT.ray("yok", "Gr") is None and MT.halat_kopma(99) is None)
 
     _girdi_sozlesmesi(r, kaynak)
+    _gelismis_sozlesmesi(r)
     return r
 
 
@@ -268,6 +269,64 @@ def _girdi_sozlesmesi(r, kaynak):
     r.kontrol("varsayılan girdiler doğrulamadan temiz geçiyor", MG.dogrula(g) == [],
               f"→ {MG.dogrula(g)}")
     r.esit("toplam ray boyu (m)", MG.toplam_ray_boyu(g), 26.6)
+
+
+#  GÖRÜNÜR KALMASI GEREKEN GİRDİLER.  Her projede değişenler ( bina ve
+#  asansörün kendi ölçüleri ) ve yanlış kaldığında sonucu çok değiştiren
+#  beyanlar.  Gelişmiş'e taşınırlarsa bir projenin değeri öbür projeden
+#  sessizce devralınırdı.
+GORUNUR_KALMALI = (
+    "beyan_yuku", "beyan_hizi", "seyir_mesafesi", "aski_orani",
+    "kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
+    #  Kaçıklıklar çizime bağlıdır;  gizli bir 0 kaçık yerleşimde unutulur.
+    "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
+    "son_kat_yuksekligi", "kuyu_dibi", "ray_kapi_arasi",
+    "motor_gucu", "makine_agirligi", "makine_tipi", "tahrik_kasnak_capi",
+    "saptirma_kasnak_capi", "makine_tst", "makine_raya_biniyor",
+    "halat_adedi", "halat_capi", "sarilma_acisi",
+    "guvenlik_devreye_kuvvet", "reg_devreye_hizi",
+    "kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
+    "agirlik_konsol_arasi", "guvenlik_tertibati", "agirlik_guvenlik_tertibati",
+    "kabin_tampon_baba", "agirlik_tampon_baba",
+)
+#  Hiçbir hesaba / paftaya girmediği ya da tek seçeneği olduğu için kaldırılanlar.
+KALDIRILAN_ALANLAR = ("kuyu_derinligi", "agirlik_ray_duvar",
+                      "dikine_kiris_tipi", "yan_yatak_tipi", "agirlik_ray_arasi")
+
+
+def _gelismis_sozlesmesi(r):
+    """Formun "Gelişmiş" bölümleri  ( MG.GELISMIS_ALANLAR · girdi.EK_GELISMIS )."""
+    from engine.uygulama import girdi as UG
+    for a in sorted(MG.GELISMIS_ALANLAR):
+        r.kontrol(f"gelişmiş {a}: sözleşmede var ve kullanıcıdan alınıyor",
+                  a in MG.ALAN and MG.ALAN[a][3] != "hesap")
+        #  Gizli bir alan boş ve zorunluysa proje görünmeyen bir kutu yüzünden
+        #  durur:  ya varsayılanı olmalı ya da boş bırakılabilmeli.
+        if a in MG.ALAN:
+            r.kontrol(f"gelişmiş {a}: varsayılanı var ya da boş bırakılabilir",
+                      MG.ALAN[a][5] is not None or a in MG.OPSIYONEL_ALANLAR)
+    for a in GORUNUR_KALMALI:
+        r.kontrol(f"görünür kalır: {a}",
+                  a in MG.ALAN and a not in MG.GELISMIS_ALANLAR)
+    for a in KALDIRILAN_ALANLAR:
+        r.kontrol(f"kaldırıldı: {a}", a not in MG.ALAN)
+    for anahtar, _e, _b, tur, secenekler, _v in MG.ALANLAR:
+        if secenekler is not None:
+            r.kontrol(f"girdi {anahtar}: tek seçenekli kutu sorulmuyor",
+                      len(secenekler) > 1, f"→ {secenekler!r}")
+    veri = UG.arayuz_alanlari()
+    for gr in veri["gruplar"]:
+        r.kontrol(f"grup '{gr['ad']}': en az bir görünür alan",
+                  any(not f["gelismis"] for f in gr["alanlar"]))
+        for f in gr["alanlar"]:
+            bek = f["anahtar"] in (MG.GELISMIS_ALANLAR | UG.EK_GELISMIS)
+            if f["gelismis"] != bek:
+                r.kontrol(f"arayüz {f['anahtar']}: gelişmiş işareti", False,
+                          f"→ {f['gelismis']!r}, beklenen {bek!r}")
+    _hepsi = [f for gr in veri["gruplar"] for f in gr["alanlar"]]
+    r.esit("arayüz: gelişmiş alan sayısı",
+           sum(f["gelismis"] for f in _hepsi),
+           len(MG.GELISMIS_ALANLAR) + len(UG.EK_GELISMIS))
 
 
 if __name__ == "__main__":

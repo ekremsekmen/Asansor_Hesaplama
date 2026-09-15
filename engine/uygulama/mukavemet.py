@@ -52,8 +52,6 @@ SABIT = {
     #  m.5.6.2.1.2.3 — karşı ağırlık tertibatı bu hızın üstünde KAYMALI olmalı
     "agirlik_kaymali_esigi": 1.0,
     "reg_sarilma_aci": 180,       # α'  regülatör kasnağı sarılma [°]
-    "Nps":             1,         # tek yönde bükülmeli kasnak sayısı
-    "Npr":             0,         # ters yönde bükülmeli kasnak sayısı
     "mu_yukleme":      0.1,       # μ  yükleme
     "mu_bloke":        0.2,       # μ  kabin bloke
     "kanal_acisi":     38,        # γ  sertleştirilmiş kanal      [°]
@@ -777,7 +775,9 @@ def _aski_halatlari(g, o):
     oran_std = oran >= S["Dt_dh_asgari"]
     oran_uygun = oran_std or belge
 
-    Nps, Npr = g["kasnak_tek_yon"], g["kasnak_ters_yon"]
+    #  Nps boşsa ASKI ORANINDAN gelir ( TS EN 81-50 Ek E — bkz. MG ).
+    Nps, Nps_girildi = MG.kasnak_tek_yon(g)
+    Npr = g["kasnak_ters_yon"]
     #  SAPTIRMA KASNAĞI DA m.5.5.2.1 KAPSAMINDADIR.
     #  Madde oranı "kasnak, makara ve tamburlar" için ister;  tahrik kasnağına
     #  özel değildir.  Yalnız Dt sınanırsa Dp hesaba SADECE Kp = (Dt/Dp)⁴
@@ -861,7 +861,9 @@ def _aski_halatlari(g, o):
                       else "alt kesilmesiz yarım daire"))
              + (f"  ×  {trn(MT.kanal_gecis_sayisi(sekil), 0)} geçiş"
                 if (MT.kanal_gecis_sayisi(sekil) or 1) > 1 else ""), 2),
-        veri("Nps", "Tek yönde bükülmeli kasnak sayısı", Nps, "adet", "GİRİŞ", 0),
+        veri("Nps", "Tek yönde bükülmeli kasnak sayısı", Nps, "adet",
+             "GİRİŞ" if Nps_girildi else
+             f"askı oranından  ·  TS EN 81-50 Ek E Şekil E.{2 if r == 1 else 1}", 0),
         veri("Npr", "Ters yönde bükülmeli kasnak sayısı", Npr, "adet", "GİRİŞ", 0),
         veri("Dp", "Tahrik kasnağı hariç kasnakların ortalama çapı", Dp, "mm", "GİRİŞ"),
         veri("r", "Halat askı oranı", r, "", "GİRİŞ", 0),
@@ -2421,8 +2423,6 @@ def _agirlik_raylari(g, o):
         veri("", "Karşı ağırlık malzemesi", g["agirlik_malzemesi"]),
         veri("Gx", "Karşı ağırlık derinliği", derinlik, "mm", "GİRİŞ", 0),
         veri("Gy", "Karşı ağırlık genişliği", genislik, "mm", "GİRİŞ", 0),
-        veri("", "Ağırlık ray arası  ( hesaba girmez )",
-             g["agirlik_ray_arasi"], "mm", "GİRİŞ", 0),
         hesap("Dxa = 0,1 × ağırlık derinliği",
               f"0,1 × {trn(derinlik, 0)}", Dxa, "mm"),
         hesap("Dya = 0,05 × ağırlık genişliği",

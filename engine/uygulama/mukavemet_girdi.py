@@ -100,9 +100,13 @@ ALANLAR = (
     ("kuyu_boyu",         "Kuyu boyu",                         "mm",   "hesap", None, None),
     ("kaide_yuksekligi",  "Kaide yüksekliği",                  "mm",   "sayi", None, 750),
     ("kuyu_dibi",         "Kuyu dibi yüksekliği  ( KY )",      "mm",   "sayi", None, 1600),
-    ("kuyu_derinligi",    "Kuyu derinliği  ( KD )",            "mm",   "sayi", None, 1600),
+    #  KUYU DERİNLİĞİ ( KD ) ve AĞIRLIK RAY MERKEZİ - DUVAR SORULMAZ.  İkisi
+    #  yalnız arka ağırlıkta halat arasını ( KD − RK − ray-duvar ) türetmek
+    #  için vardı;  o türetme α doğrudan beyan edilince kalktı ( bkz.
+    #  "halat_arasi" notu ).  Sonra hiçbir hesaba ve paftaya girmediler —
+    #  yalnız artık türetilmeyen o sayının pozitifliğini denetleyen bir
+    #  kontrolde okunuyorlardı.
     ("ray_kapi_arasi",    "Ray - kapı arası  ( RK )",          "mm",   "sayi", None, 650),
-    ("agirlik_ray_duvar", "Ağırlık ray merkezi - duvar",       "mm",   "sayi", None, 125),
 
     # ── MAKİNE VE MOTOR ───────────────────────────────────────────────
     ("motor_gucu",        "Motor gücü",                        "kW",   "sayi", None, 4.9),
@@ -124,12 +128,12 @@ ALANLAR = (
     ("saptirma_kasnak_min_capi", "Ds — saptırma kasnaklarının EN KÜÇÜK çapı  ( boşsa ortalama )",
      "mm", "sayi", None, None),
     ("sase_yuksekligi",   "Şase yüksekliği",                   "mm",   "sayi", None, 1100),
+    #  PROFİL TİPİ SORULMAZ:  tablo yalnız NPU tanır ve seçim kutusunun tek
+    #  seçeneği vardı.  Pafta profili "NPU <ölçü>" diye kendisi yazar.
     ("dikine_kiris",      "E  ( dikine kiriş ölçüsü )",        "—",    "secim",
      MT.NPU_OLCULERI, 120),
-    ("dikine_kiris_tipi", "E  ( dikine kiriş profili )",       "—",    "secim", _s("NPU"), "NPU"),
     ("yan_yatak",         "F  ( yan yatak ölçüsü )",           "—",    "secim",
      MT.NPU_OLCULERI, 120),
-    ("yan_yatak_tipi",    "F  ( yan yatak profili )",          "—",    "secim", _s("NPU"), "NPU"),
     ("yan_yatak_boyu",    "Yan yatak boyu",                    "mm",   "sayi", None, 1400),
 
     # ── ASKI HALATLARI ────────────────────────────────────────────────
@@ -172,7 +176,9 @@ ALANLAR = (
     ("sarilma_acisi",     "α — halat sarılma açısı",
      "°", "sayi", None, None),
     #  EN 81-50 m.5.12.2 — Nequiv(p).  Sabit değil, tesisin askı düzenine bağlıdır.
-    ("kasnak_tek_yon",    "Tek yönde bükülmeli kasnak sayısı  ( Nps )", "adet", "sayi", None, 1),
+    #  BOŞ BIRAKILIRSA ASKI ORANINDAN GELİR  ( bkz. kasnak_tek_yon_askidan ).
+    ("kasnak_tek_yon",    "Tek yönde bükülmeli kasnak sayısı  ( Nps — boşsa askı oranından )",
+     "adet", "sayi", None, None),
     ("kasnak_ters_yon",   "Ters yönde bükülmeli kasnak sayısı  ( Npr )", "adet", "sayi", None, 0),
     ("acil_frenleme_a",   "Acil frenleme yavaşlaması  ( a )",  "m/s²", "sayi", None, 0.8),
     ("kablo_tipi_1",      "1. bükülgen kablo tipi",            "—",    "secim",
@@ -328,10 +334,10 @@ ALANLAR = (
     #  kabin_derinligi ).
     ("agirlik_genisligi",  "Karşı ağırlık genişliği  ( Gy )", "mm", "sayi", None, 960),
     ("agirlik_derinligi",  "Karşı ağırlık derinliği  ( Gx )", "mm", "sayi", None, 150),
-    #  Ray arası PAFTA BİLGİSİDİR.  Mukavemet hesabına girmez ( standartta
-    #  ray arası → genişlik diye bir bağıntı yoktur );  kuyu yerleşimine ve
-    #  inşaat projesine ait bir ölçü olduğu için sorulmaya devam eder.
-    ("agirlik_ray_arasi", "Ağırlık ray arası  ( pafta bilgisi )", "mm", "sayi", None, 1050),
+    #  AĞIRLIK RAY ARASI SORULMAZ.  Mukavemet hesabına girmiyordu ( standartta
+    #  ray arası → genişlik diye bir bağıntı yoktur ) ve paftada yalnız
+    #  "hesaba girmez" notlu bir bilgi satırıydı;  CAD çizimi de kullanmıyordu.
+    #  Ölçü kuyu yerleşim çiziminde durur.
     #  TS EN 81-20 m.5.6.1:  karşı ağırlıkta güvenlik tertibatı, kuyunun
     #  altındaki hacme girilebiliyorsa ZORUNLUDUR.  Varsa ağırlık rayı
     #  yalnız C.2.2'ye ( normal işletme ) değil TS EN 81-50 Ek C.2.1'e göre de
@@ -399,7 +405,7 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "kabin_paten_arasi", "agirlik_paten_arasi",
                    "yan_yatak_boyu", "sase_yuksekligi", "tahrik_kasnak_capi",
                    "halat_capi", "reg_kasnak_capi", "reg_halat_capi",
-                   "kabin_genisligi", "kabin_derinligi", "kuyu_derinligi",
+                   "kabin_genisligi", "kabin_derinligi",
                    #  Eskiden listenin "her durak pozitif" kuralı sağlıyordu.
                    "son_kat_yuksekligi")
 #  MAKİNE YERLEŞİMİNE GÖRE HESABA GİRMEYEN ALANLAR.  Ekranda gizlenirler;
@@ -407,8 +413,7 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
 #    · Makine dairesi kaidesi yalnız bölüm 2'ye girer — MRL'de o bölüm yoktur.
 #    · Makine yükünün yolu yalnız MRL'de sorulur — makine daireli tesiste
 #      makine kendi kaidesindedir, yükü raya binmez.
-KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "dikine_kiris_tipi",
-                  "yan_yatak", "yan_yatak_tipi", "yan_yatak_boyu")
+KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "yan_yatak", "yan_yatak_boyu")
 RAYA_BINEN_ALANLARI = ("makine_raya_biniyor",)
 
 
@@ -427,7 +432,7 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179), "sarilma_acisi": (1, 360)}
 #  kabin_agirligi BURADA DEĞİLDİR:  tamamla() onu ofis tablosundan doldurur
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
-OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi",
+OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi", "kasnak_tek_yon",
                      "paten_balata_boyu", "guvenlik_devreye_kuvvet",
                      "reg_devreye_hizi", "makine_tst",
                      "halat_birim_kutle", "halat_kopma_kN",
@@ -498,13 +503,13 @@ GRUPLAR = (
       "agirlik_yeri", "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
      ("son_kat_yuksekligi", "kaide_yuksekligi",
-      "kuyu_dibi", "kuyu_derinligi", "ray_kapi_arasi", "agirlik_ray_duvar",
+      "kuyu_dibi", "ray_kapi_arasi",
       "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
      ("motor_gucu", "makine_agirligi",
       "tahrik_kasnak_capi", "saptirma_kasnak_capi",
       "saptirma_kasnak_min_capi", "sase_yuksekligi",
-      "dikine_kiris", "dikine_kiris_tipi", "yan_yatak", "yan_yatak_tipi",
+      "dikine_kiris", "yan_yatak",
       "yan_yatak_boyu", "makine_tipi", "makine_tst",
       "makine_raya_biniyor")),
     ("Askı halatları",
@@ -525,7 +530,7 @@ GRUPLAR = (
       "agirlik_paten_tipi",
       "klips_itme_kuvveti", "yapi_sehim_x", "yapi_sehim_y")),
     ("Karşı ağırlık", ("agirlik_genisligi", "agirlik_derinligi",
-                       "agirlik_malzemesi", "agirlik_ray_arasi",
+                       "agirlik_malzemesi",
                        "agirlik_guvenlik_tertibati")),
     ("Tamponlar",
      ("tampon_tipi", "kabin_tampon_adedi", "agirlik_tampon_adedi",
@@ -533,6 +538,60 @@ GRUPLAR = (
       "kabin_carpma_arasi", "kabin_tampon_boyu", "agirlik_tampon_ezilme",
       "agirlik_carpma_arasi")),
 )
+
+
+#  GELİŞMİŞ ALANLAR.  Her grubun altında kapalı duran "Gelişmiş" bölümünde
+#  gösterilirler;  hesaba AYNEN girerler ve paftaya aynen basılırlar — yalnız
+#  formda ilk bakışta görünmezler.
+#
+#  Ölçüt:  değer binadan ya da projeden gelmiyorsa ( ürünün ya da ofisin
+#  sabiti ), zaten tablodan / başka bir girdiden dolduruluyorsa ya da yanlış
+#  kaldığında sonuç bunu hata / uyarı olarak söylüyorsa buradadır.  GÖRÜNÜR
+#  KALANLAR her projede değişenler ve yanlış kalınca sonucu çok değiştiren
+#  beyanlardır:  askı oranı · ray-kapı arası · güvenlik tertibatı tipi ·
+#  karşı ağırlıkta güvenlik tertibatı · sarılma açısı · regülatörün iki
+#  imalatçı değeri ( girilmezse bölüm HESAP EKSİK kalır ).
+#
+#  ÜÇ KAÇIKLIK GÖRÜNÜR KALIR ( kabin merkezi y · askı xs · ys ).  Ürün
+#  sabiti değil, çizime bağlı ölçülerdir;  varsayılan 0 standart yerleşimdir
+#  ( kabin raylar arasında ortada, askı ray ekseninde ).  100 mm kaçıklık beş
+#  projenin dördünde kabin rayı hükmünü çevirdi:  kaçık bir yerleşimde gizli
+#  bir 0 unutulursa ray hesabı emniyetsiz tarafta kalır ve "değiştirildi"
+#  sayacı unutulan değeri yakalayamaz.
+#
+#  Seçim 5 proje üzerinde her girdi gerçekçi değerlere çekilerek yapıldı;
+#  karşı ağırlık yeri, malzeme ve kabin tamponu - çarpma plakası arası
+#  hesabın hiçbir sayısını değiştirmedi, kaide yüksekliği en çok %1,3
+#  etkiledi.
+GELISMIS_ALANLAR = frozenset((
+    # Asansör teknik bilgileri
+    "asansor_tipi", "kabin_agirligi",
+    # Kabin ve kapı
+    "uzun_pervaz", "agirlik_yeri", "kapi_mekanizma_payi",
+    # Durak ve kuyu
+    "kaide_yuksekligi", "siginma_tipi_ust", "siginma_tipi_dip",
+    # Makine ve motor
+    "saptirma_kasnak_min_capi", "sase_yuksekligi", "dikine_kiris", "yan_yatak",
+    "yan_yatak_boyu",
+    # Askı halatları
+    "kasnak_belgesi", "kanal_sekli", "kanal_isleme", "halat_birim_kutle",
+    "halat_kopma_kN", "denge_zinciri", "kasnak_tek_yon", "kasnak_ters_yon",
+    "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle",
+    # Hız regülatörü
+    "reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
+    "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
+    # Kılavuz raylar
+    "kabin_ray_sayisi", "agirlik_ray_sayisi", "ray_celigi_rm",
+    "kabin_paten_arasi", "agirlik_paten_arasi", "paten_tipi",
+    "paten_balata_boyu", "agirlik_paten_tipi", "klips_itme_kuvveti",
+    "yapi_sehim_x", "yapi_sehim_y",
+    # Karşı ağırlık
+    "agirlik_genisligi", "agirlik_derinligi", "agirlik_malzemesi",
+    # Tamponlar
+    "tampon_tipi", "kabin_tampon_adedi", "agirlik_tampon_adedi",
+    "kabin_tampon_ezilme", "kabin_carpma_arasi", "kabin_tampon_boyu",
+    "agirlik_tampon_ezilme", "agirlik_carpma_arasi",
+))
 
 
 #  HESAP BÖLÜMÜ  →  onu besleyen GİRDİ GRUPLARI.
@@ -587,6 +646,7 @@ def arayuz_alanlari():
                 "tur": tur,
                 "secenekler": list(secenekler) if secenekler is not None else None,
                 "varsayilan": varsayilan,
+                "gelismis": a in GELISMIS_ALANLAR,
             })
         gruplar.append({"ad": ad, "alanlar": alanlar})
     return {"gruplar": gruplar,
@@ -857,12 +917,6 @@ def dogrula(g):
                     f"kirişte yükün mesnetten X = L − {pay} uzaklıkta olduğunu "
                     "kabul eder; X ≤ 0 fiziksel değildir.")
 
-    if g.get("agirlik_yeri") == "Arka":
-        a, b, c = g.get("kuyu_derinligi"), g.get("ray_kapi_arasi"), g.get("agirlik_ray_duvar")
-        if _sayi(a) and _sayi(b) and _sayi(c) and a - b - c <= 0:
-            hata.append("Arka karşı ağırlıkta halat arası pozitif çıkmıyor: "
-                        f"KD − RK − (ray-duvar) = {a} − {b} − {c} = {a - b - c} mm.")
-
     #  ------------------------------------------------------------------
     #  RAY NARİNLİĞİ  λ = konsol arası / ix        TS EN 81-50 m.5.10.3
     #  ------------------------------------------------------------------
@@ -1078,3 +1132,30 @@ def toplam_ray_boyu(g):
     if tavan is None or not (_sayi(ky) and _sayi(kd)):
         return None
     return (tavan + (ky - 200) + (kd - 300)) / 1000.0
+
+
+#  Nps  —  TEK YÖNDE BÜKÜLMELİ KASNAK SAYISI, BOŞ BIRAKILINCA  ( TS EN 81-50 Ek E )
+#  m.5.12.3 güvenlik katsayısını halatın EN OLUMSUZ KESİTİ için ister:  sayılan,
+#  halatın tamamının geçtiği kasnaklar değil, tek bir kesitin çalışırken
+#  üzerinden geçtiği kasnaklardır.  Standardın iki çözümlü örneği:
+#     Şekil E.1 — 2:1 askı       Nps = 2   kabin kesiti iki kabin kasnağından
+#                                          geçer;  hareketli kasnak ters
+#                                          bükülme sayılmaz ( Npr = 0 )
+#     Şekil E.2 — 1:1 askı       Nps = 1   tahrik kasnağının saptırma kasnağı
+#  OFİS DÜZENİ:  2:1'de tahrik kasnağının saptırma kasnağı KARŞI AĞIRLIK
+#  tarafındadır.  Ağırlık kesiti saptırma + ağırlık kasnağından geçer ( 2 ),
+#  kabin kesiti iki kabin kasnağından ( 2 ) — ikisi de Şekil E.1'in sayısı.
+#  Saptırma kabin tarafında olan bir düzende kabin kesiti 3 kasnaktan geçer;
+#  o projede değer elle girilir.
+#  ESKİ VARSAYILAN 1'Dİ ve 2:1'de programın kendi uyarısına ( "en az iki kabin
+#  kasnağı" ) takılıyordu:  Nequiv küçük, gereken Sf olduğundan küçük çıkıyordu.
+def kasnak_tek_yon_askidan(r):
+    return 1 if r == 1 else 2
+
+
+def kasnak_tek_yon(g):
+    """( Nps , girildi_mi ).  Boşsa askı oranından türetilir."""
+    d = g.get("kasnak_tek_yon")
+    if d is None or (isinstance(d, str) and not d.strip()):
+        return kasnak_tek_yon_askidan(g.get("aski_orani")), False
+    return d, True

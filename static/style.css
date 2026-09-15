@@ -501,6 +501,25 @@ body:not(.giriste) .giris{display:none}
 .m-grup.acik .m-grup-adet{background:rgba(255,255,255,.18)}
 .m-grup-ic{padding:11px}
 
+/*  Grubun altındaki "Gelişmiş" bölümü — ofisin / ürünün hep aynı girilen değerleri */
+.m-gelismis{margin-top:10px;border-top:1px dashed var(--cizgi)}
+.m-gelismis-bas{
+  display:flex;align-items:center;gap:7px;width:100%;
+  font:600 11px/1.3 inherit;letter-spacing:.02em;color:var(--gri);
+  background:none;border:0;padding:8px 0 2px;cursor:pointer;text-align:left;
+}
+.m-gelismis-bas:hover{color:var(--mavi2)}
+.m-gelismis-ok{font-size:9px;width:9px;flex:0 0 9px}
+.m-gelismis-sayac{
+  font-size:10px;font-weight:600;color:var(--sari);background:var(--sari-ac);
+  border:1px solid #E9CE7A;border-radius:9px;padding:1px 7px;
+}
+.m-gelismis-sayac:empty{display:none}
+.m-gelismis-ic{padding-top:9px}
+/*  Varsayılandan farklı gelişmiş alan — bölüm açılınca hangisi olduğu görünsün */
+.m-gelismis .alan.degisti label{color:var(--sari)}
+.m-gelismis .alan.degisti label::before{content:"● ";font-size:8px;vertical-align:1px}
+
 /*  Sonuç tablosunda bölüm satırı → girdilerine kısayol */
 tr.m-gidilir{cursor:pointer}
 tr.m-gidilir:hover td{background:#EEF4FB}

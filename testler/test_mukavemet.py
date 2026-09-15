@@ -48,7 +48,10 @@ ORNEK_PROJE = {
     "aski_halatlari": (
         ("aski.oran", 36.92307692307692, "Dt / dh"),
         ("aski.Kp", 1, "Kp"),
-        ("aski.Nequiv_p", 1, "Nequiv(p)"),
+        #  Nps boş — askı oranından gelir:  2:1 → 2 ( TS EN 81-50 Ek E Şekil E.1 ).
+        #  Örnek projenin kendi dosyasında 1 yazılıydı;  Kp = 1 olduğu için
+        #  Nequiv(p) doğrudan Nps'dir.
+        ("aski.Nequiv_p", 2, "Nequiv(p)"),
         ("aski.S", 22.720130951145965, "S gerçek güvenlik katsayısı"),
     ),
     "regulator_halati": (
@@ -240,11 +243,33 @@ def _sapmalar(r):
     r.esit("⑦ Nps Nequiv'i belirliyor", [_n[1], _n[2], _n[3]], [13.0, 14.0, 15.0])
     _sf = MK.hesapla({"kasnak_tek_yon": 2})["ara"]["aski.Sf"]
     r.kontrol("⑦ Nps büyüyünce gereken Sf de büyüyor",
-              _sf > MK.hesapla()["ara"]["aski.Sf"], f"→ {_sf!r}")
-    _b4 = [b for b in MK.hesapla()["bolumler"] if "ASKI HALAT" in b["baslik"]][0]
-    r.kontrol("⑦ palangalı sistemde Nps uyarısı çıkıyor",
+              _sf > MK.hesapla({"kasnak_tek_yon": 1})["ara"]["aski.Sf"], f"→ {_sf!r}")
+    _b4 = [b for b in MK.hesapla({"kasnak_tek_yon": 1})["bolumler"]
+           if "ASKI HALAT" in b["baslik"]][0]
+    r.kontrol("⑦ palangalı sistemde Nps 1 GİRİLİRSE uyarı çıkıyor",
               any("EN AZ İKİ kabin kasnağı" in x for x in (_b4.get("notlar") or [])),
               f"→ {_b4.get('notlar')}")
+
+    #  ⑦b Nps BOŞSA ASKI ORANINDAN  ( TS EN 81-50 Ek E ):  1:1 → 1 ( Şekil E.2,
+    #  saptırma kasnağı ) · 2:1 → 2 ( Şekil E.1, iki kabin kasnağı ).  Girilen
+    #  değer — 0 dâhil — her zaman kazanır.
+    def _nps(**k):
+        _h = MK.hesapla(k)
+        _bl = [b for b in _h["bolumler"] if b.get("kimlik") == "aski_halatlari"][0]
+        _sat = [a for a in _bl["adimlar"] if a.get("sembol") == "Nps"][0]
+        return _sat["deger"], _sat["kaynak"], _bl.get("notlar") or []
+    for _r, _bek, _sekil in ((1, 1, "E.2"), (2, 2, "E.1")):
+        _d, _k, _nt = _nps(aski_orani=_r)
+        r.kontrol(f"⑦b Nps boş · {_r}:1 askı → {_bek}  ( Ek E Şekil {_sekil} )",
+                  _d == _bek and f"Şekil {_sekil}" in _k, f"→ {_d!r} · {_k!r}")
+        r.kontrol(f"⑦b Nps boş · {_r}:1 askı → uyarı yok",
+                  not any("EN AZ İKİ kabin kasnağı" in x for x in _nt), f"→ {_nt}")
+    for _giris in (0, 3):
+        _d, _k, _nt = _nps(aski_orani=2, kasnak_tek_yon=_giris)
+        r.kontrol(f"⑦b Nps = {_giris} girilince türetilen ezilmiyor",
+                  _d == _giris and _k == "GİRİŞ", f"→ {_d!r} · {_k!r}")
+    r.kontrol("⑦b boş metin de boş sayılır",
+              _nps(aski_orani=2, kasnak_tek_yon="")[0] == 2)
 
     #  Sf formülü EN 81-50 m.5.12.3'ün çözümlü örneğini üretiyor mu
     #  ( LEIA örneği:  Dt/dr = 40 , Nequiv = 7  →  Sf ≈ 16 )

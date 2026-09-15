@@ -70,13 +70,13 @@ async function mukavemetKur(){
   //  değer TEKTİR, hangi sekmede yazılırsa yazılsın aynı yere gider ve
   //  asansörden asansöre kopyalanmaz ( mAsansorKaydet onları atlar ).
   for(const [i, g] of MUK.gruplar.entries()){
-    let ic = '', acik = [];
-    for(const f of g.alanlar){
-      acik.push(mAlan(f));
-      if(acik.length === 2){ ic += mSatir(acik); acik = []; }
-    }
-    if(acik.length) ic += mSatir(acik);
-    if(!ic) continue;                       // bütün alanları proje geneli olan grup
+    //  GELİŞMİŞ ALANLAR grubun ALTINDA, kapalı bir bölümde durur
+    //  ( engine/uygulama/mukavemet_girdi.GELISMIS_ALANLAR ):  ofisin ya da
+    //  ürünün hep aynı girilen değerleri.  DOM'dan silinmezler — okunur,
+    //  kaydedilir ve hesaba girerler;  yalnız ilk bakışta görünmezler.
+    const ic = mSatirlar(g.alanlar.filter(f => !f.gelismis));
+    const gel = mSatirlar(g.alanlar.filter(f => f.gelismis));
+    if(!ic && !gel) continue;
     h += `<div class="m-grup" data-grup="${i}" data-ad="${kacis(g.ad)}">
             <button type="button" class="m-grup-bas" onclick="mGrupDegistir(${i})">
               <span class="m-grup-ok">▸</span>
@@ -84,7 +84,16 @@ async function mukavemetKur(){
               <span class="m-grup-adet" data-toplam="${g.alanlar.length}"
                     >${g.alanlar.length}</span>
             </button>
-            <div class="m-grup-ic" hidden>${ic}</div>
+            <div class="m-grup-ic" hidden>${ic}${gel ? `
+              <div class="m-gelismis" data-grup="${i}">
+                <button type="button" class="m-gelismis-bas" aria-expanded="false"
+                        onclick="mGelismisDegistir(this.parentElement)">
+                  <span class="m-gelismis-ok">▸</span>
+                  <span>Gelişmiş</span>
+                  <span class="m-gelismis-sayac"></span>
+                </button>
+                <div class="m-gelismis-ic" hidden>${gel}</div>
+              </div>` : ''}</div>
           </div>`;
   }
   $('m_form').innerHTML = h;
@@ -106,6 +115,7 @@ async function mukavemetKur(){
   mKanalUyumu();
   mAsansorSekmeleriTazele();
   mGkBoslariIsaretle();
+  mGelismisTazele();
   //  Kovaya İLK AÇILIŞTA da yazılır:  yoksa kullanıcı hiçbir alana dokunmadan
   //  sayfayı yenilediğinde uygulama projesi boş açılırdı ( avan tarafında bu
   //  sorun yok, orada form açılışta kuruluyor ).
@@ -155,6 +165,16 @@ function mukavemetGeriYukle(){
 }
 
 const mSatir = alanlar => `<div class="satir i${alanlar.length}">${alanlar.join('')}</div>`;
+/*  Alanları ikişerli satırlara dizer;  alan yoksa boş metin. */
+function mSatirlar(alanlar){
+  let ic = '', acik = [];
+  for(const f of alanlar){
+    acik.push(mAlan(f));
+    if(acik.length === 2){ ic += mSatir(acik); acik = []; }
+  }
+  if(acik.length) ic += mSatir(acik);
+  return ic;
+}
 
 /*  UYGULAMA PROJESİNİN KAPAĞI AYRI BİR MMO KİTABINDADIR — elimizde yok.
     Bu yüzden avan kapağı buraya BASILMAZ;  sunucuya yalnız dosya adı ve
@@ -330,7 +350,13 @@ function mAlan(f){
   }else{
     //  Varsayılanı olmayan alan BOŞ açılır ( temel ölçüleri, kolon boyu … );
     //  "0" yazmak kullanıcıyı yanıltırdı.
-    const v = (f.varsayilan===null||f.varsayilan===undefined) ? '' : mSayi(f.varsayilan);
+    //  KABİN AĞIRLIĞI DA BOŞ AÇILIR:  ilk hesapta beyan yükünün tablo değeriyle
+    //  dolar ( mGkBoslariIsaretle ).  Sözleşmedeki 700 örnek projenin değeridir
+    //  ve 800 kg yükün tablo değeri ( 800 ) değildir;  alan Gelişmiş'te gizli
+    //  durduğu için yeni proje farkına varılmadan "elle girilmiş" 700 ile
+    //  hesaplanıyordu.
+    const v = (f.varsayilan===null||f.varsayilan===undefined||f.anahtar==='kabin_agirligi')
+      ? '' : mSayi(f.varsayilan);
     giris = `<input id="${M_ID(f.anahtar)}" class="girdi" value="${kacis(v)}">`;
   }
   return `<div class="alan"><label>${et}</label>${giris}</div>`;
@@ -502,6 +528,7 @@ function mukavemetPlanla(hedef){
   mMakineDairesiKutulari();
   mIkiliTazele();
   mKanalUyumu();
+  mGelismisTazele();
   yaz();                              // girdiler tarayıcıda saklansın
   clearTimeout(mZaman);
   mZaman = setTimeout(hesapMukavemet, 220);
@@ -548,6 +575,7 @@ async function hesapMukavemet(){
     }
     if(yazildi) yaz();
     cizMukavemet(aktif);
+    mGelismisTazele();
     //  Asansör listesi YALNIZ PROJE sekmesindedir.  Bir süre her asansörün
     //  sonuç panelinin başına da basılıyordu;  ASANSÖR 1 sekmesinde "1 · 2"
     //  listesi görmek, o sekmenin zaten 1 nolu asansöre ait olduğunu bile
@@ -571,6 +599,7 @@ function cizMukavemet(r){
       · IEEE Std 80 · IEC 60364-5-52</div>
     </div><div class="kart-ic">`;
   if(!r.aktif){
+    mGelismisHataAc(r.hata);
     h += (r.hata||['Hesap yapılamadı.']).map(x=>
       `<div class="uyari kirmizi">${kacis(x)}</div>`).join('');
     $('m_sonuc').innerHTML = h + '</div>';
@@ -702,6 +731,7 @@ function mTumGruplariAc(){
     const sy = gr.querySelector('.m-grup-adet');
     if(sy) sy.textContent = sy.dataset.toplam;
   });
+  document.querySelectorAll('#m_form .m-gelismis').forEach(k=>mGelismisAc(k, true));
 }
 
 /*  Alan etiketinde geçen metne göre süzer;  eşleşme olan gruplar açılır.
@@ -709,6 +739,9 @@ function mTumGruplariAc(){
 function mAramaUygula(){
   const q = ($('m_ara').value || '').trim().toLocaleLowerCase('tr');
   if(!q){
+    //  Aramanın açtığı Gelişmiş bölümleri de kapanır:  form aramadan önceki
+    //  sade hâline döner.
+    mGelismisleriKapat();
     let i = 0; try{ i = Number(localStorage.getItem('m_grup')) || 0; }catch(e){}
     mGrupAc(i, true);
     return;
@@ -727,6 +760,9 @@ function mAramaUygula(){
     gr.querySelector('.m-grup-ic').hidden = bulunan === 0;
     gr.querySelector('.m-grup-ok').textContent = bulunan ? '▾' : '▸';
     gr.querySelector('.m-grup-adet').textContent = bulunan || gr.querySelectorAll('.alan').length;
+    //  ARAMA GELİŞMİŞ ALANLARI DA BULUR:  eşleşme varsa bölümü açılır.
+    gr.querySelectorAll('.m-gelismis').forEach(k=>
+      mGelismisAc(k, !!k.querySelector('.alan:not([hidden]):not(.kural-disi)')));
   });
 }
 
@@ -740,6 +776,82 @@ function mGirdiyeGit(kimlik){
                                    .filter(i=>i >= 0);
   if(!no.length) return;
   mGrupAc(no);
+}
+
+/* ==========================================================================
+   GELİŞMİŞ BÖLÜMLERİ
+   Her grubun altında kapalı durur;  ofisin ya da ürünün hep aynı girilen
+   değerlerini taşır ( engine/uygulama/mukavemet_girdi.GELISMIS_ALANLAR ).
+   GİZLİ DEĞER SESSİZ KALMAMALI:
+     · varsayılandan farklı değer sayısı bölüm başlığında yazar ve o alanlar
+       işaretlenir — bölümü açmadan "burada değişen bir şey var" görünür;
+     · hesabı durduran hata gizli bir alandansa bölüm kendiliğinden açılır;
+     · arama gizli alanları da bulur.
+   ========================================================================== */
+function mGelismisAc(kutu, ac){
+  if(!kutu) return;
+  kutu.classList.toggle('acik', !!ac);
+  kutu.querySelector('.m-gelismis-ic').hidden = !ac;
+  kutu.querySelector('.m-gelismis-ok').textContent = ac ? '▾' : '▸';
+  kutu.querySelector('.m-gelismis-bas').setAttribute('aria-expanded', ac ? 'true' : 'false');
+}
+
+function mGelismisDegistir(kutu){
+  if(kutu) mGelismisAc(kutu, !kutu.classList.contains('acik'));
+}
+
+function mGelismisleriKapat(){
+  document.querySelectorAll('#m_form .m-gelismis').forEach(k=>mGelismisAc(k, false));
+}
+
+/*  Alanın değeri sözleşmenin varsayılanından farklı mı?
+    Kabin ağırlığının varsayılanı sabit bir sayı değil, beyan yükünün TABLO
+    değeridir:  onu hesabın bildirdiği kaynak söyler ( "GİRİŞ" = elle ). */
+function mVarsayilandanFarkli(f){
+  const e = $(M_ID(f.anahtar));
+  if(!e) return false;
+  if(f.anahtar === 'kabin_agirligi')
+    return !mGkTazelenecek(MUK_AKTIF)
+      && ((SON.m && SON.m.girdi) || {}).kabin_agirligi_kaynak === 'GİRİŞ';
+  const s = String(e.value ?? '').trim(), d = f.varsayilan;
+  if(d === null || d === undefined) return s !== '';
+  if(e.tagName === 'SELECT' || typeof d !== 'number') return s !== String(d);
+  const x = sayiOku(s);
+  return !(isFinite(x) && Math.abs(x - d) < 1e-9);
+}
+
+function mGelismisTazele(){
+  if(!MUK) return;
+  const alan = {};
+  for(const f of mAlanlar(x => x.gelismis)) alan[M_ID(f.anahtar)] = f;
+  document.querySelectorAll('#m_form .m-gelismis').forEach(k=>{
+    let n = 0, gorunur = 0;
+    k.querySelectorAll('.m-gelismis-ic .alan').forEach(a=>{
+      //  Makine yerleşimine göre hesaba girmeyen alan sayılmaz.
+      if(a.classList.contains('kural-disi')) return;
+      gorunur++;
+      const e = a.querySelector('input,select');
+      const f = e && alan[e.id];
+      const farkli = !!f && mVarsayilandanFarkli(f);
+      a.classList.toggle('degisti', farkli);
+      if(farkli) n++;
+    });
+    //  Bütün alanları bu yerleşimde hesaba girmiyorsa bölüm de görünmez.
+    k.hidden = gorunur === 0;
+    k.querySelector('.m-gelismis-sayac').textContent = n ? `${n} değiştirildi` : '';
+  });
+}
+
+/*  Hata metni gizli bir alanın adını taşıyorsa o alanın bölümünü açar.
+    Motor hatayı alanın etiketiyle yazar ( mukavemet_girdi.dogrula ). */
+function mGelismisHataAc(metinler){
+  const liste = (metinler || []).map(String);
+  if(!liste.length || !MUK) return;
+  for(const f of mAlanlar(x => x.gelismis)){
+    if(!liste.some(m => m.includes(f.etiket))) continue;
+    const e = $(M_ID(f.anahtar));
+    mGelismisAc(e && e.closest('.m-gelismis'), true);
+  }
 }
 
 /*  Bir bölümü besleyen grup adları.  Anahtar bölümün KİMLİĞİDİR
@@ -827,6 +939,7 @@ function mAsansorKaydet(){
 function mAsansorYukle(i){
   const d = MUK_ASANSORLER[i]; if(!d) return;
   mFormaYaz(d, M_ASANSOR_ALANI);
+  mGelismisTazele();
 }
 
 function mAsansorSec(i){

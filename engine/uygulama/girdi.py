@@ -64,6 +64,12 @@ EK_ALANLAR = (
 
 EK_ALAN = {a[0]: a for a in EK_ALANLAR}
 
+#  "Gelişmiş" bölümündeki elektrik alanları  ( bkz. MG.GELISMIS_ALANLAR ).
+#  Kesitler ofisin alışılmış kesitleridir;  yetmezlerse gerilim düşümü ve
+#  koruma iletkeni bölümleri bunu hüküm olarak söyler.  Uzunluklar binaya
+#  bağlıdır, görünür kalır.
+EK_GELISMIS = frozenset(("kolon_kesit", "makine_kesit"))
+
 EK_GRUP = ("Elektrik ve topraklama  ( uygulama projesi )",
            tuple(a[0] for a in EK_ALANLAR))
 
@@ -129,7 +135,7 @@ def arayuz_alanlari():
     veri = MG.arayuz_alanlari()
     _ek = {a: {"anahtar": a, "hucre": "", "etiket": et, "birim": b,
                "tur": t, "secenekler": list(s) if s is not None else None,
-               "varsayilan": v}
+               "varsayilan": v, "gelismis": a in EK_GELISMIS}
            for a, et, b, t, s, v in EK_ALANLAR}
     veri["gruplar"].append({
         "ad": EK_GRUP[0],
