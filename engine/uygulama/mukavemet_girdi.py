@@ -81,6 +81,19 @@ ALANLAR = (
     #  değiştirmez — ama eksantrik askılı yerleşimde gerçek değer girilmelidir.
     ("aski_kaciklik_x",   "Askı noktasının x kaçıklığı  ( xs )", "mm", "sayi", None, 0),
     ("aski_kaciklik_y",   "Askı noktasının y kaçıklığı  ( ys )", "mm", "sayi", None, 0),
+    #  BOŞ KABİNİN AĞIRLIK MERKEZİ ( P )  —  Ek C.1.2'nin xp · yp'si.
+    #  Boş bırakılırsa TÜRETİLİR:  gövde kabin merkezinde, kapı ( ofis
+    #  standardındaki ağırlığıyla ) kapı tarafında, gezici kablo ve denge
+    #  zinciri kabin merkezinde kabul edilir ve yp = yc olur ( bkz.
+    #  mukavemet._kabin_raylari ).  İmalatçı ağırlık merkezini veriyorsa buraya
+    #  girilir;  ray ekseninden ölçülür ve P'nin TAMAMINA uygulanır ( kapı,
+    #  gezici kablo, zincir dahil — m.5.7.2.3.2 ).  ELEport bu iki değeri
+    #  doğrudan sorar ( Xp · Yp );  türetme onları temsil edemiyordu — örnek
+    #  projesinde xp = +250 mm iken kabin merkezi −140 mm'dedir.
+    ("kabin_agirlik_merkezi_x", "Boş kabinin ağırlık merkezi x  ( xp — boşsa türetilir )",
+     "mm", "sayi", None, None),
+    ("kabin_agirlik_merkezi_y", "Boş kabinin ağırlık merkezi y  ( yp — boşsa türetilir )",
+     "mm", "sayi", None, None),
     ("agirlik_yeri",      "Karşı ağırlık yeri",                "—",    "secim",
      _s("Sağ", "Sol", "Arka"), "Sağ"),
     #  Kabin kapısı ağırlığı burada SORULMAZ — ofis standardıdır
@@ -98,7 +111,15 @@ ALANLAR = (
     #  SON KAT YÜKSEKLİĞİ:  en üst durak döşemesinden kuyu tavanına.
     ("son_kat_yuksekligi", "Son kat yüksekliği",               "mm",   "sayi", None, 3750),
     ("kuyu_boyu",         "Kuyu boyu",                         "mm",   "hesap", None, None),
-    ("kaide_yuksekligi",  "Kaide yüksekliği",                  "mm",   "sayi", None, 750),
+    #  TABLİYE BETON YÜKSEKLİĞİ  —  makine dairesinin beton döşemesi.
+    #  Kılavuz ray boyuna ve regülatör halatı boyuna "tabliye − 200 mm"
+    #  olarak girer ( ofis modeli ).  YALNIZ MAKİNE DAİRELİ TESİSTE SORULUR:
+    #  makine dairesiz ( MRL ) tesiste tabliye yoktur — makine kuyu
+    #  üstündeki NPU kirişlere oturur — ve hesaba 0 girer ( bkz. tabliye ).
+    #  Eskiden adı "Kaide yüksekliği"ydi ve MRL'de de 750 mm ekleniyordu:
+    #  olmayan bir tabliye ray ve regülatör halatı boyunu uzatıyordu.
+    #  Varsayılan 1.200 mm:  ofisin makine daireli şablonundaki değer.
+    ("tabliye_yuksekligi", "Tabliye beton yüksekliği",         "mm",   "sayi", None, 1200),
     ("kuyu_dibi",         "Kuyu dibi yüksekliği  ( KY )",      "mm",   "sayi", None, 1600),
     #  KUYU DERİNLİĞİ ( KD ) ve AĞIRLIK RAY MERKEZİ - DUVAR SORULMAZ.  İkisi
     #  yalnız arka ağırlıkta halat arasını ( KD − RK − ray-duvar ) türetmek
@@ -132,9 +153,14 @@ ALANLAR = (
     #  seçeneği vardı.  Pafta profili "NPU <ölçü>" diye kendisi yazar.
     ("dikine_kiris",      "E  ( dikine kiriş ölçüsü )",        "—",    "secim",
      MT.NPU_OLCULERI, 120),
-    ("yan_yatak",         "F  ( yan yatak ölçüsü )",           "—",    "secim",
-     MT.NPU_OLCULERI, 120),
-    ("yan_yatak_boyu",    "Yan yatak boyu",                    "mm",   "sayi", None, 1400),
+    #  YAN YATAK = MAKİNENİN ALTINDAKİ KİRİŞ.  Makine dairesinde kaidenin
+    #  yatay kirişidir;  makine dairesiz ( MRL ) tesiste makine kuyu üstünde
+    #  doğrudan bu NPU kirişlere oturur ( kolon yoktur ).  İki yerleşimde de
+    #  sorulur ve bölüm 2'de eğilmeye göre denetlenir.  Varsayılan NPU 140:
+    #  ofisin sahada gördüğü kiriş ( kullanıcı kararı;  örnek projede 120 ).
+    ("yan_yatak",         "F  ( yan yatak — makine kirişi ölçüsü )", "—", "secim",
+     MT.NPU_OLCULERI, 140),
+    ("yan_yatak_boyu",    "Yan yatak ( makine kirişi ) boyu",  "mm",   "sayi", None, 1400),
 
     # ── ASKI HALATLARI ────────────────────────────────────────────────
     ("halat_adedi",       "Askı halatı adedi",                 "adet", "sayi", None, 7),
@@ -251,8 +277,8 @@ ALANLAR = (
      "—",    "secim", MT.MAKINE_YUK_YOLU, MT.MAKINE_YUK_YOLU[0]),
     #  BİR RAYA DÜŞEN MAKİNE YÜKÜ SORULMAZ.  "Bina yapısına" seçildiğinde
     #  hesaba hiç girmez;  "Kılavuz raylara" seçildiğinde makinenin yükü
-    #  ( Gm + Tst ) kabin raylarına EŞİT dağıtılır ( bkz. mukavemet.
-    #  _kabin_raylari ).  Eskiden imalatçının asimetrik değeri için ayrı bir
+    #  ( Gm + Tst ) kabin VE karşı ağırlık raylarına EŞİT dağıtılır ( bkz.
+    #  mukavemet._makine_ray_payi ).  Eskiden imalatçının asimetrik değeri için ayrı bir
     #  kutu vardı;  yük yolu "bina yapısına" iken de görünüyordu.
     ("makine_tst",        "Tst — makinenin azami kasnak statik yükü  ( imalatçı )",
      "kg", "sayi", None, None),
@@ -276,6 +302,14 @@ ALANLAR = (
     #  ( engine/ortak/ofis.py ) dişlisiz makinede 0,85, dişlide 0,50 der.
     ("makine_tipi",       "Makine tipi",                       "—",    "secim",
      tuple(OFIS.MAKINE_VERIMLERI), "Dişlisiz"),
+    #  PROJENİN MAKİNESİNE AİT VERİM.  Ofis değeri makine tipine göre tektir
+    #  ( dişlisiz · dişli ),  ama her projenin makinesi başkadır ve
+    #  imalatçının verdiği verim ondan ayrılabilir.  Tek projenin verimi için
+    #  Sabitler'deki ofis değerini değiştirmek BÜTÜN projeleri değiştirirdi.
+    #  Boşsa makine tipinden ofis değeri kullanılır ( bkz. sistem_verimi ).
+    #  Anlamı ofis değeriyle AYNIDIR:  toplam sistem verimi, askı kaybı dâhil.
+    ("makine_verimi",     "Toplam sistem verimi η  ( imalatçı — boşsa ofis değeri )",
+     "—", "sayi", None, None),
     #  "Ofis verimi η toplam sistem verimidir" ANAHTARI KALDIRILDI.
     #  η artık HER ZAMAN toplam sistem verimidir ( askı kaybı içinde ) —
     #  seçilecek bir şey kalmadı.  Bkz. engine/ortak/ofis.py, "PALANGA VERİM
@@ -378,7 +412,8 @@ ALANLAR = (
 #
 #  ÖTEKİ ALANLAR NEGATİF OLAMAZ:  uzunluk, kütle, çap, sehim ve adet
 #  büyüklüktür, işareti yoktur.
-ISARETLI_ALANLAR = ("kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y")
+ISARETLI_ALANLAR = ("kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
+                    "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y")
 
 #  Hızlı erişim
 ALAN = {a[0]: a for a in ALANLAR}
@@ -410,16 +445,19 @@ POZITIF_ALANLAR = ("kabin_konsol_arasi", "agirlik_konsol_arasi",
                    "son_kat_yuksekligi")
 #  MAKİNE YERLEŞİMİNE GÖRE HESABA GİRMEYEN ALANLAR.  Ekranda gizlenirler;
 #  gizli bir alandaki değer projeyi DURDURMAMALI ( bkz. uygulanmayan ).
-#    · Makine dairesi kaidesi yalnız bölüm 2'ye girer — MRL'de o bölüm yoktur.
+#    · Makine dairesi olmadan var olmayanlar:  tabliye ve kaidenin kolonları
+#      ( şase yüksekliği · dikine kiriş ).  Makinenin altındaki kiriş
+#      ( yan yatak ) MRL'de de vardır ve sorulur.
 #    · Makine yükünün yolu yalnız MRL'de sorulur — makine daireli tesiste
 #      makine kendi kaidesindedir, yükü raya binmez.
-KAIDE_ALANLARI = ("sase_yuksekligi", "dikine_kiris", "yan_yatak", "yan_yatak_boyu")
+MAKINE_DAIRESI_ALANLARI = ("tabliye_yuksekligi", "sase_yuksekligi", "dikine_kiris")
 RAYA_BINEN_ALANLARI = ("makine_raya_biniyor",)
 
 
 def uygulanmayan(g):
     """Bu makine yerleşiminde hesaba girmeyen mukavemet alanları."""
-    return set(KAIDE_ALANLARI) if evet_mi(g.get("mk_yok")) else set(RAYA_BINEN_ALANLARI)
+    return (set(MAKINE_DAIRESI_ALANLARI) if evet_mi(g.get("mk_yok"))
+            else set(RAYA_BINEN_ALANLARI))
 
 #  AÇI alanları:  0 < açı < 180.  360° girildiğinde sin(180°) = 0 çıkıyor ve
 #  hesap OverflowError ile çöküyordu.
@@ -433,8 +471,9 @@ ACI_ALANLARI = {"reg_kanal_acisi": (1, 179), "sarilma_acisi": (1, 360)}
 #  ve doldurma bir tek beyan yükü geçersizken başarısız olur — o durumda
 #  "boş bırakılamaz" hatası çıkmalı, hesap None ile devam etmemelidir.
 OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi", "kasnak_tek_yon",
+                     "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y",
                      "paten_balata_boyu", "guvenlik_devreye_kuvvet",
-                     "reg_devreye_hizi", "makine_tst",
+                     "reg_devreye_hizi", "makine_tst", "makine_verimi",
                      "halat_birim_kutle", "halat_kopma_kN",
                      "reg_halat_birim_kutle", "reg_halat_kopma_kN",
                      "saptirma_kasnak_min_capi", "kablo_birim_kutle")
@@ -500,9 +539,10 @@ GRUPLAR = (
      ("kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
       "uzun_pervaz",
       "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
+      "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y",
       "agirlik_yeri", "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
-     ("son_kat_yuksekligi", "kaide_yuksekligi",
+     ("son_kat_yuksekligi", "tabliye_yuksekligi",
       "kuyu_dibi", "ray_kapi_arasi",
       "siginma_tipi_ust", "siginma_tipi_dip")),
     ("Makine ve motor",
@@ -510,7 +550,7 @@ GRUPLAR = (
       "tahrik_kasnak_capi", "saptirma_kasnak_capi",
       "saptirma_kasnak_min_capi", "sase_yuksekligi",
       "dikine_kiris", "yan_yatak",
-      "yan_yatak_boyu", "makine_tipi", "makine_tst",
+      "yan_yatak_boyu", "makine_tipi", "makine_verimi", "makine_tst",
       "makine_raya_biniyor")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
@@ -568,11 +608,12 @@ GELISMIS_ALANLAR = frozenset((
     "asansor_tipi", "kabin_agirligi",
     # Kabin ve kapı
     "uzun_pervaz", "agirlik_yeri", "kapi_mekanizma_payi",
+    "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y",
     # Durak ve kuyu
-    "kaide_yuksekligi", "siginma_tipi_ust", "siginma_tipi_dip",
+    "siginma_tipi_ust", "siginma_tipi_dip",
     # Makine ve motor
     "saptirma_kasnak_min_capi", "sase_yuksekligi", "dikine_kiris", "yan_yatak",
-    "yan_yatak_boyu",
+    "yan_yatak_boyu", "makine_verimi",
     # Askı halatları
     "kasnak_belgesi", "kanal_sekli", "kanal_isleme", "halat_birim_kutle",
     "halat_kopma_kN", "denge_zinciri", "kasnak_tek_yon", "kasnak_ters_yon",
@@ -580,6 +621,9 @@ GELISMIS_ALANLAR = frozenset((
     # Hız regülatörü
     "reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
     "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
+    #  İkisi de imalatçı verisidir ve proje aşamasında çoğu zaman bilinmez;
+    #  boşsa paftaya standardın şartı yazılır ( bkz. mukavemet._regulator ).
+    "guvenlik_devreye_kuvvet", "reg_devreye_hizi",
     # Kılavuz raylar
     "kabin_ray_sayisi", "agirlik_ray_sayisi", "ray_celigi_rm",
     "kabin_paten_arasi", "agirlik_paten_arasi", "paten_tipi",
@@ -732,6 +776,16 @@ def tamamla(g):
 
 def _sayi(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def sistem_verimi(g):
+    """η ve girilip girilmediği:  projeye girilen verim, yoksa makine tipinden
+    ofis değeri.  Mukavemet ve elektrik köprüsü AYNI değeri buradan okur."""
+    e = g.get("makine_verimi")
+    if _sayi(e):
+        return e, True
+    from engine.uygulama import sabitler as _US
+    return _US.verim(_US.sabitler(g.get("_ofis")), g.get("makine_tipi")), False
 
 
 def dogrula(g):
@@ -892,6 +946,8 @@ def dogrula(g):
                             ("reg_halat_birim_kutle", 0.02, 5.0),
                             ("reg_halat_kopma_kN", 5.0, 2000.0),
                             ("makine_tst", 100.0, 100000.0),
+                            #  Sabitler'deki ofis verimiyle aynı aralık.
+                            ("makine_verimi", 0.1, 1.0),
                             ):
         _v = g.get(_ad)
         if _v is None or _v == "":
@@ -934,11 +990,11 @@ def dogrula(g):
     #  Δη kalktığı için η artık kendi başına negatife düşemez;  bu kalkan
     #  yine de durur, çünkü ofis sabiti ekrandan elle girilir ve ARALIK
     #  ( 0,1 - 1 ) atlanırsa N = Gmax·v/(η·102) sıfıra bölünür.
-    from engine.uygulama import sabitler as _USv
-    _O = _USv.sabitler(g.get("_ofis"))
+    #  Projeye verim girilmişse aralığını yukarıdaki katalog denetimi
+    #  bekler;  ofis değeri o projede kullanılmadığı için burada aranmaz.
     _tip = g.get("makine_tipi")
-    _etap = _USv.verim(_O, _tip)
-    if not (_sayi(_etap) and 0 < _etap <= 1):
+    _etap, _eta_girildi = sistem_verimi(g)
+    if not _eta_girildi and not (_sayi(_etap) and 0 < _etap <= 1):
         hata.append(
             f"Toplam sistem verimi η = {_etap} fiziksel değil — 0 < η ≤ 1 "
             f"olmalı ( '{_tip}' makine ). Sabitler sekmesinden düzeltin.")
@@ -1125,10 +1181,25 @@ def alt_duraktan_tavana(g):
     return sm * 1000.0 + sk
 
 
+def tabliye(g):
+    """Hesaba giren tabliye beton yüksekliği ( mm ).
+
+    Makine dairesiz ( MRL ) tesiste tabliye yoktur:  0.  Makine dairelide
+    girilen değer;  sayı değilse None.
+    """
+    if evet_mi(g.get("mk_yok")):
+        return 0.0
+    t = g.get("tabliye_yuksekligi")
+    return t if _sayi(t) else None
+
+
 def toplam_ray_boyu(g):
-    """Kılavuz ray toplam boyu ( m )  =  ( seyir + son kat + kaide − 200 + kuyu dibi − 300 ) / 1000."""
+    """Kılavuz ray toplam boyu ( m )  =  ( seyir + son kat + tabliye − 200 + kuyu dibi − 300 ) / 1000.
+
+    Tabliye makine dairesiz tesiste 0'dır ( bkz. tabliye ).
+    """
     tavan = alt_duraktan_tavana(g)
-    ky, kd = g.get("kaide_yuksekligi"), g.get("kuyu_dibi")
+    ky, kd = tabliye(g), g.get("kuyu_dibi")
     if tavan is None or not (_sayi(ky) and _sayi(kd)):
         return None
     return (tavan + (ky - 200) + (kd - 300)) / 1000.0

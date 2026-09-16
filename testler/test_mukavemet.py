@@ -100,11 +100,17 @@ def _yakin(a, b, tol=1e-7):
         return False
 
 
+#  ÖRNEK PROJENİN KENDİ İKİ DEĞERİ.  Varsayılanlar sonradan değişti:  tabliye
+#  1.200 mm ( ofisin makine daireli şablonu ) ve makine kirişi NPU 140.  Örnek
+#  projenin ara değerleri kendi girdileriyle denetlenir.
+ORNEK_GIRDI = {"tabliye_yuksekligi": 750, "yan_yatak": 120}
+
+
 def calistir():
     print("\n\033[1mTEST 9 — MUKAVEMET MOTORU\033[0m")
     r = Rapor("Mukavemet motoru")
 
-    s = MK.hesapla()
+    s = MK.hesapla(dict(ORNEK_GIRDI))
     if not r.kontrol("varsayılan girdilerle hesap koşuyor", s["aktif"],
                      f"→ {s.get('hata')}"):
         return r
@@ -115,24 +121,24 @@ def calistir():
         r.kontrol(f"bölüm {i + 1} adım üretti", len(bl.get("adimlar") or []) > 0)
         r.kontrol(f"bölüm {i + 1} sonucu var", bool(bl.get("sonuc")))
 
-    #  ÖRNEK PROJE DÖRT BÖLÜMDEN KALIYOR — dördü de gerçek yetersizliktir:
+    #  ÖRNEK PROJE ÜÇ BÖLÜMDEN KALIYOR — üçü de gerçek yetersizliktir:
     #    · ASKI HALATLARI — TS EN 81-20 m.5.5.2.1 tahrik kasnağı / halat
     #      oranını EN AZ 40 ister;  örnekte 240 / 6,5 = 36,9  ( ① ).
     #    · MOTOR GÜCÜ — verim makine tipine bağlı;  dişlisiz + 2:1 askıda
     #      gereken güç örnekte seçilen 4,9 kW'ı aşar  ( ⑨ ).
-    #    · HIZ REGÜLATÖRÜ — TS EN 81-20 m.5.6.2.2.1.1 d)'nin ikinci sınırı
-    #      "güvenlik tertibatını devreye sokmak için gerekenin iki katı"dır ve
-    #      o kuvvet İMALATÇI VERİSİDİR.  Örnekte yoktur;  madde denetlenemediği
-    #      için bölüm "HESAP EKSİK" der  ( ⑲ ).
+    #  HIZ REGÜLATÖRÜ artık kalmıyor:  m.5.6.2.2.1.1 d)'nin ikinci sınırındaki
+    #  devreye sokma kuvveti örnekte yoktur;  bölüm 300 N'u denetler ve
+    #  fren bloğunun kuvvetine Fçekme / 2 şartını yazar  ( ⑲ ).
     #    · TAHRİK YETENEĞİ — acil frenlemede Ek D'nin ivme işaretleriyle
     #      sarılma açısı 139° · sertleştirilmemiş kanal sınırı aşıyor  ( ㊳ ).
     #  Beklenen davranış budur — geri dönerse test bağırır.
     _kalan = [x["baslik"] for x in b if (x.get("sonuc") or {}).get("uygun") is False]
-    r.esit("örnek proje dört bölümden kalıyor", len(_kalan), 4)
-    r.kontrol("kalanlar motor gücü, askı halatları, regülatör ve tahrik",
-              sorted(x[:1] for x in _kalan) == ["1", "4", "5", "6"], f"→ {_kalan}")
-    r.kontrol("regülatör bölümü EKSİK diyor, UYGUN DEĞİL değil",
-              any("HESAP EKSİK" in (x.get("sonuc") or {}).get("metin", "")
+    r.esit("örnek proje üç bölümden kalıyor", len(_kalan), 3)
+    r.kontrol("kalanlar motor gücü, askı halatları ve tahrik",
+              sorted(x[:1] for x in _kalan) == ["1", "4", "6"], f"→ {_kalan}")
+    r.kontrol("regülatör bölümü kuvvet girilmeden UYGUN, HESAP EKSİK değil",
+              any((x.get("sonuc") or {}).get("uygun") is True
+                  and not x.get("eksik_hesap")
                   for x in b if x["baslik"].startswith("5 ")))
     r.esit("Dt/dh eşiği standarda göre 40", MK.SABIT["Dt_dh_asgari"], 40)
     _oran = 240 / 6.5
@@ -1024,19 +1030,20 @@ def _denetim_bulgulari(r):
               _yakin(_h5["regulator.S"], _h5["regulator.Tmin"] / _h5["regulator.Freg2"]),
               f"→ {_h5['regulator.S']!r}")
     r.esit("B12  imalatçı kuvveti yoksa sınır 300 N", _h5["regulator.F_sinir"], 300)
-    #  Girilmemişse madde DENETLENEMEZ:  bölüm 'HESAP EKSİK' der ve proje
-    #  'uygundur' çıkmaz.
-    r.kontrol("B12  imalatçı kuvveti yoksa bölüm HESAP EKSİK diyor",
-              _b5["sonuc"]["uygun"] is False
-              and "HESAP EKSİK" in _b5["sonuc"]["metin"],
+    #  Girilmemişse 300 N denetlenir ve ikinci koşul fren bloğuna ŞART olarak
+    #  yazılır:  Fçekme ≥ 2 × F  ⇔  F ≤ Fçekme / 2.
+    r.kontrol("B12  imalatçı kuvveti yoksa bölüm HESAP EKSİK değil",
+              _b5["sonuc"]["uygun"] is True and not _b5.get("eksik_hesap"),
               f"→ {_b5['sonuc']!r}")
-    r.esit("B12  eksik hesap özete giriyor", _s5["ozet"]["eksik_hesap"],
-           [_b5["sonuc"]["metin"]])
-    r.kontrol("B12  eksik hesapla proje uygun çıkmıyor",
-              _s5["ozet"]["tumu_uygun"] is False)
-    r.kontrol("B12  imalatçı kuvveti yoksa bölüm sebebini yazıyor",
-              any("İNCELEME" in x.upper() for x in (_b5.get("notlar") or [])),
-              f"→ {_b5.get('notlar')}")
+    r.esit("B12  eksik hesap özete girmiyor", _s5["ozet"]["eksik_hesap"], [])
+    r.kontrol("B12  fren bloğu şartı Fçekme / 2",
+              _yakin(_h5["regulator.Fgt_azami"], _h5["regulator.F_cekme"] / 2),
+              f"→ {_h5['regulator.Fgt_azami']!r}")
+    r.kontrol("B12  imalatçı kuvveti yoksa paftada şart satırı var",
+              any(str(x.get("aciklama", "")).startswith("Şart:  Fgt")
+                  and "tip inceleme belgesi" in str(x.get("deger", ""))
+                  for x in _b5["adimlar"]),
+              f"→ {[x.get('aciklama') for x in _b5['adimlar']]}")
     r.esit("B12  imalatçı kuvveti girilince sınır 2 katı",
            MK.hesapla({"guvenlik_devreye_kuvvet": 900})["ara"]["regulator.F_sinir"], 1800)
     r.esit("B12  küçük imalatçı kuvvetinde 300 N belirleyici",
@@ -1514,11 +1521,20 @@ def _girdi_yollari(r):
         r.kontrol(f"son kat yüksekliği {_sk!r} hesabı durduruyor", not s["aktif"],
                   f"→ {s.get('hata')}")
     s = MK.hesapla({"seyir_mesafesi": 45, "son_kat_yuksekligi": 4200,
-                    "kaide_yuksekligi": 750, "kuyu_dibi": 1600})
+                    "tabliye_yuksekligi": 750, "kuyu_dibi": 1600})
     r.esit("kuyu boyu = seyir · 1000 + son kat + kuyu dibi",
            s["girdi"]["kuyu_boyu"], 45000 + 4200 + 1600)
-    r.esit("ray boyu = ( seyir · 1000 + son kat + kaide − 200 + kuyu dibi − 300 ) / 1000",
+    r.esit("ray boyu = ( seyir · 1000 + son kat + tabliye − 200 + kuyu dibi − 300 ) / 1000",
            s["ozet"]["ray_boyu"], (45000 + 4200 + 550 + 1300) / 1000)
+    #  MRL'de tabliye yoktur:  aynı girdiyle ray boyu tabliyesiz, regülatör
+    #  halatı da tabliyesiz uzunlukla hesaplanır.
+    _m = MK.hesapla({"seyir_mesafesi": 45, "son_kat_yuksekligi": 4200,
+                     "tabliye_yuksekligi": 750, "kuyu_dibi": 1600, "mk_yok": True})
+    r.esit("MRL ray boyu = ( seyir · 1000 + son kat − 200 + kuyu dibi − 300 ) / 1000",
+           _m["ozet"]["ray_boyu"], (45000 + 4200 - 200 + 1300) / 1000)
+    r.kontrol("MRL regülatör halatı tabliyesiz daha kısa",
+              _m["ara"]["regulator.gh"] < s["ara"]["regulator.gh"],
+              f"→ {_m['ara']['regulator.gh']!r} / {s['ara']['regulator.gh']!r}")
     r.kontrol("form durak listesi göndermiyor",
               all(a[3] != "liste" and "durak" not in a[0] for a in MK.MG.ALANLAR))
 

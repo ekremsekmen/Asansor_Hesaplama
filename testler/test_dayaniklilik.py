@@ -194,8 +194,14 @@ def calistir():
     for ad, asansor, pg, gecerli in (
             ("MRL · makine dairesi ölçüsü '4.000'", {}, {"mk_yok": True, "mk_uzunluk": "4.000"}, True),
             ("MRL · makine dairesi ölçüsü '-5'", {}, {"mk_yok": True, "mk_uzunluk": "-5"}, True),
-            ("MRL · yan yatak boyu '1.400'", {"yan_yatak_boyu": "1.400"}, {"mk_yok": True}, True),
             ("MRL · dikine kiriş 'x'", {"dikine_kiris": "x"}, {"mk_yok": True}, True),
+            ("MRL · tabliye beton yüksekliği '1.200' ( gizli )",
+             {"tabliye_yuksekligi": "1.200"}, {"mk_yok": True}, True),
+            #  Makine kirişi MRL'de de sorulur ve hesaplanır:  görünen alan.
+            ("MRL · yan yatak boyu '1.400' ( görünür )", {"yan_yatak_boyu": "1.400"},
+             {"mk_yok": True}, False),
+            ("daireli · tabliye beton yüksekliği '1.200' ( görünür )",
+             {"tabliye_yuksekligi": "1.200"}, _DAIRELI, False),
             ("daireli · makine yükü yolu 'Kılavuz raylara' ( gizli )",
              {"makine_raya_biniyor": "Kılavuz raylara"}, _DAIRELI, True),
             ("daireli · makine dairesi ölçüsü '4.000' ( görünür )", {},

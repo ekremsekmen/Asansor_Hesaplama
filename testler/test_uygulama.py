@@ -178,7 +178,7 @@ def calistir():
     #  Ofis sabiti hesabı GERÇEKTEN değiştiriyor mu
     _t = MK.hesapla()
     for _ez, _hucre in (({"verim_dislisiz": 0.88}, "motor.N"),
-                        ({"sigma_em": 100}, "makine.sigma_e"),
+                        ({"sigma_em": 80}, "makine.sigma_e"),
                         ({"k1_kaymali": 3}, "makine.F"),
                         ({"q_denge": 0.45}, "motor.Ga"),
                         ({"tavan_payi": 200}, "siginma.kabin_ustu_tavan"),
@@ -253,9 +253,8 @@ def calistir():
               not (0 <= -1 <= 130), "→ karşılaştırma yalnız ≤ ile yapılıyor")
 
     #  ②  GENEL SONUÇ ENGELLEYİCİ UYARILARI SAYIYOR
-    #  "TEMİZ PROJE" için imalatçı kuvveti de gerekir:  TS EN 81-20
-    #  m.5.6.2.2.1.1 d)'nin ikinci sınırı onsuz DENETLENEMEZ ve bölüm
-    #  "HESAP EKSİK" der ( sapma ⑲ ).
+    #  Temiz projede imalatçı kuvveti girilidir;  girilmezse de proje uygun
+    #  çıkar — bölüm 300 N'u denetler ve fren bloğuna şart yazar ( sapma ⑲ ).
     #  TAHRİK YETENEĞİ için kanalın sertleştirilmiş olması ve denge zinciri
     #  de gerekir;  Ek D'nin ivme işaretleriyle ( ㊳ ) çıplak örnek
     #  tahrikten kalıyor.
@@ -296,18 +295,21 @@ def calistir():
     r.kontrol("② eksik hesap ayrı listede",
               len(_ek["ozet"].get("eksik_hesap") or []) >= 1,
               f"→ {_ek['ozet'].get('eksik_hesap')}")
-    #  İMALATÇI KUVVETİ YOKSA REGÜLATÖR MADDESİ DENETLENEMEZ  →  EKSİK
+    #  İMALATÇI KUVVETİ YOKSA ŞART YAZILIR, HESAP EKSİK SAYILMAZ.  Fren
+    #  bloğunun kuvveti proje aşamasında çoğu zaman bilinmez;  bölüm 300 N'u
+    #  denetler ve kuvvete Fçekme / 2 üst sınırını şart olarak basar.
     _rg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)
                                 | {"guvenlik_devreye_kuvvet": None}))
-    r.kontrol("② imalatçı kuvveti yoksa proje uygun çıkmıyor",
-              _rg["ozet"]["tumu_uygun"] is False)
-    r.kontrol("② regülatör eksiği eksik_hesap listesinde",
-              any("devreye sokma" in x
-                  for x in (_rg["ozet"].get("eksik_hesap") or [])),
+    r.kontrol("② imalatçı kuvveti yoksa da temiz proje uygun",
+              _rg["ozet"]["tumu_uygun"] is True,
               f"→ {_rg['ozet'].get('eksik_hesap')}")
-    r.kontrol("② eksik olan bölüm UYGUN DEĞİL değil, HESAP EKSİK diyor",
-              any("HESAP EKSİK" in (b.get("sonuc") or {}).get("metin", "")
-                  for b in _rg["bolumler"]))
+    r.esit("② regülatör eksik_hesap listesinde değil",
+           [x for x in (_rg["ozet"].get("eksik_hesap") or []) if "devreye" in x], [])
+    _rgb = [b for b in _rg["bolumler"] if b["kimlik"] == "regulator_halati"][0]
+    r.kontrol("② regülatör bölümü fren bloğu şartını basıyor",
+              any(str(a.get("aciklama", "")).startswith("Şart:  Fgt")
+                  for a in _rgb["adimlar"]),
+              f"→ {[a.get('aciklama') for a in _rgb['adimlar']]}")
 
     #  BİLGİLENDİRİCİ uyarı uygunluğu ENGELLEMEZ
     _bg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
@@ -810,7 +812,9 @@ def calistir():
               "OFİS TABLOSU" in _p_kaynagi(_tb), f"→ {_p_kaynagi(_tb)!r}")
 
     #  Mukavemet sonucu tek başına koşturulanla AYNI olmalı  ( kirlenme yok )
-    tek = MK.hesapla(TAM)
+    #  Uygulama projesinin varsayılan yerleşimi MRL'dir;  mukavemet tek başına
+    #  aynı yerleşimle koşturulur ( tabliye MRL'de hesaba girmez ).
+    tek = MK.hesapla(dict(TAM, mk_yok=UG.EK_ALAN["mk_yok"][5]))
     birlikte = UY.hesapla(TAM)
     r.esit("mukavemet bölümleri tek başına koşanla birebir aynı",
            [b["baslik"] for b in birlikte["bolumler"][:len(MK.BOLUM_URETICILERI)]],

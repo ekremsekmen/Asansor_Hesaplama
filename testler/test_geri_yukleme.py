@@ -143,6 +143,17 @@ def _gidis_donus(r, pg, mod, hazirla):
     for k in sorted(set(once_alan) | set(sonra_alan)):
         r.kontrol(f"{etiket} geri geldi {k}", once_alan.get(k) == sonra_alan.get(k),
                   f"→ kaydedilen {once_alan.get(k)!r}, yüklenen {sonra_alan.get(k)!r}")
+    if mod == "uygulama":
+        #  EKRAN DA DEĞERİ GÖSTERMELİ:  veri doğru gelip form başka bir yerleşimi
+        #  göstermemeli ( düğme · yerleşime göre gizlenen alanlar ).
+        r.kontrol(f"{etiket} makine dairesi düğmesi yüklenen değeri gösteriyor",
+                  pg.evaluate("""() => { const k = $('m_mk_yok');
+                      const s = document.querySelector('.secim-ikili[data-icin="m_mk_yok"] .secim-dg.secili');
+                      return !!s && (s.dataset.deger === '1') === k.checked; }"""))
+        r.kontrol(f"{etiket} yerleşime göre gizlenen alanlar yüklenen değere uyuyor",
+                  pg.evaluate("""() => { const k = $('m_mk_yok').checked, g = MUK.yerlesime_gore_gizli;
+                      const gizli = a => $('m_' + a).closest('.alan').classList.contains('kural-disi');
+                      return g.mrl.every(a => gizli(a) === k) && g.daireli.every(a => gizli(a) === !k); }"""))
     sonra_sonuc = pg.evaluate(_SONUC[mod])
     r.kontrol(f"{etiket} geri yüklenen proje AYNI hesap sonucunu veriyor",
               json.dumps(once_sonuc, sort_keys=True) == json.dumps(sonra_sonuc, sort_keys=True))
@@ -182,6 +193,12 @@ def _uygulama_hazirla(pg):
     adet += pg.evaluate(_DEGISTIR, "uygulama")
     pg.evaluate("document.getElementById('m_seyir_mesafesi').value = '37,5'")
     adet += 1
+    #  MAKİNE DAİRELİ PROJE.  İki tur onay kutularını İKİ KEZ çevirdiği için
+    #  proje geneli "makine dairesiz" kutusu varsayılana ( MRL ) dönüyordu:
+    #  test hiç makine daireli bir dosya kaydetmiyordu.  Varsayılanın tersi
+    #  açıkça verilir ( tabliye · şase · makine dairesi ölçüleri o zaman
+    #  hesaba girer ve ekranda görünmeleri gerekir ).
+    pg.evaluate("document.getElementById('m_mk_yok').checked = false")
     pg.evaluate("mAsansorSekmesi(0)")
     pg.wait_for_timeout(800)
     return adet

@@ -531,7 +531,9 @@ class PveMRLDenetimi(unittest.TestCase):
 
     #  ── MAKİNE YÜKÜNÜN YOLU  ( m.5.7.2.3.7 · m.5.2.1.8.4 ) ─────────────
     def test_makine_raya_binince_Maux_turetilir(self):
-        """m.5.7.2.3.7:  Maux "per guide rail" — toplam ray sayısına bölünür.
+        """m.5.7.2.3.7:  Maux "per guide rail" — KABİN VE KARŞI AĞIRLIK
+        raylarının toplam sayısına eşit bölünür ( makine şasesi dört raya
+        oturur;  kullanıcı kararı ).
 
         Seçim YALNIZ makine dairesiz tesiste uygulanır;  makine dairesi varsa
         makine kendi kaidesindedir ve yük iki kez sayılmamalıdır.
@@ -539,14 +541,35 @@ class PveMRLDenetimi(unittest.TestCase):
         s = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
         self.assertTrue(s["aktif"], s.get("hata"))
         g = s["girdi"]
-        Gm, Tst, n = g["makine_agirligi"], s["ozet"]["Tst_hesap"], g["kabin_ray_sayisi"]
+        Gm, Tst = g["makine_agirligi"], s["ozet"]["Tst_hesap"]
+        n = g["kabin_ray_sayisi"] + g["agirlik_ray_sayisi"]
+        self.assertEqual(n, 4)
         self.assertAlmostEqual(s["ara"]["kabin_ray.MY"], (Gm + Tst) * 9.81 / n, places=6)
+        self.assertAlmostEqual(s["ara"]["agirlik_ray.MY"], (Gm + Tst) * 9.81 / n, places=6)
 
     def test_Maux_ray_sayisina_bolunur(self):
-        """Ray sayısı iki katına çıkınca bir raya düşen yük YARIYA iner."""
+        """Kabin rayları 2'den 4'e çıkınca toplam 4'ten 6 raya bölünür."""
         iki = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "kabin_ray_sayisi": 2})
         dort = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY, "kabin_ray_sayisi": 4})
-        self.assertAlmostEqual(dort["ara"]["kabin_ray.MY"] * 2, iki["ara"]["kabin_ray.MY"], places=6)
+        self.assertAlmostEqual(dort["ara"]["kabin_ray.MY"] * 6, iki["ara"]["kabin_ray.MY"] * 4, places=6)
+        self.assertAlmostEqual(dort["ara"]["agirlik_ray.MY"], dort["ara"]["kabin_ray.MY"], places=9)
+
+    def test_makine_yuku_karsi_agirlik_raylarina_da_biner(self):
+        """Karşı ağırlık rayları makinenin payını σv · σc'de ve kuyu tabanında
+        ( FAR ) görür;  dört rayın payları toplamı makinenin tamamıdır."""
+        bina = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU[0]})
+        raya = M.hesapla({"mk_yok": True, "makine_raya_biniyor": T.MAKINE_YUK_YOLU_RAY})
+        self.assertAlmostEqual(bina["ara"]["agirlik_ray.MY"], M.SABIT["MY_agirlik"], places=9)
+        self.assertGreater(raya["ara"]["agirlik_ray.sv"], bina["ara"]["agirlik_ray.sv"])
+        self.assertGreater(raya["ara"]["kuyu.FAR"], bina["ara"]["kuyu.FAR"])
+        g = raya["girdi"]
+        toplam = (raya["ara"]["kabin_ray.MY"] * g["kabin_ray_sayisi"]
+                  + raya["ara"]["agirlik_ray.MY"] * g["agirlik_ray_sayisi"])
+        self.assertAlmostEqual(toplam, (g["makine_agirligi"] + raya["ozet"]["Tst_hesap"]) * 9.81,
+                               places=6)
+        kb = next(b for b in raya["bolumler"] if b["kimlik"] == "agirlik_raylari")
+        my = next(a for a in kb["adimlar"] if a.get("sembol") == "MY")
+        self.assertIn("karşı ağırlık", my["kaynak"])
 
     def test_bir_raya_dusen_yuk_sorulmaz(self):
         """Bir raya düşen makine yükü formda YOKTUR:  "bina yapısına"da hesaba
@@ -574,33 +597,53 @@ class PveMRLDenetimi(unittest.TestCase):
         self.assertGreater(var["ara"]["kuyu.FKR"], yok["ara"]["kuyu.FKR"])
         self.assertGreater(var["ara"]["kabin_ray.sigma_k"], yok["ara"]["kabin_ray.sigma_k"])
 
-    def test_MRL_de_kaide_bolumu_uygunluk_beyan_etmez(self):
-        for mrl, beklenen in ((False, True), (True, None)):
+    def test_MRL_de_bolum_2_makine_kirisini_denetler(self):
+        """MRL'de tabliye ve kolon yoktur;  makine kuyu üstündeki NPU kirişlere
+        oturur.  Bölüm 2 yalnız kiriş eğilmesini denetler ( σe ≤ σem ),
+        burkulma satırı basılmaz ve karar verilir ( None değil )."""
+        for mrl in (False, True):
             s = M.hesapla({"mk_yok": mrl})
-            b = next(x for x in s["bolumler"]
-                     if x["kimlik"] == "makine_konstruksiyonu")
-            self.assertIs(b["sonuc"]["uygun"], beklenen, msg=f"mk_yok={mrl}")
-
-    def test_MRL_de_kaide_hesabi_paftaya_basilmaz(self):
-        """Var olmayan bir kaidenin kiriş satırları ve kontrolleri basılmaz;
-        bölüm yerinde kalır ki numaralar kaymasın."""
-        s = M.hesapla({"mk_yok": True})
-        b = next(x for x in s["bolumler"] if x["kimlik"] == "makine_konstruksiyonu")
-        self.assertEqual([a.get("tip") for a in b["adimlar"]], ["metin"])
-        self.assertIn("uygulanmaz", b["adimlar"][0]["deger"])
-        self.assertFalse(any(k.startswith("makine.") for k in s["ara"]))
-        self.assertTrue(b["baslik"].startswith("2 "))
-        #  Kabin rayı k1'i yine bulur
+            b = next(x for x in s["bolumler"] if x["kimlik"] == "makine_konstruksiyonu")
+            self.assertIn(b["sonuc"]["uygun"], (True, False), msg=f"mk_yok={mrl}")
+            self.assertTrue(b["baslik"].startswith("2 "))
+            burkulma = any("σb" in str(a.get("formul")) for a in b["adimlar"])
+            self.assertEqual(burkulma, not mrl, msg=f"mk_yok={mrl}")
+        mrl = M.hesapla({"mk_yok": True})
+        self.assertFalse(any(k in mrl["ara"] for k in ("makine.sigma_b", "makine.lam", "makine.A")))
+        #  Eğilme iki yerleşimde aynı statik:  σe = FA·X / Wx ,  Wx NPU 140'tan
+        a = mrl["ara"]
+        self.assertEqual(mrl["girdi"]["yan_yatak"], 140)
+        self.assertAlmostEqual(a["makine.Wx"], T.npu(140, "Wx") * 1000)
+        self.assertAlmostEqual(a["makine.sigma_e"], a["makine.FA"] * a["makine.X"] / a["makine.Wx"],
+                               places=9)
         daireli = M.hesapla({"mk_yok": False})
-        self.assertEqual(s["ara"]["kabin_ray.c21.d1.Fx"], daireli["ara"]["kabin_ray.c21.d1.Fx"])
+        self.assertAlmostEqual(a["makine.sigma_e"], daireli["ara"]["makine.sigma_e"], places=9)
+        #  Kabin rayı k1'i yine bulur
+        self.assertEqual(mrl["ara"]["kabin_ray.c21.d1.Fx"], daireli["ara"]["kabin_ray.c21.d1.Fx"])
 
-    def test_MRL_de_kaide_alanlari_dogrulanmaz(self):
-        """Hesaba girmeyen, ekranda da gizli bir alan projeyi durdurmamalı."""
-        bozuk = {"yan_yatak_boyu": 100, "sase_yuksekligi": 0}
+    def test_MRL_de_yalniz_makine_dairesi_alanlari_dogrulanmaz(self):
+        """Tabliye ve kaide kolonu ( şase yüksekliği · dikine kiriş ) MRL'de yoktur:
+        gizlidir ve bozuk değerleri projeyi durdurmaz.  Makine kirişi ( yan yatak )
+        MRL'de de sorulur ve denetlenir."""
+        bozuk = {"sase_yuksekligi": 0, "dikine_kiris": "x", "tabliye_yuksekligi": "x"}
         self.assertFalse(M.hesapla(dict(bozuk, mk_yok=False))["aktif"])
         s = M.hesapla(dict(bozuk, mk_yok=True))
         self.assertTrue(s["aktif"], s.get("hata"))
-        self.assertIn("yan_yatak_boyu", MG.KAIDE_ALANLARI)
+        self.assertEqual(set(MG.MAKINE_DAIRESI_ALANLARI),
+                         {"tabliye_yuksekligi", "sase_yuksekligi", "dikine_kiris"})
+        for mrl in (False, True):
+            self.assertFalse(M.hesapla({"yan_yatak_boyu": 100, "mk_yok": mrl})["aktif"],
+                             msg=f"mk_yok={mrl}")
+
+    def test_tabliye_yalniz_makine_dairelide_hesaba_girer(self):
+        g = {"seyir_mesafesi": 20, "son_kat_yuksekligi": 4000, "kuyu_dibi": 1500}
+        for t in (500, 1200):
+            d = M.hesapla(dict(g, mk_yok=False, tabliye_yuksekligi=t))
+            m = M.hesapla(dict(g, mk_yok=True, tabliye_yuksekligi=t))
+            self.assertAlmostEqual(d["ozet"]["ray_boyu"], (20000 + 4000 + t - 200 + 1200) / 1000)
+            self.assertAlmostEqual(m["ozet"]["ray_boyu"], (20000 + 4000 - 200 + 1200) / 1000)
+        self.assertEqual(MG.ALAN["tabliye_yuksekligi"][5], 1200)
+        self.assertNotIn("tabliye_yuksekligi", MG.GELISMIS_ALANLAR)
 
     def test_paten_tipi_ray_basina(self):
         """Kabinin paten tipi karşı ağırlığa geçmez;  girilen ℓ kabinindir."""
@@ -1120,6 +1163,61 @@ class GenelHukumDenetimi(unittest.TestCase):
         self.assertEqual(o["genel_sonuc"], "UYGUN DEĞİLDİR.")
 
 
+class AgirlikMerkeziVeRm450Denetimi(unittest.TestCase):
+    """Boş kabinin ağırlık merkezi ( xp · yp ) girdisi ve Rm = 450 ray çeliği."""
+
+    def test_bos_birakilinca_turetme_aynen(self):
+        a = M.hesapla({})["ara"]
+        b = M.hesapla({"kabin_agirlik_merkezi_x": None, "kabin_agirlik_merkezi_y": ""})["ara"]
+        for k in ("kabin_ray.xp", "kabin_ray.c21.d1.Fx", "kabin_ray.c22.d2.Fy", "kabin_ray.c23.Fx"):
+            self.assertEqual(a[k], b[k], k)
+
+    def test_girilen_xp_yp_P_nin_tamamina_uygulanir(self):
+        """Ek C.2.1.1:  Fx = k1·gn·( Q·xQ + P·xp ) / ( n·h ) ,
+        Fy = k1·gn·( Q·yQ + P·yp ) / ( ( n/2 )·h ) — P standardın P'si."""
+        s = M.hesapla({"kabin_agirlik_merkezi_x": 120, "kabin_agirlik_merkezi_y": -80,
+                       "guvenlik_tertibati": "Kaymalı"})
+        self.assertTrue(s["aktif"], s.get("hata"))
+        a, g = s["ara"], s["girdi"]
+        self.assertEqual(a["kabin_ray.xp"], 120)
+        kb = next(b for b in s["bolumler"] if b["kimlik"] == "kabin_raylari")
+        #  Standardın P'si ( boş kabin + gezici kablo + zincir ) bölüm 9'da basılır.
+        kt = next(b for b in s["bolumler"] if b["kimlik"] == "kuyu_tabani")
+        P = next(x["deger"] for x in kt["adimlar"]
+                 if "P'nin standarttaki tanımı" in str(x.get("kaynak")))
+        n, h, Q = g["kabin_ray_sayisi"], g["kabin_paten_arasi"], g["beyan_yuku"]
+        xQ = a["kabin_ray.xQ1"]
+        Fx = 2 * 9.81 * (Q * xQ + P * 120) / (n * h)
+        self.assertAlmostEqual(abs(a["kabin_ray.c21.d1.Fx"]), abs(Fx), places=6)
+        yc = g["kabin_kaciklik"]
+        Fy_d1 = 2 * 9.81 * (Q * yc + P * -80) / ((n / 2) * h)
+        self.assertAlmostEqual(abs(a["kabin_ray.c21.d1.Fy"]), abs(Fy_d1), places=6)
+        satir = {x.get("sembol"): x for x in kb["adimlar"]}
+        self.assertIn("GİRİŞ", satir["xp"]["kaynak"])
+        self.assertIn("GİRİŞ", satir["yp"]["kaynak"])
+        self.assertFalse(any("Kabin kapısı ağırlığı" in str(x.get("aciklama")) for x in kb["adimlar"]))
+
+    def test_isaretli_ve_opsiyonel(self):
+        self.assertIn("kabin_agirlik_merkezi_x", MG.ISARETLI_ALANLAR)
+        self.assertIn("kabin_agirlik_merkezi_y", MG.OPSIYONEL_ALANLAR)
+        self.assertIn("kabin_agirlik_merkezi_x", MG.GELISMIS_ALANLAR)
+        self.assertTrue(M.hesapla({"kabin_agirlik_merkezi_x": -300})["aktif"])
+
+    def test_rm_450_iso_7465_araliginda_ara_deger(self):
+        """ISO 7465 m.5:  370 ≤ Rm ≤ 520.  EN 81-50 m.5.10.3:
+        ω = ω370 + ( ω520 − ω370 ) · ( Rm − 370 ) / 150 ;  σperm = Rm / St."""
+        self.assertIn(450, T.RAY_CELIKLERI)
+        self.assertAlmostEqual(T.sigma_perm_normal(450), 200.0)
+        self.assertAlmostEqual(T.sigma_perm_guvenlik(450), 250.0)
+        for lam in (40, 90, 128.45, 200):
+            w370, w520 = T.omega_en8150(lam, 370), T.omega_en8150(lam, 520)
+            self.assertAlmostEqual(T.omega_en8150(lam, 450),
+                                   w370 + (w520 - w370) * 80 / 150, places=12)
+        # ELEport örneği:  λ = 128,45 · W370 2,79 · W520 4,18 · wRm 3,53
+        self.assertAlmostEqual(T.omega_en8150(128.45, 450), 3.53, delta=0.005)
+        self.assertTrue(M.hesapla({"ray_celigi_rm": 450})["aktif"])
+
+
 class NequivEkEDenetimi(unittest.TestCase):
     """TS EN 81-50 Ek E'nin iki çözümlü örneği — Nps BOŞ bırakılarak.
 
@@ -1152,6 +1250,132 @@ class NequivEkEDenetimi(unittest.TestCase):
         self.assertAlmostEqual(a["aski.Nequiv_t"], 5)
         self.assertAlmostEqual(a["aski.Nequiv_p"], 5.06, delta=0.01)
         self.assertAlmostEqual(a["aski.Nequiv"], 10.06, delta=0.01)
+
+
+class ProjeVerimiDenetimi(unittest.TestCase):
+    """Projeye girilen toplam sistem verimi η ( imalatçı ) — boşsa ofis değeri.
+
+    Beklenen güç MMO 208/7 - 2.4 bağıntısından elle kurulur:
+    N = Gmax · v / ( η · 102 ).
+    """
+
+    OFIS = {"verim_dislisiz": 0.80}
+
+    def _motor(self, s):
+        return next(b for b in s["bolumler"] if b["kimlik"] == "motor_gucu")
+
+    def _eta_satiri(self, s):
+        return next(x for x in self._motor(s)["adimlar"] if x.get("sembol") == "η")
+
+    def test_bos_birakilinca_ofis_degeri_aynen(self):
+        a = M.hesapla({"_ofis": self.OFIS})
+        for bos in (None, ""):
+            b = M.hesapla({"_ofis": self.OFIS, "makine_verimi": bos})
+            self.assertEqual(a["ara"], b["ara"])
+            self.assertEqual(b["ara"]["motor.eta"], 0.80)
+            self.assertIn("OFİS STANDARDI", self._eta_satiri(b)["kaynak"])
+
+    def test_girilen_verim_gucu_belirler(self):
+        s = M.hesapla({"_ofis": self.OFIS, "makine_verimi": 0.83})
+        self.assertTrue(s["aktif"], s.get("hata"))
+        a, g = s["ara"], s["girdi"]
+        self.assertEqual(a["motor.eta"], 0.83)
+        N = a["motor.Gmax"] * g["beyan_hizi"] / (0.83 * 102)
+        self.assertAlmostEqual(s["ozet"]["N_hesap"], N, places=9)
+        self.assertEqual(self._motor(s)["sonuc"]["uygun"], g["motor_gucu"] >= N)
+        self.assertEqual(self._eta_satiri(s)["kaynak"], "GİRİŞ  ·  imalatçı")
+
+    def test_dislili_makinede_de_girilen_kullanilir(self):
+        s = M.hesapla({"makine_tipi": "Dişli", "makine_verimi": 0.62})
+        self.assertEqual(s["ara"]["motor.eta"], 0.62)
+
+    def test_aralik_disi_reddedilir(self):
+        for e in (0, 0.05, 1.2, -0.8):
+            s = M.hesapla({"makine_verimi": e})
+            self.assertFalse(s["aktif"], e)
+        for e in (0.1, 1.0):
+            self.assertTrue(M.hesapla({"makine_verimi": e})["aktif"], e)
+
+    def test_elektrik_koprusu_ayni_verimi_alir(self):
+        from engine.uygulama import girdi as UG
+        g = MG.tamamla(dict(MG.varsayilanlar(), _ofis=self.OFIS, makine_verimi=0.83))
+        self.assertEqual(UG.kopru(g)["asansorler"][0]["eta"], 0.83)
+        g = MG.tamamla(dict(MG.varsayilanlar(), _ofis=self.OFIS))
+        self.assertEqual(UG.kopru(g)["asansorler"][0]["eta"], 0.80)
+
+    def test_opsiyonel_ve_gelismis(self):
+        self.assertIn("makine_verimi", MG.OPSIYONEL_ALANLAR)
+        self.assertIn("makine_verimi", MG.GELISMIS_ALANLAR)
+        self.assertIsNone(MG.ALAN["makine_verimi"][5])
+
+
+class RegulatorSartDenetimi(unittest.TestCase):
+    """TS EN 81-20 m.5.6.2.2.1.1 — imalatçı değerleri boşken paftaya ŞART yazılır.
+
+    d):  regülatörün ürettiği kuvvet ≥ max( 2 × devreye sokma kuvveti ; 300 N ).
+         Kuvvet bilinmiyorsa 300 N denetlenir ve ikinci koşul tersinden
+         yazılır:  devreye sokma kuvveti ≤ Fçekme / 2.
+    a):  1,15·v ≤ v_dev < üst sınır;  v > 1 m/s'de üst sınıra, düşük hızda
+         alt sınıra olabildiğince yakın seçilmesi önerilir.
+    """
+
+    def _bolum(self, s):
+        return next(b for b in s["bolumler"] if b["kimlik"] == "regulator_halati")
+
+    def _satir(self, b, bas):
+        return next(x for x in b["adimlar"] if str(x.get("aciklama", "")).startswith(bas))
+
+    def test_kuvvet_bossa_300_N_ve_sart(self):
+        s = M.hesapla({})
+        a, b = s["ara"], self._bolum(s)
+        Fc = a["regulator.Freg2"] - a["regulator.Freg"]
+        self.assertGreaterEqual(Fc, 300)
+        self.assertTrue(b["sonuc"]["uygun"])
+        self.assertIsNone(b.get("eksik_hesap"))
+        self.assertEqual(a["regulator.F_sinir"], 300)
+        self.assertAlmostEqual(a["regulator.Fgt_azami"], Fc / 2, places=9)
+        sart = self._satir(b, "Şart:  Fgt")
+        self.assertIn(f"{Fc / 2:.2f}".replace(".", ","), sart["aciklama"])
+        self.assertIn("Fgt ≤ Fçekme / 2", b["sonuc"]["baslik"])
+
+    def test_kuvvet_bossa_da_300_N_altinda_kalir(self):
+        s = M.hesapla({"reg_gergi_agirligi": 5, "reg_surtunme": 0.05})
+        self.assertLess(s["ara"]["regulator.F_cekme"], 300)
+        self.assertFalse(self._bolum(s)["sonuc"]["uygun"])
+
+    def test_kuvvet_girilince_iki_kati_aranir_sart_yazilmaz(self):
+        for F, sinir in ((100, 300), (400, 800), (900, 1800)):
+            s = M.hesapla({"guvenlik_devreye_kuvvet": F})
+            a, b = s["ara"], self._bolum(s)
+            self.assertEqual(a["regulator.F_sinir"], sinir)
+            self.assertIsNone(a["regulator.Fgt_azami"])
+            self.assertEqual(b["sonuc"]["uygun"], a["regulator.F_cekme"] >= sinir)
+            self.assertFalse(any(str(x.get("aciklama", "")).startswith("Şart:  Fgt")
+                                 for x in b["adimlar"]))
+        self.assertFalse(self._bolum(M.hesapla({"guvenlik_devreye_kuvvet": 9000}))["sonuc"]["uygun"])
+
+    def test_hiz_bossa_aralik_uc_haneyle_ve_oneri(self):
+        for v, alt, ust, yon in ((1.6, "1,840", "2,156", "üst"), (1.0, "1,150", "1,500", "alt")):
+            b = self._bolum(M.hesapla({"beyan_hizi": v}))
+            sart = self._satir(b, "Şart:  ")
+            self.assertEqual(sart["aciklama"], f"Şart:  {alt} m/s  ≤  v_dev  <  {ust} m/s")
+            self.assertIn(f"{yon} sınıra olabildiğince yakın", sart["deger"])
+            self.assertTrue(b["sonuc"]["uygun"])
+
+    def test_hiz_girilince_denetlenir(self):
+        #  1,6 m/s kaymalı:  1,25·1,6 + 0,25/1,6 = 2,15625
+        for v_dev, uygun in ((2.0, True), (2.155, True), (2.158, False), (1.83, False)):
+            b = self._bolum(M.hesapla({"beyan_hizi": 1.6, "reg_devreye_hizi": v_dev}))
+            self.assertEqual(b["sonuc"]["uygun"], uygun, v_dev)
+        b = self._bolum(M.hesapla({"beyan_hizi": 1.6, "reg_devreye_hizi": 2.158}))
+        self.assertTrue(any("< 2,156 m/s" in str(x.get("aciklama")) for x in b["adimlar"]))
+
+    def test_regulator_grubu_tamamen_gelismis(self):
+        grup = dict(MG.GRUPLAR)["Hız regülatörü"]
+        self.assertTrue(set(grup) <= MG.GELISMIS_ALANLAR)
+        for a in ("guvenlik_devreye_kuvvet", "reg_devreye_hizi"):
+            self.assertIn(a, MG.OPSIYONEL_ALANLAR)
+            self.assertIsNone(MG.ALAN[a][5])
 
 
 if __name__ == "__main__":

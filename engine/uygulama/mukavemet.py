@@ -78,7 +78,7 @@ SABIT = {
     "tampon_katsayi":  4,         # F = 4·gn·(P+Q)
     #  ( Kuyu sürtünmesi yüzdeleri buradan OFİS SABİTLERİNE taşındı —
     #    kuyu_surtunme_kabin · kuyu_surtunme_agirlik;  bkz. _tahrik. )
-    "ray_kaide_payi":  200,       # ray boyu:  kaide yüksekliği − 200 mm
+    "ray_kaide_payi":  200,       # ray boyu:  tabliye beton yüksekliği − 200 mm
     "ray_kuyu_payi":   300,       # ray boyu:  kuyu dibi − 300 mm
 }
 
@@ -145,6 +145,33 @@ def _trh(x, hane=4):
 def _pozitif(x):
     """Pozitif bir sayı mı  ( bool tuzağı dâhil )."""
     return isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
+
+
+def _sayi_mi(x):
+    """Sayı mı  ( bool tuzağı dâhil;  işaretli olabilir )."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+#  MAKİNE YÜKÜ DÖRT RAYA EŞİT DAĞILIR  ( MRL · "Kılavuz raylara" ).
+#  MRL makinesinin şasesi kabin raylarıyla birlikte karşı ağırlık raylarına da
+#  oturur;  ELEport'un örnek projesi de yükü dört raya birden verir ( bina
+#  yükleri M1 … M4 ).  Eskiden yalnız kabin raylarına bölünüyordu:  kabin rayı
+#  payı iki katı çıkıyor, karşı ağırlık rayları ise makineyi hiç görmüyordu
+#  ( 50 N ofis kabulü ) — o rayların σv · σc'si ve kuyu tabanı yükü FAR
+#  EMNİYETSİZ taraftaydı.  Ofisin MRL makineleri dört raya oturur ( kullanıcı
+#  kararı ).  Toplam:  makine ağırlığı + kasnağın statik yükü ( Tst ).
+def _makine_ray_payi(g, o):
+    """Makine raylara biniyorsa ( BİR RAYA düşen yük N , kaynak );  binmiyorsa None."""
+    if not (evet_mi(g.get("mk_yok"))
+            and MT.makine_raya_mi(g.get("makine_raya_biniyor"))):
+        return None
+    nk, na = g["kabin_ray_sayisi"] or 0, g["agirlik_ray_sayisi"] or 0
+    n_top = nk + na
+    toplam = (g["makine_agirligi"] or 0.0) + (o.get("Tst_hesap") or 0.0)
+    kutle = toplam / n_top if n_top else toplam
+    return (kutle * SABIT["gn"],
+            f"( Gm + Tst ) / {trn(n_top, 0)} ray  ( {trn(nk, 0)} kabin + {trn(na, 0)} "
+            "karşı ağırlık rayı · makine raylara biniyor — m.5.7.2.3.7 )")
 
 
 def _gezici_kablo(g):
@@ -335,7 +362,8 @@ def _motor(g, o):
     #  askı ( palanga ) kaybı artık η'nın İÇİNDEDİR, ikinci kez inmez.  Bu
     #  yüzden "Ofis verimi η toplam sistem verimidir" anahtarı da kalktı —
     #  η her zaman toplam sistem verimidir.
-    eta = US.verim(O, g.get("makine_tipi"))
+    #  Projeye imalatçının verimi girilmişse o kullanılır ( MG.sistem_verimi ).
+    eta, eta_girildi = MG.sistem_verimi(g)
     #  İKİNCİ KALKAN.  Girdi doğrulaması η ≤ 0'ı ve negatif halat boyunu
     #  zaten reddediyor;  motor doğrudan çağrılırsa ( testler ) sıfıra
     #  bölünmesin ve fiziksel olmayan bir güç "uygun" sayılmasın.
@@ -450,6 +478,7 @@ def _motor(g, o):
               "tahrik kasnağı momenti"),
         veri("", "Makine tipi", g.get("makine_tipi") or "—", "", "GİRİŞ"),
         veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "",
+             "GİRİŞ  ·  imalatçı" if eta_girildi else
              f"OFİS STANDARDI  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
         hesap("N = Gmax × v / ( η × 102 )",
               f"{tr(Gmax)} × {tr(v)} / ( {tr(eta)} × 102 )",
@@ -535,48 +564,18 @@ def _makine(g, o):
     #  Kabin rayları ( bölüm 7 ) aynı k1'i okur — makine dairesi olsun olmasın.
     o.update(k1=k1)
     b = Bolum("MAKİNE KONSTRÜKSİYONUNUN HESAPLANMASI", kimlik="makine_konstruksiyonu", kaynak="MMO 208/4 - m.3.4.6")
-    #  MAKİNE DAİRESİ YOKSA BU BÖLÜM HESAPLANMAZ.  Bölüm, döşemeye basan NPU
-    #  dikine kirişli bir MAKİNE DAİRESİ KAİDESİNİ çözer;  MRL'de öyle bir
-    #  kaide yoktur — makine ya raylara ya bina yapısına biner ( bölüm 7 ).
-    #  Eskiden hesap yine basılıyordu:  hüküm "UYGULANMAZ" derken paftada
-    #  var olmayan bir kaidenin kiriş satırları ve kırmızı "UYGUN DEĞİL"
-    #  kontrolleri duruyordu.  Bölüm yerinde kalır ( numaralar kaymasın ),
-    #  içinde yalnız neden uygulanmadığı yazar.
-    if evet_mi(g.get("mk_yok")):
-        b["adimlar"] = [metin("MAKİNE DAİRESİZ ( MRL ) SİSTEM — makine dairesi "
-                              "kaidesi yoktur, bu hesap uygulanmaz.  Makine yükü "
-                              "bölüm 7'de kılavuz raylara ya da bina yapısına "
-                              "verilir.", vurgu=True)]
-        b["sonuc"] = {"baslik": "MAKİNE DAİRESİ KAİDESİ",
-                      "metin": "UYGULANMAZ — makine dairesiz ( MRL ) sistem. "
-                               "Makine yükünün yolu bölüm 7'de denetlenir.",
-                      "uygun": None}
-        return b
-    Gm, L, L1 = g["makine_agirligi"], g["yan_yatak_boyu"], g["sase_yuksekligi"]
-    A = MT.npu(g["dikine_kiris"], "A") * 100            # cm² → mm²
-    #  NPU tablosunun atalet YARIÇAPI ( cm ):  λ = L1 / imin bağıntısında
-    #  eylemsizlik momenti değil yarıçap kullanılır.
-    #
-    #  BURKULMA ZAYIF EKSENDE OLUR.  Program uzun süre yalnız ix'i okuyordu;
-    #  oysa bir çubuk EN KÜÇÜK atalet yarıçapına sahip
-    #  eksende burkulur.  U profilinde iki eksen çok ayrışır — NPU 120'de
-    #  ix = 46,2 mm ama iy = 15,9 mm'dir ( λ 23,8 yerine 69,2 ).  ix ile
-    #  hesaplanan ω burkulma etkisini KÜÇÜK gösterir;  NPU 40x20 ve 50x25'te
-    #  varsayılan yüklerde bile karar "UYGUN"dan "UYGUN DEĞİL"e döner.
-    #
-    #  ix DOĞRU OLABİLİR — ama ancak kiriş zayıf eksende MESNETLİYSE.  Bu bir
-    #  KABULDÜR ve sessizce yapılamaz:  şase yanal bağlıysa ofis bunu
-    #  "kaide_zayif_eksen_mesnetli" anahtarıyla AÇIKÇA beyan eder ve ω yine
-    #  ix'ten hesaplanır.  Beyan yoksa emniyetli taraf olan min( ix ; iy )
-    #  kullanılır.
-    _ix = MT.npu(g["dikine_kiris"], "ix") * 10          # cm → mm
-    _iy = MT.npu(g["dikine_kiris"], "iy") * 10          # cm → mm
-    _mesnetli = bool(O["kaide_zayif_eksen_mesnetli"])
-    imin = _ix if _mesnetli else min(_ix, _iy)
-    _eksen = "ix  ( zayıf eksen mesnetli )" if _mesnetli else (
-        "ix" if _ix <= _iy else "iy  ( zayıf eksen )")
+    #  MAKİNE DAİRESİZ ( MRL ) TESİSTE YALNIZ KİRİŞ HESAPLANIR.
+    #  Makine dairesinde makine, tabliyeye basan bir ÇELİK KAİDEYE oturur:
+    #  yatay kirişler ( yan yatak ) ve onları taşıyan kolonlar ( dikine
+    #  kiriş, boyu şase yüksekliği ).  MRL'de tabliye de kolon da yoktur —
+    #  makine kuyu üstündeki NPU kirişlere doğrudan oturur ( sahada genelde
+    #  NPU 140 ).  Bu kirişler aynı yükü aynı statikle taşır;  kolonların
+    #  burkulma kontrolü MRL'de UYGULANMAZ.  Eskiden bölüm MRL'de hiç
+    #  hesaplanmıyor, makinenin altındaki kiriş hiçbir yerde denetlenmiyordu.
+    #  Kirişin yükü nereye aktardığı ( raylar / bina ) bölüm 7 · 8'dedir.
+    _mrl = evet_mi(g.get("mk_yok"))
+    Gm, L = g["makine_agirligi"], g["yan_yatak_boyu"]
     Wx = MT.npu(g["yan_yatak"], "Wx") * 1000            # cm³ → mm³
-
     F = k1 * gn * (o["Q"] + o["P"] + o["Gh"] + o["Ga"] + Gm)
     F1 = F / 2.0                                        # yan yatak putreli
     X = L - O["yan_yatak_L_X"]
@@ -584,38 +583,71 @@ def _makine(g, o):
     FA = F1 - FB
     Mmax = FA * X
     sigma_e = Mmax / Wx
-    lam_ham = L1 / imin
-    lam = max(20, math.ceil(lam_ham - 1e-9))
-    #  Kaide kirişi ST 37'dir ( σem = 130 ) — ω'nın Rm = 370 eğrisi geçerli.
-    omega = MT.omega_en8150(lam, MT.OMEGA_RM_ALT)
-    sigma_b = FB * omega / A if omega else None
     #  σem "en çok" değeridir:  sınıra eşit gerilme de uygundur.
     #  NEGATİF GERİLME "UYGUN" SAYILMAZ:  gerilme büyüklüktür, işareti
     #  geometrinin ters dönmesinden gelir ( X < 0 ).  Yalnız "≤ σem" bakmak,
     #  −5.350 N/mm² gibi anlamsız bir değeri sessizce geçirirdi.  Girdi
     #  doğrulaması bu geometriyi zaten reddediyor;  bu ikinci kalkandır.
     egilme_uygun = 0 <= sigma_e <= O["sigma_em"]
-    burkulma_uygun = (sigma_b is not None and 0 <= sigma_b <= O["sigma_em"])
-
-    #  σem de kaydedilir:  hükmün sınırıdır ve ofis sabitidir.
-    _kay(o, "makine", k1=k1, A=A, imin=imin, Wx=Wx, omega=omega,
-         sigma_em=O["sigma_em"], F=F, F1=F1, X=X, FB=FB, FA=FA, Mmax=Mmax,
-         sigma_e=sigma_e, lam_ham=lam_ham, lam=lam, sigma_b=sigma_b)
-
-    b["adimlar"] = [
+    if not _mrl:
+        L1 = g["sase_yuksekligi"]
+        A = MT.npu(g["dikine_kiris"], "A") * 100            # cm² → mm²
+        #  NPU tablosunun atalet YARIÇAPI ( cm ):  λ = L1 / imin bağıntısında
+        #  eylemsizlik momenti değil yarıçap kullanılır.
+        #
+        #  BURKULMA ZAYIF EKSENDE OLUR.  Program uzun süre yalnız ix'i okuyordu;
+        #  oysa bir çubuk EN KÜÇÜK atalet yarıçapına sahip
+        #  eksende burkulur.  U profilinde iki eksen çok ayrışır — NPU 120'de
+        #  ix = 46,2 mm ama iy = 15,9 mm'dir ( λ 23,8 yerine 69,2 ).  ix ile
+        #  hesaplanan ω burkulma etkisini KÜÇÜK gösterir;  NPU 40x20 ve 50x25'te
+        #  varsayılan yüklerde bile karar "UYGUN"dan "UYGUN DEĞİL"e döner.
+        #
+        #  ix DOĞRU OLABİLİR — ama ancak kiriş zayıf eksende MESNETLİYSE.  Bu bir
+        #  KABULDÜR ve sessizce yapılamaz:  şase yanal bağlıysa ofis bunu
+        #  "kaide_zayif_eksen_mesnetli" anahtarıyla AÇIKÇA beyan eder ve ω yine
+        #  ix'ten hesaplanır.  Beyan yoksa emniyetli taraf olan min( ix ; iy )
+        #  kullanılır.
+        _ix = MT.npu(g["dikine_kiris"], "ix") * 10          # cm → mm
+        _iy = MT.npu(g["dikine_kiris"], "iy") * 10          # cm → mm
+        _mesnetli = bool(O["kaide_zayif_eksen_mesnetli"])
+        imin = _ix if _mesnetli else min(_ix, _iy)
+        _eksen = "ix  ( zayıf eksen mesnetli )" if _mesnetli else (
+            "ix" if _ix <= _iy else "iy  ( zayıf eksen )")
+        lam_ham = L1 / imin
+        lam = max(20, math.ceil(lam_ham - 1e-9))
+        #  Kaide kirişi ST 37'dir ( σem = 130 ) — ω'nın Rm = 370 eğrisi geçerli.
+        omega = MT.omega_en8150(lam, MT.OMEGA_RM_ALT)
+        sigma_b = FB * omega / A if omega else None
+        burkulma_uygun = (sigma_b is not None and 0 <= sigma_b <= O["sigma_em"])
+        #  σem de kaydedilir:  hükmün sınırıdır ve ofis sabitidir.
+        _kay(o, "makine", k1=k1, A=A, imin=imin, Wx=Wx, omega=omega,
+             sigma_em=O["sigma_em"], F=F, F1=F1, X=X, FB=FB, FA=FA, Mmax=Mmax,
+             sigma_e=sigma_e, lam_ham=lam_ham, lam=lam, sigma_b=sigma_b)
+    else:
+        burkulma_uygun = True
+        _kay(o, "makine", k1=k1, Wx=Wx, sigma_em=O["sigma_em"], F=F, F1=F1, X=X,
+             FB=FB, FA=FA, Mmax=Mmax, sigma_e=sigma_e)
+    b["adimlar"] = ([
+        metin("MAKİNE DAİRESİZ ( MRL ) — makine kuyu üstündeki NPU kirişlere "
+              "oturur;  tabliye ve kolon ( dikine kiriş ) yoktur, burkulma "
+              "kontrolü uygulanmaz.", vurgu=True),
+    ] if _mrl else []) + [
         veri("k1", "Darbe katsayısı", k1, "",
              f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
         veri("Gm", "Makine motor ağırlığı", Gm, "kg", "GİRİŞ ( üretici kataloğu )"),
-        veri("L", "Yan yatak boyu", L, "mm", "GİRİŞ"),
+        veri("L", "Yan yatak ( makine kirişi ) boyu", L, "mm", "GİRİŞ"),
+    ] + ([] if _mrl else [
         veri("L1", "Dikine kirişin boyu", L1, "mm", "GİRİŞ"),
         veri("A", "Dikine kirişin kesit alanı", A, "mm²",
              f"NPU {g['dikine_kiris']}", 0),
         veri("imin", "Dikine kirişin en küçük atalet yarıçapı", imin, "mm",
              f"NPU {g['dikine_kiris']}  ·  {_eksen}"),
+    ]) + [
         veri("Wx", "Yan yatağın mukavemet momenti", Wx, "mm³",
              f"NPU {g['yan_yatak']}", 0),
         veri("σem", "Emniyet gerilmesi ( ST 37 )", O["sigma_em"], "N/mm²", "OFİS STANDARDI"),
-        metin("Kaide üzerindeki en büyük kuvvet :"),
+        metin("Makine kirişlerine gelen en büyük kuvvet :" if _mrl
+              else "Kaide üzerindeki en büyük kuvvet :"),
         hesap("F = k1 × gn × ( Q + P + Gh + Ga + Gm )",
               f"{tr(k1)} × {tr(gn)} × ( {trn(o['Q'], 0)} + {trn(o['P'], 0)} + "
               f"{tr(o['Gh'])} + {tr(o['Ga'])} + {trn(Gm, 0)} )", F, "N"),
@@ -624,11 +656,13 @@ def _makine(g, o):
         hesap("X = L − 335", f"{trn(L, 0)} − {O['yan_yatak_L_X']}", X, "mm"),
         hesap("FB = F1 × X / L", f"{tr(F1)} × {trn(X, 0)} / {trn(L, 0)}", FB, "N"),
         hesap("FA = F1 − FB", f"{tr(F1)} − {tr(FB)}", FA, "N"),
-        metin("Kaide yatay kirişlerinde eğilme momenti ve gerilmesi :"),
+        metin("Makine kirişlerinde eğilme momenti ve gerilmesi :" if _mrl
+              else "Kaide yatay kirişlerinde eğilme momenti ve gerilmesi :"),
         hesap("Mmax = FA × X", f"{tr(FA)} × {trn(X, 0)}", Mmax, "N·mm", ondalik=0),
         hesap("σe = Mmax / Wx", f"{trn(Mmax, 0)} / {trn(Wx, 0)}", sigma_e, "N/mm²"),
         kontrol(f"σe = {tr(sigma_e)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['yan_yatak']}", egilme_uygun),
+    ] + ([] if _mrl else [
         metin("Dikine kirişlerin bükülme kontrolü :"),
         hesap("λ = L1 / imin", f"{trn(L1, 0)} / {tr(imin)}", lam_ham, ""),
         veri("λ", "Yuvarlanmış burkulma narinliği ( en az 20 )", lam, "",
@@ -638,24 +672,31 @@ def _makine(g, o):
               f"{tr(FB)} × {tr(omega)} / {trn(A, 0)}", sigma_b, "N/mm²"),
         kontrol(f"σb = {tr(sigma_b)}  ≤  σem = {tr(O['sigma_em'])} N/mm²  →  "
                 f"NPU {g['dikine_kiris']}", burkulma_uygun),
-    ]
-    b["sonuc"] = {"baslik": "KONTROL      σe ≤ σem   ve   σb ≤ σem",
+    ])
+    b["sonuc"] = {"baslik": ("KONTROL      σe ≤ σem  ( makine kirişleri )" if _mrl
+                             else "KONTROL      σe ≤ σem   ve   σb ≤ σem"),
                   "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
                            else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
                   "uygun": bool(egilme_uygun and burkulma_uygun)}
     b["aciklamalar"] = [
         "Kiriş statiği:  açıklığı L olan basit kirişte, A mesnedinden X "
         "uzaktaki tekil yük için  FA = F1·(L−X)/L,  FB = F1·X/L,  "
-        "Mmax = FA·X.  Burkulmada σb = FB·ω/A ( omega yöntemi ) ve "
-        "λ = L1/imin — yani burkulma boyu Lk = L1 alınır, iki ucu mafsallı "
-        "kabulüdür ( β = 1,0 ).  Kolon tek ucundan ankastre, öbür ucu "
-        "serbestse bu kabul narinliği OLDUĞUNDAN KÜÇÜK gösterir.",
-        "imin, profilin İKİ EKSENİNİN EN KÜÇÜĞÜDÜR:  çubuk zayıf eksende "
-        "burkulur.  U profilinde iki eksen çok ayrışır ( NPU 120: ix = 46,2 "
-        "mm · iy = 15,9 mm ).  Yalnız ix ile hesaplamak ω'yı ve dolayısıyla "
-        "σb'yi OLDUĞUNDAN KÜÇÜK gösterir.  Şase kirişi zayıf eksende yanal "
-        "mesnetliyse ix geçerlidir;  bu bir KABULDÜR ve Sabitler sekmesindeki "
-        "'Kaide zayıf ekseni mesnetli' anahtarıyla açıkça beyan edilir."]
+        "Mmax = FA·X."
+        + ("  Makine dairesiz tesiste makine kirişleri kuyu üstünde doğrudan "
+           "mesnetlenir;  kolon olmadığı için burkulma kontrolü yapılmaz."
+           if _mrl else
+           "  Burkulmada σb = FB·ω/A ( omega yöntemi ) ve "
+           "λ = L1/imin — yani burkulma boyu Lk = L1 alınır, iki ucu mafsallı "
+           "kabulüdür ( β = 1,0 ).  Kolon tek ucundan ankastre, öbür ucu "
+           "serbestse bu kabul narinliği OLDUĞUNDAN KÜÇÜK gösterir.")]
+    if not _mrl:
+        b["aciklamalar"] += [
+            "imin, profilin İKİ EKSENİNİN EN KÜÇÜĞÜDÜR:  çubuk zayıf eksende "
+            "burkulur.  U profilinde iki eksen çok ayrışır ( NPU 120: ix = 46,2 "
+            "mm · iy = 15,9 mm ).  Yalnız ix ile hesaplamak ω'yı ve dolayısıyla "
+            "σb'yi OLDUĞUNDAN KÜÇÜK gösterir.  Şase kirişi zayıf eksende yanal "
+            "mesnetliyse ix geçerlidir;  bu bir KABULDÜR ve Sabitler sekmesindeki "
+            "'Kaide zayıf ekseni mesnetli' anahtarıyla açıkça beyan edilir."]
     #  İKİSİ DE YÖNTEM ANLATIMI — paftaya değil, ekrandaki ⓘ'ye.
     b["aciklamalar"] += [
         "Darbe katsayısı k1 ve emniyet gerilmesi σem OFİS KABULLERİDİR "
@@ -955,7 +996,8 @@ def _regulator(g, o):
     mu, gama = g["reg_surtunme"], g["reg_kanal_acisi"]
     alfa = S["reg_sarilma_aci"]
     #  Regülatör halatı kuyu boyunca iki kat gider
-    boy = ((MG.alt_duraktan_tavana(g) + g["kaide_yuksekligi"]
+    #  Tabliye makine dairesiz tesiste 0'dır ( MG.tabliye ).
+    boy = ((MG.alt_duraktan_tavana(g) + MG.tabliye(g)
             - S["ray_kaide_payi"]) * 2) / 1000.0
     #  REGÜLATÖR HALATINDA DA KATALOG VERİSİ GEÇERLİDİR.  Askı halatında
     #  imalatçı alanları vardı, regülatörde yoktu ve değerler HER ZAMAN
@@ -991,7 +1033,15 @@ def _regulator(g, o):
                    f"{tr(F_devreye)} N )" if devreye_var
                    else f"{trn(S['reg_kuvvet_asgari'], 0)} N")
     Fcekme = Freg2 - Freg
-    kuvvet_uygun = devreye_var and Fcekme >= sinir
+    kuvvet_uygun = Fcekme >= sinir
+    #  KUVVET GİRİLMEMİŞSE İKİNCİ KOŞUL ŞART OLARAK YAZILIR.  Devreye sokma
+    #  kuvveti fren bloğunun belgesindedir ve proje aşamasında çoğu zaman
+    #  bilinmez ( fren bloğu ayrı bir parçadır, montajda seçilir;  yerli
+    #  üreticinin kullanma kılavuzunda bile yazmaz ).  Bölüm bu yüzden
+    #  HESAP EKSİK sayılıyordu ve her projede bir sayı yazdırıyordu.  Koşul
+    #  tersinden de aynıdır:  Fçekme ≥ 2 × F  ⇔  F ≤ Fçekme / 2.  300 N
+    #  yine denetlenir;  fren bloğunun kuvveti en çok Fçekme / 2 olabilir.
+    Fgt_azami = Fcekme / 2.0
 
     #  ── TS EN 81-20 m.5.6.2.1.2.1 b)  ve  m.5.6.2.2.1.1 a) ────────────
     #  İkisi denetlenmezse 2,5 m/s'lik bir asansöre ani frenlemeli tertibat
@@ -1023,7 +1073,8 @@ def _regulator(g, o):
     kat_uygun = kat >= S["reg_kat_asgari"]
 
     _kay(o, "regulator", gh=gh, Tmin=Tmin, oran=oran, f=f, efa=efa, Freg=Freg,
-         Freg2=Freg2, F_cekme=Fcekme, F_sinir=sinir, S=kat)
+         Freg2=Freg2, F_cekme=Fcekme, F_sinir=sinir, S=kat,
+         Fgt_azami=None if devreye_var else Fgt_azami)
 
     b = Bolum("HIZ REGÜLATÖRÜ HALATININ HESAPLANMASI", kimlik="regulator_halati",
               kaynak="TS EN 81-20 m.5.6.2.2.1  /  TS EN 81-50 m.5.11.2.3")
@@ -1034,13 +1085,13 @@ def _regulator(g, o):
         veri("γ", "Kanal açısı", gama, "°", "GİRİŞ", 0),
         veri("α'", "Regülatör kasnağı sarılma açısı", alfa, "°", "Ofis kabulü", 0),
         veri("", "Regülatör halatı 1 m ağırlığı", gh_m, "kg/m", gh_kaynak),
-        hesap("gh = ( 1 m ağırlık ) × ( H × 1000 + son kat + kaide − 200 ) × 2 / 1000",
+        hesap("gh = ( 1 m ağırlık ) × ( H × 1000 + son kat + tabliye − 200 ) × 2 / 1000",
               f"{_trh(gh_m)} × {tr(boy)}", gh, "kg"),
         veri("Gra", "Regülatör alt ağırlığı ve kasnak kütlesi", Gra, "kg", "GİRİŞ"),
         veri("Fgt", "Güvenlik tertibatını devreye sokma kuvveti",
              F_devreye if devreye_var else "girilmedi", "N" if devreye_var else "",
              "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if devreye_var
-             else "İMALATÇI VERİSİ — girilmediği için 2·Fgt sınırı denetlenemedi"),
+             else "fren bloğunun belgesinden — şartı aşağıda yazılır"),
         veri("T'min", "Halatın en küçük kopma yükü", Tmin, "N", Tmin_kaynak, 0),
         metin("Güvenlik tertibatı tipi & beyan hızı  ( m.5.6.2.1.2.1 ) :"),
         veri("", "Kabin güvenlik tertibatı tipi", tertibat, "", "GİRİŞ"),
@@ -1054,11 +1105,17 @@ def _regulator(g, o):
         veri("v_dev", "Regülatör devreye girme hızı",
              v_dev if hiz_var else "seçilecek", "m/s" if hiz_var else "",
              "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if hiz_var
-             else f"İMALATÇI ŞARTI — [{tr(v_alt)}, {tr(v_ust)}) m/s aralığında olmalıdır", 3 if hiz_var else None),
-        kontrol(f"{tr(v_alt)} ≤ v_dev = {tr(v_dev)} < {tr(v_ust)} m/s", hiz_uygun)
+             else f"İMALATÇI ŞARTI — [{trn(v_alt, 3)}, {trn(v_ust, 3)}) m/s aralığında olmalıdır", 3 if hiz_var else None),
+        #  Sınırlar üç haneyle yazılır:  iki hane 2,156'yı 2,16 gösteriyordu
+        #  ve reddedilen 2,158 paftada sınırın içinde görünüyordu.
+        kontrol(f"{trn(v_alt, 3)} ≤ v_dev = {trn(v_dev, 3)} < {trn(v_ust, 3)} m/s", hiz_uygun)
         if hiz_var else
-        kontrol(f"Şart:  {tr(v_alt)} m/s  ≤  v_dev  <  {tr(v_ust)} m/s", True,
-                "Regülatör bu aralıkta seçilmelidir"),
+        kontrol(f"Şart:  {trn(v_alt, 3)} m/s  ≤  v_dev  <  {trn(v_ust, 3)} m/s", True,
+                #  m.5.6.2.2.1.1 a)'nın kendi önerisi:  v > 1 m/s'de üst
+                #  sınıra, düşük hızda alt sınıra olabildiğince yakın.
+                "Bu aralıkta seçilir  ·  "
+                + ("üst" if v > 1.0 else "alt")
+                + " sınıra olabildiğince yakın önerilir"),
         metin("Regülatör kasnağı & halat oranı :"),
         hesap("Dreg / dreg", f"{trn(Dreg, 0)} / {tr(dreg)}", oran, ""),
         kontrol(f"Dreg / dreg = {tr(oran)}  ≥  {S['Dreg_dreg_asgari']}", oran_uygun),
@@ -1072,23 +1129,21 @@ def _regulator(g, o):
         hesap("Fçekme = F'reg − Freg",
               f"{tr(Freg2)} − {tr(Freg)}", Fcekme, "N",
               "regülatörün ÜRETTİĞİ çekme kuvveti  —  m.5.6.2.2.1.1 d)"),
-        #  İMALATÇI KUVVETİ YOKSA BU SATIR "UYGUN DEĞİL" DEMEZ.
-        #  Sınırın kendisi bilinmiyor;  sağlanmış bir eşitsizliğin yanına
-        #  "UYGUN DEĞİL" yazmak paftada çelişki gibi okunurdu
-        #  ( Fçekme = 1.981 N ≥ 300 N doğrudur ).  Doğrusu:  DENETLENEMEDİ.
         kontrol(f"Fçekme = {tr(Fcekme)} N  ≥  {sinir_metni} = {tr(sinir)} N",
                 kuvvet_uygun) if devreye_var else
-        kontrol(f"Fçekme = {tr(Fcekme)} N  ≥  max( "
-                f"{trn(S['reg_kuvvet_asgari'], 0)} N ; 2 × devreye sokma "
-                "kuvveti )", False,
-                "DENETLENEMEDİ — imalatçı kuvveti girilmedi"),
+        kontrol(f"Fçekme = {tr(Fcekme)} N  ≥  {sinir_metni}", kuvvet_uygun),
+    ] + ([] if devreye_var else [
+        hesap("Fgt,azami = Fçekme / 2", f"{tr(Fcekme)} / 2", Fgt_azami, "N",
+              "fren bloğunun devreye girme kuvveti en çok bu değer olabilir"),
+        kontrol(f"Şart:  Fgt  ≤  {tr(Fgt_azami)} N", True,
+                "Fren bloğunun tip inceleme belgesinden doğrulanır"),
+    ]) + [
         metin("Regülatör halatı emniyet katsayısı :"),
         hesap("T'min / F'reg", f"{trn(Tmin, 0)} / {tr(Freg2)}", kat, ""),
         kontrol(f"T'min / F'reg = {tr(kat)}  ≥  {S['reg_kat_asgari']}", kat_uygun),
     ]
-    #  Başlık, imalatçı kuvveti yokken SAYI yazmaz:  sınır bilinmiyor.
     _baslik_sinir = sinir_metni if devreye_var else (
-        f"max( {trn(S['reg_kuvvet_asgari'], 0)} N ; 2 × devreye sokma kuvveti )")
+        f"{sinir_metni}   ·   Fgt ≤ Fçekme / 2")
     b["sonuc"] = {"baslik": (f"KONTROL      Dreg/dreg ≥ {trn(S['Dreg_dreg_asgari'], 0)}"
                              f"   ·   Fçekme ≥ {_baslik_sinir}"
                              f"   ·   T'min/F'reg ≥ {trn(S['reg_kat_asgari'], 0)}"),
@@ -1112,17 +1167,6 @@ def _regulator(g, o):
         "μ, TS EN 81-20 m.5.6.2.2.1.3 b)'nin verdiği µmax = 0,2 ile "
         "sınırlıdır:  emniyet katsayısı hesabında bundan büyük bir sürtünme "
         "varsayılamaz."]
-    if not devreye_var:
-        b["sonuc"]["metin"] = "HESAP EKSİK — güvenlik tertibatını devreye sokma kuvveti girilmedi"
-        b["eksik_hesap"] = b["sonuc"]["metin"]
-        b["notlar"] = [
-            "⚠ 'Güvenlik tertibatını devreye sokma kuvveti' GİRİLMEDİ.  "
-            "TS EN 81-20 m.5.6.2.2.1.1 d) sınırı  max( 300 N ; 2 × o kuvvet )  "
-            "olarak verir;  ikinci terim bilinmediği için sınırın kendisi "
-            "bilinmiyor ve madde DENETLENEMİYOR.  Bu yüzden bölüm 'uygun "
-            "değil' değil, HESAP EKSİK sayılır ve proje 'uygundur' çıkmaz.  "
-            "Kuvvet, güvenlik tertibatı ile regülatörün TİP İNCELEME "
-            "BELGELERİNDEN okunup buraya girilmelidir."]
     return b
 
 
@@ -1881,10 +1925,11 @@ def _kabin_raylari(g, o):
     #   the guide rail Maux shall be considered".  150 N da ray başınadır ( şalter · kam · kanal ), o yüzden bölünmez.
     #
     #  TÜRETİLEN DEĞER İSE TOPLAMDIR:  Gm + Tst makinenin tamamının yüküdür.
-    #  Ray sayısına EŞİT bölünür — makine iki kabin rayı arasındaki bir
-    #  kirişe oturur ve yük simetrik paylaşılır kabul edilir.  Bir raya düşen
-    #  yük ayrıca SORULMAZ ( kullanıcı kararı:  imalatçının asimetrik değeri
-    #  için duran kutu kaldırıldı ).
+    #  KABİN VE KARŞI AĞIRLIK RAYLARININ TOPLAM SAYISINA EŞİT bölünür — makine
+    #  şasesi dört raya oturur ve yük simetrik paylaşılır kabul edilir
+    #  ( bkz. _makine_ray_payi;  karşı ağırlık rayı aynı payı bölüm 8'de
+    #  görür ).  Bir raya düşen yük ayrıca SORULMAZ ( kullanıcı kararı:
+    #  imalatçının asimetrik değeri için duran kutu kaldırıldı ).
     #  SEÇİM YALNIZ MAKİNE DAİRESİZ TESİSTE GEÇERLİDİR.  Makine dairesi
     #  varsa makine kendi kaidesinde durur ve yükü bölüm 2'de hesaplanır;
     #  aynı yükü bir de raya bindirmek onu İKİ KEZ saymaktır ve paftaya
@@ -1902,12 +1947,9 @@ def _kabin_raylari(g, o):
     _raya = MT.makine_raya_mi(g.get("makine_raya_biniyor"))
     MY = S["MY_kabin"]
     MY_kaynak = "Ofis kabulü"
-    if _mrl and _raya:
-        _toplam = (g["makine_agirligi"] or 0.0) + (o.get("Tst_hesap") or 0.0)
-        _kutle = _toplam / n if n else _toplam
-        MY_kaynak = (f"( Gm + Tst ) / {trn(n, 0)} ray"
-                     "  ( makine raylara biniyor — m.5.7.2.3.7 )")
-        MY = _kutle * gn
+    _pay = _makine_ray_payi(g, o)
+    if _pay:
+        MY, MY_kaynak = _pay
     #  KUYU TABANI DA AYNI SAYIYI GÖRÜR.  m.5.2.1.8.4 kalemleri sayarken bunu
     #  ADIYLA anar:  "...any additional reaction (N) occurring during
     #  emergency stopping (e.g. LOAD ON TRACTION SHEAVE DUE TO REBOUND WHEN
@@ -1958,6 +2000,15 @@ def _kabin_raylari(g, o):
     #  Kapı ağırlığı OFİS STANDARDIDIR ( asansör bazında sorulmaz ).
     m_kapi = O["kabin_kapisi_agirligi"]
     xp_kapi = (m_kapi * (D / 2.0 + g["kapi_mekanizma_payi"])) / P_bos
+    #  AĞIRLIK MERKEZİ GİRİLMİŞSE TÜRETME YAPILMAZ  ( Ek C.1.2 ).
+    #  Girilen değer standardın xp · yp'sidir:  ray ekseninden ölçülen, P'nin
+    #  ( boş kabin + kapı + kabine asılı gezici kablo ve denge zinciri )
+    #  ağırlık merkezi — m.5.7.2.3.2 "the mass centre of gravity of them".
+    #  Kapı düzeltmesi de eklenen kütleler de onun içindedir;  ELEport da
+    #  Xp · Yp'yi P'nin tamamına uygular.
+    xp_giris = g.get("kabin_agirlik_merkezi_x")
+    yp_giris = g.get("kabin_agirlik_merkezi_y")
+    xp_verildi, yp_verildi = _sayi_mi(xp_giris), _sayi_mi(yp_giris)
     xp_bos = xc - xp_kapi
     #  m.5.7.2.3.2:  "The acting point of the masses of the empty car and
     #  components supported by the car such as ram, part of travelling cable,
@@ -1971,11 +2022,12 @@ def _kabin_raylari(g, o):
     #
     #  P = P_boş olduğunda ( zincirsiz, kablosuz ) eski davranışa döner.
     _ek = P - P_bos
-    xp = ((P_bos * xp_bos + _ek * xc) / P) if P else xp_bos
-    #  yp = yc:  kapı x yüzündedir, kabinin y merkezini kaydırmaz — bu yüzden
-    #  x'teki gibi ayrı bir kapı düzeltmesi yoktur.  Eklenen kütleler de
-    #  kabin merkezinde kabul edildiği için yp değişmez.
-    yp = yc
+    xp = float(xp_giris) if xp_verildi else (
+        ((P_bos * xp_bos + _ek * xc) / P) if P else xp_bos)
+    #  TÜRETİLİRKEN yp = yc:  kapı x yüzündedir, kabinin y merkezini
+    #  kaydırmaz — x'teki gibi ayrı bir kapı düzeltmesi yoktur;  eklenen
+    #  kütleler de kabin merkezinde olduğu için yp değişmez.
+    yp = float(yp_giris) if yp_verildi else yc
     #  ASKI NOKTASI ( S ) GİRDİDİR.  Ek C.1.2'nin tanımı:  "xs, ys is the
     #  position of the suspension (S) in relation to the guide rail cross
     #  coordinates".  C.2.1.1'de geçmez ( güvenlik tertibatı rayı kavrar,
@@ -2051,13 +2103,17 @@ def _kabin_raylari(g, o):
              "OFİS STANDARDI  —  Çizelge 14 sayı vermez, imalatçı belirler", 1),
         veri("xc", "Kabin merkezinin x mesafesi", xc, "mm"),
         veri("yc", "Kabin merkezinin y mesafesi", yc, "mm"),
-        veri("", "Kabin kapısı ağırlığı  ( panel + mekanizma )", m_kapi, "kg",
-             "KATALOG", 0),
+        *( [] if xp_verildi else
+           [veri("", "Kabin kapısı ağırlığı  ( panel + mekanizma )", m_kapi, "kg",
+                 "KATALOG", 0)] ),
         veri("xp", "Boş kabin ağırlık merkezinin x mesafesi", xp, "mm",
+             "GİRİŞ  ·  P'nin ağırlık merkezi  ( kapı, gezici kablo, zincir dahil )"
+             if xp_verildi else
              f"xc − kapı katkısı  ( {trn(m_kapi, 0)} kg × "
              f"{trn(D / 2 + g['kapi_mekanizma_payi'], 0)} mm / {trn(P, 0)} kg )  ·  "
              "gövde kabin merkezinde kabul edilir"),
-        veri("yp", "Boş kabin ağırlık merkezinin y mesafesi", yp, "mm"),
+        veri("yp", "Boş kabin ağırlık merkezinin y mesafesi", yp, "mm",
+             "GİRİŞ  ·  P'nin ağırlık merkezi" if yp_verildi else ""),
         veri("xs", "Askı noktasının x mesafesi", xs, "mm"),
         veri("ys", "Askı noktasının y mesafesi", ys, "mm"),
         veri("xi", "Kabin kapısının x mesafesi", xi, "mm"),
@@ -2326,8 +2382,12 @@ def _agirlik_raylari(g, o):
     #  tamamı o taraftadır;  kabin rayıyla aynı anda olmadığı için çift
     #  sayma değildir  ( bkz. _motor'daki P_std açıklaması ).
     Mcwt = g["karsi_agirlik"] + (o.get("MCR") or 0.0)
-    MY = S["MY_agirlik"]
+    MY, MY_kaynak = S["MY_agirlik"], "Ofis kabulü"
+    _pay = _makine_ray_payi(g, o)
+    if _pay:
+        MY, MY_kaynak = _pay
     o["MY_agirlik"] = MY
+    o["MY_agirlik_kaynak"] = MY_kaynak
     sperm = MT.sigma_perm_normal(g["ray_celigi_rm"])
 
     gt = g.get("agirlik_guvenlik_tertibati") or "Yok"
@@ -2429,7 +2489,7 @@ def _agirlik_raylari(g, o):
               f"0,05 × {trn(genislik, 0)}", Dya, "mm"),
         veri("xsa", "Askı noktasının x mesafesi", xsa, "mm"),
         veri("ysa", "Askı noktasının y mesafesi", ysa, "mm"),
-        veri("MY", "Raylara bağlı yardımcı donanım", MY, "N", "Ofis kabulü", 0),
+        veri("MY", "Raylara bağlı yardımcı donanım", MY, "N", MY_kaynak, 0),
         veri("ℓ", "Paten balatasının uzunluğu",
              "—" if makarali else balata,
              "" if makarali else "mm",
@@ -2575,8 +2635,9 @@ def _agirlik_raylari(g, o):
            "hesaplanmıştır." if gt_var else
            "Bu projede 'Yok' seçilmiştir;  kuyu dibindeki hacme "
            "girilebiliyorsa seçim gözden geçirilmelidir.")]
+    #  MY de kaydedilir:  makine raylara biniyorsa türetilen bir değerdir.
     _kay(o, "agirlik_ray", derinlik=derinlik, genislik=genislik, Dxa=Dxa, Dya=Dya,
-         Mg=Mg, Fx=Fx, sx=sx, Fy=Fy, sy=sy, Fv=Fv, sv=sv, sm=sm, sc=sc, sf=sf,
+         Mg=Mg, MY=MY, Fx=Fx, sx=sx, Fy=Fy, sy=sy, Fv=Fv, sv=sv, sm=sm, sc=sc, sf=sf,
          dx=dx, dy=dy)
     o.update(Mg_agirlik=Mg)
     return b
@@ -2660,7 +2721,9 @@ def _kuyu_tabani(g, o):
               f"{trn(o['P'], 0)} + {tr(o.get('MTrav') or 0)} + {tr(o.get('MCR') or 0)}",
               o["P_std"], "kg",
               "TS EN 81-20 m.5.2.1.8.5  ·  P'nin standarttaki tanımı"),
-        veri("LR", "Kılavuz ray boyu", LR, "mm", "H × 1000 + son kat + kaide − 200 + kuyu dibi − 300", 0),
+        veri("LR", "Kılavuz ray boyu", LR, "mm",
+             "H × 1000 + son kat + tabliye − 200 + kuyu dibi − 300"
+             + ( "  ·  MRL:  tabliye yok ( 0 )" if evet_mi(g.get("mk_yok")) else ""), 0),
         metin("Kabin raylarına gelen kuvvetler :"),
         hesap("FKR = gn × Gr × LR / 1000 + k3 × MY + Fgt" + ("  +  Fp" if Fp else ""),
               f"{tr(gn)} × {tr(Gr_k)} × {trn(LR, 0)} / 1000 + "

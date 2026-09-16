@@ -48,9 +48,11 @@ GENISLETILEN = {
     },
     #  EN 81-20 m.5.7.4.5:  σperm = Rm / St.  Kaynak oranları tam sayıya
     #  yuvarlıyordu;  Rm 370'te normal işletme 165 ( kesin 164,44 ) emniyetsiz
-    #  yöndeydi.  Satırlar değişti, eklenen yok.
+    #  yöndeydi.  Satırlar değişti.  450 EKLENDİ:  ISO 7465 m.5 aralığında
+    #  ( 370 – 520 ) ELEport örneğinin işlenmiş ray çeliği;  ω EN 81-50
+    #  m.5.10.3 ara değerinden, σperm aynı bağıntıdan.
     "RAY_CELIGI": {
-        "eklenen": (),
+        "eklenen": (450,),
         "degisen": {rm: (rm / 2.25, rm / 1.8) for rm in (370, 440, 520)},
     },
 }
@@ -237,6 +239,12 @@ SECENEKLER = {
 }
 
 
+#  KAYNAK ÖRNEKTEN BİLEREK AYRILAN VARSAYILANLAR  ( anahtar → ( değer , neden ) ).
+BILEREK_DEGISEN_VARSAYILAN = {
+    "yan_yatak": (140, "makine kirişi — sahada genelde NPU 140 ( kullanıcı kararı )"),
+}
+
+
 def _girdi_sozlesmesi(r, kaynak):
     """engine/uygulama/mukavemet_girdi.py  —  varsayılanlar ve seçenekler."""
     for anahtar, etiket, _b, tur, secenekler, varsayilan in MG.ALANLAR:
@@ -248,7 +256,7 @@ def _girdi_sozlesmesi(r, kaynak):
         #  Örnek projenin varsayılanları kaynaktaki örnekle aynı:  TEST 9'un
         #  örnek değerleri ve TEST 10'un taraması bu girdilere dayanır.
         if anahtar in kaynak["varsayilanlar"]:
-            bek = kaynak["varsayilanlar"][anahtar]
+            bek = BILEREK_DEGISEN_VARSAYILAN.get(anahtar, (kaynak["varsayilanlar"][anahtar],))[0]
             r.kontrol(f"girdi {anahtar}: varsayılan örnek projeyle aynı",
                       _esit(varsayilan, bek),
                       f"→ modül {varsayilan!r}, kaynak {bek!r}")
@@ -268,7 +276,12 @@ def _girdi_sozlesmesi(r, kaynak):
                   f"→ modül {g[anahtar]!r}, kaynak {kaynak['hesaplanan'][anahtar]!r}")
     r.kontrol("varsayılan girdiler doğrulamadan temiz geçiyor", MG.dogrula(g) == [],
               f"→ {MG.dogrula(g)}")
-    r.esit("toplam ray boyu (m)", MG.toplam_ray_boyu(g), 26.6)
+    #  Örnek projenin tabliyesi 750 mm'dir ( varsayılan artık 1.200 ).
+    r.esit("toplam ray boyu (m)  ( örnek proje, tabliye 750 )",
+           MG.toplam_ray_boyu(dict(g, tabliye_yuksekligi=750)), 26.6)
+    #  MAKİNE DAİRESİZ TESİSTE TABLİYE YOKTUR:  girilen değer ray boyuna girmez.
+    r.esit("toplam ray boyu (m)  ( MRL — tabliye yok )",
+           MG.toplam_ray_boyu(dict(g, mk_yok=True, tabliye_yuksekligi=750)), 26.6 - 0.75)
 
 
 #  GÖRÜNÜR KALMASI GEREKEN GİRDİLER.  Her projede değişenler ( bina ve
@@ -278,17 +291,22 @@ def _girdi_sozlesmesi(r, kaynak):
 GORUNUR_KALMALI = (
     "beyan_yuku", "beyan_hizi", "seyir_mesafesi", "aski_orani",
     "kabin_genisligi", "kabin_derinligi", "kat_kapisi_tipi", "kapi_genisligi",
+    #  Makine daireli projede sorulur ( MRL'de gizli ).
+    "tabliye_yuksekligi",
     #  Kaçıklıklar çizime bağlıdır;  gizli bir 0 kaçık yerleşimde unutulur.
     "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
     "son_kat_yuksekligi", "kuyu_dibi", "ray_kapi_arasi",
     "motor_gucu", "makine_agirligi", "makine_tipi", "tahrik_kasnak_capi",
     "saptirma_kasnak_capi", "makine_tst", "makine_raya_biniyor",
     "halat_adedi", "halat_capi", "sarilma_acisi",
-    "guvenlik_devreye_kuvvet", "reg_devreye_hizi",
     "kabin_ray_profili", "agirlik_ray_profili", "kabin_konsol_arasi",
     "agirlik_konsol_arasi", "guvenlik_tertibati", "agirlik_guvenlik_tertibati",
     "kabin_tampon_baba", "agirlik_tampon_baba",
 )
+#  BÜTÜN ALANLARI GELİŞMİŞ'TE OLAN GRUPLAR  ( kullanıcı kararı ).  Hız
+#  regülatörünün hepsi ürün / imalatçı verisidir;  devreye sokma kuvveti ve
+#  devreye girme hızı boşsa paftaya standardın şartı yazılır.
+TAMAMI_GELISMIS_GRUPLAR = ("Hız regülatörü",)
 #  Hiçbir hesaba / paftaya girmediği ya da tek seçeneği olduğu için kaldırılanlar.
 KALDIRILAN_ALANLAR = ("kuyu_derinligi", "agirlik_ray_duvar",
                       "dikine_kiris_tipi", "yan_yatak_tipi", "agirlik_ray_arasi")
@@ -316,6 +334,10 @@ def _gelismis_sozlesmesi(r):
                       len(secenekler) > 1, f"→ {secenekler!r}")
     veri = UG.arayuz_alanlari()
     for gr in veri["gruplar"]:
+        if gr["ad"] in TAMAMI_GELISMIS_GRUPLAR:
+            r.kontrol(f"grup '{gr['ad']}': bütün alanlar gelişmiş",
+                      bool(gr["alanlar"]) and all(f["gelismis"] for f in gr["alanlar"]))
+            continue
         r.kontrol(f"grup '{gr['ad']}': en az bir görünür alan",
                   any(not f["gelismis"] for f in gr["alanlar"]))
         for f in gr["alanlar"]:

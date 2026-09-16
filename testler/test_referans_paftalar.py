@@ -28,6 +28,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.uygulama import mukavemet as MK                       # noqa: E402
+from engine.uygulama import mukavemet_tablolari as MT              # noqa: E402
 from testler.ortak import Rapor                                   # noqa: E402
 
 
@@ -154,6 +155,66 @@ def _eleport(r):
         _v = s_a["ara"][_h]
         r.kontrol(f"ELEport · ağırlık rayı {_ad} birebir  ( ≤ %0,05 )",
                   abs(_v - _bek) / _bek * 100 <= 0.05, f"→ bizim {_v:.4f} · ELEport {_bek}")
+
+    #  ── KABİN RAYI:  ELEport'UN KENDİ AĞIRLIK MERKEZİYLE ───────────────
+    #  ELEport P'nin ağırlık merkezini doğrudan sorar:  Xp = +25 cm,
+    #  Yp = −15 cm ( kabin merkezi Xc = −14 cm ).  Program bunu türetemezdi;
+    #  "Boş kabinin ağırlık merkezi" girdileri ( Gelişmiş ) ile aynı proje
+    #  girilebilir.  Ray T75/B, l = 200 cm, h = 330 cm, Rm = 450, kaymalı paten
+    #  lp = 14 cm, tek gezici kablo 0,44 kg/m.  Birim:  N/cm² → N/mm², cm → mm.
+    s_k = MK.hesapla(dict(ELEPORT, kabin_derinligi=1400, kabin_genisligi=1350,
+                          ray_kapi_arasi=970, aski_kaciklik_x=250, aski_kaciklik_y=50,
+                          kabin_agirlik_merkezi_x=250, kabin_agirlik_merkezi_y=-150,
+                          kabin_ray_profili="75 x 62 x 10", kabin_konsol_arasi=2000,
+                          kabin_paten_arasi=3300, ray_celigi_rm=450,
+                          guvenlik_tertibati="Kaymalı", paten_tipi="Kaymalı",
+                          paten_balata_boyu=140, kablo_birim_kutle=0.44))
+    r.kontrol("ELEport · kabin rayı girdileri ( Rm 450 · xp · yp ) geçerli",
+              s_k.get("aktif"), f"→ {s_k.get('hata')}")
+    if s_k.get("aktif"):
+        k = lambda ad: s_k["ara"]["kabin_ray." + ad]
+        for _ad, _v, _bek, _tol in (
+                ("güv. tert. yük önde  Fx", k("c21.d1.Fx"), 810.85, 0.01),
+                ("güv. tert. yük önde  |Fy|", abs(k("c21.d1.Fy")), 873.14, 0.01),
+                ("güv. tert. yük yanda  Fx", k("c21.d2.Fx"), 394.67, 0.01),
+                ("güv. tert. flanş σF  ( N/mm² )", k("c21.d1.sf"), 11.7425, 0.01),
+                ("normal işletme yük yanda  |Fx|", abs(k("c22.d2.Fx")), 556.49, 0.01),
+                ("σperm güvenlik  ( Rm 450 / 1,8 )", k("sperm_g"), 250.0, 0.001),
+                ("σperm normal  ( Rm 450 / 2,25 )", k("sperm_n"), 200.0, 0.001),
+                ("eşik kuvveti Fs", k("Fs"), 3139.2, 0.01)):
+            r.kontrol(f"ELEport · kabin rayı {_ad} birebir  ( ≤ %{_tol} )",
+                      abs(_v - _bek) / _bek * 100 <= _tol,
+                      f"→ bizim {_v:.3f} · ELEport {_bek}")
+        #  Sehim cm'de 2 haneye yuvarlı basılır ( 0,17 · 0,12 cm ).
+        for _ad, _v, _bek in (("δx", k("c21.d1.dx"), 1.7), ("δy", k("c21.d1.dy"), 1.2)):
+            r.kontrol(f"ELEport · kabin rayı güv. tert. {_ad} ( ±0,05 mm )",
+                      abs(_v - _bek) <= 0.05, f"→ bizim {_v:.3f} mm · ELEport {_bek} mm")
+        #  ω:  λ = l / iy = 128,45.  Aynı λ ile ω ELEport'un 3,53'ü;  program
+        #  λ'yı yukarı tam sayıya ( 129 ) yuvarladığı için biraz büyük alır.
+        r.kontrol("ELEport · ω ( Rm 450 ara değeri, λ = 128,45 ) = 3,53",
+                  abs(MT.omega_en8150(128.45, 450) - 3.53) <= 0.005,
+                  f"→ {MT.omega_en8150(128.45, 450):.4f}")
+        #  BİLİNEN FARK 1 — YÜKÜN YÖNÜ.  m.5.7.2.3.4 yükü "en olumsuz" konuma
+        #  koyar;  program ±Dy/8'i dener, ELEport yalnız +Dy/8'i alır.  İki
+        #  değer de ELEport'un kendi kütle ve konumlarıyla yeniden üretilir.
+        _gn, _Q, _P, _h = 9.81, 800, 900 + 72.67 + 6.38, 3300
+        _arti = 2 * _gn * (_Q * 168.75 + _P * -150) / _h
+        _eksi = 2 * _gn * (_Q * -168.75 + _P * -150) / _h
+        r.kontrol("ELEport · güv. tert. yük yanda Fy:  ELEport +Dy/8 ( 70,50 N )",
+                  abs(abs(_arti) - 70.50) <= 0.05, f"→ {_arti:.2f}")
+        r.kontrol("ELEport · güv. tert. yük yanda Fy:  bizde en olumsuz yön ( −Dy/8 )",
+                  abs(abs(k("c21.d2.Fy")) - max(abs(_arti), abs(_eksi))) <= 0.05,
+                  f"→ bizim {k('c21.d2.Fy'):.2f} · +Dy/8 {_arti:.2f} · −Dy/8 {_eksi:.2f}")
+        #  BİLİNEN FARK 2 — NORMAL İŞLETMEDE P.  ELEport güvenlik tertibatında
+        #  P'ye zinciri ve kabloyu katar ( 979 kg ), normal işletmede katmaz
+        #  ( 900 kg → Fy 784,8 N ).  Standardın P tanımı ikisinde de katar.
+        _fy900 = 1.2 * _gn * (_Q * -50 + 900 * -200) / _h
+        _fyP = 1.2 * _gn * (_Q * -50 + _P * -200) / _h
+        r.kontrol("ELEport · normal işletme Fy:  ELEport P = 900 kg ile 784,8 N",
+                  abs(abs(_fy900) - 784.8) <= 0.05, f"→ {_fy900:.2f}")
+        r.kontrol("ELEport · normal işletme Fy:  bizde standardın P'si ( 979 kg )",
+                  abs(abs(k("c22.d1.Fy")) - abs(_fyP)) <= 0.05,
+                  f"→ bizim {k('c22.d1.Fy'):.2f} · P = 979 kg ile {_fyP:.2f}")
 
     #  ── T1/T2 ETİKETİ:  AYNI SAYI, BAŞKA AD ───────────────────────────
     #  EN 81-50 m.5.11.2.1 T1 ve T2'yi "kasnağın İKİ YANINDAKİ kuvvetler"

@@ -617,6 +617,19 @@ function uygula(o){
       mAsansorSekmeleriTazele();
     }
   }
+  /*  UYGULAMA FORMUNUN GÖRÜNÜMÜ DEĞERLERE UYDURULUR.  Değerler yazılır ama
+      onlardan türeyen ekran durumu kendiliğinden yenilenmez:  makine dairesi
+      düğmesi, yerleşime göre gizlenen alanlar, kanal uyumu, Gelişmiş sayaçları.
+      Proje dosyası açılınca makine daireli projede düğme "Yok ( MRL )"
+      gösteriyor, tabliye ve makine dairesi ölçüleri gizli kalıyordu — hesap
+      doğru yapılırken form başka bir yerleşimi gösteriyordu.  ( Form henüz
+      kurulmadıysa bunu mukavemetKur yapar. ) */
+  if($('m_form') && $('m_form').innerHTML && typeof mMakineDairesiKutulari === 'function'){
+    mMakineDairesiKutulari();
+    mIkiliTazele();
+    mKanalUyumu();
+    mGelismisTazele();
+  }
   AVAN_OTO = (o.__avan_oto && typeof o.__avan_oto==='object') ? {...o.__avan_oto} : {};
   AVAN_TRF = (o.__avan_trf && typeof o.__avan_trf==='object') ? {...o.__avan_trf} : {};
   cokluKolonlariGoster();

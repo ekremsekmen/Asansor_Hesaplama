@@ -115,8 +115,9 @@ EK_BOLUM_GRUBU = {
 #  üçünü belirler:
 #     · makine dairesi var mı        →  bölüm 2 ( kaide ) uygulanır mı ·
 #                                       aydınlatma ve elektrik hesapları
-#     · makine yükü raylara biniyor mu →  bölüm 7 ( ray ) Maux ·
-#                                       bölüm 9 ( kuyu tabanı ) FKR
+#     · makine yükü raylara biniyor mu →  bölüm 7 · 8 ( kabin ve karşı
+#                                       ağırlık rayları ) Maux ·
+#                                       bölüm 9 ( kuyu tabanı ) FKR · FAR
 #  Bu kadar şey belirleyen bir seçim formun dibinde duramaz;  eskiden
 #  "Elektrik ve topraklama" grubunun içinde, en altta duruyordu — çünkü o
 #  zamanlar YALNIZ aydınlatma hesabını etkiliyordu.
@@ -238,7 +239,8 @@ def kopru(g):
         #  0,92 geçiyordu:  aynı asansör için avan ve uygulama paftaları
         #  farklı motor gücü veriyordu. )
         "makine_tipi": g.get("makine_tipi"),
-        "eta": US.verim(US.sabitler(g.get("_ofis")), g.get("makine_tipi")),
+        #  Projeye imalatçının verimi girilmişse mukavemetle aynı değer geçer.
+        "eta": MG.sistem_verimi(g)[0],
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
         "S1": g.get("kolon_kesit"), "L1": g.get("kolon_uzunluk"),

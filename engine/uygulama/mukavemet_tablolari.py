@@ -643,8 +643,14 @@ AGIRLIK_MALZEMELERI = tuple(r[0] for r in AGIRLIK_MALZEMESI)
 #  EMNİYETSİZ yönde %0,3.  Tablo bağıntının kendisidir.
 RAY_EMNIYET_NORMAL = 2.25
 RAY_EMNIYET_GUVENLIK = 1.8
+#  SEÇENEKLER:  ISO 7465:2007 m.5 ray çeliğinin çekme dayanımını "en az 370,
+#  en çok 520 N/mm²" diye sınırlar ve işlenmiş raylar için E 275 B çeliğini
+#  önerir.  Aradaki her Rm için ω EN 81-50 m.5.10.3'ün doğrusal ara
+#  değeriyle bulunur ( omega_en8150 ), σperm de bu bağıntıdan — yeni bir
+#  seçenek için ayrı tablo gerekmez.  450:  ELEport'un örnek projesindeki
+#  işlenmiş ray değeri.
 RAY_CELIGI = tuple((rm, rm / RAY_EMNIYET_NORMAL, rm / RAY_EMNIYET_GUVENLIK)
-                   for rm in (370, 440, 520))
+                   for rm in (370, 440, 450, 520))
 
 RAY_CELIKLERI = tuple(s[0] for s in RAY_CELIGI)
 

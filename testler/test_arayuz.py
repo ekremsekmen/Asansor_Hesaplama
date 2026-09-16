@@ -687,17 +687,16 @@ def calistir():
         #  Beklenen davranış budur.
         r.kontrol("uygulama hesabı koştu", pg.evaluate("SON.m && SON.m.aktif"),
                   f"→ {pg.evaluate('SON.m && SON.m.hata')}")
-        #    · HIZ REGÜLATÖRÜ — m.5.6.2.2.1.1 d)'nin ikinci sınırı imalatçının
-        #      "devreye sokma kuvveti"ni ister;  kitabın örneğinde yoktur, o
-        #      yüzden madde denetlenemez ve bölüm HESAP EKSİK der ( sapma ⑲ ).
+        #    · HIZ REGÜLATÖRÜ artık kalmıyor:  devreye sokma kuvveti yoksa
+        #      300 N denetlenir, fren bloğuna Fçekme / 2 şartı yazılır ( ⑲ ).
         _kalan = pg.evaluate("SON.m.bolumler.filter(b=>b.sonuc && "
                              "b.sonuc.uygun===false).map(b=>b.baslik)")
         #    · TAHRİK YETENEĞİ — acil frenlemede ivme işaretleri Ek D'ye göre
         #      düzeltilince ( sapma ㊳ ) oran %36 büyüdü;  kitabın örneği
         #      139°'lik sarılma ve sertleştirilmemiş kanalla sınırı aşıyor.
-        r.esit("varsayılanda dört bölüm kalıyor", len(_kalan), 4)
-        r.kontrol("kalanlar motor gücü, askı halatları, regülatör ve tahrik",
-                  sorted(x[:1] for x in _kalan) == ["1", "4", "5", "6"], f"→ {_kalan}")
+        r.esit("varsayılanda üç bölüm kalıyor", len(_kalan), 3)
+        r.kontrol("kalanlar motor gücü, askı halatları ve tahrik",
+                  sorted(x[:1] for x in _kalan) == ["1", "4", "6"], f"→ {_kalan}")
         #  GİRDİ AKORDEONU.  Alanlar artık gruplara ayrıldı ve kapalı gruptaki
         #  alan "görünür değil" sayılır — Playwright dolduramaz.  Test alanları
         #  id ile doldurduğu için bütün grupları açıyoruz;  akordeonun kendi
@@ -801,8 +800,9 @@ def calistir():
         pg.wait_for_timeout(1400)
         r.esit("kuyu boyu = seyir + son kat + kuyu dibi",
                pg.evaluate("SON.m.girdi.kuyu_boyu"), 24750 + 4000 + 1600)
-        r.esit("ray boyu seyir ve son kattan",
-               pg.evaluate("SON.m.ozet.ray_boyu"), (24750 + 4000 + 550 + 1300) / 1000)
+        #  Varsayılan yerleşim MRL'dir:  tabliye yoktur ( 0 − 200 ).
+        r.esit("ray boyu seyir ve son kattan  ( MRL — tabliye yok )",
+               pg.evaluate("SON.m.ozet.ray_boyu"), (24750 + 4000 - 200 + 1300) / 1000)
         pg.fill("#m_seyir_mesafesi", "21")
         pg.fill("#m_son_kat_yuksekligi", "3750")
         pg.wait_for_timeout(1400)
@@ -1088,10 +1088,10 @@ def calistir():
         _n1 = pg.evaluate("SON.m.ozet.N_hesap")
         r.kontrol("ofis verimi motor gücünü değiştiriyor", _n1 < _n0,
                   f"→ önce {_n0}, sonra {_n1}")
-        pg.fill("#uof_sigma_em", "100")
-        #  KAİDE HESABI MAKİNE DAİRESİ İSTER.  Varsayılan proje MRL'dir ve
-        #  bölüm 2 orada uygunluk beyan etmez ( "UYGULANMAZ" ) — σem'i
-        #  düşürmenin etkisini görebilmek için makine dairesi açılır.
+        #  NPU 140 makine kirişinde σe ≈ 85 N/mm²:  σem 80'e inince kalmalı.
+        pg.fill("#uof_sigma_em", "80")
+        #  KAİDE HESABI ( kolon burkulması dahil ) MAKİNE DAİRESİ İSTER —
+        #  σem'i düşürmenin etkisini tam kaidede görmek için makine dairesi açılır.
         #  ( Kutu akordeon içindedir;  gruplar önce açılır. )
         pg.click(".sekme[data-sekme='mukavemet']")
         pg.wait_for_timeout(300)
@@ -1102,6 +1102,10 @@ def calistir():
         pg.fill("#m_mk_uzunluk", "4000")
         pg.fill("#m_mk_genislik", "3000")
         pg.wait_for_timeout(2200)
+        #  TABLİYE YALNIZ MAKİNE DAİRELİDE SORULUR — görünür alanda, Gelişmiş'te değil.
+        r.kontrol("daireli: tabliye beton yüksekliği görünür alanda soruluyor",
+                  pg.evaluate("(()=>{const a=$('m_tabliye_yuksekligi').closest('.alan');"
+                              "return !a.classList.contains('kural-disi') && !a.closest('.m-gelismis-ic');})()"))
         _b2 = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
         r.kontrol("σem düşürülünce makine kaidesi kalıyor",
                   _b2.get("uygun") is False, f"→ {_b2}")
@@ -1109,16 +1113,19 @@ def calistir():
                   "OFİS STANDARDI" in pg.evaluate(
                       "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
                       ".adimlar.find(a=>a.sembol==='σem').kaynak"))
-        #  MRL'ye dönünce kaide hesabı uygunluk beyan etmemeli
+        #  MRL'ye dönünce bölüm 2 MAKİNE KİRİŞİNİ denetler:  tabliye ve kolon
+        #  yoktur, burkulma satırı basılmaz;  σem 80'de kiriş kalır.
         _mrl_sec(pg, True)
         pg.wait_for_timeout(2200)
         _b2m = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).sonuc")
-        r.kontrol("MRL'de makine kaidesi uygunluk beyan etmiyor",
-                  _b2m.get("uygun") is None and "UYGULANMAZ" in _b2m.get("metin", ""),
+        r.kontrol("MRL'de bölüm 2 makine kirişini denetliyor ( σem 80'de kalıyor )",
+                  _b2m.get("uygun") is False and "makine kirişleri" in _b2m.get("baslik", ""),
                   f"→ {_b2m}")
-        #  Var olmayan kaidenin kiriş satırları basılmaz, alanları da gizlenir
-        _n2m = pg.evaluate("SON.m.bolumler.find(b=>b.baslik.startsWith('2')).adimlar.length")
-        r.esit("MRL'de bölüm 2 yalnız 'uygulanmaz' satırını taşıyor", _n2m, 1)
+        r.kontrol("MRL: tabliye beton yüksekliği gizli",
+                  pg.evaluate("$('m_tabliye_yuksekligi').closest('.alan').classList.contains('kural-disi')"))
+        r.kontrol("MRL'de bölüm 2'de burkulma satırı yok",
+                  pg.evaluate("!SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
+                              ".adimlar.some(a=>String(a.formul||'').includes('σb'))"))
         r.kontrol("MRL'de kaide kirişi ve makine dairesi alanları gizli",
                   pg.evaluate("MUK.yerlesime_gore_gizli.mrl.length > 0 && "
                               "MUK.yerlesime_gore_gizli.mrl.every("
