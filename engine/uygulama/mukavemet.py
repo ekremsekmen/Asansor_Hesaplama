@@ -184,7 +184,7 @@ def _gezici_kablo(g):
     """
     elle = g.get("kablo_birim_kutle")
     if _pozitif(elle):
-        return float(elle), "GİRİŞ — imalatçı kataloğu"
+        return float(elle), "KATALOG"
     return (sum(MT.kablo_agirligi(g.get(k)) or 0.0
                 for k in ("kablo_tipi_1", "kablo_tipi_2")),
             f"tablo  ( {g.get('kablo_tipi_1')} + {g.get('kablo_tipi_2')} )")
@@ -206,11 +206,11 @@ def _halat_verisi(g, cap="halat_capi", kutle="halat_birim_kutle",
     gh_e, Tmin_e = g.get(kutle), g.get(kopma)
     tablo = f"TS 12385-5  ·  {MT.halat_tipi(dh)}"
     if _pozitif(gh_e):
-        gh, gh_k = float(gh_e), "GİRİŞ — imalatçı kataloğu"
+        gh, gh_k = float(gh_e), "KATALOG"
     else:
         gh, gh_k = gh_t, tablo
     if _pozitif(Tmin_e):
-        Tmin, Tmin_k = float(Tmin_e) * 1000.0, "GİRİŞ — imalatçı kataloğu"
+        Tmin, Tmin_k = float(Tmin_e) * 1000.0, "KATALOG"
     else:
         Tmin, Tmin_k = Tmin_t, tablo
     return gh, Tmin, gh_k, Tmin_k
@@ -435,13 +435,13 @@ def _motor(g, o):
                f"{trn(O['halat_pay_m'])} ] × 2") if r != 1 else
               (f"( {trn(g['kuyu_boyu'], 0)} − {trn(yigin, 0)} ) / 1000 + "
                f"{trn(O['halat_pay_m'])}"),
-              lh, "m", "halat payı ofis sabiti"),
+              lh, "m", "KABUL  ·  halat payı"),
         hesap("Gh = gh × lh × nh", f"{_trh(gh)} × {tr(lh)} × {trn(nh, 0)}",
               Gh, "kg"),
         hesap("F1 = P + Q + Gh", f"{trn(P, 0)} + {trn(Q, 0)} + {tr(Gh)}", F1, "kg"),
         hesap(f"Ga = P + {tr(O['q_denge'])} × Q",
               f"{trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)}", Ga, "kg"),
-        veri("Gs", "Sürtünme yükü", O["Gs"], "kg", "OFİS STANDARDI"),
+        veri("Gs", "Sürtünme yükü", O["Gs"], "kg", "KABUL"),
         metin("Dengesiz  ( artan )  yükün bileşenleri :"),
         hesap("Gden₁ = ( Q + P ) − Ga        ( dolu kabin yukarı )",
               f"( {trn(Q, 0)} + {trn(P, 0)} ) − {tr(Ga)}", Gden_dolu, "kg"),
@@ -458,7 +458,7 @@ def _motor(g, o):
         veri("", "Denge ( kompanzasyon ) zinciri",
              "Var" if lam else "Yok", "", "GİRİŞ"),
         veri("λ", "Dengeleme oranı", lam, "—",
-             f"OFİS STANDARDI  ·  %{trn(O['denge_zinciri_orani'], 0)}"
+             f"KABUL  ·  %{trn(O['denge_zinciri_orani'], 0)}"
              if lam else "zincir yok", 2),
         hesap("MCR = λ × MSR", f"{tr(lam)} × {tr(MSR)}", MCR, "kg",
               "zincirin dengelediği kütle"),
@@ -478,8 +478,8 @@ def _motor(g, o):
               "tahrik kasnağı momenti"),
         veri("", "Makine tipi", g.get("makine_tipi") or "—", "", "GİRİŞ"),
         veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "",
-             "GİRİŞ  ·  imalatçı" if eta_girildi else
-             f"OFİS STANDARDI  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
+             "KATALOG" if eta_girildi else
+             f"KABUL  ·  {g.get('makine_tipi') or 'tanınmayan tip'}"),
         hesap("N = Gmax × v / ( η × 102 )",
               f"{tr(Gmax)} × {tr(v)} / ( {tr(eta)} × 102 )",
               N, "kW", "MMO 208/7 - 2.4"),
@@ -493,7 +493,7 @@ def _motor(g, o):
               "kasnağın taşıdığı toplam yük  ( halatlar + denge zinciri )"),
     ] + ([
         veri("Tst", "Makinenin azami kasnak statik yükü", Tst, "kg",
-             "GİRİŞ — imalatçı kataloğu", 0),
+             "KATALOG", 0),
         kontrol(f"Tst-h = {trn(Tst_h, 0)} kg  ≤  Tst = {trn(Tst, 0)} kg", bool(tst_uygun)),
     ] if Tst_verildi else [
         metin("Tst girilmediği için kasnak statik yükü DENETLENMEDİ — "
@@ -633,8 +633,8 @@ def _makine(g, o):
               "kontrolü uygulanmaz.", vurgu=True),
     ] if _mrl else []) + [
         veri("k1", "Darbe katsayısı", k1, "",
-             f"OFİS STANDARDI  ·  {g['guvenlik_tertibati']}"),
-        veri("Gm", "Makine motor ağırlığı", Gm, "kg", "GİRİŞ ( üretici kataloğu )"),
+             f"KABUL  ·  {g['guvenlik_tertibati']}"),
+        veri("Gm", "Makine motor ağırlığı", Gm, "kg", "KATALOG"),
         veri("L", "Yan yatak ( makine kirişi ) boyu", L, "mm", "GİRİŞ"),
     ] + ([] if _mrl else [
         veri("L1", "Dikine kirişin boyu", L1, "mm", "GİRİŞ"),
@@ -645,7 +645,7 @@ def _makine(g, o):
     ]) + [
         veri("Wx", "Yan yatağın mukavemet momenti", Wx, "mm³",
              f"NPU {g['yan_yatak']}", 0),
-        veri("σem", "Emniyet gerilmesi ( ST 37 )", O["sigma_em"], "N/mm²", "OFİS STANDARDI"),
+        veri("σem", "Emniyet gerilmesi ( ST 37 )", O["sigma_em"], "N/mm²", "KABUL"),
         metin("Makine kirişlerine gelen en büyük kuvvet :" if _mrl
               else "Kaide üzerindeki en büyük kuvvet :"),
         hesap("F = k1 × gn × ( Q + P + Gh + Ga + Gm )",
@@ -880,7 +880,7 @@ def _aski_halatlari(g, o):
         _dd_kontrol("Dt / dh", oran, oran_std),
     ] + ([
         veri("Ds", "Kasnakların EN KÜÇÜK çapı", Ds, "mm",
-             "GİRİŞ" if Ds_verildi else "girilmedi — ortalama çap kullanıldı", 0),
+             "GİRİŞ" if Ds_verildi else "ortalama çap kullanıldı", 0),
         hesap("Ds / dh", f"{trn(Ds, 0)} / {tr(dh)}", oran_p, ""),
         _dd_kontrol("Ds / dh", oran_p, oran_p_std),
     ] if kasnak_var else [
@@ -890,10 +890,10 @@ def _aski_halatlari(g, o):
         metin("Halat güvenlik katsayısının hesaplanması :"),
         veri("", "Kanal tipi", sekil),
         veri("γ", "Kanal açısı  ( hesapta kullanılan )", gama, "°",
-             "OFİS STANDARDI  ·  " + ("yarım daire" if MT.kanal_yarim_daire_mi(sekil)
-                                      else "V kanal"), 0),
+             "KABUL  ·  " + ("yarım daire" if MT.kanal_yarim_daire_mi(sekil)
+                             else "V kanal"), 0),
         veri("β", "Alt kesilme açısı", beta, "°",
-             "OFİS STANDARDI" if MT.kanal_alti_kesik_mi(sekil)
+             "KABUL" if MT.kanal_alti_kesik_mi(sekil)
              else "alt kesilme yok", 0),
         veri("Nequiv(t)", "Kasnakların eşdeğer sayısı", Nequiv_t, "",
              "EN 81-50 Çizelge 2  ·  "
@@ -991,9 +991,11 @@ def _aski_halatlari(g, o):
 #  5 -  HIZ REGÜLATÖRÜ HALATI               ( TS EN 81-20 m.5.6.2.2.1 )
 # =====================================================================
 def _regulator(g, o):
-    S, gn = SABIT, SABIT["gn"]
+    S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Dreg, dreg = g["reg_kasnak_capi"], g["reg_halat_capi"]
-    mu, gama = g["reg_surtunme"], g["reg_kanal_acisi"]
+    #  µ OFİS SABİTİDİR ( m.5.6.2.2.1.3 b)'nin µmax'ı );  asansör bazında
+    #  sorulmaz — küçültülürse halat emniyet katsayısı olduğundan iyi çıkar.
+    mu, gama = O["reg_mu"], g["reg_kanal_acisi"]
     alfa = S["reg_sarilma_aci"]
     #  Regülatör halatı kuyu boyunca iki kat gider
     #  Tabliye makine dairesiz tesiste 0'dır ( MG.tabliye ).
@@ -1081,17 +1083,18 @@ def _regulator(g, o):
     b["adimlar"] = [
         veri("Dreg", "Regülatör kasnak çapı", Dreg, "mm", "GİRİŞ"),
         veri("dreg", "Regülatör halat çapı", dreg, "mm", "GİRİŞ"),
-        veri("μ", "Sürtünme faktörü", mu, "", "GİRİŞ"),
+        veri("μ", "Sürtünme faktörü", mu, "",
+             "KABUL  ·  TS EN 81-20 m.5.6.2.2.1.3 b) µmax"),
         veri("γ", "Kanal açısı", gama, "°", "GİRİŞ", 0),
-        veri("α'", "Regülatör kasnağı sarılma açısı", alfa, "°", "Ofis kabulü", 0),
+        veri("α'", "Regülatör kasnağı sarılma açısı", alfa, "°", "KABUL", 0),
         veri("", "Regülatör halatı 1 m ağırlığı", gh_m, "kg/m", gh_kaynak),
         hesap("gh = ( 1 m ağırlık ) × ( H × 1000 + son kat + tabliye − 200 ) × 2 / 1000",
               f"{_trh(gh_m)} × {tr(boy)}", gh, "kg"),
         veri("Gra", "Regülatör alt ağırlığı ve kasnak kütlesi", Gra, "kg", "GİRİŞ"),
         veri("Fgt", "Güvenlik tertibatını devreye sokma kuvveti",
              F_devreye if devreye_var else "girilmedi", "N" if devreye_var else "",
-             "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if devreye_var
-             else "fren bloğunun belgesinden — şartı aşağıda yazılır"),
+             "KATALOG  ·  tip inceleme belgesi" if devreye_var
+             else "fren bloğunun belgesinden  ·  şartı aşağıda"),
         veri("T'min", "Halatın en küçük kopma yükü", Tmin, "N", Tmin_kaynak, 0),
         metin("Güvenlik tertibatı tipi & beyan hızı  ( m.5.6.2.1.2.1 ) :"),
         veri("", "Kabin güvenlik tertibatı tipi", tertibat, "", "GİRİŞ"),
@@ -1104,7 +1107,7 @@ def _regulator(g, o):
         hesap("v_üst", ust_dayanak, v_ust, "m/s", "tertibat tipine bağlı", 3),
         veri("v_dev", "Regülatör devreye girme hızı",
              v_dev if hiz_var else "seçilecek", "m/s" if hiz_var else "",
-             "GİRİŞ  ( imalatçı / tip inceleme belgesi )" if hiz_var
+             "KATALOG  ·  tip inceleme belgesi" if hiz_var
              else f"İMALATÇI ŞARTI — [{trn(v_alt, 3)}, {trn(v_ust, 3)}) m/s aralığında olmalıdır", 3 if hiz_var else None),
         #  Sınırlar üç haneyle yazılır:  iki hane 2,156'yı 2,16 gösteriyordu
         #  ve reddedilen 2,158 paftada sınırın içinde görünüyordu.
@@ -1507,9 +1510,9 @@ def _tahrik(g, o):
         veri("μ", "Kabinin bloke edildiği durumlar için", mu_bloke, "",
              "EN 81-50 Şekil 8"),
         metin(f"Sürtünme faktörü f  —  kanal işleme : {g['kanal_isleme']} :"),
-        veri("γ", "Kanal açısı", gama_derece, "°", "OFİS STANDARDI", 0),
+        veri("γ", "Kanal açısı", gama_derece, "°", "KABUL", 0),
         veri("β", "Alt kesilme açısı", beta_derece, "°",
-             "OFİS STANDARDI" if MT.kanal_alti_kesik_mi(sekil)
+             "KABUL" if MT.kanal_alti_kesik_mi(sekil)
              else "alt kesilme yok", 0),
         veri("f", "Kabinin yüklenmesi", f_yuk, "", "EN 81-50 m.5.11.2.3", 4),
         veri("f", "Durdurma tertibatının çalışması", f_fren, "",
@@ -1530,17 +1533,17 @@ def _tahrik(g, o):
             hesap("A = ( ns − 1 ) × 1,6 × dr + pay",
                   f"( {trn(g['halat_adedi'], 0)} − 1 ) × 1,6 × {tr(g['halat_capi'])}"
                   f" + {trn(O['kasnak_kanal_payi'], 0)}", _A * 1000, "mm",
-                  "OFİS KABULÜ  ·  kasnak genişliği", 0),
+                  "KABUL  ·  kasnak genişliği", 0),
             hesap("J = ½·π·ρ·A·( R⁴ − R₁⁴ ) + ½·π·ρ·A₁·R₁⁴",
                   f"ρ = {trn(O['kasnak_yogunluk'], 0)} kg/m³  ·  "
                   f"göbek payı {trn(O['kasnak_gobek_pay'], 0)} mm",
-                  _J, "kg·m²", "OFİS KABULÜ  ·  döküm disk modeli", 4),
+                  _J, "kg·m²", "KABUL  ·  döküm disk modeli", 4),
             hesap("mP = J / R²", f"{_trh(_J)} / ( {_trh(g['saptirma_kasnak_capi'] / 2000)} )²",
                   _mP, "kg"),
             veri("iPcar", "Kabin tarafındaki kasnak sayısı",
-                 O["kasnak_adet_kabin"], "adet", "OFİS KABULÜ", 0),
+                 O["kasnak_adet_kabin"], "adet", "KABUL", 0),
             veri("iPcwt", "Ağırlık tarafındaki kasnak sayısı",
-                 O["kasnak_adet_agirlik"], "adet", "OFİS KABULÜ", 0),
+                 O["kasnak_adet_agirlik"], "adet", "KABUL", 0),
         ]
 
     #  ── KUYU SÜRTÜNMESİ  ( m.5.11.2.2 · yalnız acil frenlemede ) ──────
@@ -1946,7 +1949,7 @@ def _kabin_raylari(g, o):
     _mrl = evet_mi(g.get("mk_yok"))
     _raya = MT.makine_raya_mi(g.get("makine_raya_biniyor"))
     MY = S["MY_kabin"]
-    MY_kaynak = "Ofis kabulü"
+    MY_kaynak = "KABUL"
     _pay = _makine_ray_payi(g, o)
     if _pay:
         MY, MY_kaynak = _pay
@@ -2100,12 +2103,12 @@ def _kabin_raylari(g, o):
         veri("k2", "Normal işletme darbe katsayısı", k2, "",
              "EN 81-20 Çizelge 14  ·  Running", 1),
         veri("k3", "Yardımcı donanım darbe katsayısı", k3, "",
-             "OFİS STANDARDI  —  Çizelge 14 sayı vermez, imalatçı belirler", 1),
+             "KABUL  ·  EN 81-20 Çiz.14 sayı vermez, imalatçı belirler", 1),
         veri("xc", "Kabin merkezinin x mesafesi", xc, "mm"),
         veri("yc", "Kabin merkezinin y mesafesi", yc, "mm"),
         *( [] if xp_verildi else
            [veri("", "Kabin kapısı ağırlığı  ( panel + mekanizma )", m_kapi, "kg",
-                 "KATALOG", 0)] ),
+                 "KABUL  ·  kapı kataloğu", 0)] ),
         veri("xp", "Boş kabin ağırlık merkezinin x mesafesi", xp, "mm",
              "GİRİŞ  ·  P'nin ağırlık merkezi  ( kapı, gezici kablo, zincir dahil )"
              if xp_verildi else
@@ -2118,7 +2121,7 @@ def _kabin_raylari(g, o):
         veri("ys", "Askı noktasının y mesafesi", ys, "mm"),
         veri("xi", "Kabin kapısının x mesafesi", xi, "mm"),
         veri("yi", "Kabin kapısının y mesafesi", yi, "mm"),
-        veri("E", "Elastisite modülü", S["E"], "N/mm²", "Ofis kabulü", 0),
+        veri("E", "Elastisite modülü", S["E"], "N/mm²", "KABUL", 0),
         hesap(f"Fs = {tr(k_esik, 1)} × gn × Q      ( {tip} )",
               f"{tr(k_esik, 1)} × {tr(gn)} × {trn(Q, 0)}", Fs, "N",
               "TS EN 81-20 m.5.7.2.3.6  ·  asansör tipi GİRİŞ"),
@@ -2382,7 +2385,7 @@ def _agirlik_raylari(g, o):
     #  tamamı o taraftadır;  kabin rayıyla aynı anda olmadığı için çift
     #  sayma değildir  ( bkz. _motor'daki P_std açıklaması ).
     Mcwt = g["karsi_agirlik"] + (o.get("MCR") or 0.0)
-    MY, MY_kaynak = S["MY_agirlik"], "Ofis kabulü"
+    MY, MY_kaynak = S["MY_agirlik"], "KABUL"
     _pay = _makine_ray_payi(g, o)
     if _pay:
         MY, MY_kaynak = _pay
@@ -2546,7 +2549,7 @@ def _agirlik_raylari(g, o):
             metin("Güvenlik Tertibatının Çalışması  ( TS EN 81-50 m.C.2.1 ) :",
                   vurgu=True),
             veri("k1", "Darbe katsayısı", kg["k1"], "",
-                 f"OFİS STANDARDI  ·  {gt}"),
+                 f"KABUL  ·  {gt}"),
             veri("σperm", "Güvenlik tertibatı durumunda izin verilen gerilme",
                  sg, "N/mm²", f"Rm = {trn(g['ray_celigi_rm'], 0)}  ·  Rm / 1,8  ( m.5.7.4.5 )"),
             hesap("Fx = k1 × gn × Mcwt × ( Dxa − xsa ) / ( n × h )",
@@ -2733,7 +2736,7 @@ def _kuyu_tabani(g, o):
         veri("MY", "Kabin rayına bağlı donanım yükü", MY_k, "N",
              o.get("MY_kaynak") or "ofis kabulü", 0),
         veri("k3", "Yardımcı donanım darbe katsayısı", k3, "",
-             "m.5.7.4.3  ·  ofis sabiti  ( bölüm 7 ile aynı )"),
+             "KABUL  ·  m.5.7.4.3  ( bölüm 7 ile aynı )"),
         veri("Fgt", "Güvenlik tertibatı çalışma tepkisi  ( Fk − Mg·gn"
              + ( " − Fp )" if Fp else " )"),
              guvenlik_tepkisi, "N",

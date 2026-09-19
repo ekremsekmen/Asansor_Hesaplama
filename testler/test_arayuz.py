@@ -167,7 +167,7 @@ def calistir():
                pg.input_value("#m_kabin_agirligi"),
                str(int(_OFg.bos_kabin_kutlesi(int(pg.input_value("#m_beyan_yuku"))))))
         r.kontrol("yeni projede kabin ağırlığının kaynağı tablo",
-                  "OFİS TABLOSU" in (pg.evaluate("SON.m.girdi.kabin_agirligi_kaynak") or ""))
+                  "KABUL" in (pg.evaluate("SON.m.girdi.kabin_agirligi_kaynak") or ""))
         #  FORMUN BAŞINDAKİ AÇIKLAMA KUTULARI KALDIRILDI.  Ortak girdi
         #  köprüsü ve "bu bölüm uygulama projesine aittir" metni her açılışta
         #  girdilerin önünü kapatıyordu;  köprü zaten görünmez çalışıyor.
@@ -810,7 +810,7 @@ def calistir():
 
         #  BOŞ KABİN AĞIRLIĞI ARTIK ZORUNLU DEĞİL — boş bırakılırsa ofis
         #  tablosundan dolar ( beyan yükü 800 kg → 800 kg ) ve paftada
-        #  kaynağı "OFİS TABLOSU" yazar.
+        #  kaynağı "KABUL  ·  ortalama boş kabin kütlesi" yazar.
         pg.fill("#m_kabin_agirligi", "")
         pg.wait_for_timeout(1400)
         r.kontrol("boş kabin ağırlığı hesabı durdurmuyor",
@@ -819,7 +819,7 @@ def calistir():
         r.esit("boş bırakılan kabin ağırlığı tablodan doluyor",
                pg.evaluate("SON.m.girdi.kabin_agirligi"), 800)
         r.kontrol("paftada kaynağı ofis tablosu yazıyor",
-                  "OFİS TABLOSU" in pg.evaluate(
+                  "KABUL" in pg.evaluate(
                       "SON.m.girdi.kabin_agirligi_kaynak"),
                   f"→ {pg.evaluate('SON.m.girdi.kabin_agirligi_kaynak')!r}")
 
@@ -1110,7 +1110,7 @@ def calistir():
         r.kontrol("σem düşürülünce makine kaidesi kalıyor",
                   _b2.get("uygun") is False, f"→ {_b2}")
         r.kontrol("σem satırı kaynağını OFİS STANDARDI diye yazıyor",
-                  "OFİS STANDARDI" in pg.evaluate(
+                  "KABUL" in pg.evaluate(
                       "SON.m.bolumler.find(b=>b.baslik.startsWith('2'))"
                       ".adimlar.find(a=>a.sembol==='σem').kaynak"))
         #  MRL'ye dönünce bölüm 2 MAKİNE KİRİŞİNİ denetler:  tabliye ve kolon
@@ -1655,7 +1655,7 @@ def calistir():
         r.esit("ray kütlesi yer tutucusu ofis değeri",
                pg.get_attribute("#a_gr1", "placeholder"), "17,91")
         _s = pg.inner_text("#a_sonuc")
-        r.kontrol("paftada kaynak 'OFİS VARSAYILANI' yazıyor", "OFİS VARSAYILANI" in _s)
+        r.kontrol("paftada ofis değerinin kaynağı KABUL yazıyor", "KABUL" in _s)
         r.kontrol("hesap yapılıyor ( eksik girdi uyarısı yok )",
                   "girdi tamamlanmadı" not in _s)
 

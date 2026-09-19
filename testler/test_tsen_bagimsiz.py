@@ -1273,7 +1273,7 @@ class ProjeVerimiDenetimi(unittest.TestCase):
             b = M.hesapla({"_ofis": self.OFIS, "makine_verimi": bos})
             self.assertEqual(a["ara"], b["ara"])
             self.assertEqual(b["ara"]["motor.eta"], 0.80)
-            self.assertIn("OFİS STANDARDI", self._eta_satiri(b)["kaynak"])
+            self.assertIn("KABUL", self._eta_satiri(b)["kaynak"])
 
     def test_girilen_verim_gucu_belirler(self):
         s = M.hesapla({"_ofis": self.OFIS, "makine_verimi": 0.83})
@@ -1339,7 +1339,7 @@ class RegulatorSartDenetimi(unittest.TestCase):
         self.assertIn("Fgt ≤ Fçekme / 2", b["sonuc"]["baslik"])
 
     def test_kuvvet_bossa_da_300_N_altinda_kalir(self):
-        s = M.hesapla({"reg_gergi_agirligi": 5, "reg_surtunme": 0.05})
+        s = M.hesapla({"reg_gergi_agirligi": 5, "_ofis": {"reg_mu": 0.05}})
         self.assertLess(s["ara"]["regulator.F_cekme"], 300)
         self.assertFalse(self._bolum(s)["sonuc"]["uygun"])
 

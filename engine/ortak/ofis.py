@@ -82,7 +82,7 @@ VARSAYILAN_VERIM = 0.92
 GK_TABLOSU = ((450, 500), (630, 650), (800, 800), (1000, 950), (1125, 1020),
               (1275, 1100), (1600, 1350), (2000, 1600), (2500, 1900))
 
-GK_KAYNAGI = "OFİS TABLOSU  —  ortalama boş kabin kütlesi  ( standart sayısı değildir )"
+GK_KAYNAGI = "KABUL  ·  ortalama boş kabin kütlesi  ( standart sayısı değildir )"
 
 #  Tablonun kapsadığı yük aralığı.  Dışında UÇ DEĞERE SABİTLENİR:  100 kg'lık
 #  bir asansöre 500 kg'lık kabin gelir.  Sayı ekranda görünür ve elle

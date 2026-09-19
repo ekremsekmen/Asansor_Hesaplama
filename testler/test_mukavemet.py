@@ -899,7 +899,7 @@ def _denetim_bulgulari(r):
               "tablo" in str(_mt(_kt).get("kaynak")) and _mt(_kt)["deger"] > 1.0,
               f"→ {_mt(_kt).get('deger')!r} · {_mt(_kt).get('kaynak')!r}")
     r.kontrol("B9c4 girilince imalatçı değeri kullanılıyor",
-              _mt(_ke)["deger"] == 0.44 and "imalatçı" in str(_mt(_ke).get("kaynak")))
+              _mt(_ke)["deger"] == 0.44 and "KATALOG" in str(_mt(_ke).get("kaynak")))
     _H = _ke["girdi"]["seyir_mesafesi"]
     r.kontrol("B9c4 aynı değer motora, P'ye ve tahrike giriyor",
               _yakin(_ke["ozet"]["N_hesap"] - _kt["ozet"]["N_hesap"],
@@ -1126,12 +1126,23 @@ def _denetim_bulgulari(r):
               _b8_kaymali_hizli["sonuc"]["uygun"] is True,
               f"→ {_b8_kaymali_hizli['sonuc']!r}")
 
-    #  ── B16  Regülatör μ'sünün üst sınırı  ( EN 81-20 m.5.6.2.2.1.3 b) )
-    _g16 = _MG.tamamla(dict(_MG.varsayilanlar(), reg_surtunme=5))
-    r.kontrol("B16  μ > 0,2 reddediliyor",
-              any("µmax" in x or "0.2" in x or "0,2" in x
-                  for x in _MG.dogrula(_g16)), f"→ {_MG.dogrula(_g16)}")
-    r.esit("B16  sınır standardın verdiği değer", _MG.REG_MU_AZAMI, 0.2)
+    #  ── B16  Regülatör μ'sü OFİS SABİTİ  ( EN 81-20 m.5.6.2.2.1.3 b) )
+    #  Asansör bazında sorulmaz:  0,2'den küçük bir değer halatın emniyet
+    #  katsayısını olduğundan iyi gösterirdi.  Üst sınır standardınkidir.
+    r.kontrol("B16  μ asansör girdisi değil", "reg_surtunme" not in _MG.ALAN)
+    r.esit("B16  sınır standardın verdiği değer", _MTd.REG_MU_AZAMI, 0.2)
+    from engine.uygulama import sabitler as _USm
+    r.esit("B16  ofis varsayılanı µmax", _USm.VARSAYILAN["reg_mu"], 0.2)
+    _o16 = _USm.sabitler({"reg_mu": 5})
+    r.kontrol("B16  ofiste µmax aşılamaz, değer reddedilir",
+              _o16["reg_mu"] == 0.2 and "reg_mu" in _o16["_reddedilen"],
+              f"→ {_o16['reg_mu']} / {_o16['_reddedilen']}")
+    r.esit("B16  ofis küçük µ'yü kabul eder ve hesap onu kullanır",
+           round(MK.hesapla({"_ofis": {"reg_mu": 0.1}})["ara"]["regulator.f"], 4),
+           round(0.1 / math.sin(math.radians(40) / 2), 4))
+    r.kontrol("B16  asansöre yazılan μ hesabı değiştirmiyor",
+              MK.hesapla({"reg_surtunme": 0.05})["ara"]["regulator.S"]
+              == MK.hesapla({})["ara"]["regulator.S"])
 
     #  ── B14  C.2.2'de ω YOKTUR — denetimin şüphesi yersizdi
     #  EN 81-50 Ek C.2.2.2:  σv = ( Fv + k3·Maux ) / A.  ω yalnız C.2.1.2'de
@@ -1399,8 +1410,9 @@ def _denetim_bulgulari(r):
     _bK = [x for x in _sK["bolumler"] if x["baslik"].startswith("7 ")][0]
     _satirK = next((a for a in _bK["adimlar"]
                     if str(a.get("aciklama", "")).startswith("Kabin kapısı ağırlığı")), None)
-    r.kontrol("E2  paftada kapı ağırlığı satırı: 62 kg · KATALOG",
-              _satirK is not None and _satirK["deger"] == 62 and _satirK["kaynak"] == "KATALOG",
+    r.kontrol("E2  paftada kapı ağırlığı satırı: 62 kg · KABUL",
+              _satirK is not None and _satirK["deger"] == 62
+              and _satirK["kaynak"] == "KABUL  ·  kapı kataloğu",
               f"→ {_satirK}")
     _, _xp120, _s120 = _xcxp(ray_kapi_arasi=650, _ofis={"kabin_kapisi_agirligi": 120})
     _P120 = _P_std(_s120)

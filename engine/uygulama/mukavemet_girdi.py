@@ -230,7 +230,6 @@ ALANLAR = (
     ("reg_halat_capi",    "Regülatör halatı çapı",             "mm",   "secim", _s(6, 6.5, 8), 6),
     ("reg_kasnak_capi",   "Regülatör kasnak çapı  ( Dreg )",   "mm",   "sayi", None, 300),
     ("reg_kanal_acisi",   "Regülatör kanal açısı",             "°",    "sayi", None, 40),
-    ("reg_surtunme",      "Regülatör sürtünme faktörü  ( μ )", "—",    "sayi", None, 0.2),
     ("reg_gergi_agirligi", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
     #  KATALOG VERİSİ ASKI HALATINDA VARDI, REGÜLATÖRDE YOKTU.  TS 12385-5
     #  tablosu yalnız LİF ÖZLÜ halatları kapsar;  regülatör halatları çoğu
@@ -478,9 +477,8 @@ OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi", "kasnak_tek_yon",
                      "reg_halat_birim_kutle", "reg_halat_kopma_kN",
                      "saptirma_kasnak_min_capi", "kablo_birim_kutle")
 
-#  TS EN 81-20 m.5.6.2.2.1.3 b):  kaymalı ( traction ) hız regülatörü için
-#  hesaba katılacak azami sürtünme katsayısı.
-REG_MU_AZAMI = 0.2
+#  µ artık OFİS SABİTİDİR ( sabitler.reg_mu );  üst sınırı standartla
+#  birlikte MT.REG_MU_AZAMI'da durur.
 
 #  Hesapta BÖLEN olarak geçen alanlar — sıfır kabul edilmez.
 BOLEN_ALANLAR = (
@@ -559,7 +557,7 @@ GRUPLAR = (
       "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle")),
     ("Hız regülatörü",
-     ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
+     ("reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi",
       "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
       "guvenlik_devreye_kuvvet", "reg_devreye_hizi")),
     ("Kılavuz raylar",
@@ -619,7 +617,7 @@ GELISMIS_ALANLAR = frozenset((
     "halat_kopma_kN", "denge_zinciri", "kasnak_tek_yon", "kasnak_ters_yon",
     "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle",
     # Hız regülatörü
-    "reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi", "reg_surtunme",
+    "reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi",
     "reg_gergi_agirligi", "reg_halat_birim_kutle", "reg_halat_kopma_kN",
     #  İkisi de imalatçı verisidir ve proje aşamasında çoğu zaman bilinmez;
     #  boşsa paftaya standardın şartı yazılır ( bkz. mukavemet._regulator ).
@@ -1027,18 +1025,8 @@ def dogrula(g):
                 f"{_y['agirlik_paten_arasi']:g} + kabin paten arası "
                 f"{_y['kabin_paten_arasi']:g}.")
 
-    #  ------------------------------------------------------------------
-    #  REGÜLATÖR SÜRTÜNME KATSAYISI       TS EN 81-20 m.5.6.2.2.1.3 b)
-    #  ------------------------------------------------------------------
-    #  Standart bu hesap için sürtünme katsayısının ÜST DEĞERİNİ kendisi
-    #  verir:  "taking into account a friction factor µmax equal to 0,2 for
-    #  traction type overspeed governor".  Alan sınırsızdı;  μ = 5 gibi bir
-    #  değer kabul ediliyordu.
-    mu = g.get("reg_surtunme")
-    if _sayi(mu) and mu > REG_MU_AZAMI:
-        hata.append(f"Regülatör sürtünme katsayısı ({mu:g}) TS EN 81-20 "
-                    f"m.5.6.2.2.1.3 b)'nin verdiği µmax = {REG_MU_AZAMI:g} "
-                    "değerini aşamaz.")
+    #  REGÜLATÖR SÜRTÜNME KATSAYISI artık asansör bazında sorulmaz:  ofis
+    #  sabitidir ( sabitler.reg_mu ) ve üst sınırını ARALIK denetler.
     return hata
 
 

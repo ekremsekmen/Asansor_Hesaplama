@@ -809,7 +809,7 @@ def calistir():
     r.esit("[Gk] elle girilende kaynak GİRİŞ", _p_kaynagi(_el), "GİRİŞ")
     _tb = MK.hesapla({"beyan_yuku": 1275, "kabin_agirligi": None})
     r.kontrol("[Gk] tablodan gelende kaynak ofis tablosu",
-              "OFİS TABLOSU" in _p_kaynagi(_tb), f"→ {_p_kaynagi(_tb)!r}")
+              "KABUL" in _p_kaynagi(_tb), f"→ {_p_kaynagi(_tb)!r}")
 
     #  Mukavemet sonucu tek başına koşturulanla AYNI olmalı  ( kirlenme yok )
     #  Uygulama projesinin varsayılan yerleşimi MRL'dir;  mukavemet tek başına

@@ -308,8 +308,12 @@ GORUNUR_KALMALI = (
 #  devreye girme hızı boşsa paftaya standardın şartı yazılır.
 TAMAMI_GELISMIS_GRUPLAR = ("Hız regülatörü",)
 #  Hiçbir hesaba / paftaya girmediği ya da tek seçeneği olduğu için kaldırılanlar.
+#  reg_surtunme ( µ ) KALKMADI, OFİS SABİTİNE TAŞINDI ( sabitler.reg_mu ):
+#  standart hesaba katılacak değeri kendisi verir ve asansör bazında
+#  küçültülünce halatın emniyet katsayısı olduğundan iyi çıkıyordu.
 KALDIRILAN_ALANLAR = ("kuyu_derinligi", "agirlik_ray_duvar",
-                      "dikine_kiris_tipi", "yan_yatak_tipi", "agirlik_ray_arasi")
+                      "dikine_kiris_tipi", "yan_yatak_tipi", "agirlik_ray_arasi",
+                      "reg_surtunme")
 
 
 def _gelismis_sozlesmesi(r):

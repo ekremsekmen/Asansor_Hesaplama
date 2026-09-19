@@ -130,6 +130,15 @@ VARSAYILAN = {
     "kuyu_surtunme_kabin":   2,    # %
     "kuyu_surtunme_agirlik": 1.5,  # %
 
+    # ── ②d HIZ REGÜLATÖRÜ  ( TS EN 81-20 m.5.6.2.2.1.3 b) ) ─────────────
+    #  µ, regülatör kasnağı ile halat arasındaki sürtünmedir.  STANDART
+    #  hesaba katılacak değeri kendisi verir:  µmax = 0,2.  Asansör bazında
+    #  sorulduğunda 0,2'den küçük bir değer yazılabiliyordu ve halatın
+    #  emniyet katsayısını olduğundan iyi gösteriyordu ( 0,2'de 16,77 iken
+    #  0,1'de 42,02 ).  Ofis sabiti olarak durur:  tek yerde görünür,
+    #  paftada kaynağı OFİS STANDARDI yazar ve üst sınırı aşamaz.
+    "reg_mu":           MT.REG_MU_AZAMI,
+
     # ── ③ SIĞINMA PAYLARI  ( kabin / kuyu geometrisi ) ───────────────
     #  Bunlar kabin imalatına bağlı ofis kabulleridir;  TS EN 81-20 sayısı
     #  DEĞİLDİR.  Standardın asgari açıklıkları ( 100 · 500 · 300 mm ve
@@ -179,6 +188,9 @@ ARALIK = {
     "kasnak_kanal_payi": (0, 500), "kasnak_gobek_orani": (0, 1),
     "kasnak_adet_kabin": (0, 10), "kasnak_adet_agirlik": (0, 10),
     "kuyu_surtunme_kabin": (0, 10), "kuyu_surtunme_agirlik": (0, 10),
+    #  Üst sınır STANDARDIN sayısıdır ( m.5.6.2.2.1.3 b) );  alt sınır
+    #  yalnız sıfıra bölünmeyi ve fiziksel olmayan değeri engeller.
+    "reg_mu": (0.01, MT.REG_MU_AZAMI),
     "kabin_yuksekligi": (0, 10000), "kabin_ust_donanim": (0, 10000),
     "paten_payi": (0, 5000), "tavan_payi": (0, 5000),
     "revizyon_payi": (0, 5000), "etek_payi": (0, 5000),
@@ -217,6 +229,10 @@ GRUPLAR = (
      "acil frenlemede kılavuz ve kasnak yatağı sürtünmesi — TS EN 81-50 "
      "m.5.11.2.2 sayı vermez;  asgari sürtünme sağlanamıyorsa 0 yazılır",
      ("kuyu_surtunme_kabin", "kuyu_surtunme_agirlik")),
+    ("②d HIZ REGÜLATÖRÜ",
+     "TS EN 81-20 m.5.6.2.2.1.3 b) — halat emniyet katsayısı µmax = 0,2 ile "
+     "hesaplanır;  daha küçük bir değer katsayıyı olduğundan iyi gösterir",
+     ("reg_mu",)),
     ("③ SIĞINMA PAYLARI",
      "kabin gövde ve kuyu geometrisi — kabin imalatına bağlıdır, "
      "TS EN 81-20 sayısı değildir",
@@ -255,6 +271,9 @@ ETIKET = {
                             "( P + Q + MCR + MTrav )·( gn ± a ) kuvvetinin yüzdesi"),
     "kuyu_surtunme_agirlik": ("Ağırlık tarafı kuyu sürtünmesi FRcwt (%)",
                               "( Mcwt + MCR )·( gn ∓ a ) kuvvetinin yüzdesi"),
+    "reg_mu": ("Regülatör sürtünme faktörü µ",
+               "TS EN 81-20 m.5.6.2.2.1.3 b) hesaba katılacak değeri kendisi "
+               "verir:  µmax = 0,2;  bunun üstü kabul edilmez"),
     "kabin_kapisi_agirligi": ("Kabin kapısı ağırlığı (kg)",
                               "panel + mekanizma, kabin ray hesabında xp'ye girer — "
                               "Fermator 40/10 PM · 2 panel teleskopik 800 × 2.000 mm "

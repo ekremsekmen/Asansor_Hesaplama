@@ -607,10 +607,12 @@ def calistir():
     #  Kaynak metni hem OFİS tablosu olduğunu söylemeli hem de standart
     #  sayısı OLMADIĞINI açıkça yazmalı:  TS EN 81-20 / 81-50 boş kabin
     #  kütlesini hep GİRDİ olarak tanımlar, çizelge vermez.
-    r.kontrol("Gk kaynağı ofis tablosu olduğunu söylüyor",
-              "TABLOSU" in T.GK_KAYNAGI.upper()
+    #  Kaynak sütununda "ofis" sözü GEÇMEZ ( kullanıcı kararı ):  ofisin
+    #  kabulleri KABUL, katalogdan girilenler KATALOG diye yazılır.
+    r.kontrol("Gk kaynağı kabul olduğunu ve standart sayısı olmadığını söylüyor",
+              T.GK_KAYNAGI.startswith("KABUL")
               and "değildir" in T.GK_KAYNAGI
-              and T.GK_KAYNAGI.upper().startswith("OF"),
+              and "fis" not in T.GK_KAYNAGI,
               f"→ {T.GK_KAYNAGI!r}")
     #  TABLO TEK KAYNAKTAN OKUNUR.  Avan ile uygulama aynı asansöre aynı
     #  kabin kütlesini vermelidir;  iki kopya tutulsaydı biri güncellenip
@@ -667,13 +669,14 @@ def calistir():
     #  Tablo-4 kapı süreleri tablosudur.  Varsayılan ofis armatür tablosundan gelir.
     for bolum, ad in ((2, "kabin"), (3, "kuyu"), ("mk", "mk.dairesi")):
         _k = _ol_kaynagi(None, bolum)
-        r.kontrol(f"{ad}: varsayılan ØL kaynağı ofis tablosu diyor",
-                  "fis" in _k and "Tablo-4" not in _k, f"→ {_k!r}")
+        r.kontrol(f"{ad}: varsayılan ØL kaynağı armatür tablosu diyor",
+                  _k.startswith("KABUL") and "armatür tablosu" in _k
+                  and "Tablo-4" not in _k, f"→ {_k!r}")
     for bolum, ad in ((3, "kuyu"), ("mk", "mk.dairesi")):
-        r.kontrol(f"{ad}: elle girilen ØL kaynağı imalatçı diyor",
-                  "imalatçı" in _ol_kaynagi({"kuyu_armatur_lm": 2600}, bolum))
+        r.kontrol(f"{ad}: elle girilen ØL kaynağı KATALOG diyor",
+                  "KATALOG" in _ol_kaynagi({"kuyu_armatur_lm": 2600}, bolum))
     r.kontrol("elle girilen armatür GÜCÜ de kaynağı değiştirir",
-              "imalatçı" in _ol_kaynagi({"kuyu_armatur_W": 58}, 3))
+              "KATALOG" in _ol_kaynagi({"kuyu_armatur_W": 58}, 3))
     r.kontrol("sabitler() kabul edilen ezmeyi kaydediyor",
               "kuyu_armatur_lm" in AV.sabitler({"kuyu_armatur_lm": 2600})["_ozel"])
     r.kontrol("reddedilen ezme _ozel'e girmiyor",
@@ -891,7 +894,7 @@ def calistir():
     r.esit("geçersiz q varsayılana döner", o4["Ga"], o4["P"] + 0.50 * o4["Q"])
     r.esit("i kaynağı — asansör bazı", v1["asansorler"][0]["ozet"]["i_kaynak"],
            "GİRİŞ — asansör bazında")
-    r.esit("i kaynağı — ofis standardı", o0["i_kaynak"], "SABİTLER B")
+    r.esit("i kaynağı — ofis kabulü", o0["i_kaynak"], "KABUL")
     r.esit("q kaynağı — asansör bazı", o2["q_kaynak"], "GİRİŞ — asansör bazında")
     v5 = AV.hesapla({"ortak": ORTAK_Y, "sabitler": {"q_denge": 0.42},
                      "asansorler": [dict(TEMEL_AS), dict(TEMEL_AS, q_denge=0.55)]})

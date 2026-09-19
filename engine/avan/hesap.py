@@ -58,7 +58,7 @@ SABIT_B_VARSAYILAN = {
     #  Ofis armatür tablosu ( bkz. tables.ARMATUR_ISIK_AKISI ):  Flüoresan 40 W = 2100 lm.
     #  Bu değer MMO/697'de YOKTUR — kitapta aydınlatma bölümü yoktur.
     #  Burada eskiden kaynağı belirsiz bir "ofis teamülü" olarak 2600 lm duruyordu;
-    #  pafta ØL satırına kaynak olarak yalnız "SABİTLER B" yazdığı için tablodan
+    #  pafta ØL satırına kaynak olarak yalnız "KABUL" yazdığı için tablodan
     #  sapıldığı GÖRÜNMÜYORDU.  2600 daha az armatür verir — yani emniyetsiz
     #  taraftır: saha ölçümünde TS EN 81-20'nin 50 lüksü tutmayabilir.  Varsayılan
     #  tabloya çekildi;  farklı bir armatür kullanılacaksa alan doldurulur ve pafta
@@ -191,7 +191,7 @@ def sabitler(ozel=None):
     KABUL EDİLEN ezmeler ayrıca "_ozel" listesinde tutulur:  paftada bir
     değerin tablodan mı yoksa kullanıcıdan mı geldiğini yazabilmek için
     ( bkz. _armatur_kaynagi ).  Aksi hâlde ØL satırı, değer ne olursa olsun
-    "SABİTLER B" diyordu ve tablodan sapıldığı paftada görünmüyordu.
+    "KABUL" diyordu ve tablodan sapıldığı paftada görünmüyordu.
     """
     s = dict(SABIT_A)
     s.update(SABIT_B_VARSAYILAN)
@@ -227,8 +227,8 @@ def sabitler(ozel=None):
 def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
     ozel = set(S.get("_ozel") or ())
     if ozel & {w_anahtar, lm_anahtar}:
-        return "GİRİŞ — imalatçı verisi ( marka-model paftada belirtilmelidir )"
-    return "Ofis armatür tablosu"
+        return "KATALOG  ( marka-model paftada belirtilmelidir )"
+    return "KABUL  ·  armatür tablosu"
 
 
 #  ELLE GİRİLEN FİZİKSEL BÜYÜKLÜKLERİN SINIRLARI
@@ -352,7 +352,7 @@ def _asansor_sabiti(a, S, anahtar, red=None):
         if sayi_mi(deger) and (alt is None or alt <= deger <= ust):
             return deger, "GİRİŞ — asansör bazında"
         _red_yaz(red, anahtar, deger, alt, ust, S[anahtar])
-    return S[anahtar], "SABİTLER B"
+    return S[anahtar], "KABUL"
 
 
 def _ofis_degeri(a, S, anahtar, red=None):
@@ -366,13 +366,13 @@ def _ofis_degeri(a, S, anahtar, red=None):
         metin = str(deger or "").strip()
         if metin:
             return metin, "GİRİŞ — asansör bazında"
-        return S[anahtar], "OFİS VARSAYILANI"
+        return S[anahtar], "KABUL"
     if deger not in (None, ""):
         alt, ust = OFIS_ARALIK.get(anahtar, (None, None))
         if sayi_mi(deger) and (alt is None or alt <= deger <= ust):
             return deger, "GİRİŞ — asansör bazında"
         _red_yaz(red, anahtar, deger, alt, ust, S[anahtar])
-    return S[anahtar], "OFİS VARSAYILANI"
+    return S[anahtar], "KABUL"
 
 
 def _ortak_degeri(ortak, S, anahtar, red=None):
@@ -555,7 +555,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         veri("i", f"Askı ( palanga ) oranı   —   {T.aski_orani_metni(i_pal)}",
              i_pal, "—", i_kaynak, 0),
         veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "—",
-             f"GİRİŞ  ( {makine_tipi} — ofis kabulü )" if makine_tipi else "GİRİŞ"),
+             f"GİRİŞ  ( {makine_tipi} )" if makine_tipi else "GİRİŞ"),
         hesap(("N   =   ( 1 − q ) · Q · V   /   ( 102 · η )" if (1 - q) >= q
                else "N   =   q · Q · V   /   ( 102 · η )        ( boş kabin aşağı — ağır yön )"),
               (f"=   ( 1 − {tr(q)} ) · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"
@@ -610,10 +610,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                kimlik="avan_kuvvetler")
     b2["adimlar"] = [
         metin("ORTAK BÜYÜKLÜKLER"),
-        veri("gn", "Yerçekimi ivmesi", gn, "m/s²", "SABİTLER A"),
+        veri("gn", "Yerçekimi ivmesi", gn, "m/s²", "fiziksel sabit"),
         veri("Gk", "Boş kabin kütlesi", Gk, "kg",
              "GİRİŞ" if sayi_mi(Gk_elle) else T.GK_KAYNAGI, 0),
-        veri("gf", "Gezici kablo ( flexbil ) birim kütlesi", S["gf"], "kg/m", "SABİTLER B"),
+        veri("gf", "Gezici kablo ( flexbil ) birim kütlesi", S["gf"], "kg/m", "KABUL"),
         hesap("Gf   =   gf · ( Hk / 2  +  3 )",
               f"=   {tr(S['gf'])}  ·  ( {tr(Hk)} / 2  +  3 )", Gf, "kg", "gezici kablo kütlesi"),
         hesap("P    =   Gk  +  Gf",
@@ -623,10 +623,10 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("Ga  =   P  +  q · Q",
               f"=   {tr(P_kut)}  +  {tr(q)} · {trn(Q,0)}", Ga, "kg", "karşı ağırlık kütlesi"),
         veri("k1", "Darbe faktörü ( V > 1 → 2 / V > 0,63 → 3 / V ≤ 0,63 → 5 )", k1, "—",
-             "SABİTLER A  /  MMO/697 Çiz-1", 0),
-        veri("n", "Kabin kılavuz ray sayısı", n_ray, "adet", "SABİTLER B", 0),
+             "KABUL  ·  MMO/697 Çiz-1", 0),
+        veri("n", "Kabin kılavuz ray sayısı", n_ray, "adet", "KABUL", 0),
         veri("gr", "1 m kılavuz rayın kütlesi", gr, "kg/m", gr_kaynak),
-        veri("Lr", "Kılavuz ray uzunluğu ( Hk − 0,20 )", Lr, "m", "SABİTLER A"),
+        veri("Lr", "Kılavuz ray uzunluğu ( Hk − 0,20 )", Lr, "m", "KABUL  ·  ray payı"),
         hesap("Mg  =   Lr · gr", f"=   {tr(Lr)}  ·  {tr(gr)}", Mg, "kg", "bir ray hattının kütlesi"),
 
         metin("A -  KUYU ALT BOŞLUĞU TABANINA GELEN KUVVET  ( kabin tamponu altı )"),
@@ -694,13 +694,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     b3["adimlar"] = [
         veri("a", "Kabin boyu", ka, "m", "GİRİŞ"),
         veri("b", "Kabin genişliği", kb, "m", "GİRİŞ"),
-        veri("h", "Armatür ile çalışma düzlemi arasındaki yükseklik", hh, "m", "SABİTLER A"),
+        veri("h", "Armatür ile çalışma düzlemi arasındaki yükseklik", hh, "m", "KABUL"),
         hesap("k   =   a · b   /   ( h · ( a + b ) )",
               f"=   {tr(ka)} · {tr(kb)}   /   ( {tr(hh)} · ( {tr(ka)} + {tr(kb)} ) )",
               k_kabin, "—", "bölge indeksi", 4),
-        veri("η", "Oda aydınlatma verimi", eta_kabin, "—", "TABLOLAR T2"),
-        veri("E", "Asgari aydınlatma şiddeti", E_kabin, "lüx", "SABİTLER A", 0),
-        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "SABİTLER A"),
+        veri("η", "Oda aydınlatma verimi", eta_kabin, "—", "KABUL  ·  aydınlatma verimi tablosu"),
+        veri("E", "Asgari aydınlatma şiddeti", E_kabin, "lüx", "KABUL", 0),
+        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "KABUL"),
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E_kabin,0)} · {tr(ka)} · {tr(kb)} · {tr(d)}   /   {tr(eta_kabin)}",
               T_kabin, "lm", "gerekli toplam ışık akısı"),
@@ -731,13 +731,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     b4["adimlar"] = [
         veri("a", "Kuyu yüksekliği ( kuyu boyu )", qa, "m", "GİRİŞ"),
         veri("b", "Kuyu genişliği", qb, "m", "GİRİŞ"),
-        veri("h", "Armatür ile çalışma düzlemi arasındaki yükseklik", hh, "m", "SABİTLER A"),
+        veri("h", "Armatür ile çalışma düzlemi arasındaki yükseklik", hh, "m", "KABUL"),
         hesap("k   =   a · b   /   ( h · ( a + b ) )",
               f"=   {tr(qa)} · {tr(qb)}   /   ( {tr(hh)} · ( {tr(qa)} + {tr(qb)} ) )",
               k_kuyu, "—", "bölge indeksi", 4),
-        veri("η", "Oda aydınlatma verimi", eta_kuyu, "—", "TABLOLAR T2"),
-        veri("E", "Asgari aydınlatma şiddeti", E_kuyu, "lüx", "SABİTLER A", 0),
-        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "SABİTLER A"),
+        veri("η", "Oda aydınlatma verimi", eta_kuyu, "—", "KABUL  ·  aydınlatma verimi tablosu"),
+        veri("E", "Asgari aydınlatma şiddeti", E_kuyu, "lüx", "KABUL", 0),
+        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "KABUL"),
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E_kuyu,0)} · {tr(qa)} · {tr(qb)} · {tr(d)}   /   {tr(eta_kuyu)}",
               T_kuyu, "lm", "gerekli toplam ışık akısı"),
@@ -746,8 +746,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         hesap("Z   =   T   /   ØL", f"=   {tr(T_kuyu)}   /   {trn(OL_kuyu,0)}",
               Z_kuyu, "adet", "hesaplanan armatür sayısı"),
         veri("n1", "Işık akısından  =  ROUNDUP( Z ) + 2   ( kuyu dibi + üstü )", n1, "adet",
-             "SABİTLER A", 0),
-        veri("Dmax", "Armatürler arası azami aralık", Dmax, "m", "SABİTLER B", 0),
+             "KABUL", 0),
+        veri("Dmax", "Armatürler arası azami aralık", Dmax, "m", "KABUL", 0),
         hesap("n2  =   ROUNDUP( ( Hk − 1 ) / Dmax )  +  1",
               (f"=   ROUNDUP( ( {tr(Hk)} − 1 ) / {tr(Dmax)} )  +  1"
                if (sayi_mi(Dmax) and Dmax > 0) else "—   ( aralık kontrolü kapalı )"),
@@ -904,7 +904,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     ]
     b6["adimlar"] = [
         veri("U", "Şebeke gerilimi ( fazlar arası )", U_sebeke, "V", "GİRİŞ", 0),
-        veri("cosφ", "Güç katsayısı", cosfi, "—", "SABİTLER B"),
+        veri("cosφ", "Güç katsayısı", cosfi, "—", "KABUL"),
         veri("κ", "İletken iletkenliği", kappa, "m/Ω·mm²",
              ("TS HD 60364-5-52 EK-G  ·  ρ1 = 1,25 × ρ20  ( normal çalışma )"
               if abs(kappa - 44.4) < 0.05 else
@@ -912,7 +912,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                if abs(kappa - 56) < 0.05 else "GİRİŞ")), 1),
         veri("Pm", "Makine ( motor ) anma gücü  —  mil gücü", g_motor, "W",
              "GİRİŞ  ( Nsç )", 0),
-        veri("ηm", "Motorun elektrik verimi", _eta_m, "—", "SABİTLER B"),
+        veri("ηm", "Motorun elektrik verimi", _eta_m, "—", "KABUL"),
         hesap("Pşeb  =   Pm  /  ηm",
               f"=   {trn(g_motor, 0)}  /  {tr(_eta_m)}", g_motor_seb, "W",
               "motorun şebekeden çektiği güç", 0),
@@ -944,12 +944,12 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         veri("Iz2", "Makine besleme kablosunun taşıma kapasitesi",
              (trn(Iz2, 1) if Iz2_kesin else f"≥ {trn(Iz2, 1)}") if sayi_mi(Iz2)
              else "tablo dışı — kontrol edilemedi", "A",
-             "TABLOLAR / IEC 60364-5-52" if Iz2_kesin
+             "IEC 60364-5-52" if Iz2_kesin
              else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
         veri("Iz", "Kablonun akım taşıma kapasitesi",
              (trn(Iz, 1) if Iz_kesin else f"≥ {trn(Iz, 1)}") if sayi_mi(Iz)
              else "tablo dışı — kontrol edilemedi", "A",
-             "TABLOLAR / IEC 60364-5-52" if Iz_kesin
+             "IEC 60364-5-52" if Iz_kesin
              else "tablo dışı kesit — alt sınır ( bir küçük tablo satırı )", 1),
         metin("Koruma iletkeni ( PE ) kesitleri  —  Çizelge-8 :"),
         veri("SPE1", "Kolon hattı koruma iletkeni  ( asgari )",
@@ -1115,9 +1115,9 @@ def hesapla_makine_dairesi(ortak: dict, S: dict) -> dict:
              "TS EN 81-20 m.5.2.1.4.2 · m.5.2.6.3.2.1"),
         hesap("k   =   a · b   /   ( h · ( a + b ) )",
               f"=   {tr(a)} · {tr(b)}   /   ( {tr(hh)} · ( {tr(a)} + {tr(b)} ) )", k, "—", "bölge indeksi", 4),
-        veri("η", "Oda aydınlatma verimi", eta, "—", "TABLOLAR T2"),
-        veri("E", "Asgari aydınlatma şiddeti", E, "lüx", "SABİTLER A", 0),
-        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "SABİTLER A"),
+        veri("η", "Oda aydınlatma verimi", eta, "—", "KABUL  ·  aydınlatma verimi tablosu"),
+        veri("E", "Asgari aydınlatma şiddeti", E, "lüx", "KABUL", 0),
+        veri("d", "Kirlenme ( bakım ) faktörü", d, "—", "KABUL"),
         hesap("T   =   E · a · b · d   /   η",
               f"=   {trn(E,0)} · {tr(a)} · {tr(b)} · {tr(d)}   /   {tr(eta)}", Tt, "lm", ""),
         veri("ØL", "Bir armatürün ışık akısı", OL, "lm",
@@ -1213,7 +1213,7 @@ def hesapla_topraklama(ortak: dict, S: dict, en_buyuk_pe=None) -> dict:
     b2 = Bolum("2 -  DİKEY ( ÇUBUK ) TOPRAKLAYICI",
                kimlik="topraklama_dikey")
     b2["adimlar"] = [
-        veri("lç", "Bir çubuğun boyu", lc, "m", "SABİTLER B"),
+        veri("lç", "Bir çubuğun boyu", lc, "m", "KABUL"),
         veri("Is", "Paralel bağlı çubuk sayısı", Is, "adet", "GİRİŞ", 0),
         hesap("Rç  =   β / ( Is · lç )",
               (f"=   {trn(beta,0)} / ( {trn(Is,0)}  ·  {tr(lc)} )" if sayi_mi(Rc)
@@ -1228,8 +1228,8 @@ def hesapla_topraklama(ortak: dict, S: dict, en_buyuk_pe=None) -> dict:
               (f"=   ( {tr(Ry)} · {tr(Rc)} )  /  ( {tr(Ry)} + {tr(Rc)} )" if sayi_mi(Rc)
                else f"=   {tr(Ry)}   ( yalnız temel topraklayıcı )"),
               Re, "Ω", "paralel", 3),
-        veri("UL", "İzin verilen temas gerilimi", UL, "V", "SABİTLER B", 0),
-        veri("IΔn", "Kaçak akım rölesi anma akımı", IDn, "A", "SABİTLER B"),
+        veri("UL", "İzin verilen temas gerilimi", UL, "V", "KABUL", 0),
+        veri("IΔn", "Kaçak akım rölesi anma akımı", IDn, "A", "KABUL"),
         hesap("Re max  =   UL   /   IΔn", f"=   {trn(UL,0)}   /   {tr(IDn)}", Re_max, "Ω", "", 2),
     ]
     b3["sonuc"] = {

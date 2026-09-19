@@ -443,6 +443,12 @@ GAMA_ASGARI_U = 25.0      # yarım daire:  "in no case … less than 25°"
 GAMA_ASGARI_V = 35.0      # V kanal:  "in no case, angle γ shall be less than 35°"
 GAMA_AZAMI = 90.0         # γ bir kanal açısıdır;  90°'yi aşamaz
 
+#  m.5.6.2.2.1.3 b):  regülatör halatının emniyet katsayısı hesaplanırken
+#  "taking into account a friction factor µmax equal to 0,2".  Sayıyı
+#  standart verir;  ofis daha KÜÇÜK bir değer yazarsa katsayı olduğundan
+#  iyi çıkar — üst sınır bu yüzden burada durur.
+REG_MU_AZAMI = 0.2
+
 
 def _dogrusal_ara(tablo, x):
     """Çizelge 2 için doğrusal ara değer;  aralık dışında uç değere sabitler."""
