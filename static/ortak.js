@@ -205,13 +205,18 @@ function cetvelTablosu(c){
 /* Yöntem açıklamalarını başlığın yanındaki ( ! ) dairesine toplar; üzerine
    gelince açılır, dokunmatik ekranda tıklayınca kalır.  Uyarılar buraya
    girmez — onlar açıkta durur.  Paftada bu metinler yine tam basılır. */
-function bilgiSimgesi(metinler, sinif){
+function bilgiSimgesi(metinler, sinif, harf){
   const liste=(Array.isArray(metinler)?metinler:[metinler])
     .filter(x=>x!==null&&x!==undefined&&String(x).trim()!=='');
   if(!liste.length) return '';
+  /*  İKİ AYRI SİMGE, İKİ AYRI İŞ:
+        ( ! )  sonuç bölümlerinde YÖNTEM açıklaması — "bu sayı nasıl çıktı".
+        ( i )  girdi kutularında TANIM — "bu kutuya ne yazılır".
+      Aynı harf kullanılsaydı okuyan, sonucun yanındaki uyarı tonundaki
+      açıklamayla kutunun yanındaki tarifi ayırt edemezdi.                  */
   return `<span class="bilgi${sinif?' '+sinif:''}" tabindex="0" role="button"`
     + ` aria-label="Açıklamayı göster" onclick="bilgiAc(this,event)">`
-    + `<span class="bilgi-im">!</span><span class="bilgi-balon">`
+    + `<span class="bilgi-im">${harf||'!'}</span><span class="bilgi-balon">`
     + liste.map(x=>`<p>${kacis(String(x))}</p>`).join('')
     + `</span></span>`;
 }

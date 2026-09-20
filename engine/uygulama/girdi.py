@@ -64,6 +64,29 @@ EK_ALANLAR = (
 
 EK_ALAN = {a[0]: a for a in EK_ALANLAR}
 
+
+#  Elektrik / topraklama alanlarının ⓘ metinleri  ( bkz. MG.ACIKLAMA ).
+EK_ACIKLAMA = {
+    "kuyu_genisligi": "KG — kuyunun plandaki genişliği. Yalnız kuyu "
+              "aydınlatmasının bölge indeksine girer; mukavemet hesabına "
+              "girmez.",
+    "kolon_kesit": "S1 — panodan asansör tablosuna gelen kolon hattının "
+              "iletken kesiti. Gerilim düşümü ve koruma iletkeni bundan çıkar.",
+    "kolon_uzunluk": "L1 — kolon hattının bina içindeki gerçek uzunluğu.",
+    "makine_kesit": "S2 — tablodan makineye giden besleme hattının kesiti.",
+    "makine_uzunluk": "L2 — tablo ile makine arasındaki hat uzunluğu.",
+    "temel_a": "Binanın temelinin uzunluğu. Temel topraklamasının eşdeğer "
+              "direnci temel ALANINDAN hesaplanır.",
+    "temel_b": "Binanın temelinin genişliği.",
+    "serit_L": "Temele gömülü topraklama şeridinin toplam boyu.",
+    "mk_yok": "Makine dairesi var mı yok mu. Dairesiz ( MRL ) seçilirse "
+              "tabliye betonu ve makine kaidesi kolonu yoktur: kiriş burkulma "
+              "kontrolü yapılmaz, ray boyuna tabliye eklenmez.",
+    "mk_uzunluk": "Makine dairesinin plandaki uzunluğu. Makine dairesi "
+              "aydınlatmasına girer.",
+    "mk_genislik": "Makine dairesinin plandaki genişliği.",
+}
+
 #  "Gelişmiş" bölümündeki elektrik alanları  ( bkz. MG.GELISMIS_ALANLAR ).
 #  Kesitler ofisin alışılmış kesitleridir;  yetmezlerse gerilim düşümü ve
 #  koruma iletkeni bölümleri bunu hüküm olarak söyler.  Uzunluklar binaya
@@ -136,7 +159,8 @@ def arayuz_alanlari():
     veri = MG.arayuz_alanlari()
     _ek = {a: {"anahtar": a, "hucre": "", "etiket": et, "birim": b,
                "tur": t, "secenekler": list(s) if s is not None else None,
-               "varsayilan": v, "gelismis": a in EK_GELISMIS}
+               "varsayilan": v, "gelismis": a in EK_GELISMIS,
+               "bilgi": EK_ACIKLAMA.get(a, "")}
            for a, et, b, t, s, v in EK_ALANLAR}
     veri["gruplar"].append({
         "ad": EK_GRUP[0],

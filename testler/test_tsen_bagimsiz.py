@@ -1283,7 +1283,7 @@ class ProjeVerimiDenetimi(unittest.TestCase):
         N = a["motor.Gmax"] * g["beyan_hizi"] / (0.83 * 102)
         self.assertAlmostEqual(s["ozet"]["N_hesap"], N, places=9)
         self.assertEqual(self._motor(s)["sonuc"]["uygun"], g["motor_gucu"] >= N)
-        self.assertEqual(self._eta_satiri(s)["kaynak"], "GİRİŞ  ·  imalatçı")
+        self.assertEqual(self._eta_satiri(s)["kaynak"], "KATALOG")
 
     def test_dislili_makinede_de_girilen_kullanilir(self):
         s = M.hesapla({"makine_tipi": "Dişli", "makine_verimi": 0.62})

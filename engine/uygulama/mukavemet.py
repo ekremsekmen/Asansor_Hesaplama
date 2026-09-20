@@ -56,7 +56,22 @@ SABIT = {
     "mu_bloke":        0.2,       # μ  kabin bloke
     "kanal_acisi":     38,        # γ  sertleştirilmiş kanal      [°]
     "alt_kesilme":     90,        # β  alt kesilme açısı          [°]
-    "E":               206010,    # elastisite modülü           [N/mm²]
+    #  ÇELİĞİN ELASTİSİTE MODÜLÜ.  EN 81-50 m.5.10.4 ve Ek C'nin sembol
+    #  listeleri E'yi yalnız "modulus of elasticity" diye tanımlar, sayı
+    #  vermez;  standardın KENDİ verdiği tek çelik değeri m.5.13'tedir:
+    #  "for steel: E = 2,1 × 10⁵ N/mm²".  Yapı çeliğinin Avrupa'daki bağlayıcı
+    #  değeri de budur ( EN 1993-1-1 m.3.2.6 ).  ELEport, ofisin Excel'i ve
+    #  "new block" paftası da 210.000 kullanır — aynı sayı, paftamızı elden
+    #  doğrulanabilir kılar.
+    #
+    #  ESKİDEN 206.010'du ve gerekçesi yazılı değildi:  21.000 kgf/mm² × 9,81,
+    #  yani kgf'den çevrilmiş eski teknik değer.  Sehimleri %1,94 BÜYÜK
+    #  gösteriyordu.  Yön emniyetliydi ama iki zararı vardı:  δ/δperm oranı
+    #  0,981 – 1,000 bandına düşen bir tasarımı standarda göre geçerken
+    #  reddediyorduk, ve paftada E'nin sayısı görünmediği için hesabı elden
+    #  denetleyen 210.000 ile %1,94 farklı bir sonuç bulup bizde aritmetik
+    #  hata arıyordu.
+    "E":               210000,    # elastisite modülü           [N/mm²]
     #  TS EN 81-20 Çizelge 14.  k2 ÇİZELGEDE YAZILIDIR ( Running = 1,2 );
     #  k3 için çizelge sayı vermez — "imalatçı tarafından, gerçek tesise göre
     #  belirlenir" — o yüzden k3 OFİS SABİTİDİR ( sabitler.k3_yardimci ).
@@ -907,7 +922,10 @@ def _aski_halatlari(g, o):
              f"askı oranından  ·  TS EN 81-50 Ek E Şekil E.{2 if r == 1 else 1}", 0),
         veri("Npr", "Ters yönde bükülmeli kasnak sayısı", Npr, "adet", "GİRİŞ", 0),
         veri("Dp", "Tahrik kasnağı hariç kasnakların ortalama çapı", Dp, "mm", "GİRİŞ"),
-        veri("r", "Halat askı oranı", r, "", "GİRİŞ", 0),
+        #  ORAN GÖSTERİMİYLE BASILIR.  Çıplak "2" okuyan, 2:1 mi 1:2 mi
+        #  olduğunu ayırt edemiyordu;  n : 1 sektör gösterimidir ve avan
+        #  paftası zaten böyle basıyor ( tablolar.aski_orani_metni ).
+        veri("r", "Halat askı oranı", f"{trn(r, 0)} : 1", "", "GİRİŞ"),
         veri("Tmin", "Halatın en küçük kopma değeri", Tmin, "N", Tmin_kaynak, 0),
         veri("Smin", "Asgari halat güvenlik katsayısı", Smin, "",
              "EN 81-20 m.5.5.2.2  ( nh = 2 ise 16 )", 0),
@@ -960,7 +978,7 @@ def _aski_halatlari(g, o):
             "geçemiyor olabilir.")
     if r > 1 and Nps < 2:
         b["notlar"] += [
-            "⚠ Palangalı ( 1:" + trn(r, 0) + " ) sistemde halatın en olumsuz "
+            "⚠ Palangalı ( " + trn(r, 0) + ":1 ) sistemde halatın en olumsuz "
             "kesiti genelde tahrik kasnağı + EN AZ İKİ kabin kasnağı üzerinden "
             "geçer ( EN 81-50 Ek E ). Tek yönde bükülmeli kasnak sayısı "
             f"{trn(Nps, 0)} girilmiş; tesisin gerçek askı düzenine göre "
@@ -1563,6 +1581,17 @@ def _tahrik(g, o):
 
     tumu_uygun = alfa_uygun
     gevsek_var = False
+    #  m.5.5.3 c) 2 BEYAN EDİLDİYSE "bloke" SATIRI HÜKÜM VERMEZ.
+    #  Satır yine hesaplanır ve paftada durur — T1 · T2 · oran gerçek bilgidir
+    #  ve m.6.3.3 saha deneyinde karşılaştırılır;  yalnız bölümün kararını
+    #  belirlemez, çünkü kabini tavana çekilmekten koruyan şey halatın kayması
+    #  değil, makineyi durduran elektrikli tertibattır.
+    _elektrikli = (str(g.get("yukari_kacma_korumasi") or "").strip()
+                   == "Elektrikli güvenlik tertibatı")
+    #  HANGİ YÜK DURUMUNUN KALDIĞI SÖYLENİR.  Bölüm yalnız "UYGUN DEĞİLDİR"
+    #  diyordu;  dört durumdan hangisinin kaldığı ve ne yapılacağı yazmıyordu.
+    #  Öteki bütün bölümler uygulanabilir bir öğüt veriyor.
+    _kalan = []
     for durum, baslik in YUK_DURUMLARI:
         t = _terimler(g, o, durum)
         isl = ISLEM[durum]
@@ -1639,6 +1668,16 @@ def _tahrik(g, o):
             metni = (f"{ALFA_ARALIK_DISI} — hüküm verilemez" if not alfa_uygun
                      else f"{KANAL_STANDART_DISI} — hüküm verilemez")
             sinir_kaynak = "ölçüt DEĞİLDİR  ( girdi geçersiz )"
+        if durum == "bloke" and _elektrikli:
+            #  Hüküm dışıdır:  satır UYGUN / UYGUN DEĞİL basmaz, dayanağını yazar.
+            kont_mesaj = "m.5.5.3 c) 2"
+            metni = ("Koruma HALATIN KAYMASIYLA sağlanmıyor — makineyi "
+                     "durduran elektrikli güvenlik tertibatı beyan edildi;  "
+                     "bu satır hüküm vermez, tertibat projede gösterilmelidir")
+            uygun = True
+        elif not uygun and (alfa_var and alfa_uygun and not kanal_standart_disi
+                            and not gevsek_var):
+            _kalan.append(durum)
         tumu_uygun = tumu_uygun and uygun
         #  ORAN SATIRI KENDİ SAYILARINI VERMELİ.
         #  T1 ve T2 satırları TARAFA göre yazılır ( T1 = kabin tarafı ) —
@@ -1684,12 +1723,39 @@ def _tahrik(g, o):
             kontrol(metni, uygun, kont_mesaj),
         ]
 
+    #  KALAN DURUMUN ADI VE ÖĞÜDÜ.  "bloke" ötekilerin TERSİ yöndedir
+    #  ( orada kayma İSTENİR ), o yüzden öğüdü de terstir:  ötekiler sarılma
+    #  açısını / sürtünmeyi BÜYÜTMEK ister, bloke KÜÇÜLTMEK ya da m.5.5.3 c) 2
+    #  yoluna geçmek ister.  Tek bir "UYGUN DEĞİLDİR" ikisini ayırt ettirmiyordu.
+    #  İKİ FRENLEME DURUMU AYIRT EDİLİR.  Başlıkların ikisi de "Acil
+    #  frenleme" ile başlıyor;  parantezi atınca mühendis hangisinin kaldığını
+    #  göremiyordu.
+    KALAN_ADI = {"yukleme": "kabinin yüklenmesi",
+                 "fren_alt": "acil frenleme ( dolu kabin altta )",
+                 "fren_ust": "acil frenleme ( boş kabin üstte )",
+                 "bloke": "karşı ağırlığın asılı kalması"}
+    _ogut = ""
+    if _kalan:
+        _bloke_kaldi = "bloke" in _kalan
+        _oteki = [KALAN_ADI[k] for k in _kalan if k != "bloke"]
+        _kalan = [KALAN_ADI[k] for k in _kalan]
+        _parca = []
+        if _oteki:
+            _parca.append("sarılma açısını ya da kanal sürtünmesini artırın "
+                          "( denge zinciri de oranı düşürür )")
+        if _bloke_kaldi:
+            _parca.append("halat kaymıyor — kabin tavana çekilebilir;  "
+                          "TS EN 81-20 m.5.5.3 c) 2 uyarınca makineyi durduran "
+                          "elektrikli güvenlik tertibatı kullanılıyorsa "
+                          "\"Yukarı kaçmaya karşı koruma\" alanından beyan edin")
+        _ogut = "  —  kalan:  " + " · ".join(_kalan) + "  →  " + ";  ".join(_parca)
     b["sonuc"] = {"baslik": "KONTROL      dört yük durumunda tahrik yeteneği",
                   "metin": "UYGUNDUR." if tumu_uygun else
                            (f"UYGUN DEĞİLDİR — {ALFA_ARALIK_DISI}"
                             if alfa_var and not alfa_uygun else
                             f"UYGUN DEĞİLDİR — {KANAL_STANDART_DISI}"
-                            if kanal_standart_disi else "UYGUN DEĞİLDİR"),
+                            if kanal_standart_disi else
+                            "UYGUN DEĞİLDİR" + _ogut),
                   "uygun": bool(tumu_uygun)}
     if not alfa_var and gevsek_var:
         #  Kesin başarısızlık eksikten güçlüdür:  bölüm "uygun değil" kalır,
@@ -2121,7 +2187,11 @@ def _kabin_raylari(g, o):
         veri("ys", "Askı noktasının y mesafesi", ys, "mm"),
         veri("xi", "Kabin kapısının x mesafesi", xi, "mm"),
         veri("yi", "Kabin kapısının y mesafesi", yi, "mm"),
-        veri("E", "Elastisite modülü", S["E"], "N/mm²", "KABUL", 0),
+        #  E BİR OFİS KABULÜ DEĞİLDİR — kaynağı "KABUL" yazıyordu.  Çeliğin
+        #  elastisite modülü standardın kendi verdiği sayıdır ve ofis
+        #  sabitlerinden değiştirilmez;  kaynak kolonu artık onu gösterir.
+        veri("E", "Çeliğin elastisite modülü", S["E"], "N/mm²",
+             "EN 81-50 m.5.13  ·  EN 1993-1-1 m.3.2.6", 0),
         hesap(f"Fs = {tr(k_esik, 1)} × gn × Q      ( {tip} )",
               f"{tr(k_esik, 1)} × {tr(gn)} × {trn(Q, 0)}", Fs, "N",
               "TS EN 81-20 m.5.7.2.3.6  ·  asansör tipi GİRİŞ"),
@@ -2493,6 +2563,8 @@ def _agirlik_raylari(g, o):
         veri("xsa", "Askı noktasının x mesafesi", xsa, "mm"),
         veri("ysa", "Askı noktasının y mesafesi", ysa, "mm"),
         veri("MY", "Raylara bağlı yardımcı donanım", MY, "N", MY_kaynak, 0),
+        veri("E", "Çeliğin elastisite modülü", S["E"], "N/mm²",
+             "EN 81-50 m.5.13  ·  EN 1993-1-1 m.3.2.6", 0),
         veri("ℓ", "Paten balatasının uzunluğu",
              "—" if makarali else balata,
              "" if makarali else "mm",

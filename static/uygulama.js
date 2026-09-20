@@ -312,9 +312,14 @@ function mAlan(f){
   const pg = mProjeGeneliMi(f.anahtar)
     ? ` <span class="pg-rozet" title="Binaya aittir: bütün asansörlerde tek`
       + ` değer, hesaba bir kez girer">proje geneli</span>` : '';
+  //  ALANIN TANIMI ( i ) DAİRESİNDE.  Metin motordan gelir ( MG.ACIKLAMA ·
+  //  UG.EK_ACIKLAMA );  burada bir kopyası tutulsaydı alan değişince ikisi
+  //  ayrışırdı.  Özellikle üç kaçıklık ( kabin merkezi · askı noktası · boş
+  //  kabin ağırlık merkezi ) birbirine karıştırılmaya çok açık.
+  const bilgi = bilgiSimgesi(f.bilgi, 'bilgi-alan', 'i');
   const et = kacis(f.etiket)
     + (f.birim && f.birim !== '—' ? ` <span class="ipucu">(${kacis(f.birim)})</span>` : '')
-    + pg;
+    + pg + bilgi;
   if(f.tur === 'onay'){
     //  İKİLİ SEÇİM GÖRÜNÜMÜ.  Bazı onay alanları aslında İKİ ŞIKLI bir
     //  tercihtir ( makine daireli / dairesiz ) ve işaretsiz bir kutu
@@ -326,7 +331,7 @@ function mAlan(f){
     const ik = IKILI_ETIKET[f.anahtar];
     if(ik){
       const id = M_ID(f.anahtar), a = f.varsayilan ? 1 : 0;
-      return `<div class="alan"><label>${kacis(ik.etiket)}${pg}</label>`
+      return `<div class="alan"><label>${kacis(ik.etiket)}${pg}${bilgi}</label>`
         + `<input type="checkbox" class="gorsel-gizli" id="${id}"${f.varsayilan?' checked':''}>`
         + `<div class="secim-ikili" role="group" aria-label="${kacis(ik.etiket)}"`
         + ` data-icin="${id}">`
@@ -339,13 +344,19 @@ function mAlan(f){
     }
     return `<div class="alan"><label class="kutu-satir">`
       + `<input type="checkbox" id="${M_ID(f.anahtar)}"${f.varsayilan?' checked':''}>`
-      + `<span>${kacis(f.etiket)}${pg}</span></label></div>`;
+      + `<span>${kacis(f.etiket)}${pg}${bilgi}</span></label></div>`;
   }
   let giris;
   if(f.secenekler){
+    //  GÖRÜNEN YAZI DEĞERDEN AYRI OLABİLİR ( f.secenek_metni ).  Değer sayı
+    //  kalır — hesap, kayıt ve geri yükleme ona bakar;  yalnız kullanıcının
+    //  okuduğu metin değişir.  Askı oranında çıplak "2", 2:1 mi 1:2 mi
+    //  belli olmuyordu.
+    const sm = f.secenek_metni || null;
+    const oku = o => (sm && sm[o] !== undefined) ? sm[o] : mSayi(o);
     giris = `<select id="${M_ID(f.anahtar)}" class="girdi">`
       + f.secenekler.map(o=>
-          `<option value="${kacis(o)}"${o===f.varsayilan?' selected':''}>${kacis(mSayi(o))}</option>`
+          `<option value="${kacis(o)}"${o===f.varsayilan?' selected':''}>${kacis(oku(o))}</option>`
         ).join('') + '</select>';
   }else{
     //  Varsayılanı olmayan alan BOŞ açılır ( temel ölçüleri, kolon boyu … );

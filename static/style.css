@@ -344,6 +344,13 @@ html,body{max-width:100%;overflow-x:hidden}
 .bilgi-balon p:last-child{margin-bottom:0}
 .bilgi-balon p::before{content:"\25AA\00a0\00a0";color:var(--mavi2)}
 .bilgi-im{pointer-events:none}
+/*  Girdi etiketindeki ( i ) — form kalabalık görünmesin diye normalde daha
+    siliktir, üzerine gelince tam görünür.  Balon ve davranış aynıdır.      */
+.alan label .bilgi{opacity:.42;width:14px;height:14px;font-size:9.5px;margin-left:5px}
+.alan label .bilgi:hover,.alan label .bilgi:focus-visible,.alan label .bilgi.acik{opacity:1}
+/*  Tanım metninde madde imi istemiyoruz — tek bir cümledir, liste değil.   */
+.bilgi-alan .bilgi-balon p{padding-left:0;text-indent:0}
+.bilgi-alan .bilgi-balon p::before{content:none}
 /*  Ekranı yazdırırken ( ! ) daireleri kaybolur ama içindeki açıklamalar
     küçük not olarak basılır — kâğıtta bilgi eksilmesin.                 */
 @media print{

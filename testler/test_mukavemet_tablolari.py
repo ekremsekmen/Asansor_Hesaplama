@@ -354,6 +354,29 @@ def _gelismis_sozlesmesi(r):
            sum(f["gelismis"] for f in _hepsi),
            len(MG.GELISMIS_ALANLAR) + len(UG.EK_GELISMIS))
 
+    #  ── ALAN AÇIKLAMALARI  ( formdaki ⓘ )  ────────────────────────────
+    #  SÖZLEŞMENİN PARÇASIDIR.  Açıklamasız bir girdi, kullanıcının ne
+    #  yazacağını bilemediği bir kutudur;  yeni alan eklenirken metni
+    #  yazmak unutulmasın diye burada zorunlu tutulur.  Özellikle üç
+    #  kaçıklık birbirine karıştırılmaya çok açıktır.
+    for f in _hepsi:
+        r.kontrol(f"açıklama {f['anahtar']}: var ve boş değil",
+                  bool(str(f.get("bilgi") or "").strip()))
+        _b = str(f.get("bilgi") or "")
+        r.kontrol(f"açıklama {f['anahtar']}: kısa  ( ≤ 320 karakter )",
+                  len(_b) <= 320, f"→ {len(_b)} karakter")
+    #  ÜÇ KAÇIKLIK AYIRT EDİLİR.  Metinleri birbirinin kopyası olmamalı ve
+    #  her biri ÖLÇÜM ORİJİNİNİ ( ray ekseni ) söylemeli — asıl karışma
+    #  sebebi "neye göre kaçık" sorusunun cevapsız kalmasıydı.
+    _kacik = ("kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
+              "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y")
+    _metin = {a: MG.ACIKLAMA[a] for a in _kacik}
+    r.kontrol("kaçıklık açıklamaları birbirinden farklı",
+              len(set(_metin.values())) == len(_kacik))
+    for a, m in _metin.items():
+        r.kontrol(f"kaçıklık {a}: ölçüm orijinini söylüyor",
+                  "ray ekseni" in m or "ray ekseninden" in m, f"→ {m[:60]}")
+
 
 if __name__ == "__main__":
     sys.exit(0 if calistir().yazdir() else 1)

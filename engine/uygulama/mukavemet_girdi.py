@@ -55,7 +55,12 @@ ALANLAR = (
     #  günceller.
     ("kabin_agirligi",    "Kabin ağırlığı",                    "kg",   "sayi", None, 700),
     ("karsi_agirlik",     "Karşı ağırlık",                     "kg",   "hesap", None, None),
-    ("aski_orani",        "Askı oranı  ( 1 : n )",             "—",    "secim", _s(1, 2), 2),
+    #  GÖSTERİM  n : 1'DİR, 1 : n DEĞİL.  Oran HALAT HIZININ KABİN HIZINA
+    #  oranıdır;  paydadaki 1 kabindir, baştaki sayı halat / kasnak tarafına
+    #  aittir ( 2:1'de halat iki kat hızlı gider, kuvvet yarıya iner ).
+    #  Etiket "( 1 : n )" yazıyordu — sektör gösteriminin tersi.  Avan tarafı
+    #  zaten doğruydu ( tablolar.ASKI_ORANLARI = {"1:1": 1, "2:1": 2} ).
+    ("aski_orani",        "Askı oranı  ( n : 1 )",             "—",    "secim", _s(1, 2), 2),
 
     # ── KABİN VE KAPI ─────────────────────────────────────────────────
     ("kabin_genisligi",   "Kabin genişliği",                   "mm",   "sayi", None, 1450),
@@ -94,8 +99,6 @@ ALANLAR = (
      "mm", "sayi", None, None),
     ("kabin_agirlik_merkezi_y", "Boş kabinin ağırlık merkezi y  ( yp — boşsa türetilir )",
      "mm", "sayi", None, None),
-    ("agirlik_yeri",      "Karşı ağırlık yeri",                "—",    "secim",
-     _s("Sağ", "Sol", "Arka"), "Sağ"),
     #  Kabin kapısı ağırlığı burada SORULMAZ — ofis standardıdır
     #  ( engine/uygulama/sabitler.py · kabin_kapisi_agirligi ).
     ("kapi_mekanizma_payi", "Kapı mekanizma ağ. mrk. payı",    "mm",   "sayi", None, 50),
@@ -177,6 +180,26 @@ ALANLAR = (
     #  dengesizliği karşılar.  Program bunu HİÇ bilmiyordu:  zincirli bir
     #  tesiste motoru gereğinden büyük hesaplıyordu ( 120 m seyirde 20,7 kW
     #  yerine 39,3 kW ).  %0 = zincir yok  ·  %100 = tam dengeleme.
+    #  YUKARI KAÇMAYA KARŞI KORUMA — TS EN 81-20 m.5.5.3 c) İKİ YOL TANIR.
+    #  "…it shall not be possible to raise the empty car or the counterweight
+    #  to a dangerous position if either the car or the counterweight is
+    #  stalled;  EITHER  1) the ropes shall slip on the traction sheave;  OR
+    #  2) the machine shall be stopped by an electric safety device."
+    #  EN 81-50 m.5.11.2.1 de  T1/T2 ≥ e^(f·α)  şartını açıkça
+    #  "where protection … is provided by LIMITING OF TRACTION" diye koşula
+    #  bağlar.  Program bu şartı KOŞULSUZ uyguluyordu;  2. yolu kullanan bir
+    #  tesis haksız yere UYGUN DEĞİL alıyordu — uzun seyirde halat kütlesi
+    #  yüzünden T2 küçülmez ve kayma güvenilmez olur, o yüzden elektrikli
+    #  tertibata geçilir.
+    #
+    #  VARSAYILAN 1. YOLDUR ve öyle kalmalıdır:  bir emniyet kontrolünü
+    #  gevşeten seçenek sessizce varsayılan olamaz.  Karşılaştırdığımız üç
+    #  uygulama ( ELEport · new block · ofisin Excel'i ) de 1. yolu varsayar.
+    #  Hangisinin geçerli olduğu sahada m.6.3.3 deneyiyle sınanır:  karşı
+    #  ağırlık tampona oturtulur, makine döndürülmeye devam edilir;  ya halat
+    #  kayar ya da kabin hiç yükselmez.
+    ("yukari_kacma_korumasi", "Yukarı kaçmaya karşı koruma",      "—",    "secim",
+     _s("Halatın kayması", "Elektrikli güvenlik tertibatı"), "Halatın kayması"),
     ("denge_zinciri",     "Denge ( kompanzasyon ) zinciri",     "—",    "secim",
      ("Yok", "Var"), "Yok"),
     ("halat_birim_kutle", "Askı halatı 1 m ağırlığı  ( imalatçı — boşsa tablo )",
@@ -352,6 +375,16 @@ ALANLAR = (
     ("yapi_sehim_y",      "δstr-y ( bina yapısının y sehimi )", "mm",   "sayi", None, 0),
 
     # ── KARŞI AĞIRLIK ─────────────────────────────────────────────────
+    #  KARŞI AĞIRLIĞIN YERİ HER PROJEDE SEÇİLİR — Gelişmiş'te değildir.
+    #  Yerleşimin en temel kararıdır ve hesabı da etkiler:  ağırlık YANDA
+    #  ( Sağ / Sol ) olduğunda rayları kabin raylarına göre 90° dönük monte
+    #  edilir, bu yüzden binanın δstr-x sehimi ağırlık rayının Y eksenine,
+    #  δstr-y ise X eksenine gelir ( bkz. mukavemet._agirlik_raylari ).
+    #  Arkada ise eksenler paraleldir.  Eskiden bu alan "Kabin ve kapı"
+    #  grubundaydı ve Gelişmiş'teydi:  ağırlık bölümünün girdisi olduğu
+    #  hâlde revizyonda o bölümün grupları arasında görünmüyordu.
+    ("agirlik_yeri",      "Karşı ağırlık yeri",                "—",    "secim",
+     _s("Sağ", "Sol", "Arka"), "Sağ"),
     ("agirlik_malzemesi", "Karşı ağırlık malzemesi",           "—",    "secim",
      MT.AGIRLIK_MALZEMELERI, "Barit"),
     #  KARŞI AĞIRLIĞIN KENDİ İKİ ÖLÇÜSÜ  —  TS EN 81-50 Ek C.2.2'nin Gx · Gy
@@ -538,7 +571,7 @@ GRUPLAR = (
       "uzun_pervaz",
       "kabin_kaciklik", "aski_kaciklik_x", "aski_kaciklik_y",
       "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y",
-      "agirlik_yeri", "kapi_mekanizma_payi")),
+      "kapi_mekanizma_payi")),
     ("Durak ve kuyu",
      ("son_kat_yuksekligi", "tabliye_yuksekligi",
       "kuyu_dibi", "ray_kapi_arasi",
@@ -553,7 +586,8 @@ GRUPLAR = (
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
       "sarilma_acisi",
-      "halat_birim_kutle", "halat_kopma_kN", "denge_zinciri",
+      "halat_birim_kutle", "halat_kopma_kN",
+      "yukari_kacma_korumasi", "denge_zinciri",
       "kasnak_tek_yon", "kasnak_ters_yon",
       "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle")),
     ("Hız regülatörü",
@@ -567,7 +601,8 @@ GRUPLAR = (
       "guvenlik_tertibati", "paten_tipi", "paten_balata_boyu",
       "agirlik_paten_tipi",
       "klips_itme_kuvveti", "yapi_sehim_x", "yapi_sehim_y")),
-    ("Karşı ağırlık", ("agirlik_genisligi", "agirlik_derinligi",
+    ("Karşı ağırlık", ("agirlik_yeri",
+                       "agirlik_genisligi", "agirlik_derinligi",
                        "agirlik_malzemesi",
                        "agirlik_guvenlik_tertibati")),
     ("Tamponlar",
@@ -598,23 +633,25 @@ GRUPLAR = (
 #  sayacı unutulan değeri yakalayamaz.
 #
 #  Seçim 5 proje üzerinde her girdi gerçekçi değerlere çekilerek yapıldı;
-#  karşı ağırlık yeri, malzeme ve kabin tamponu - çarpma plakası arası
+#  karşı ağırlık malzemesi ve kabin tamponu - çarpma plakası arası
 #  hesabın hiçbir sayısını değiştirmedi, kaide yüksekliği en çok %1,3
-#  etkiledi.
+#  etkiledi.  KARŞI AĞIRLIK YERİ O TARAMADA DA "değiştirmedi" çıkmıştı,
+#  ama yanıltıcıydı:  etkisi yalnız δstr girilmiş projelerde görünür ve
+#  tarama projelerinde δstr boştu.  Yerleşim kararı olduğu için artık
+#  Gelişmiş'te değil, "Karşı ağırlık" grubunda normal alandır.
 GELISMIS_ALANLAR = frozenset((
     # Asansör teknik bilgileri
     "asansor_tipi", "kabin_agirligi",
     # Kabin ve kapı
-    "uzun_pervaz", "agirlik_yeri", "kapi_mekanizma_payi",
+    "uzun_pervaz", "kapi_mekanizma_payi",
     "kabin_agirlik_merkezi_x", "kabin_agirlik_merkezi_y",
-    # Durak ve kuyu
-    "siginma_tipi_ust", "siginma_tipi_dip",
     # Makine ve motor
     "saptirma_kasnak_min_capi", "sase_yuksekligi", "dikine_kiris", "yan_yatak",
     "yan_yatak_boyu", "makine_verimi",
     # Askı halatları
     "kasnak_belgesi", "kanal_sekli", "kanal_isleme", "halat_birim_kutle",
-    "halat_kopma_kN", "denge_zinciri", "kasnak_tek_yon", "kasnak_ters_yon",
+    "halat_kopma_kN", "yukari_kacma_korumasi", "denge_zinciri",
+    "kasnak_tek_yon", "kasnak_ters_yon",
     "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle",
     # Hız regülatörü
     "reg_halat_capi", "reg_kasnak_capi", "reg_kanal_acisi",
@@ -634,6 +671,264 @@ GELISMIS_ALANLAR = frozenset((
     "kabin_tampon_ezilme", "kabin_carpma_arasi", "kabin_tampon_boyu",
     "agirlik_tampon_ezilme", "agirlik_carpma_arasi",
 ))
+
+
+#  ---------------------------------------------------------------------
+#  ALAN AÇIKLAMALARI  —  formdaki ⓘ dairesinin içeriği
+#  ---------------------------------------------------------------------
+#  Her girdinin NE OLDUĞUNU bir iki cümlede söyler.  Amaç öğretmek değil,
+#  KARIŞTIRMAYI ÖNLEMEK:  aynı sözcükle anılan ama farklı şeyler olan
+#  alanlar ( üç kaçıklık, iki kasnak çapı, tamponun dört ölçüsü ) burada
+#  birbirinden ayrılır.
+#
+#  EKSEN TAKIMI TEK YERDE ANLATILIR.  TS EN 81-50 Ek C.1.2 bütün konumları
+#  KILAVUZ RAY SİSTEMİNİN EKSENİNDEN ölçer:  orijin iki rayı birleştiren
+#  doğrunun ortasıdır, y bu doğru boyunca ( kabin genişliği ), x ona dik
+#  ( kabin derinliği · kapı–arka ) yöndedir.  Kaçıklık soran her kutu bu
+#  orijine göredir ve açıklaması bunu tekrar eder — kullanıcı kutuya
+#  bakarken Ek C'yi açmak zorunda kalmasın.
+#  AÇILIR LİSTEDE DEĞERİN YERİNE BASILACAK METİN.  Kutunun DEĞERİ sayı
+#  kalır ( hesap, kayıt ve geri yükleme ona bakar );  yalnız GÖRÜNEN yazı
+#  değişir.  Askı oranında çıplak "2" okuyan, 2:1 mi 1:2 mi olduğunu
+#  ayırt edemiyordu — avan formu zaten "1:1 / 2:1" gösteriyor.
+SECENEK_METNI = {
+    "aski_orani": {1: "1:1", 2: "2:1"},
+}
+
+
+ACIKLAMA = {
+    # ── YERLEŞİM ──────────────────────────────────────────────────────
+    "makine_raya_biniyor": "Makine ağırlığı ve kasnak yükü nereye iniyor. "
+              "'Kılavuz raylara' seçilirse bu yük rayların yardımcı donanım "
+              "kalemine ( MY ) eklenir ve ray gerilmesini büyütür.",
+    # ── ASANSÖR TEKNİK BİLGİLERİ ─────────────────────────────────────
+    "asansor_adi": "Paftanın başlığında ve sekmede görünen ad. Hesaba girmez.",
+    "asansor_tipi": "İnsan mı yük-insan mı. Yükleme sırasında eşiğe gelen "
+              "kuvveti değiştirir: insan asansöründe Fs = 0,4·gn·Q, "
+              "yük-insanda 0,6·gn·Q ( m.5.7.2.3.6 ).",
+    "beyan_yuku": "Q — kabinin taşıyacağı anma yükü. Kullanılabilir kabin "
+              "alanının üst sınırını ( Çizelge 6 ) ve yolcu sayısını belirler.",
+    "beyan_hizi": "v — kabinin anma hızı. Motor gücüne, tampon strokuna ve "
+              "regülatörün devreye girme hızı bandına doğrudan girer.",
+    "seyir_mesafesi": "En alt durak eşiği ile en üst durak eşiği arasındaki "
+              "düşey mesafe. Kuyu boyu değildir — dengesiz halat kütlesi "
+              "bundan hesaplanır.",
+    "kabin_agirligi": "P — kabinin BOŞ ağırlığı ( iskelet, döşeme, duvarlar, "
+              "kapı ). Gezici kablo ve denge zinciri buna dâhil değildir; "
+              "onları program ayrıca ekler.",
+    "aski_orani": "Halatın kabine kaç kolla bağlandığı. 1:1'de kasnak kabin "
+              "hızında döner, 2:1'de halat iki kat yol alır — kasnağa gelen "
+              "kuvvet yarıya iner, halat boyu ve halat kütlesi iki katına çıkar.",
+    # ── KABİN VE KAPI ────────────────────────────────────────────────
+    "kabin_genisligi": "Kabinin duvardan duvara İÇ genişliği ( rayları "
+              "birleştiren doğrultu, y ekseni ). Kaplama hariç ölçülür.",
+    "kabin_derinligi": "Kabinin kapıdan arka duvara İÇ derinliği ( x ekseni ). "
+              "Kaplama hariç ölçülür.",
+    "kat_kapisi_tipi": "Kapının açılış düzeni. Kapı kanatlarının ağırlık "
+              "merkezini ve dolayısıyla boş kabinin ağırlık merkezini etkiler.",
+    "kapi_genisligi": "Kapının net geçiş genişliği ( kasa iç ölçüsü ).",
+    "uzun_pervaz": "Kapı kasası dikmeleri arasındaki GİRİNTİNİN derinliği. "
+              "100 mm'ye kadar kabin alanına hiç katılmaz, 100 mm'yi aşarsa "
+              "girintinin tamamı alana eklenir ( m.5.4.2.1.3 ).",
+    # ── ÜÇ KAÇIKLIK  —  BİRBİRİNE KARIŞTIRILMASI EN KOLAY ALANLAR ───
+    "kabin_kaciklik": "yc — KABİN GÖVDESİNİN merkezi, iki rayı birleştiren "
+              "doğrultuda ray ekseninden ne kadar kaçık. Kabin rayların tam "
+              "ortasındaysa 0 girin. Bu, ağırlığın NEREDE DURDUĞUDUR.",
+    "aski_kaciklik_x": "xs — HALATLARIN kabine bağlandığı askı noktasının, "
+              "kabin derinliği doğrultusunda ray ekseninden kaçıklığı. "
+              "Kaçıklık ağırlığın nerede durduğu, askı ise NEREDEN ASILDIĞIDIR; "
+              "ray kuvveti ikisinin FARKINDAN doğar. Kabin ortada olup askı "
+              "kaçık olabilir.",
+    "aski_kaciklik_y": "ys — askı noktasının, rayları birleştiren doğrultuda "
+              "ray ekseninden kaçıklığı. Kabin kendi askı noktasının tam "
+              "altındaysa yc ile ys eşittir ve boş kabinin momenti sıfırlanır.",
+    "kabin_agirlik_merkezi_x": "xp — BOŞ KABİN KÜTLESİNİN ağırlık merkezi, "
+              "ray ekseninden ölçülür ( kabin merkezinden değil ). Boş "
+              "bırakılırsa gövde + kapı dağılımından türetilir; imalatçı "
+              "değer veriyorsa onu girin.",
+    "kabin_agirlik_merkezi_y": "yp — boş kabin kütlesinin ağırlık merkezi, "
+              "rayları birleştiren doğrultuda ve ray ekseninden. Boşsa kabin "
+              "merkezinin kaçıklığına ( yc ) eşit alınır.",
+    "kapi_mekanizma_payi": "Kapı ve mekanizmasının ağırlık merkezinin, kabin "
+              "ön yüzünden ne kadar ileride olduğu. Boş kabinin ağırlık "
+              "merkezi türetilirken kullanılır.",
+    # ── DURAK VE KUYU ────────────────────────────────────────────────
+    "son_kat_yuksekligi": "En üst durak eşiğinden kuyu tavanına ( tabliye "
+              "altına ) kadar olan düşey mesafe. Kuyu üst boşluğu ve ray boyu "
+              "buradan çıkar.",
+    "tabliye_yuksekligi": "Kuyu üstündeki tabliye betonunun kalınlığı. Yalnız "
+              "makine daireli projede sorulur; MRL'de tabliye yoktur ve hesaba "
+              "0 girer.",
+    "kuyu_dibi": "KY — en alt durak eşiğinden kuyu tabanına inen DÜŞEY mesafe "
+              "( kuyu dibi derinliği ). Plandaki derinlik değildir. Kuyu dibi "
+              "sığınma hacmini ve ray boyunu belirler.",
+    "ray_kapi_arasi": "RK — kılavuz ray ekseninden kat kapısı düzlemine olan "
+              "yatay mesafe. Kabin merkezinin x kaçıklığı bundan türetilir: "
+              "ray kabin ortasından geçmiyorsa ray kuvveti büyür.",
+    "siginma_tipi_ust": "Bakım yapan kişinin kabin üstünde hangi duruşta "
+              "korunacağı. Dik duruş daha büyük bir kuyu üst boşluğu ister "
+              "( m.5.2.5.7 ).",
+    "siginma_tipi_dip": "Kuyu dibinde hangi duruşta korunulacağı. Yatarak, "
+              "çömelme ve dik duruş için standart farklı hacimler verir "
+              "( m.5.2.5.8 ).",
+    # ── MAKİNE VE MOTOR ──────────────────────────────────────────────
+    "motor_gucu": "Seçilen makinenin katalog gücü. Program hesapladığı gücü "
+              "bununla karşılaştırır; küçükse bölüm uygun çıkmaz.",
+    "makine_agirligi": "Gm — makine ve motorun katalogdaki ağırlığı. Makine "
+              "kaidesine ve kuyu üstüne gelen yüke girer.",
+    "tahrik_kasnak_capi": "D1 — halatın üzerinden geçtiği tahrik kasnağının "
+              "bölüm dairesi çapı. D1 / halat çapı oranı en az 40 olmalıdır.",
+    "saptirma_kasnak_capi": "D2 — tahrik kasnağı HARİÇ bütün kasnakların "
+              "ORTALAMA çapı. Halatın bükülme şiddeti katsayısı Kp = (D1/D2)⁴ "
+              "bundan çıkar.",
+    "saptirma_kasnak_min_capi": "Ds — aynı kasnakların EN KÜÇÜĞÜNÜN çapı. "
+              "D/d ≥ 40 sınırı her kasnak için ayrı geçerlidir; çaplar farklıysa "
+              "bunu mutlaka girin, yoksa ortalama kullanılır ve küçük kasnak "
+              "gözden kaçar.",
+    "sase_yuksekligi": "Makine kaidesinin kolonlarının ( dikine kirişlerin ) "
+              "boyu. Burkulma narinliği bu boydan hesaplanır.",
+    "dikine_kiris": "Makine kaidesini taşıyan düşey kolonun NPU ölçüsü. "
+              "Burkulma kontrolüne girer.",
+    "yan_yatak": "Makinenin üzerine oturduğu yatay kirişin NPU ölçüsü. "
+              "Eğilme gerilmesi kontrolüne girer.",
+    "yan_yatak_boyu": "Makine kirişinin mesnetleri arasındaki açıklık. "
+              "Eğilme momenti bu açıklıkla doğru orantılı büyür.",
+    "makine_tipi": "Dişlisiz mi dişli mi. Verim girilmediğinde ofisin bu tipe "
+              "ait varsayılan verimi kullanılır.",
+    "makine_verimi": "η — askı ( palanga ) kaybı DÂHİL toplam sistem verimi. "
+              "İmalatçının katalog değeri; boş bırakılırsa makine tipine göre "
+              "ofis değeri kullanılır.",
+    "makine_tst": "Makinenin taşıyabileceği en büyük kasnak statik yükü "
+              "( imalatçı verisi ). Program hesapladığı statik yükü bununla "
+              "karşılaştırır.",
+    # ── ASKI HALATLARI ───────────────────────────────────────────────
+    "halat_adedi": "Kabini taşıyan bağımsız halat sayısı. En az iki olmalıdır; "
+              "iki halatta aranan güvenlik katsayısı 12 yerine 16'dır.",
+    "halat_capi": "Askı halatının anma çapı. En az 8 mm olmalıdır "
+              "( m.5.5.1.2 ).",
+    "kasnak_belgesi": "Kasnak / halat oranı 40'ın altındaysa, sapmayı "
+              "kanıtlayan onaylanmış kuruluş belgesi var mı. Belge beyan "
+              "edilirse 40 sınırı hata sayılmaz; güvenlik katsayısı yine aranır.",
+    "kanal_sekli": "Halatın oturduğu kanalın biçimi. Sürtünme katsayısını ve "
+              "halatın bükülme yorulmasını ( Nequiv ) belirler.",
+    "kanal_isleme": "Kanal yüzeyi sertleştirilmiş mi. Sertleştirilmemiş V "
+              "kanalın alt kesilmesi olmak zorundadır.",
+    "sarilma_acisi": "α — halatın tahrik kasnağını sardığı açı. Tahrik "
+              "yeteneğinin sınırı e^(f·α) buradan çıkar; girilmezse dört "
+              "tahrik kontrolü hüküm veremez.",
+    "halat_birim_kutle": "Halatın metre ağırlığı. Boş bırakılırsa çap ve "
+              "yapıya göre tablodan alınır; imalatçı değeri varsa onu girin.",
+    "halat_kopma_kN": "Halatın en küçük kopma yükü. Boşsa tablodan alınır. "
+              "Gerçekleşen güvenlik katsayısı bu değerle hesaplanır.",
+    "yukari_kacma_korumasi": "Karşı ağırlık tampona oturmuşken makine yukarı "
+              "dönmeye devam ederse kabinin tavana çekilmesini ne engelliyor. "
+              "Standart iki yol tanır ( m.5.5.3 c ): halatın kasnakta kayması, "
+              "ya da makineyi durduran elektrikli güvenlik tertibatı. Kumanda "
+              "panosunda böyle bir tertibat yoksa varsayılanı bırakın.",
+    "denge_zinciri": "Kuyuda kabin ile karşı ağırlık arasına asılan denge "
+              "( kompanzasyon ) zinciri var mı. Varsa halat dengesizliğini "
+              "karşılar ve gereken motor gücü düşer.",
+    "kasnak_tek_yon": "Nps — halatın AYNI yönde büküldüğü kasnak sayısı. "
+              "Boş bırakılırsa askı oranından alınır. Halat yorulmasını "
+              "( Nequiv ) büyütür.",
+    "kasnak_ters_yon": "Npr — halatın TERS yönde büküldüğü kasnak sayısı. "
+              "Ters bükülme halatı dört kat daha çok yorar.",
+    "acil_frenleme_a": "a — acil duruşta kabinin yavaşlaması. Tahrik "
+              "yeteneğinin frenleme durumlarında halat kuvvetlerini belirler.",
+    "kablo_tipi_1": "Kabine inen bükülgen ( gezici ) kablonun tipi. Metre "
+              "ağırlığı buradan tabloya bakılır.",
+    "kablo_birim_kutle": "Bütün gezici kabloların toplam metre ağırlığı. "
+              "Boşsa kablo tipinden tabloya bakılır.",
+    # ── HIZ REGÜLATÖRÜ ───────────────────────────────────────────────
+    "reg_halat_capi": "Regülatör halatının anma çapı. En az 6 mm olmalıdır.",
+    "reg_kasnak_capi": "Dreg — regülatör kasnağının bölüm dairesi çapı. "
+              "Halat çapına oranı en az 30 olmalıdır ( m.5.6.2.2.1.3 ).",
+    "reg_kanal_acisi": "Regülatör kasnağı kanalının açısı. Halatı çekme "
+              "kuvvetini belirleyen sürtünme buradan çıkar.",
+    "reg_gergi_agirligi": "Gra — kuyu dibindeki regülatör gergi ağırlığının "
+              "kütlesi. Halattaki çekme kuvvetini doğrudan belirler.",
+    "reg_halat_birim_kutle": "Regülatör halatının metre ağırlığı. Boşsa "
+              "tablodan alınır.",
+    "reg_halat_kopma_kN": "Regülatör halatının en küçük kopma yükü. Boşsa "
+              "tablodan alınır; halat güvenlik katsayısı en az 8 olmalıdır.",
+    "guvenlik_devreye_kuvvet": "Fren bloğunu devreye sokmak için gereken "
+              "kuvvet ( fren bloğunun tip inceleme belgesinde yazar ). Boş "
+              "bırakılırsa standardın 300 N şartı denetlenir.",
+    "reg_devreye_hizi": "Regülatörün fren bloğunu tetiklediği hız "
+              "( regülatörün etiketinde yazar ). Boşsa paftaya standardın "
+              "izin verdiği aralık yazılır.",
+    # ── KILAVUZ RAYLAR ───────────────────────────────────────────────
+    "kabin_ray_profili": "Kabin kılavuz rayının T profili ( TS ISO 7465 ). "
+              "Kesit değerleri ( Wx, Wy, Ix, Iy, A ) buradan gelir.",
+    "agirlik_ray_profili": "Karşı ağırlık kılavuz rayının profili. Ağırlıkta "
+              "güvenlik tertibatı yoksa genelde kabininkinden küçük seçilir.",
+    "kabin_konsol_arasi": "İki ray konsolu arasındaki EN UZUN düşey mesafe. "
+              "Gerilme bu mesafeyle doğru, sehim ise KÜBÜYLE orantılıdır — "
+              "iki katına çıkarsa sehim sekiz katına çıkar.",
+    "agirlik_konsol_arasi": "Karşı ağırlık rayında iki konsol arasındaki en "
+              "uzun düşey mesafe.",
+    "kabin_ray_sayisi": "Kabini kılavuzlayan ray sayısı. Kuvvet raylara eşit "
+              "dağıtılır; dört rayda bir raya düşen kuvvet yarıya iner.",
+    "agirlik_ray_sayisi": "Karşı ağırlığı kılavuzlayan ray sayısı.",
+    "ray_celigi_rm": "Ray çeliğinin çekme dayanımı. İzin verilen gerilme "
+              "σperm = Rm / St buradan hesaplanır ( Çizelge 15 ).",
+    "kabin_paten_arasi": "h — kabinin üst ve alt patenleri arasındaki DÜŞEY "
+              "mesafe. Devirici momentin kolu budur: büyüdükçe raya gelen "
+              "yatay kuvvet küçülür.",
+    "agirlik_paten_arasi": "Karşı ağırlığın üst ve alt patenleri arasındaki "
+              "düşey mesafe.",
+    "guvenlik_tertibati": "Fren bloğunun tipi. Darbe katsayısını belirler "
+              "( kaymalı 2 · ani frenlemeli makaralı 3 · ani frenlemeli 5 ) — "
+              "ray kuvvetlerini doğrudan iki buçuk katına kadar büyütür.",
+    "paten_tipi": "Kabin patenlerinin cinsi. Rayın boyun ( flanş ) eğilmesi "
+              "makaralı ve kaymalı patende FARKLI formülle hesaplanır.",
+    "paten_balata_boyu": "ℓ — kaymalı patenin balatasının ray boyunca "
+              "uzunluğu. Boşsa kareye yakın bir balata kabul edilir. Makaralı "
+              "patende kullanılmaz.",
+    "agirlik_paten_tipi": "Karşı ağırlık patenlerinin cinsi. Kabinden ayrı "
+              "seçilir — kabinde kaymalı, ağırlıkta makaralı yaygın bir düzendir.",
+    "klips_itme_kuvveti": "Fp — bir raydaki bütün konsol klipslerinin, betonun "
+              "büzülmesi ya da binanın oturması yüzünden uyguladığı itme "
+              "kuvveti. Bilinmiyorsa 0 bırakılır.",
+    "yapi_sehim_x": "δstr-x — BİNA yapısının kendi sehimi ( rayın değil ). "
+              "Rayın sehimine EKLENİR ve aynı sınırla karşılaştırılır.",
+    "yapi_sehim_y": "δstr-y — bina yapısının öbür eksendeki sehimi. Karşı "
+              "ağırlık yanda ise rayları 90° dönük olduğu için bu iki eksen "
+              "ağırlık rayında yer değiştirir.",
+    # ── KARŞI AĞIRLIK ────────────────────────────────────────────────
+    "agirlik_yeri": "Karşı ağırlığın kuyudaki yeri. Yanda ( sağ / sol ) ise "
+              "rayları kabin raylarına göre 90° dönük monte edilir ve binanın "
+              "iki sehim ekseni ağırlık rayında yer değiştirir.",
+    "agirlik_genisligi": "Gy — karşı ağırlık çerçevesinin genişliği. "
+              "Kütlenin kaçıklığı bunun %5'i kabul edilir ( m.5.7.2.3.3 ).",
+    "agirlik_derinligi": "Gx — karşı ağırlık çerçevesinin derinliği. Kütlenin "
+              "kaçıklığı bunun %10'u kabul edilir.",
+    "agirlik_malzemesi": "Ağırlık bloklarının malzemesi. Seçim yalnız derinlik "
+              "kutusunun başlangıç değerini doldurur; hesap kutudaki sayıyı okur.",
+    "agirlik_guvenlik_tertibati": "Karşı ağırlıkta fren bloğu var mı. Kuyunun "
+              "altındaki hacme girilebiliyorsa ZORUNLUDUR ( m.5.6.1 ). Varsa "
+              "ağırlık rayı ayrıca darbe katsayısıyla hesaplanır ve izin "
+              "verilen sehim 10 mm'den 5 mm'ye iner.",
+    # ── TAMPONLAR ────────────────────────────────────────────────────
+    "tampon_tipi": "Tamponun cinsi. Her tipin strok kuralı ayrıdır: lineer "
+              "( yaylı ), lineer olmayan ( poliüretan ) ve enerji yutmalı "
+              "( hidrolik ).",
+    "kabin_tampon_adedi": "Kabinin altındaki tampon sayısı. Kuyu tabanına "
+              "gelen toplam kuvvet bu sayıya bölünerek bir tampon altına düşen "
+              "yük bulunur.",
+    "agirlik_tampon_adedi": "Karşı ağırlığın altındaki tampon sayısı.",
+    "kabin_tampon_baba": "Tamponun üzerinde durduğu beton babanın yüksekliği "
+              "( kuyu tabanından tamponun altına ).",
+    "agirlik_tampon_baba": "Karşı ağırlık tamponunun beton babasının yüksekliği.",
+    "kabin_tampon_ezilme": "Tamponun tam ezildiğinde kısalacağı miktar "
+              "( stroku ). Kabinin tampona oturduğu en alçak konum bununla bulunur.",
+    "kabin_carpma_arasi": "Tamponun üst yüzü ile kabinin altındaki çarpma "
+              "plakası arasındaki boşluk ( kabin en alt durakta iken ).",
+    "kabin_tampon_boyu": "Tamponun kendi boyu ( ezilmemiş hâlde ).",
+    "agirlik_tampon_ezilme": "Karşı ağırlık tamponunun ezilme miktarı.",
+    "agirlik_carpma_arasi": "Karşı ağırlık tamponu ile ağırlığın çarpma "
+              "plakası arasındaki boşluk.",
+}
 
 
 #  HESAP BÖLÜMÜ  →  onu besleyen GİRDİ GRUPLARI.
@@ -689,6 +984,10 @@ def arayuz_alanlari():
                 "secenekler": list(secenekler) if secenekler is not None else None,
                 "varsayilan": varsayilan,
                 "gelismis": a in GELISMIS_ALANLAR,
+                #  ⓘ metni.  Alan sözleşmesinin PARÇASIDIR:  yeni bir girdi
+                #  açıklamasız eklenemesin diye TEST 8 boş olanı reddeder.
+                "bilgi": ACIKLAMA.get(a, ""),
+                "secenek_metni": SECENEK_METNI.get(a),
             })
         gruplar.append({"ad": ad, "alanlar": alanlar})
     return {"gruplar": gruplar,
