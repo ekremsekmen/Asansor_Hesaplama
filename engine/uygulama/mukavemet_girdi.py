@@ -25,6 +25,9 @@ def _s(*d):
 #  ( anahtar, etiket, birim, tür, seçenekler, varsayılan )
 #    tür:  "sayi" · "secim" · "hesap"
 #    "hesap" alanları kullanıcıdan alınmaz — tamamla() üretir.
+#  TS EN 81-50 m.5.11.2.2.2 — hesaba girecek en küçük yavaşlama.
+ACIL_FRENLEME_ASGARI = 0.5
+
 ALANLAR = (
     # ── ASANSÖR TEKNİK BİLGİLERİ ──────────────────────────────────────
     #  ASANSÖR ADI.  Bir binada dört asansör olabilir ve hepsi ayrı kuyudadır;
@@ -219,6 +222,27 @@ ALANLAR = (
      "—",    "secim", ("Yok", "Var"), "Yok"),
     ("kanal_sekli",       "Kasnak kanal şekli",                "—",    "secim",
      MT.KANAL_SEKILLERI, "Altı Kesik V Kanal"),
+    #  γ ve β KASNAĞIN KENDİ ÖZELLİĞİDİR.  TS EN 81-50 m.5.11.2.3.1.1:
+    #  "The value of the groove angle γ shall be GIVEN BY THE MANUFACTURER
+    #  according to the grooving design."  Gerçek projelerde değişiyor:
+    #  ELEport'un makinesi ( Y-2/1-01 ) γ = 38°, ofisin Excel'i γ = 45°,
+    #  EN 81-50 hesaplarının yayımlanmış örneği γ = 50° · β = 105°.
+    #
+    #  İKİSİ DE YALNIZ OFİS SABİTİYDİ ve tek bir projeyi modellemek için genel
+    #  sabiti değiştirmek gerekiyordu — o da ofisteki BÜTÜN projeleri sessizce
+    #  kaydırıyor, paftada izi kalmıyordu.  ( Makine verimi η'da düzeltilen
+    #  hatanın aynısı — bkz. sistem_verimi. )
+    #
+    #  γ İKİ YÖNLÜDÜR, bu yüzden hiçbir ofis varsayılanı "emniyetli taraf"
+    #  olamaz:  büyük γ tahrikte sürtünmeyi düşürür ( emniyetli ) ama
+    #  Çizelge 2'de Nequiv(t)'yi de düşürür, yani gereken halat güvenlik
+    #  katsayısını GEVŞETİR ( γ = 38° → 12 ,  γ = 50° → 5 ).  Tek dürüst
+    #  çözüm, föy elde varken kasnağın gerçek açısını girmektir.
+    #  β ise yalnız tahriki etkiler — Nequiv(t) altı kesik V'de β'dan bağımsızdır.
+    ("kasnak_gama",       "γ — kasnak kanal açısı  ( imalatçı — boşsa ofis )",
+     "°", "sayi", None, None),
+    ("kasnak_beta",       "β — kanal alt kesme açısı  ( imalatçı — boşsa ofis )",
+     "°", "sayi", None, None),
     ("kanal_isleme",      "Kanal işleme şekli",                "—",    "secim",
      MT.KANAL_ISLEME_SEKILLERI, "Sertleştirilmemiş"),
     # Açı doğrudan beyan edilir; eksik açıya varsayılan atanmaz.
@@ -229,7 +253,25 @@ ALANLAR = (
     ("kasnak_tek_yon",    "Tek yönde bükülmeli kasnak sayısı  ( Nps — boşsa askı oranından )",
      "adet", "sayi", None, None),
     ("kasnak_ters_yon",   "Ters yönde bükülmeli kasnak sayısı  ( Npr )", "adet", "sayi", None, 0),
-    ("acil_frenleme_a",   "Acil frenleme yavaşlaması  ( a )",  "m/s²", "sayi", None, 0.8),
+    #  VARSAYILAN = STANDARDIN KENDİ TABANI ( ACIL_FRENLEME_ASGARI = 0,5 ).
+    #  EN 81-50 m.5.11.2.2.2:  "Each moving element shall be considered with
+    #  its proper rate of retardation …  In no case shall the rate of
+    #  retardation to consider be less than …  0,5 m/s²."  Yani 0,5 bir
+    #  TABANDIR;  doğrusu makinenin GERÇEK fren yavaşlamasını imalatçıdan
+    #  alıp girmektir.  Bilinmiyorken standardın izin verdiği taban kullanılır.
+    #
+    #  Eskiden 0,8 yazıyordu ve kaynağı yazılı değildi.  Ofisin Excel'i
+    #  b = 0,67·v² + 0,13·v kullanıyor;  bu bağıntı v = 1 m/s'de tam 0,80
+    #  verir — 0,8 oradan gelmiş ama HIZA BAĞLI bir değer sabitlenmiş, oysa
+    #  aynı bağıntı v = 1,6'da 1,92, v = 2,5'te 4,51 der.  Referans program
+    #  ( ELEport ) 0,5 kullanıyor  ( bkz. testler/test_referans_paftalar.py ).
+    #
+    #  ETKİSİ TEK YÖNLÜ DEĞİLDİR:  a yalnız tahrik bölümüne girer ve
+    #  ( gn + a ) / ( gn − a ) çarpanıyla T1/T2 oranını büyütür.  0,8 → 0,5
+    #  bu çarpanı 1,178'den 1,107'ye indirir;  gerçek saha projelerinde
+    #  tahrik hükmünü belirleyen TEK başat girdi budur.
+    ("acil_frenleme_a",   "Acil frenleme yavaşlaması  ( a )",  "m/s²", "sayi", None,
+     ACIL_FRENLEME_ASGARI),
     ("kablo_tipi_1",      "1. bükülgen kablo tipi",            "—",    "secim",
      MT.KABLO_TIPLERI, "24 x 0,75"),
     #  2. kablo tipi GİRDİ DEĞİLDİR:  kat kapısı tipinden türetilir.
@@ -455,9 +497,6 @@ HESAPLANAN = tuple(a[0] for a in ALANLAR if a[3] == "hesap")
 #  BOŞ BIRAKILABİLEN alanlar.  Boşsa motor değeri kendisi türetir ve
 #  paftada kaynağını "türetilen" diye yazar;  zorunlu tutmak kullanıcıyı
 #  bilmediği bir sayıyı uydurmaya iter.
-#  TS EN 81-50 m.5.11.2.2.2 — hesaba girecek en küçük yavaşlama.
-ACIL_FRENLEME_ASGARI = 0.5
-
 #  ---------------------------------------------------------------------
 #  FİZİKSEL GİRDİ SINIRLARI
 #  ---------------------------------------------------------------------
@@ -508,7 +547,8 @@ OPSIYONEL_ALANLAR = ("asansor_adi", "sarilma_acisi", "kasnak_tek_yon",
                      "reg_devreye_hizi", "makine_tst", "makine_verimi",
                      "halat_birim_kutle", "halat_kopma_kN",
                      "reg_halat_birim_kutle", "reg_halat_kopma_kN",
-                     "saptirma_kasnak_min_capi", "kablo_birim_kutle")
+                     "saptirma_kasnak_min_capi", "kablo_birim_kutle",
+                     "kasnak_gama", "kasnak_beta")
 
 #  µ artık OFİS SABİTİDİR ( sabitler.reg_mu );  üst sınırı standartla
 #  birlikte MT.REG_MU_AZAMI'da durur.
@@ -585,6 +625,7 @@ GRUPLAR = (
       "makine_raya_biniyor")),
     ("Askı halatları",
      ("halat_adedi", "halat_capi", "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
+      "kasnak_gama", "kasnak_beta",
       "sarilma_acisi",
       "halat_birim_kutle", "halat_kopma_kN",
       "yukari_kacma_korumasi", "denge_zinciri",
@@ -649,7 +690,8 @@ GELISMIS_ALANLAR = frozenset((
     "saptirma_kasnak_min_capi", "sase_yuksekligi", "dikine_kiris", "yan_yatak",
     "yan_yatak_boyu", "makine_verimi",
     # Askı halatları
-    "kasnak_belgesi", "kanal_sekli", "kanal_isleme", "halat_birim_kutle",
+    "kasnak_belgesi", "kanal_sekli", "kanal_isleme",
+    "kasnak_gama", "kasnak_beta", "halat_birim_kutle",
     "halat_kopma_kN", "yukari_kacma_korumasi", "denge_zinciri",
     "kasnak_tek_yon", "kasnak_ters_yon",
     "acil_frenleme_a", "kablo_tipi_1", "kablo_birim_kutle",
@@ -811,6 +853,13 @@ ACIKLAMA = {
               "edilirse 40 sınırı hata sayılmaz; güvenlik katsayısı yine aranır.",
     "kanal_sekli": "Halatın oturduğu kanalın biçimi. Sürtünme katsayısını ve "
               "halatın bükülme yorulmasını ( Nequiv ) belirler.",
+    "kasnak_gama": "Tahrik kasnağı kanalının açısı — kasnağın kendi "
+              "özelliğidir ve makinenin teknik föyünde yazar. Boşsa ofis değeri "
+              "kullanılır. İki yönlü etkir: büyük γ tahrikte sürtünmeyi "
+              "düşürür ama gereken halat güvenlik katsayısını da düşürür.",
+    "kasnak_beta": "Kanalın alt kesme açısı — yalnız altı kesik kanallarda "
+              "vardır ve en çok 105° olabilir. Yalnız tahriki etkiler, halat "
+              "güvenlik katsayısına girmez. Boşsa ofis değeri kullanılır.",
     "kanal_isleme": "Kanal yüzeyi sertleştirilmiş mi. Sertleştirilmemiş V "
               "kanalın alt kesilmesi olmak zorundadır.",
     "sarilma_acisi": "α — halatın tahrik kasnağını sardığı açı. Tahrik "
@@ -834,7 +883,10 @@ ACIKLAMA = {
     "kasnak_ters_yon": "Npr — halatın TERS yönde büküldüğü kasnak sayısı. "
               "Ters bükülme halatı dört kat daha çok yorar.",
     "acil_frenleme_a": "a — acil duruşta kabinin yavaşlaması. Tahrik "
-              "yeteneğinin frenleme durumlarında halat kuvvetlerini belirler.",
+              "yeteneğinde halat kuvvetlerini belirleyen başat girdidir. "
+              "Varsayılan 0,5 m/s² STANDARDIN TABANIDIR ( m.5.11.2.2.2 ); "
+              "makinenin gerçek fren yavaşlaması biliniyorsa imalatçı "
+              "değerini girin — büyük a tahriki zorlaştırır.",
     "kablo_tipi_1": "Kabine inen bükülgen ( gezici ) kablonun tipi. Metre "
               "ağırlığı buradan tabloya bakılır.",
     "kablo_birim_kutle": "Bütün gezici kabloların toplam metre ağırlığı. "
@@ -1075,6 +1127,22 @@ def _sayi(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def kanal_acilari(g, O):
+    """( γ , β , γ_girildi , β_girildi )  —  proje değeri varsa o, yoksa ofis.
+
+    BÖLÜM 4 ( Nequiv ) İLE BÖLÜM 6 ( tahrik ) AYNI KAYNAKTAN OKUR.  İki yerde
+    ayrı ayrı okunsaydı projeye girilen açı yalnız birine işler, pafta kendi
+    içinde çelişirdi.
+    """
+    sekil = g.get("kanal_sekli")
+    pg, pb = g.get("kasnak_gama"), g.get("kasnak_beta")
+    g_var, b_var = _sayi(pg), _sayi(pb)
+    gv = float(pg) if g_var else O["kanal_gama_v"]
+    gyd = float(pg) if g_var else O["kanal_gama_yd"]
+    bt = float(pb) if b_var else O["kanal_beta"]
+    return (MT.kanal_acisi(sekil, gv, gyd), MT.kanal_beta(sekil, bt), g_var, b_var)
+
+
 def sistem_verimi(g):
     """η ve girilip girilmediği:  projeye girilen verim, yoksa makine tipinden
     ofis değeri.  Mukavemet ve elektrik köprüsü AYNI değeri buradan okur."""
@@ -1145,6 +1213,67 @@ def dogrula(g):
                     "altına inemez. ( Tampon kursu kısıtlıysa daha küçük bir "
                     "değer ancak tamponun tasarım yavaşlamasıyla birlikte "
                     "gerekçelendirilebilir. )")
+    #  EN KÜÇÜK ÇAP, ORTALAMADAN BÜYÜK OLAMAZ.
+    #  Ds "saptırma kasnaklarının EN KÜÇÜK çapı", D2 ise ORTALAMASIDIR;
+    #  tanım gereği Ds ≤ D2.  İki kutu karıştırılınca ( ya da "en küçük"
+    #  "en büyük" diye okununca ) m.5.5.2.1'in Ds/dh ≥ 40 kontrolü
+    #  HÜKÜMDEN SESSİZCE DÜŞÜYORDU:  D2 = 240 · dh = 8 ile Ds/dh = 30
+    #  kalması gerekirken, Ds = 600 girilince satır kayboluyor ve bölüm o
+    #  kontrolü geçmiş sayılıyordu — emniyetsiz yön.
+    _d2, _ds = g.get("saptirma_kasnak_capi"), g.get("saptirma_kasnak_min_capi")
+    if _sayi(_d2) and _sayi(_ds) and float(_ds) > float(_d2):
+        hata.append(f"{ALAN['saptirma_kasnak_min_capi'][1]} ({_ds} mm), "
+                    f"saptırma kasnaklarının ORTALAMA çapından ({_d2} mm) "
+                    "büyük olamaz — Ds en küçük çaptır.  İki değer ters "
+                    "girilmiş olabilir.")
+
+    #  KABİN VE KARŞI AĞIRLIK EN AZ İKİ RAYLA KILAVUZLANIR.
+    #  TS EN 81-20 m.5.7.1.1:  "The car, counterweight or balancing weight
+    #  shall each be guided by AT LEAST TWO rigid steel guide rails."
+    #  Tek ray kabul ediliyordu;  hesap çalışıyor ( n bölen olarak geçer ve
+    #  ray kuvvetleri iki katına çıkar ) ama standarda aykırı bir düzen
+    #  paftaya olağan bir seçenek gibi yazılıyordu.
+    for _ra in ("kabin_ray_sayisi", "agirlik_ray_sayisi"):
+        _n = g.get(_ra)
+        if _sayi(_n) and 0 < float(_n) < 2:
+            hata.append(f"{ALAN[_ra][1]}: en az 2 olmalıdır "
+                        f"( {_n} girildi ).  TS EN 81-20 m.5.7.1.1 kabin ve "
+                        "karşı ağırlığın en az iki rijit çelik kılavuz rayla "
+                        "kılavuzlanmasını ister.")
+
+    #  KABİNİN EN ALT KONUMU KUYU DİBİNİN İÇİNDE KALMALIDIR.
+    #  a_dip = baba + ( tampon boyu − ezilme ) , kabinin TAM EZİLMİŞ tamponun
+    #  üstünde durduğu kot.  Bu kot kuyu dibi derinliğini aşarsa kabinin en
+    #  alt noktası ALT DURAK DÖŞEMESİNİN ÜSTÜNDE kalır — geometrik olarak
+    #  olanaksızdır.  Dip açıklıklarının hepsi "büyükse iyidir" diye
+    #  bakıldığı için böyle bir düzen sığınma bölümünü GEÇİYORDU
+    #  ( KY = 800 mm · baba = 1.000 mm → a_dip = 1.010 mm , hüküm UYGUN ).
+    _ky, _bb = g.get("kuyu_dibi"), g.get("kabin_tampon_baba")
+    _tb2, _te2 = g.get("kabin_tampon_boyu"), g.get("kabin_tampon_ezilme")
+    if all(_sayi(x) for x in (_ky, _bb, _tb2, _te2)):
+        _adip = float(_bb) + (float(_tb2) - float(_te2))
+        if _adip >= float(_ky):
+            hata.append(
+                f"Kabinin tampona oturduğu kot ({_adip:.0f} mm = baba "
+                f"{_bb} + tampon boyu {_tb2} − ezilme {_te2}), kuyu dibi "
+                f"yüksekliğinden ({_ky} mm) küçük olmalıdır — aksi hâlde "
+                "kabinin en alt noktası alt durak döşemesinin üstünde kalır.")
+
+    #  TAMPON KENDİ BOYUNDAN FAZLA EZİLEMEZ.
+    #  Kuyu dibindeki bütün açıklıklar tek bir sayıdan türer:
+    #      a_dip = baba + ( tampon boyu − ezilme )
+    #  yani kabinin, TAM EZİLMİŞ tamponun üstünde durduğu kot.  Ezilme boyu
+    #  aşarsa parantez negatife döner ve a_dip fiziksel anlamını yitirir;
+    #  ondan türeyen a · a.1 · a.2 · b açıklıkları ile Ç.4 sığınma hacmi de
+    #  sessizce bozulur.  Denetimde 100 mm'lik tampona 5.000 mm ezilme
+    #  girilebiliyor ve a_dip = −3.900 mm çıkıyordu — hiçbir uyarı yoktu.
+    _tb, _te = g.get("kabin_tampon_boyu"), g.get("kabin_tampon_ezilme")
+    if _sayi(_tb) and _sayi(_te) and float(_te) > float(_tb):
+        hata.append(f"{ALAN['kabin_tampon_ezilme'][1]} ({_te} mm), tamponun "
+                    f"kendi boyunu ({_tb} mm) aşamaz — tampon en çok kendi "
+                    "boyu kadar kısalabilir.  Kuyu dibi açıklıkları ve Ç.4 "
+                    "sığınma hacmi bu farktan türer.")
+
     #  ADET · POZİTİFLİK · AÇI  —  fiziksel sınırlar
     for anahtar in TAM_SAYI_ALANLARI:
         d = g.get(anahtar)
@@ -1210,6 +1339,31 @@ def dogrula(g):
             "m.5.11.2.3.1.2 sertleştirilmemiş V kanalda aşınmadan doğan tahrik "
             "kaybını sınırlamak için ALT KESİLME ister. Kanal ya "
             "sertleştirilmiş olmalı ya da 'Altı Kesik V Kanal' seçilmelidir.")
+
+    #  γ ve β STANDARDIN SINIRLARI İÇİNDE OLMALIDIR.  Aynı sınırlar ofis
+    #  sabitleri için sabitler.ARALIK'ta duruyor;  proje girdisi onları
+    #  atlayamaz.  γ'nın ALT sınırı kanal türüne göre değişir ( V 35° ·
+    #  yarım daire 25° ), üst sınır bir kanal açısı olarak 90°'dir.
+    _pg, _pb = g.get("kasnak_gama"), g.get("kasnak_beta")
+    if _sayi(_pg):
+        _alt = (MT.GAMA_ASGARI_U if MT.kanal_yarim_daire_mi(_kanal)
+                else MT.GAMA_ASGARI_V)
+        if not (_alt <= _pg <= MT.GAMA_AZAMI):
+            hata.append(
+                f"Kasnak kanal açısı γ = {_pg}° sınırların dışında — seçilen "
+                f"kanalda {_alt:.0f}° ≤ γ ≤ {MT.GAMA_AZAMI:.0f}° olmalıdır "
+                "( TS EN 81-50 m.5.11.2.3.1 ).")
+    if _sayi(_pb):
+        if not (0 < _pb <= MT.BETA_AZAMI):
+            hata.append(
+                f"Kanal alt kesme açısı β = {_pb}° sınırların dışında — "
+                f"0° < β ≤ {MT.BETA_AZAMI:.0f}° olmalıdır "
+                "( TS EN 81-50 m.5.11.2.3.1 ).")
+        elif not MT.kanal_alti_kesik_mi(_kanal):
+            hata.append(
+                f"Alt kesme açısı β girildi ama seçilen kanalın ( {_kanal} ) "
+                "alt kesilmesi yoktur — ya kutuyu boş bırakın ya da altı "
+                "kesik bir kanal seçin.")
 
     #  OPSİYONEL ALANLARIN POZİTİFLİK VE FİZİKSEL SINIRLARI
     #  Boş bırakılabilirler;  ama girilmişse pozitif ve fiziksel olmalıdır.

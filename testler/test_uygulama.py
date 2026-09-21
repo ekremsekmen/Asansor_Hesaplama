@@ -1335,6 +1335,7 @@ def _pafta_zinciri(r):
         {"asansor_adi": "Sedye", "beyan_yuku": "1275", "kabin_agirligi": "1100",
          "kabin_genisligi": "1400", "kabin_derinligi": "2400", "kabin_ray_profili": "90 x 75 x 16",
          "sarilma_acisi": "170", "beyan_hizi": "1.6", "tampon_tipi": "Hidrolik  ( enerji yutmalı )",
+         "kabin_tampon_boyu": "250",
          "kabin_tampon_ezilme": "200", "agirlik_tampon_ezilme": "200"},
         {"asansor_adi": "Servis", "beyan_yuku": "630", "kabin_agirligi": "600",
          "kabin_genisligi": "1100", "kabin_derinligi": "1400", "sarilma_acisi": "175",

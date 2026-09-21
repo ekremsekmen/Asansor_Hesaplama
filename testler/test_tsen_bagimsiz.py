@@ -209,6 +209,10 @@ class BagimsizDenetim(unittest.TestCase):
         if strok is not None:
             g["kabin_tampon_ezilme"] = strok
             g["agirlik_tampon_ezilme"] = strok
+            #  Tampon kendi boyundan fazla ezilemez;  bu modül STROK
+            #  şartını denetliyor, tamponun boyunu değil — boy her zaman
+            #  denenen stroku taşıyacak kadar büyük tutulur.
+            g["kabin_tampon_boyu"] = max(strok, 100)
         s = M.hesapla(g)
         self.assertTrue(s["aktif"], s.get("hata"))
         return next(b for b in s["bolumler"] if b["kimlik"] == "tamponlar")

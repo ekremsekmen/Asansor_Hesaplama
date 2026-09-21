@@ -303,6 +303,11 @@ def calistir():
                pg.evaluate("Object.keys(mukavemetGirdi()).length"), _ga)
         _sayac = f'#m_form .m-gelismis[data-grup="{_gi}"] .m-gelismis-sayac'
         _once = pg.inner_text(_sayac).strip()
+        #  Varsayılan SAYI OLARAK YAZILMAZ, açılıştaki değer okunur:  0,8
+        #  çivilenmişti ve varsayılan 0,5'e ( EN 81-50 m.5.11.2.2.2 tabanı )
+        #  çekilince "varsayılana dön" adımı aslında 0,8'i YENİ bir değer
+        #  olarak giriyordu — arayüz doğruydu, test bayattı.
+        _varsayilan_a = pg.input_value("#m_acil_frenleme_a")
         pg.evaluate("(()=>{const e=$('m_acil_frenleme_a');const v=e.value;"
                     "e.value = (v==='0,5'?'0,6':'0,5');"
                     "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
@@ -313,8 +318,9 @@ def calistir():
                   and pg.evaluate("$('m_acil_frenleme_a').closest('.alan')"
                                   ".classList.contains('degisti')"),
                   f"→ {_once!r} → {_sonra!r}")
-        pg.evaluate("(()=>{const e=$('m_acil_frenleme_a');e.value='0,8';"
-                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.evaluate("(v)=>{const e=$('m_acil_frenleme_a');e.value=v;"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));}",
+                    _varsayilan_a)
         pg.wait_for_timeout(300)
         r.kontrol("gelişmiş: varsayılana dönünce işaret kalkıyor",
                   not pg.evaluate("$('m_acil_frenleme_a').closest('.alan')"

@@ -690,8 +690,29 @@ def _makine(g, o):
     ])
     b["sonuc"] = {"baslik": ("KONTROL      σe ≤ σem  ( makine kirişleri )" if _mrl
                              else "KONTROL      σe ≤ σem   ve   σb ≤ σem"),
-                  "metin": "UYGUNDUR." if (egilme_uygun and burkulma_uygun)
-                           else "UYGUN DEĞİLDİR — kiriş kesitini büyütün",
+                  #  HANGİ KİRİŞİN DÜŞTÜĞÜ YAZILIR.  "Kiriş kesitini
+                  #  büyütün" iki ayrı eleman için aynı cümleydi:  yan
+                  #  yatak eğilmeden ( σe ), dikine kiriş burkulmadan
+                  #  ( σb ) düşer ve büyütülecek profil farklıdır.
+                  "metin": ("UYGUNDUR." if (egilme_uygun and burkulma_uygun)
+                            else "UYGUN DEĞİLDİR — " + "  ·  ".join(
+                                ([f"yan yatak ( NPU {g['yan_yatak']} ) eğilmeden "
+                                  f"düşüyor:  σe = {tr(sigma_e)} > σem = "
+                                  f"{tr(O['sigma_em'])} N/mm²"]
+                                 if not egilme_uygun else [])
+                                + ([f"dikine kiriş ( NPU {g['dikine_kiris']} ) "
+                                    + (f"burkulmadan düşüyor:  σb = "
+                                       f"{tr(sigma_b)} > σem = "
+                                       f"{tr(O['sigma_em'])} N/mm²"
+                                       if sigma_b is not None else
+                                       #  σb yoksa "aşıyor" DENMEZ:  ω
+                                       #  çizelgesi λ aralığı dışında kalmış,
+                                       #  hesap hiç yapılamamıştır.
+                                       f"için burkulma denetlenemedi:  λ = "
+                                       f"{trn(lam, 0)} , ω çizelgesi "
+                                       f"{MT.OMEGA_LAMBDA_MIN} … "
+                                       f"{MT.OMEGA_LAMBDA_MAX} arasını kapsar")]
+                                   if not burkulma_uygun else []))),
                   "uygun": bool(egilme_uygun and burkulma_uygun)}
     b["aciklamalar"] = [
         "Kiriş statiği:  açıklığı L olan basit kirişte, A mesnedinden X "
@@ -854,9 +875,14 @@ def _aski_halatlari(g, o):
     #  yapılsa bile Nequiv(t) 12 kalır, pafta γ = 38° yazmayı sürdürürdü — hesabın bölüm 6'da kullandığı sayı ile paftaya basılan
     #  sayı ayrışıyordu.
     sekil = g["kanal_sekli"]
-    gama = MT.kanal_acisi(sekil, O["kanal_gama_v"], O["kanal_gama_yd"])
-    beta = MT.kanal_beta(sekil, O["kanal_beta"])
-    Nequiv_t = MT.kanal_nequiv_t(sekil, O["kanal_gama_v"], O["kanal_beta"])
+    #  γ ve β TEK KAYNAKTAN:  projeye girilmişse o, yoksa ofis ( MG ).
+    #  Nequiv(t) de AYNI açılardan okunur — eskiden doğrudan ofis sabitinden
+    #  okunuyordu;  projeye girilen γ yalnız tahrike işleseydi pafta kendi
+    #  içinde çelişirdi ( bölüm 4'te 38°, bölüm 6'da 50° ).
+    gama, beta, gama_girildi, beta_girildi = MG.kanal_acilari(g, O)
+    _g_ofis = O["kanal_gama_yd"] if MT.kanal_yarim_daire_mi(sekil) else O["kanal_gama_v"]
+    Nequiv_t = MT.kanal_nequiv_t(sekil, gama if gama_girildi else _g_ofis,
+                                 beta if beta_girildi else O["kanal_beta"])
     _gh4, Tmin, _gh4_kaynak, Tmin_kaynak = _halat_verisi(g)
     nh_uygun = nh >= 2 and float(nh).is_integer()
     Smin = 16 if nh == 2 else 12
@@ -905,11 +931,12 @@ def _aski_halatlari(g, o):
         metin("Halat güvenlik katsayısının hesaplanması :"),
         veri("", "Kanal tipi", sekil),
         veri("γ", "Kanal açısı  ( hesapta kullanılan )", gama, "°",
-             "KABUL  ·  " + ("yarım daire" if MT.kanal_yarim_daire_mi(sekil)
-                             else "V kanal"), 0),
+             "KATALOG  ·  kasnak föyü" if gama_girildi else
+             ("KABUL  ·  " + ("yarım daire" if MT.kanal_yarim_daire_mi(sekil)
+                              else "V kanal")), 0),
         veri("β", "Alt kesilme açısı", beta, "°",
-             "KABUL" if MT.kanal_alti_kesik_mi(sekil)
-             else "alt kesilme yok", 0),
+             ("KATALOG  ·  kasnak föyü" if beta_girildi else "KABUL")
+             if MT.kanal_alti_kesik_mi(sekil) else "alt kesilme yok", 0),
         veri("Nequiv(t)", "Kasnakların eşdeğer sayısı", Nequiv_t, "",
              "EN 81-50 Çizelge 2  ·  "
              + (f"β = {trn(beta, 0)}°" if MT.kanal_alti_kesik_mi(sekil)
@@ -1008,6 +1035,36 @@ def _aski_halatlari(g, o):
 # =====================================================================
 #  5 -  HIZ REGÜLATÖRÜ HALATI               ( TS EN 81-20 m.5.6.2.2.1 )
 # =====================================================================
+def _reg_metni(tip_uygun, hiz_uygun, oran_uygun, kuvvet_uygun, kat_uygun,
+               tertibat, S, oran, Fcekme, sinir_metni, kat):
+    """Regülatör bölümünün hükmü — GEREKÇE DÜŞEN KONTROLDEN YAZILIR.
+
+    Bölümde beş kontrol var;  metin yalnız ikisini ( tip · hız ) açıklıyordu.
+    Dreg/dreg oranı, çekme kuvveti ya da emniyet katsayısı düştüğünde pafta
+    çıplak "UYGUN DEĞİLDİR" yazıyor, mühendise neyi değiştireceğini
+    SÖYLEMİYORDU — ör. Dreg 150 mm'de hüküm tamamen gerekçesizdi.
+    """
+    if tip_uygun and hiz_uygun and oran_uygun and kuvvet_uygun and kat_uygun:
+        return "UYGUNDUR."
+    n = []
+    if not tip_uygun:
+        n.append(f"{tertibat} tertibat en çok "
+                 f"{tr(S['ani_tertibat_azami_v'])} m/s'de kullanılır "
+                 f"( m.5.6.2.1.2.1 b) )")
+    if not hiz_uygun:
+        n.append("regülatör devreye girme hızı izin verilen sınırların dışındadır")
+    if not oran_uygun:
+        n.append(f"Dreg / dreg = {tr(oran)} < {S['Dreg_dreg_asgari']} — "
+                 "regülatör kasnağını büyütün ya da halat çapını küçültün")
+    if not kuvvet_uygun:
+        n.append(f"Fçekme = {tr(Fcekme)} N, {sinir_metni} değerinin altında — "
+                 "gergi ağırlığını ya da kanal sürtünmesini artırın")
+    if not kat_uygun:
+        n.append(f"T'min / F'reg = {tr(kat)} < {S['reg_kat_asgari']} — "
+                 "regülatör halatını güçlendirin ya da gergi ağırlığını azaltın")
+    return "UYGUN DEĞİLDİR — " + "  ·  ".join(n)
+
+
 def _regulator(g, o):
     S, gn, O = SABIT, SABIT["gn"], o["ofis"]
     Dreg, dreg = g["reg_kasnak_capi"], g["reg_halat_capi"]
@@ -1168,14 +1225,9 @@ def _regulator(g, o):
     b["sonuc"] = {"baslik": (f"KONTROL      Dreg/dreg ≥ {trn(S['Dreg_dreg_asgari'], 0)}"
                              f"   ·   Fçekme ≥ {_baslik_sinir}"
                              f"   ·   T'min/F'reg ≥ {trn(S['reg_kat_asgari'], 0)}"),
-                  "metin": "UYGUNDUR." if (tip_uygun and hiz_uygun and oran_uygun
-                                            and kuvvet_uygun and kat_uygun)
-                           else ("UYGUN DEĞİLDİR"
-                                 + (f" — {tertibat} tertibat en çok "
-                                    f"{tr(S['ani_tertibat_azami_v'])} m/s'de kullanılır "
-                                    f"( m.5.6.2.1.2.1 b) )" if not tip_uygun
-                                    else (" — regülatör devreye girme hızı izin verilen sınırların dışındadır"
-                                          if not hiz_uygun else ""))),
+                  "metin": _reg_metni(tip_uygun, hiz_uygun, oran_uygun,
+                                      kuvvet_uygun, kat_uygun, tertibat, S,
+                                      oran, Fcekme, sinir_metni, kat),
                   "uygun": bool(tip_uygun and hiz_uygun and oran_uygun
                                 and kuvvet_uygun and kat_uygun)}
     b["aciklamalar"] = [
@@ -1471,8 +1523,7 @@ def _tahrik(g, o):
     #  Alt kesilme yoksa β = 0;  düz yarım daire kanalın alt kesilmesi yoktur.
     #  Açılar bölüm 4 ile AYNI kaynaktan okunur ( MT.kanal_acisi / kanal_beta ) —
     #  pafta ile hesap ayrışmasın diye.
-    beta_derece = MT.kanal_beta(sekil, O["kanal_beta"])
-    gama_derece = MT.kanal_acisi(sekil, O["kanal_gama_v"], O["kanal_gama_yd"])
+    gama_derece, beta_derece, gama_girildi, beta_girildi = MG.kanal_acilari(g, O)
     beta = math.radians(beta_derece)
     gama = math.radians(gama_derece)
     sert = g["kanal_isleme"] == "Sertleştirilmiş"
@@ -1528,10 +1579,11 @@ def _tahrik(g, o):
         veri("μ", "Kabinin bloke edildiği durumlar için", mu_bloke, "",
              "EN 81-50 Şekil 8"),
         metin(f"Sürtünme faktörü f  —  kanal işleme : {g['kanal_isleme']} :"),
-        veri("γ", "Kanal açısı", gama_derece, "°", "KABUL", 0),
+        veri("γ", "Kanal açısı", gama_derece, "°",
+             "KATALOG  ·  kasnak föyü" if gama_girildi else "KABUL", 0),
         veri("β", "Alt kesilme açısı", beta_derece, "°",
-             "KABUL" if MT.kanal_alti_kesik_mi(sekil)
-             else "alt kesilme yok", 0),
+             ("KATALOG  ·  kasnak föyü" if beta_girildi else "KABUL")
+             if MT.kanal_alti_kesik_mi(sekil) else "alt kesilme yok", 0),
         veri("f", "Kabinin yüklenmesi", f_yuk, "", "EN 81-50 m.5.11.2.3", 4),
         veri("f", "Durdurma tertibatının çalışması", f_fren, "",
              "EN 81-50 m.5.11.2.3", 4),
@@ -1851,6 +1903,46 @@ def _sehim(F, l, I):
     """Sehim  δ = 0,7 · l³ · F / ( 48 · E · I )."""
     S = SABIT
     return S["sehim_katsayi"] * l ** 3 * F / (S["sehim_bolen"] * S["E"] * I)
+
+
+RAY_CARE = (
+    ("gerilme",  "eğilme / birleşik gerilme ( σm · σc )",
+     "ray profilini büyütün ya da konsol aralığını küçültün"),
+    ("burkulma", "burkulma ( σk )",
+     "ray profilini büyütün ya da konsol aralığını küçültün"),
+    ("sehim",    "sehim ( δ )",
+     "ray profilini büyütün ya da konsol aralığını küçültün"),
+    ("flans",    "flanş eğilmesi ( σF )",
+     "ray profilini büyütün ya da paten balatasını uzatın  —  "
+     "konsol aralığı bu kontrole GİRMEZ"),
+    ("basma",    "normal işletme basma gerilmesi ( σv )",
+     "ray profilini büyütün  —  konsol aralığı bu kontrole GİRMEZ"),
+)
+
+
+def _ray_metni(uygunlar, turler, ad_ray="ray"):
+    """Ray bölümünün hükmü — ÇÖZÜM DÜŞEN KONTROLÜN TÜRÜNDEN YAZILIR.
+
+    Aynı çözümü paylaşan kontroller TEK KEZ yazılır:  üç tür de "profili
+    büyütün ya da konsol aralığını küçültün" diyorsa cümle üç kez
+    tekrarlanmaz, adlar toplanır ve çözüm bir kere söylenir.
+    """
+    dusen = {t for t, u in zip(turler, uygunlar) if not u}
+    gruplar = []                       # [ ( çare , [ ad … ] ) ]  —  sıra korunur
+    for anahtar, ad, care in RAY_CARE:
+        if anahtar not in dusen:
+            continue
+        for g in gruplar:
+            if g[0] == care:
+                g[1].append(ad)
+                break
+        else:
+            gruplar.append((care, [ad]))
+    if not gruplar:
+        return "UYGUN DEĞİLDİR."
+    return "UYGUN DEĞİLDİR — " + "  ;  ".join(
+        "  ·  ".join(adlar) + "  →  " + care.replace("ray profilini", ad_ray + " profilini")
+        for care, adlar in gruplar)
 
 
 def _burkulma_mesaji(lam, deger, sperm):
@@ -2218,6 +2310,14 @@ def _kabin_raylari(g, o):
     ]
 
     uygunlar = []
+    #  KONTROLÜN TÜRÜ DE BİRİKTİRİLİR.  Hüküm bütün ret hâllerine
+    #  "ray profilini büyütün ya da konsol aralığını küçültün" yazıyordu.
+    #  İki kontrolde bu tavsiye FİZİKEN YANLIŞTIR:  flanş eğilmesi ( σF )
+    #  yerel bir kuvvetten doğar, konsol aralığı l bağıntıya hiç girmez;
+    #  normal işletme basma gerilmesi ( σv = ( Fv + k3·MY ) / A ) da yalnız
+    #  kesit alanına bağlıdır.  Mühendis konsolları sıklaştırıp aynı sonucu
+    #  alıyordu.
+    turler = []
 
     def _kesim(baslik, kaynak, kaynak_y, Fx1, Fy1, Fx2, Fy2, kk, sperm,
                omega=None, kayit=None):
@@ -2231,6 +2331,7 @@ def _kabin_raylari(g, o):
         """
         ad.append(metin(baslik, vurgu=True))
         sonuc = []
+        tur = []
         for sira, (etiket, Fx, Fy) in enumerate(
                 (("Durum 1  x-ekseni", Fx1, Fy1), ("Durum 2  y-ekseni", Fx2, Fy2))):
             ad.append(metin(etiket + " :"))
@@ -2255,6 +2356,7 @@ def _kabin_raylari(g, o):
             ad.append(kontrol(f"σc = {tr(sc)}  ≤  σperm = {tr(sperm)} N/mm²",
                               sc <= sperm))
             sonuc += [sm <= sperm, sc <= sperm]
+            tur += ["gerilme", "gerilme"]
             if omega is not None:
                 st = kk["sigma_k"] + S["birlesik_katsayi"] * sm
                 ad.append(hesap("σ = σk + 0,9 × σm",
@@ -2262,6 +2364,7 @@ def _kabin_raylari(g, o):
                 ad.append(kontrol(f"σ = {tr(st)}  ≤  σperm = {tr(sperm)} N/mm²",
                                   st <= sperm))
                 sonuc.append(st <= sperm)
+                tur.append("gerilme")
             sf = abs(_flans(Fx, p, balata, makarali))
             ad.append(hesap(
                 "σF = 1,85 × | Fx | / c²" if makarali else
@@ -2285,6 +2388,7 @@ def _kabin_raylari(g, o):
             ad.append(kontrol(f"δy = {tr(dy)}  ≤  δperm = {trn(dperm, 0)} mm",
                               dy <= dperm))
             sonuc += [sf <= sperm, dx <= dperm, dy <= dperm]
+            tur += ["flans", "sehim", "sehim"]
             if kayit:
                 degerler = dict(Fx=Fx, sy=sy, Fy=Fy, sx=sx, sm=sm, sc=sc,
                                 sf=sf, dx=dx, dy=dy)
@@ -2293,6 +2397,7 @@ def _kabin_raylari(g, o):
                                       if omega else None)
                 _kay(o, f"{kayit}.d{sira + 1}", **degerler)
         uygunlar.extend(sonuc)
+        turler.extend(tur)
 
     # ── C.2.1  Güvenlik tertibatının çalışması ────────────────────────
     #  Ek C.2.1.2:  Fv = k1·gn·(P+Q)/n + Mg·gn + Fp.  Fp bir raydaki bütün
@@ -2324,6 +2429,7 @@ def _kabin_raylari(g, o):
         kontrol(_burkulma_mesaji(lam, sigma_k, sperm_g), burkulma_uygun),
     ]
     uygunlar.append(burkulma_uygun)
+    turler.append("burkulma")
     _kesim("Eğilme gerilmesi  ( C.2.1 ) :",
            "k1 × gn × ( Q·xQ + P·xp ) / ( n × h )",
            "k1 × gn × ( Q·yQ + P·yp ) / ( ( n / 2 ) × h )",
@@ -2349,6 +2455,7 @@ def _kabin_raylari(g, o):
                 sigma_v <= sperm_n),
     ]
     uygunlar.append(sigma_v <= sperm_n)
+    turler.append("basma")
     #  Ek C.2.2.1 katsayıyı k2 der ( EN 81-20 Çizelge 14:  Running = 1,2 ).
     #  Fy'nin paydası da C.2.1.1 b) ile aynıdır:  ( n / 2 ) · h  —  n·h
     #  Fy'yi YARISI kadar gösterirdi, emniyetsiz.
@@ -2392,6 +2499,7 @@ def _kabin_raylari(g, o):
     ]
     uygunlar += [sm3 <= sperm_n, sc3 <= sperm_n, sf3 <= sperm_n,
                  dx3 <= dperm, dy3 <= dperm]
+    turler += ["gerilme", "gerilme", "flans", "sehim", "sehim"]
 
     #  MY ( Maux ) makine raya biniyorsa türetilir — o yüzden o da kaydedilir.
     _kay(o, "kabin_ray", MY=MY, Mg=Mg, xc=xc, xp=xp, xi=xi, yi=yi, Fs=Fs,
@@ -2404,9 +2512,8 @@ def _kabin_raylari(g, o):
     b["adimlar"] = ad
     hepsi = all(uygunlar)
     b["sonuc"] = {"baslik": "KONTROL      σm · σc · σF ≤ σperm   ve   δ ≤ δperm",
-                  "metin": "UYGUNDUR." if hepsi
-                           else "UYGUN DEĞİLDİR — ray profilini büyütün ya da "
-                                "konsol aralığını küçültün",
+                  "metin": ("UYGUNDUR." if hepsi
+                            else _ray_metni(uygunlar, turler)),
                   "uygun": bool(hepsi)}
     _not = _ray_tutarsizlik_notu(prof)
     if _not:
@@ -2506,6 +2613,8 @@ def _agirlik_raylari(g, o):
     dy = abs(_sehim(Fy, l, p["Ix"])) + dstr_ray_y
     kontroller = [sm <= sperm, sc <= sperm, sf <= sperm, dx <= dperm, dy <= dperm,
                   gt_tip_uygun]
+    #  kontroller ile AYNI SIRADA tür listesi  —  bkz. _ray_metni / RAY_CARE
+    turler = ["gerilme", "gerilme", "flans", "sehim", "sehim", "tip"]
 
     #  ------------------------------------------------------------------
     #  KARŞI AĞIRLIKTA GÜVENLİK TERTİBATI      TS EN 81-50 Ek C.2.1
@@ -2540,6 +2649,7 @@ def _agirlik_raylari(g, o):
             skg is not None and 0 <= skg <= sperm_g,
             scg is not None and scg <= sperm_g,
             sfg <= sperm_g, dxg <= dperm, dyg <= dperm]
+        turler += ["gerilme", "burkulma", "gerilme", "flans", "sehim", "sehim"]
 
     b = Bolum("KARŞI AĞIRLIK KILAVUZ RAYLARININ HESAPLANMASI", kimlik="agirlik_raylari",
               kaynak="TS EN 81-50 m.5.10  /  m.C.2.2" + ("  /  m.C.2.1" if gt_var else ""))
@@ -2693,7 +2803,7 @@ def _agirlik_raylari(g, o):
                                   "rayı profilini büyütün ya da konsol aralığını "
                                   "küçültün"
                                   if (kg and kg.get("omega") is None) else
-                                  "UYGUN DEĞİLDİR — ağırlık rayı profilini büyütün")),
+                                  _ray_metni(kontroller, turler, "ağırlık rayı"))),
                   "uygun": bool(all(kontroller))}
     _not8 = _ray_tutarsizlik_notu(prof)
     if _not8:
@@ -2975,6 +3085,12 @@ def _siginma(g, o):
     #  ( m.5.2.5.7.2 b );  hız payı ölçünün kendisindedir.
     _kay(o, "siginma", paten_tavan_asgari=K["min_paten_tavan"])
     uygunlar = []
+    #  DÜŞEN ÖLÇÜNÜN ADI BİRİKTİRİLİR.  Bölümde on ikiye yakın ayrı kontrol
+    #  var ama hüküm hepsine aynı cümleyi yazıyordu:  "kuyu üst/alt
+    #  boşluğunu artırın".  Ç.3 / Ç.4 SIĞINMA HACMİ düştüğünde bu tavsiye
+    #  yanlış yöne gönderir — hacim kabin planına ve BEYAN EDİLEN DURUŞA
+    #  bağlıdır, boşluk büyütmek tek başına çözmez.
+    dusen = []
     for i, (etiket, asgari, hesaplanan) in enumerate(satir):
         _kay(o, "siginma", **{ADLAR[i]: hesaplanan})
         if i == 5:
@@ -2983,6 +3099,9 @@ def _siginma(g, o):
         #  Standart "en az" der:  sınıra eşit ölçü de uygundur.
         uygun = hesaplanan >= asgari
         uygunlar.append(uygun)
+        if not uygun:
+            dusen.append(f"{etiket}  ( {trn(hesaplanan, 0)} < "
+                         f"{trn(asgari, 0)} mm )")
         ad.append(veri("", etiket + "  ( en az " + trn(asgari, 0) + " mm )",
                        hesaplanan, "mm", "", 0))
         ad.append(kontrol(f"{trn(hesaplanan, 0)} mm  ≥  {trn(asgari, 0)} mm", uygun))
@@ -2997,6 +3116,9 @@ def _siginma(g, o):
              K["dip_hacim"], (W / 1000.0, D / 1000.0, a_dip / 1000.0))):
         uygun = a <= olcu[0] and bb <= olcu[1] and c <= olcu[2]
         uygunlar.append(uygun)
+        if not uygun:
+            dusen.append(f"{etiket}  ( beyan edilen duruş:  {tip} — "
+                         f"en az {tr(a)} × {tr(bb)} × {tr(c)} m gerekir )")
         ad.append(veri("", f"{etiket}   —   beyan edilen duruş :  {tip}"
                            f"  ( en az {tr(a)} × {tr(bb)} × {tr(c)} m )",
                        f"{tr(olcu[0])} × {tr(olcu[1])} × {tr(olcu[2])} m"))
@@ -3006,8 +3128,8 @@ def _siginma(g, o):
               kaynak="TS EN 81-20 m.5.2.5.7  /  m.5.2.5.8")
     b["adimlar"] = ad
     b["sonuc"] = {"baslik": "KONTROL      bütün sığınma ölçüleri",
-                  "metin": "UYGUNDUR." if all(uygunlar)
-                           else "UYGUN DEĞİLDİR — kuyu üst/alt boşluğunu artırın",
+                  "metin": ("UYGUNDUR." if all(uygunlar)
+                            else "UYGUN DEĞİLDİR — " + "  ·  ".join(dusen)),
                   "uygun": bool(all(uygunlar))}
     b["aciklamalar"] = [
         "Kabin gövde yükseklikleri, etek ve revizyon kutusu payları ( 2400 · "
@@ -3150,12 +3272,23 @@ def _tamponlar(g, o):
         "üzerinde tip inceleme belge numarası bulunur ( m.5.8.1.8 ).",
     ]
     tumu = all(uygunlar)
-    if gereken is None:
+    if tumu:
         metni = ("Tip uygun — strok tip inceleme belgesinden doğrulanır."
-                 if tumu else "UYGUN DEĞİLDİR — tampon tipi bu hıza uygun değil.")
+                 if gereken is None else "UYGUNDUR.")
     else:
-        metni = ("UYGUNDUR." if tumu else
-                 f"UYGUN DEĞİLDİR — en az {trn(gereken, 0)} mm strok gerekir.")
+        #  GEREKÇE GERÇEKTEN DÜŞEN KONTROLDEN YAZILIR.
+        #  Tip/hız düşüp strok geçtiğinde ( ör. 1,6 m/s'de 400 mm stroklu
+        #  YAYLI tampon:  346 mm gerekiyor, 400 mm var ) hüküm yine de
+        #  "en az 346 mm strok gerekir" diyordu.  Strok zaten yeterliydi;
+        #  asıl engel m.5.8.1.5'ti — enerji biriktirmeli tampon 1 m/s
+        #  üstünde HİÇBİR strokla kullanılamaz.  Mühendis paftadaki
+        #  gerekçeye bakıp daha uzun yay arar, aynı yere çıkardı.
+        _neden = []
+        if not hiz_uygun:
+            _neden.append("tampon tipi bu hıza uygun değil")
+        if gereken is not None and not all(uygunlar[1:]):
+            _neden.append(f"en az {trn(gereken, 0)} mm strok gerekir")
+        metni = "UYGUN DEĞİLDİR — " + "  ·  ".join(_neden) + "."
     b["sonuc"] = {"baslik": "KONTROL TİP · HIZ · STROK", "metin": metni,
                   "uygun": tumu}
     o.update(tampon_gereken_strok=gereken, tampon_biriktirmeli=biriktirmeli)

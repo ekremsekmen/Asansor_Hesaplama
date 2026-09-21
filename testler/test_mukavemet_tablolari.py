@@ -80,15 +80,21 @@ def _kanal_tablosu(r, kaynak):
         bizim = MT.kanal_nequiv_t(ad, O["kanal_gama_v"], O["kanal_beta"])
         if _tur == "VK":
             #  ALTI KESİK V'DE BİLEREK AYRILIYORUZ:  kaynak onu Çizelge 2'nin
-            #  β satırından okur ( 5,0 ), standart ise V satırındadır
-            #  ( γ = 38° → 12 ).
+            #  β satırından okur ( 5,0 ), standart ise V satırındadır.
+            #  Beklenen değer OFİS γ'SINI İZLER — sabitlendiğinde varsayılan
+            #  değişince test kırılıyor ve kaynağı kendisi söylemiyordu.
             r.esit(f"kanal '{ad}' kaynakta β satırından okunuyor", neq_x, 5)
-            r.esit(f"kanal '{ad}' bizde V satırından  ( standart )", bizim, 12.0)
+            r.esit(f"kanal '{ad}' bizde V satırından  ( standart )", bizim,
+                   MT.kanal_nequiv_t("V Kanal", O["kanal_gama_v"], O["kanal_beta"]))
             continue
-        r.kontrol(f"kanal '{ad}' açısı kaynakla aynı  ( varsayılan ofis )",
-                  _esit(bizim_aci, aci_x), f"→ modül {bizim_aci!r}, kaynak {aci_x!r}")
-        r.kontrol(f"kanal '{ad}' Nequiv(t) kaynakla aynı  ( varsayılan ofis )",
-                  _esit(bizim, neq_x), f"→ modül {bizim!r}, kaynak {neq_x!r}")
+        #  KAYNAK TABLOSU KENDİ AÇISIYLA ÜRETİLMİŞTİR ( γ = 38° ).  Ofis
+        #  varsayılanı Akış'ın yayımlanmış 45°'sine çekilince bu karşılaştırma
+        #  "modül 45, kaynak 38" diye kırılıyordu — oysa denetlenmek istenen
+        #  şey BAĞINTININ aynılığı, ofis kabulünün aynılığı değil.  Kaynağın
+        #  kendi açısı verilerek karşılaştırılır.
+        r.kontrol(f"kanal '{ad}' Nequiv(t) kaynağın kendi açısıyla aynı",
+                  _esit(MT.kanal_nequiv_t(ad, aci_x, aci_x), neq_x),
+                  f"→ modül {MT.kanal_nequiv_t(ad, aci_x, aci_x)!r}, kaynak {neq_x!r}")
     #  ÇİZELGE 2'NİN KENDİSİ  —  TS EN 81-50 m.5.12.2.2
     for aci, bek in MT.NEQUIV_V:
         r.esit(f"Çizelge 2  V kanal γ = {aci}°",
@@ -242,6 +248,14 @@ SECENEKLER = {
 #  KAYNAK ÖRNEKTEN BİLEREK AYRILAN VARSAYILANLAR  ( anahtar → ( değer , neden ) ).
 BILEREK_DEGISEN_VARSAYILAN = {
     "yan_yatak": (140, "makine kirişi — sahada genelde NPU 140 ( kullanıcı kararı )"),
+    #  Kaynak örnek 0,8 taşıyor;  o sayı ofis Excel'inin b = 0,67·v² + 0,13·v
+    #  bağıntısının YALNIZ v = 1 m/s değeridir ve sabitlenmişti.  EN 81-50
+    #  m.5.11.2.2.2 hesaba girecek en küçük yavaşlamayı 0,5 m/s² der;  referans
+    #  program ( ELEport ) da 0,5 kullanır.  Bilinmeyen makinede standardın
+    #  tabanı alınır, gerçek değer imalatçıdan girilir.
+    "acil_frenleme_a": (MG.ACIL_FRENLEME_ASGARI,
+                        "EN 81-50 m.5.11.2.2.2 tabanı — ELEport da 0,5 "
+                        "kullanıyor ( kullanıcı kararı )"),
 }
 
 

@@ -246,9 +246,13 @@ def uygulama_senaryolar():
                "ortak": dict(PG)}
 
     #  16) Ds ( en küçük kasnak ) ayrımı
+    #  Ds ≤ D2'dir;  ortalama 320 sınırı geçerken EN KÜÇÜK 295 geçmez —
+    #  senaryo tam da bu ayrımı dondurur.  ( Eskiden D2 = 295'e Ds = 320
+    #  veriliyordu:  en küçük çap ortalamayı aşamaz, geçerli bir tesis
+    #  değildi ve dogrula artık reddediyor. )
     yield {"asansorler": [{"tahrik_kasnak_capi": 320, "halat_capi": 8,
-                           "saptirma_kasnak_capi": 295, "kasnak_tek_yon": 2,
-                           "saptirma_kasnak_min_capi": 320}],
+                           "saptirma_kasnak_capi": 320, "kasnak_tek_yon": 2,
+                           "saptirma_kasnak_min_capi": 295}],
            "ortak": dict(PG)}
 
     #  17) ÇOK ASANSÖRLÜ — proje geneli bölümler yalnız ilkinde kalmalı

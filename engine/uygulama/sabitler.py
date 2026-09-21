@@ -43,11 +43,27 @@ VARSAYILAN = {
     "halat_pay_m":      5,      # Halat boyu payı, m
 
     #  ── TAHRİK KANALI GEOMETRİSİ ─────────────────────────────────────
-    #  Kasnak kanalının açıları imalatçıdan gelir;  proje bazında
-    #  bilinemedikleri için ofis kabulü olarak burada dururlar.
+    #  Kasnak kanalının açıları İMALATÇIDAN GELİR ( TS EN 81-50 m.5.11.2.3.1.1:
+    #  "shall be given by the manufacturer" ).  Proje bazında bilindiğinde
+    #  MG.kasnak_gama / MG.kasnak_beta kutularına girilir;  buradakiler
+    #  yalnız föy elde yokken kullanılan OFİS KABULÜDÜR.
     #  TS EN 81-50 sınırları:  β ≤ 105°  ·  V kanalda γ ≥ 35°  ·  yarım
     #  daire kanalda γ ≥ 25°.
-    "kanal_gama_v":    38,      # V kanal açısı γ            [°]
+    #
+    #  γ = 45°  —  AKIŞ ASANSÖR'ÜN YAYIMLANMIŞ DEĞERİ.  Firmanın Kullanım
+    #  Kılavuzu ( Rev.02 · 11.01.2023 ) bölüm 16'da kasnak kodlama şeması
+    #  verir ve örnek kasnağı "altı kesik kanallı Ɣ:45° , β:90° açılı" diye
+    #  çözer.  Ofisin kendi Excel şablonu da w = 45° kullanıyor.  Eskiden 38°
+    #  yazılıydı ve gerekçesi yoktu;  ELEport'un makinesinin ( Y-2/1-01 )
+    #  değeriyle örtüşüyordu ama ofisin kullandığı makineyle örtüşmüyordu.
+    #
+    #  YÖN:  γ tahrik sürtünmesine YALNIZ sertleştirilmiş V kanalda girer;
+    #  altı kesik kanalda formül γ'yı kullanmaz.  Asıl etkisi Çizelge 2'nin
+    #  Nequiv(t)'sindedir:  38° → 12 ,  45° → 6,5.  Yani bu değişiklik
+    #  gereken HALAT GÜVENLİK KATSAYISINI DÜŞÜRÜR — emniyet yönünden bir
+    #  gevşemedir ve bilerek, imalatçının yayımlanmış değerine dayanılarak
+    #  yapılmıştır.  Başka bir makine kullanılıyorsa proje kutusuna girilir.
+    "kanal_gama_v":    45,      # V kanal açısı γ            [°]
     "kanal_gama_yd":   25,      # Yarım daire kanal açısı γ  [°]
     "kanal_beta":      90,      # Alt kesilme açısı β        [°]
 
