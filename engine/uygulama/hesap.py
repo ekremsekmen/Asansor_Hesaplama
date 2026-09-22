@@ -90,7 +90,7 @@ def _proje_geneli_bolumleri(av, g):
     elif g.get("temel_a") or g.get("temel_b"):
         #  Temel ölçüsü girilmiş ama topraklama hesaplanamamış — eksik hesap.
         eksik.append("TOPRAKLAMA HESABI YAPILAMADI: "
-                     + str(tp.get("uyari") or ""))
+                     + str(tp.get("uyari") or av.get("hata") or ""))
     return bolumler, eksik
 
 
@@ -131,8 +131,10 @@ def hesapla(veriler=None):
     else:
         # Zorunlu hesap eksikliği genel uygunluğu da engeller.
         # Uyarı aşağıda eksik listesinden tek kez üretilir.
+        #  Sebep asansörün kendi uyarısıdır;  proje geneli bir girdi
+        #  reddedildiyse avan motoru hiç hesaplamaz ve sebebi "hata"dadır.
         eksik.append("ELEKTRİK HESAPLARI YAPILAMADI: "
-                     + str(asansor.get("uyari") or "girdiler eksik"))
+                     + str(asansor.get("uyari") or av.get("hata") or "girdiler eksik"))
 
     #  Bölüm numaraları uygulama projesinin kendi sırasına göre yeniden
     #  yazılır;  avandan gelen "3 - ..." başlığı burada 11. sıradadır.
@@ -242,7 +244,8 @@ def hesapla_coklu(asansorler=None, ortak=None):
 
     asansorler   her biri hesapla()'nın beklediği girdi sözlüğü
     ortak        bütün asansörlerde geçerli değerler ( ofis sabitleri … );
-                 asansörün kendi girdisi bunu EZER.
+                 asansörün kendi girdisi bunu EZER — PROJE GENELİ alanlar
+                 hariç ( UG.PROJE_GENELI_ALANLAR ):  onlarda ortak kazanır.
 
     Döner:  { aktif , asansorler:[ … ] , ozet , … }
     Tek asansörlü çağrıda da aynı yapı döner;  arayüz tek koda bakar.
@@ -260,9 +263,16 @@ def hesapla_coklu(asansorler=None, ortak=None):
     #  ait hesap, asansörlerin arasında değil HEPSİNİN ARKASINDA durmalıdır.
     #  Burada ayrılıp üst seviyeye alınırlar;  paftayı basan taraf onları en
     #  sona, kendi şeridiyle bir kez koyar ( bkz. pdf_export.uygulama_coklu_pdf ).
+    #  PROJE GENELİ ALANLARDA ORTAK KAZANIR.  Asansörün kendi değeri önce
+    #  geliyordu:  eski bir proje dosyasından kalmış temel_a = 10 taşıyan
+    #  asansör, proje genelinde 20 yazılıyken binanın topraklamasını 10 ile
+    #  hesaplatıyordu ( tesis bölümleri 1 nolu asansörün girdisinden kurulur ).
+    #  Ortakta OLMAYAN alan asansörden alınır — eski tek asansörlük çağrılar
+    #  bunları asansörün içinde taşır.
+    pg = {k: ortak[k] for k in UG.PROJE_GENELI_ALANLAR if k in ortak}
     sonuclar = []
     for i, g in enumerate(ham, 1):
-        s = hesapla(dict(ortak, **g))
+        s = hesapla({**ortak, **g, **pg})
         s["no"] = i
         s["tanim"] = str(g.get("asansor_adi") or "").strip() or f"{i} nolu asansör"
         if s.get("aktif"):
@@ -293,8 +303,10 @@ def hesapla_coklu(asansorler=None, ortak=None):
         #  veriyordu ve aynı dallanma PDF · CAD · ZIP uçlarında üç kez
         #  tekrarlanıyordu;  iki yol zamanla ayrıştı.
         "yol": "tek" if len(sonuclar) == 1 else "coklu",
-        "hata": [h for s in sonuclar if not s.get("aktif")
-                 for h in (s.get("hata") or [])],
+        #  Aynı metin bir kez:  reddedilen bir ofis değeri bütün asansörleri
+        #  aynı cümleyle durdurur, dört kez basılması okumayı zorlaştırır.
+        "hata": list(dict.fromkeys(h for s in sonuclar if not s.get("aktif")
+                                   for h in (s.get("hata") or []))),
         "ozet": {
             "adet": len(sonuclar),
             "tumu_uygun": bool(aktifler) and pg_uygun and all(

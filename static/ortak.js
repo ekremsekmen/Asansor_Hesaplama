@@ -35,11 +35,26 @@ const $  = id => document.getElementById(id);
 const el = (t,s,h)=>{const e=document.createElement(t); if(s)e.className=s; if(h!=null)e.innerHTML=h; return e;};
 
 /* ---------------------------------------------------------- biçimleme */
+/*  YARIMI SIFIRDAN UZAĞA YUVARLAR  —  sunucudaki steps.yuvarla ile AYNI kural.
+    toLocaleString sayının İKİLİ değerini yuvarlar:  9,325 ikilide 9,32499…
+    diye saklandığı için ekran "9,32", pafta "9,33" basıyordu.  Sayı önce
+    12 anlamlı haneye indirilip gürültüden arındırılır, yuvarlama ONDALIK
+    haneler üzerinde tam sayıyla yapılır. */
+function yuvarla(x, d=0){
+  if(!isFinite(x) || x===0) return x;
+  const [govde, us] = Math.abs(x).toExponential(11).split('e');
+  const hane = BigInt(govde.replace('.', ''));           // 12 anlamlı hane
+  const at = -d - (Number(us) - 11);                     // atılacak hane sayısı
+  if(at <= 0) return x;                                  // istenen hane 12 haneden ince
+  const bolen = 10n ** BigInt(at);
+  const tam = hane / bolen + (2n * (hane % bolen) >= bolen ? 1n : 0n);
+  return Math.sign(x) * Number(tam) / 10 ** d;
+}
 function tr(x, d=2){
   if(x===null||x===undefined||x==='') return '—';
   if(typeof x==='string') return x;
   if(!isFinite(x)) return '—';
-  return Number(x).toLocaleString('tr-TR',{minimumFractionDigits:d, maximumFractionDigits:d});
+  return yuvarla(Number(x), d).toLocaleString('tr-TR',{minimumFractionDigits:d, maximumFractionDigits:d});
 }
 function trn(x, d=2){
   if(x===null||x===undefined||x==='') return '—';
@@ -316,7 +331,7 @@ const SABIT_ETIKET = {
   S2:['S2 — Makine besleme kesiti (mm²)',''],
   L2:['L2 — Makine besleme uzunluğu (m)','pano – makine arası'],
   kablo_tipi:['Kablo tipi','paftaya metin olarak yazılır'],
-  L1_pay:['L1 payı (m)','L1 = kuyu yüksekliği Hk + bu pay'],
+  L1_pay:['L1 yatay güzergâh payı (m)','ana pano → kuyu → asansör panosu yatay kablo yolu + bağlantı payı;  L1 = kuyu yüksekliği Hk + bu pay'],
   beta:['β — Toprak özgül direnci (Ω·m)','zemin etüdü varsa o değeri yazın'],
   cubuk_sayisi:['Is — Çubuk topraklayıcı adedi','paralel bağlı çubuk sayısı'],
   goz_araligi:['Karelaj gözü (m)','şerit boyu temel ölçülerinden türetilirken kullanılır'],
@@ -357,28 +372,24 @@ const SABIT_GRUP = [
     çizildiğinde plandaki gerçek boy yazılır ve o değer türetileni ezer. */
 
 
-/* Şerit boyu yer tutucusu — motorun türettiği değeri ve açılımını gösterir.
-   Böylece "boş bıraktım, ne kullanıldı" sorusu ekrandan cevaplanır. */
+/* Şerit boyu — motorun temel ölçülerinden kurduğu değer ve açılımı.
+   Kutu kalktı ( boy her zaman türetilir );  "ne kullanıldı" sorusu yine
+   ekrandan cevaplanır. */
 function seritGoster(r){
-  const e = $('a_serit_L'); if(!e) return;
+  const not = $('a_serit_tahmin'); if(!not) return;
   const oz = (r && r.ozet) || {};
   const L = oz.serit_L, ring = oz.serit_L_ring, na = oz.serit_L_na, nb = oz.serit_L_nb;
-  const not = $('a_serit_tahmin');
-  if(!(typeof L === 'number' && isFinite(L)) || oz.serit_L_kaynak !== 'türetilen'){
-    e.placeholder = 'temel ölçülerinden türetilir';
-    if(not) not.textContent = '';
+  if(!(typeof L === 'number' && isFinite(L))){
+    not.textContent = 'Temel uzunluğu ve genişliği girilince hesaplanır.';
     return;
   }
-  e.placeholder = `${tr(L)}   ( temel ölçülerinden )`;
-  if(not){
-    const a = sayiOku(v('a_temel_a')), b = sayiOku(v('a_temel_b'));
-    const bag = [];
-    if(na) bag.push(`${na} × ${tr(b)}`);
-    if(nb) bag.push(`${nb} × ${tr(a)}`);
-    not.textContent = `Kullanılan: ring ${tr(ring)} m`
-      + (bag.length ? `  +  enine bağ ${bag.join(' + ')}` : '  ·  enine bağ gerekmiyor')
-      + `  =  ${tr(L)} m`;
-  }
+  const a = sayiOku(v('a_temel_a')), b = sayiOku(v('a_temel_b'));
+  const bag = [];
+  if(na) bag.push(`${na} × ${tr(b)}`);
+  if(nb) bag.push(`${nb} × ${tr(a)}`);
+  not.textContent = `Kullanılan: ring ${tr(ring)} m`
+    + (bag.length ? `  +  enine bağ ${bag.join(' + ')}` : '  ·  enine bağ gerekmiyor')
+    + `  =  ${tr(L)} m`;
 }
 
 /* Türkçe / İngilizce ondalık ayracını kabul eden basit okuyucu ( yalnız
@@ -564,7 +575,7 @@ function bolumuTemizle(tur){
        'kabin_genisligi','Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2',
        'kablo_tipi','i_palanga','q_denge'].forEach(k=>bosalt('a_'+k+i));
     }
-    ['temel_a','temel_b','serit_L','mk_uzunluk','mk_genislik'].forEach(k=>bosalt('a_'+k));
+    ['temel_a','temel_b','mk_uzunluk','mk_genislik'].forEach(k=>bosalt('a_'+k));
     //  Yüklenen avan değerleri trafikle EZİLMESİN:  bu asansörler artık
     //  "otomatik" değildir ( bkz. avanDoldur ).
     AVAN_OTO = {};
@@ -747,7 +758,7 @@ function ornekYukle(){
         de gerçek kullanımdaki gibi bunları ofis standardından alır.
         Şerit boyu da boş: ofiste yalnız temel uzunluğu ve genişliği girilir,
         band boyu bunlardan türetilir. */
-    a_temel_a:'26,55', a_temel_b:'16,4', a_serit_L:'',
+    a_temel_a:'26,55', a_temel_b:'16,4',
     a_mk_yok:true, a_mk_uzunluk:'0', a_mk_genislik:'0',
     a_aktif1:true, a_tanim1:'İnsan', a_kapasite1:'10', a_V1:'1.6', a_eta1:'0,85', a_Hk1:'38,50',
     a_makine_tipi1:'Dişlisiz', a_i_palanga1:'2',

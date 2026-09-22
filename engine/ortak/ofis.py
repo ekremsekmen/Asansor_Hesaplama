@@ -14,7 +14,7 @@ NİÇİN AYRI DOSYA:
     olandı ( dişli makinede gerçek ihtiyacın yarısı ).  Tek kaynağa
     alınmasının sebebi budur:  buradan okuyan iki taraf bir daha ayrışamaz.
 """
-import math
+from engine.ortak.steps import yuvarla
 
 
 #  Makine tipine göre TOPLAM SİSTEM VERİMİ  ( ofis kabulü ).  Anahtarlar
@@ -107,8 +107,8 @@ def bos_kabin_kutlesi(Q):
             y = y0 + (Q - x0) * (y1 - y0) / (x1 - x0)
             #  Yarım YUKARI yuvarlanır;  Python'un round()'u bankacı
             #  yuvarlaması yapar ( 865 → 860 ).  Fark 10 kg'lık kademede
-            #  görünür, o yüzden elle yapılır.
-            return float(math.floor(y / 10.0 + 0.5) * 10)
+            #  görünür.  Kural tek yerdedir ( steps.yuvarla ).
+            return yuvarla(y, -1)
     return None
 
 

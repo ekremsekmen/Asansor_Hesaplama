@@ -868,19 +868,6 @@ def _nufus_tablo(nufus, b):
     return t
 
 
-def _imza_kutusu():
-    t = Table([[_p("<b>Hesabı yapan</b><br/><br/><br/>", "n"),
-                _p("<b>Kontrol eden</b><br/><br/><br/>", "n"),
-                _p("<b>Onay</b><br/><br/><br/>", "n")]],
-              colWidths=[_w(60 * mm), _w(60 * mm), _w(60 * mm)])
-    t.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.5, CIZGI), ("INNERGRID", (0, 0), (-1, -1), 0.4, CIZGI),
-        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
-    return t
-
-
 # =====================================================================
 #  AVAN HESAPLARI PDF
 # =====================================================================
@@ -943,12 +930,13 @@ def avan_pdf(sonuc: dict, proje: dict = None) -> bytes:     # noqa: ARG001
         ust.spaceBefore = 6 * mm
         ic += [KeepTogether([ust] + _uyari_kutusu([tp.get("uyari", "")], hata=True))]
 
-    # ---- SONUÇ ÖZETİ  ( en sonda )  —  imza kutusuyla birlikte tek blok
+    # ---- SONUÇ ÖZETİ  ( en sonda )  —  tek blok, bölünmez.
+    #  İMZA KUTUSU YOK:  "Hesabı yapan · Kontrol eden · Onay" kutusu boş
+    #  kalıyordu;  imza bilgisi kapak sayfasındadır ( trafik paftası gibi ).
     ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "tüm asansörler")
     ozet_bas.spaceBefore = 6 * mm
     ic += [KeepTogether([ozet_bas, _BolumIsareti("SONUÇ ÖZETİ"),
-                         Spacer(1, 1.2 * mm), _avan_ozet_tablo(sonuc),
-                         Spacer(1, 5 * mm), _imza_kutusu()])]
+                         Spacer(1, 1.2 * mm), _avan_ozet_tablo(sonuc)])]
     doc.build(ic)
     buf.seek(0)
     return buf.read()
@@ -1044,8 +1032,7 @@ def mukavemet_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
     ozet_bas = _baslik_seridi("SONUÇ ÖZETİ", "on hesap bölümü")
     ozet_bas.spaceBefore = 6 * mm
     ic += [KeepTogether([ozet_bas, _BolumIsareti("SONUÇ ÖZETİ"),
-                         Spacer(1, 1.2 * mm), _mukavemet_ozet(sonuc),
-                         Spacer(1, 5 * mm), _imza_kutusu()])]
+                         Spacer(1, 1.2 * mm), _mukavemet_ozet(sonuc)])]
     doc.build(ic)
     buf.seek(0)
     return buf.read()
@@ -1108,8 +1095,7 @@ def _uygulama_govdesi(sonuc, ust_ek=""):
         "SONUÇ ÖZETİ", f"{len(sonuc.get('bolumler') or [])} hesap bölümü")
     ozet_bas.spaceBefore = 6 * mm
     ic += [KeepTogether([ozet_bas, _BolumIsareti(_isaret_adi(ust_ek, "SONUÇ ÖZETİ")),
-                         Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc),
-                         Spacer(1, 5 * mm), _imza_kutusu()])]
+                         Spacer(1, 1.2 * mm), _uygulama_ozet(sonuc)])]
     return ic
 
 
@@ -1164,27 +1150,18 @@ def uygulama_pdf(sonuc: dict, proje: dict = None) -> bytes:   # noqa: ARG001
     pg = sonuc.get("proje_geneli") or []
     if pg:
         ic.append(PageBreak())
-        bas = _baslik_seridi("PROJE GENELİ HESAPLAR",
-                             "bütün asansörler için bir kez")
-        ic.append(bas)
-        #  Bu sayfayı açan şey PROJE GENELİ bandıdır;  ilk bölüm işareti
-        #  açıklama kutusunun altında kaldığı için üst yazıyı band koyar.
+        #  Yalnız başlık:  "bütün asansörler için bir kez" yan yazısı ve
+        #  "BİNAYA aittir" açıklama kutusu paftadan çıkarıldı — paftayı okuyana
+        #  bilgi vermiyordu ( tek asansörde de aynı cümleyi basıyordu ).
+        ic.append(_baslik_seridi("PROJE GENELİ HESAPLAR"))
+        #  Bu sayfayı açan şey PROJE GENELİ bandıdır;  üst yazıyı band koyar.
         ic.append(_BolumIsareti("PROJE GENELİ HESAPLAR"))
         ic.append(Spacer(1, 1.5 * mm))
-        ic += _pg_aciklamasi(len(asansorler))
         for b in pg:
             ic += _bolum(b, sayfa=SAYFA_ALANI, onek="PROJE GENELİ")
     doc.build(ic)
     buf.seek(0)
     return buf.read()
-
-
-def _pg_aciklamasi(adet):
-    """Proje geneli bölümlerin niçin bir kez basıldığını yazar."""
-    return _uyari_kutusu(
-        ["Temel topraklama ve makine dairesi aydınlatması BİNAYA aittir, "
-         f"asansöre değil: projedeki {adet} asansör için bu hesaplar bir kez "
-         "yapılır ve paftada bir kez basılır."])
 
 
 def _uygulama_ozet(sonuc):

@@ -17,12 +17,13 @@ sonrası her projenin kendi kararıdır.
 """
 from engine.avan import hesap as _AVAN
 from engine.ortak import ofis as OFIS
+from engine.ortak.steps import aralik_disi
 from engine.uygulama import mukavemet_tablolari as MT
 
 _AVAN_VARSAYILAN = {**_AVAN.SABIT_B_VARSAYILAN, **_AVAN.OFIS_VARSAYILAN}
 
 #  Fiziksel dönüşümler ve STANDARDIN dayattığı sayılar buraya GİRMEZ:
-#  gn · 102 · 1,34 · k3 = 1,2 ( EN 81-20 Çiz.14 ) · Dt/dh ≥ 40
+#  gn · 102 · 1,34 · k2 = 1,2 ( EN 81-20 Çiz.14 ) · Dt/dh ≥ 40
 #  ( EN 81-20 m.5.5.2.1 ).  Onlar ofis kabulü değildir, değiştirilemezler;
 #  yerleri engine/uygulama/mukavemet.py içindeki SABIT sözlüğüdür.
 
@@ -82,8 +83,10 @@ VARSAYILAN = {
     #  ( k2 = 1,2 ), k3 için ise çizelge "the value has to be determined by
     #  the manufacturer due to the actual installation" der — yani standardın
     #  verdiği bir sayı YOKTUR.  Bu yüzden k3 ofis sabitidir, motorda çivili
-    #  değildir;  varsayılanı 1,2'dir.
-    "k3_yardimci":      1.2,    # Yardımcı donanım darbe katsayısı k3
+    #  değildir.  VARSAYILANI 2'DİR:  iki dış referans paftası da ( ELEport
+    #  örneği, new block "karşı ağırlık zıplaması k3 = 2" ) 2 kullanır.
+    #  Önceki 1,2, k2'nin ( Running ) değeriydi.
+    "k3_yardimci":      2,      # Yardımcı donanım darbe katsayısı k3
     #  KABİN KAPISI AĞIRLIĞI  ( panel + kapı mekanizması ).  Kabin ray
     #  hesabında boş kabinin ağırlık merkezini ( xp ) kapı tarafına kaydırır
     #  ( TS EN 81-50 m.5.7.2.3.2 · Ek C.1.2 );  standart sayı vermez.
@@ -183,6 +186,16 @@ VARSAYILAN = {
         "priz_adedi", "priz_gucu", "kablo_tipi", "sigorta_katsayisi",
         # ── ⑥ TOPRAKLAMA
         "beta", "cubuk_sayisi", "goz_araligi", "lc", "UL", "IDn")},
+
+    #  L2 — makine besleme uzunluğu ( asansör panosu → motor ).  UYGULAMANIN
+    #  KENDİ değeridir, avandan okunmaz;  köprü onu avan motoruna her zaman
+    #  açıkça geçirir ( girdi._avan_sabitleri ).
+    "L2": 3,
+    #  L1 = kuyu yüksekliği + bu pay.  Kolon hattı kuyu boyunca çıkar;  ana
+    #  panodan kuyuya ve kuyudan asansör panosuna yatay yol ile bağlantı payı
+    #  bunun üstüne eklenir.  Pano kuyudan uzak bir projede o projenin
+    #  Sabitler'inde büyütülür ( proje dosyasıyla birlikte saklanır ).
+    "L1_pay": 3.5,
 }
 
 #  Metin alanları — sayı denetimine girmez
@@ -218,6 +231,7 @@ ARALIK = {
     "U": (100, 1000), "kappa": (10, 100), "eps_max": (0.1, 20),
     "cosfi": (0.1, 1), "motor_elektrik_verimi": (0.1, 1), "priz_adedi": (0, 50), "priz_gucu": (0, 10000),
     "sigorta_katsayisi": (1, 4),
+    "L2": (0.1, 500), "L1_pay": (0, 100),
     "beta": (1, 100000), "cubuk_sayisi": (0, 100), "goz_araligi": (1, 200),
     "lc": (0.1, 50), "UL": (1, 1000), "IDn": (0.001, 10),
 }
@@ -262,7 +276,8 @@ GRUPLAR = (
     ("⑤ KURULU GÜÇ VE GERİLİM DÜŞÜMÜ",
      "IEC 60364-5-52 — kurulu güç, hat akımı, kablo ve gerilim düşümü",
      ("U", "kappa", "eps_max", "cosfi", "motor_elektrik_verimi",
-      "priz_adedi", "priz_gucu", "kablo_tipi", "sigorta_katsayisi")),
+      "priz_adedi", "priz_gucu", "kablo_tipi", "sigorta_katsayisi", "L2",
+      "L1_pay")),
     ("⑥ TEMEL TOPRAKLAMA",
      "IEEE Std 80 · BYKHY — temel ve çubuk topraklayıcı",
      ("beta", "cubuk_sayisi", "goz_araligi", "lc", "UL", "IDn")),
@@ -342,6 +357,12 @@ ETIKET = {
     "kappa": ("İletken iletkenliği κ (m/Ω·mm²)",
               "bakır, normal çalışma = 44,4  ( TS HD 60364-5-52 EK-G )"),
     "eps_max": ("İzin verilen gerilim düşümü (%)", ""),
+    "L1_pay": ("L1 yatay güzergâh payı (m)",
+               "kolon hattı kuyu boyunca çıkar;  ana pano → kuyu → asansör panosu "
+               "yatay kablo yolu ve bağlantı payı eklenir — L1 = kuyu yüksekliği + bu pay"),
+    "L2": ("Makine besleme uzunluğu L2 (m)",
+           "asansör panosu → motor;  pano makineye yakın durur ( makine dairesinde "
+           "yanında, MRL'de üst katta ) — ε2'ye girer"),
     "cosfi": ("Güç katsayısı cosφ", ""),
     "motor_elektrik_verimi": ("Motorun elektrik verimi ηm",
                               "şebekeden çekilen güç = mil gücü / ηm;  kablo ve sigorta bu akıma göre seçilir"),
@@ -362,8 +383,8 @@ ETIKET = {
 def sabitler(ozel=None):
     """Ofis standardı + kullanıcının ezmeleri.
 
-    Geçersiz değer YOK SAYILIR ve varsayılan kullanılır;  reddedilenlerin
-    listesi ``_reddedilen`` anahtarında döner — sessizce düşmesin.
+    Geçersiz değer sözlüğe YAZILMAZ;  anahtarı ``_reddedilen`` listesinde
+    döner.  Hesap reddedilen bir değerle YAPILMAZ ( bkz. ofis_hatalari ).
     """
     s = dict(VARSAYILAN)
     reddedilen = []
@@ -385,6 +406,23 @@ def sabitler(ozel=None):
         s[k] = v
     s["_reddedilen"] = reddedilen
     return s
+
+
+def ofis_hatalari(ozel):
+    """Kullanılamayan ofis değerleri  —  hata metinleri ( boşsa temiz ).
+
+    sabitler() reddedileni sözlüğe yazmaz;  bunu söyleyen yer yoktu.  β = 0,5
+    yazılan projenin topraklaması 150 Ω·m ile hesaplanıyor, ekranda da
+    paftada da iz kalmıyordu.  Girdi doğrulaması bu listeyi hata sayar ve
+    hesap DURUR ( bkz. mukavemet_girdi.dogrula ).
+    """
+    ozel = ozel if isinstance(ozel, dict) else {}
+    return [
+        "Ofis standardı · " + aralik_disi(ETIKET.get(k, (k,))[0], ozel.get(k),
+                                          *ARALIK.get(k, (None, None)))
+        + "  —  değeri düzeltin ya da alanı boşaltın ( boş alan ofis "
+          "varsayılanını kullanır )."
+        for k in sabitler(ozel)["_reddedilen"]]
 
 
 def verim(S, makine_tipi):

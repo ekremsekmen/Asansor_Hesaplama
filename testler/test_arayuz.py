@@ -98,6 +98,34 @@ def calistir():
                   f"→ {pg.title()!r}")
 
         # ---------------------------------------------------------------
+        #  EKRAN ve PAFTA AYNI SAYIYI AYNI YAZAR
+        #  Ekran sayıyı JavaScript'in toLocaleString'iyle, pafta Python'un
+        #  biçimlendirmesiyle yuvarlıyordu;  ikisi de sayının İKİLİ değerine
+        #  bakıyor ama tam yarımda farklı kural uyguluyordu:  0,125 ekranda
+        #  "0,13", paftada "0,12";  9,325 ( ikilide 9,32499… ) ikisinde de
+        #  "9,32".  Artık ikisi aynı kuralla ( yarımı yukarı, 12 anlamlı
+        #  haneden gürültü atılarak ) yuvarlar.
+        # ---------------------------------------------------------------
+        import random as _rnd
+        from engine.ortak.steps import tr as _tr_py
+        _rnd.seed(20260922)
+        _ozel = (0.125, 0.375, 2.5, 3.5, 0.5, 1.5, 1.005, -1.005, 9.325, 9.625,
+                 2.675, 347.835, 4978.575, 279.085, 1234.5, 1234567.895, 0.001,
+                 -0.001, 0, 1e-7, 12.3456789, 99.995, 999999.995, 7, -7.5)
+        _degerler = [[x, d] for x in _ozel for d in range(5)]
+        _degerler += [[round(_rnd.uniform(-5000, 5000), _rnd.randint(0, 6)),
+                       _rnd.randint(0, 4)] for _ in range(3000)]
+        _js = pg.evaluate("V => V.map(([x, d]) => tr(x, d))", _degerler)
+        _ayri = [(x, d, _tr_py(x, d), j) for (x, d), j in zip(_degerler, _js)
+                 if _tr_py(x, d) != j]
+        r.kontrol(f"ekran ve pafta {len(_degerler)} sayıyı aynı biçimde yazıyor",
+                  not _ayri, f"→ {len(_ayri)} fark, ör. {_ayri[:4]}")
+        r.esit("ekran 9,325'i 9,33 yazıyor ( ikili gürültü )",
+               pg.evaluate("tr(9.325, 2)"), "9,33")
+        r.esit("ekran 2,5'i 3 yazıyor ( bankacı kuralı değil )",
+               pg.evaluate("tr(2.5, 0)"), "3")
+
+        # ---------------------------------------------------------------
         #  AÇILIŞ EKRANI  ( 2.6 )
         #  Program doğrudan hesap ekranına düşmez:  önce hangi projenin
         #  hazırlanacağı seçilir.  İki mod da hazırdır ve ŞERİTLERİ AYRIDIR —
@@ -331,6 +359,18 @@ def calistir():
                   and not pg.evaluate("$('m_kasnak_tek_yon').closest('.alan')"
                                       ".classList.contains('degisti')"),
                   f"→ {pg.input_value('#m_kasnak_tek_yon')!r}")
+        #  BOŞ BIRAKILAN ALAN "DEĞİŞTİRİLDİ" SAYILMAZ  ( S1 · S2 boşken motor
+        #  varsayılana düşer;  işaret "2 değiştirildi" diyordu ).
+        _s1 = pg.input_value("#m_kolon_kesit")
+        pg.evaluate("(()=>{const e=$('m_kolon_kesit');e.value='';"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_timeout(400)
+        r.kontrol("gelişmiş: boş bırakılan S1 değiştirilmiş sayılmıyor",
+                  not pg.evaluate("$('m_kolon_kesit').closest('.alan')"
+                                  ".classList.contains('degisti')"))
+        pg.evaluate(f"(()=>{{const e=$('m_kolon_kesit');e.value={_s1!r};"
+                    "e.dispatchEvent(new Event('input',{bubbles:true}));})()")
+        pg.wait_for_timeout(400)
         #  HESABI DURDURAN HATA GİZLİ ALANDAYSA bölüm kendiliğinden açılır
         pg.evaluate("mGruplariKapat(); mGelismisleriKapat()")
         _kpa = pg.input_value("#m_kabin_paten_arasi")
@@ -523,8 +563,7 @@ def calistir():
         pg.evaluate("mTumGruplariAc()")
         _mrl_sec(pg, False)
         for _a, _d in (("m_mk_uzunluk", "4"), ("m_mk_genislik", "3"),
-                       ("m_temel_a", "20"), ("m_temel_b", "12"),
-                       ("m_serit_L", "64")):
+                       ("m_temel_a", "20"), ("m_temel_b", "12")):
             pg.fill(f"#{_a}", _d)
         pg.wait_for_timeout(2500)
         #  1 makine dairesi aydınlatması + 4 topraklama  ( 4. bölüm:
@@ -625,7 +664,7 @@ def calistir():
         #  ÖNCE ölçüler boşaltılır, SONRA MRL işaretlenir:  MRL işaretliyken
         #  makine dairesi kutuları gizlenir ve doldurulamaz.
         for _a in ("m_mk_uzunluk", "m_mk_genislik", "m_temel_a",
-                   "m_temel_b", "m_serit_L"):
+                   "m_temel_b"):
             pg.fill(f"#{_a}", "")
         _mrl_sec(pg, True)
         pg.wait_for_timeout(2000)
@@ -1649,8 +1688,9 @@ def calistir():
         #  v1.7: β ve çubuk adedi de ofis standardına taşındı
         for _k in ("a_beta", "a_cubuk_sayisi"):
             r.kontrol(f"{_k} avan panelinden kalktı", pg.query_selector("#" + _k) is None)
-        r.kontrol("şerit boyu ( L ) avan panelinde kaldı — projeye özel",
-                  pg.query_selector("#a_serit_L") is not None)
+        #  Şerit boyu da kutu değildir:  her zaman temelden türetilir.
+        r.kontrol("şerit boyu kutusu avan panelinden kalktı",
+                  pg.query_selector("#a_serit_L") is None)
 
         #  Asansör kartı: malzeme alanları katlanır bölüme indi
         pg.evaluate("document.getElementById('a_ozel1').style.display='none';")
@@ -1673,8 +1713,8 @@ def calistir():
         r.esit("Nsç alanı boş, yer tutucu otomatik",
                pg.get_attribute("#a_Nsc1", "placeholder"), "otomatik")
 
-        #  L1 = Hk + ofis payı
-        r.kontrol("L1 Hk + ofis payından türetildi", "Hk + ofis payı" in _s)
+        #  L1 = Hk + yatay güzergâh payı  ( paftada ne olduğu yazılır )
+        r.kontrol("L1 Hk + yatay güzergâh payından türetildi", "Hk + yatay güzergâh" in _s)
 
         #  Ofis değeri değişince asansör hesabı da değişir ( tek yerden )
         pg.click('.sekme[data-sekme="sabitler"]')
@@ -1766,33 +1806,17 @@ def calistir():
         r.kontrol("temel çevresi karşılaştırma notu çıkıyor",
                   "çevresi" in pg.evaluate(
                       "document.getElementById('a_temel_cevre').textContent"))
-        r.kontrol("şerit boyu alanı topraklama diye etiketli",
+        r.kontrol("şerit boyu satırı topraklama diye etiketli",
                   "topraklama" in pg.eval_on_selector(
-                      "#a_serit_L", "e=>e.closest('.alan').querySelector('label').textContent"))
+                      "#a_serit_tahmin", "e=>e.closest('.alan').querySelector('label').textContent"))
 
         # ------------------------------------------------------------------
-        #  v1.8 — ŞERİT BOYU TEMEL ÖLÇÜLERİNDEN TÜRETİLİR
-        #  Ofiste yalnız uzunluk ve genişlik giriliyor; alan boş kalınca
-        #  kullanılan boy YER TUTUCUDA ve açılımıyla görünmeli.
+        #  ŞERİT BOYU TEMEL ÖLÇÜLERİNDEN TÜRETİLİR  ( kutu yok )
+        #  Kullanılan boy ekranda açılımıyla görünmeli.
         # ------------------------------------------------------------------
-        r.esit("örnek projede şerit boyu boş bırakılmış",
-               pg.input_value("#a_serit_L"), "")
-        _yt = pg.get_attribute("#a_serit_L", "placeholder")
-        r.kontrol("şerit boyu yer tutucusu türetilen değeri gösteriyor",
-                  "102,30" in (_yt or ""), f"→ {_yt!r}")
         _ac = pg.evaluate("document.getElementById('a_serit_tahmin').textContent")
         r.kontrol("türetme açılımı ekranda", "ring" in _ac and "102,30" in _ac,
                   f"→ {_ac!r}")
-        #  Elle yazılan boy türetileni ezer ve açılım kaybolur
-        pg.fill("#a_serit_L", "140")
-        pg.wait_for_timeout(1500)
-        _ac2 = pg.evaluate("document.getElementById('a_serit_tahmin').textContent")
-        r.kontrol("elle girilince türetme açılımı kalkıyor", _ac2.strip() == "",
-                  f"→ {_ac2!r}")
-        pg.fill("#a_serit_L", "")
-        pg.wait_for_timeout(1500)
-        r.kontrol("alan boşaltılınca türetme geri geliyor",
-                  "102,30" in (pg.get_attribute("#a_serit_L", "placeholder") or ""))
         #  Göz aralığı ofis standardında olmalı
         pg.click('.sekme[data-sekme="sabitler"]')
         pg.wait_for_timeout(500)

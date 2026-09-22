@@ -305,39 +305,19 @@
             <div class="alan"><label>a — Temel uzunluğu <span class="ipucu">(m)</span></label><input id="a_temel_a" class="girdi"></div>
             <div class="alan"><label>b — Temel genişliği <span class="ipucu">(m)</span></label><input id="a_temel_b" class="girdi"></div>
           </div>
+          <!--  ŞERİT BOYU GİRDİ DEĞİLDİR:  hep boş bırakılan bir kutuydu;  boy her
+                zaman temel ölçülerinden hesaplanır ( uygulama projesiyle aynı ) ve
+                paftaya işlemiyle basılır.  Burada yalnız kullanılan boy ve açılımı
+                görünür.  -->
           <div class="alan"><label>Şerit boyu — <b>topraklama bandı</b>
-            <span class="ipucu">(m — boş bırakın, temel ölçülerinden hesaplanır)</span>
-            <span class="bilgi" tabindex="0" role="button" aria-label="Açıklamayı göster"
-              onclick="bilgiAc(this,event)"><span class="bilgi-im">!</span><span class="bilgi-balon">
-              <p><b>Temele gömülen topraklama şeridinin toplam boyu.</b> Genelde 30×3,5 mm
-                galvanizli çelik bant; temel içinde dolaşan hattın toplam uzunluğudur.
-                Bağlantı ve enine bağlar da bu boya dâhildir.</p>
-              <p>Yatay topraklama direncine girer: <b>Ry = β / (2·D) + β / L</b>. Şerit
-                uzadıkça direnç düşer.</p>
-              <p><b>Bu alanı doldurmanız gerekmez.</b> Avan aşamasında elektrik projesinin
-                topraklama planı henüz çizilmemiş olur; program bandın boyunu
-                <b>temel uzunluğu ve genişliğinden</b> türetir:
-                band temelin çevresini <b>kapalı ring</b> olarak dolaşır, 20 m'yi aşan
-                kenarlarda gözler <b>20 × 20 m</b>'yi geçmeyecek şekilde
-                <b>enine bağ</b> atılır —<br>
-                <b>L = 2·( a + b ) + enine bağlar</b>.
-                Göz aralığı <b>Sabitler → ④ Temel Topraklama</b> altından değiştirilebilir.</p>
-              <p>Topraklama planı çizildiğinde <b>plandaki gerçek boyu</b> buraya yazın;
-                yazdığınız değer türetileni ezer. Paftada boyun nereden geldiği
-                ( GİRİŞ / türetilen ) yazılır.</p>
-              <p>Malzeme uygulamada <b>30 × 3,5 mm sıcak daldırma galvanizli çelik band</b>;
-                donatıya yaklaşık 2 m aralıkla cıvatalı bağlanır.</p>
-              <p><b>Asansör kartındaki L1 ile ilgisi yoktur.</b> L1 kolon hattı ( pano →
-                kuyu ) elektrik besleme uzunluğudur ve kuyu yüksekliğinden türetilir;
-                buradaki band temelde yatay uzanır.</p>
-              <p class="ipucu" id="a_temel_cevre"></p></span></span></label>
-            <input id="a_serit_L" class="girdi" placeholder="temel ölçülerinden türetilir"></div>
-          <div class="ipucu" id="a_serit_tahmin" style="margin:-6px 0 4px"></div>
-          <div class="ipucu" style="margin:0 0 10px">Boş bırakılırsa
-            <b>L = 2·( a + b ) + enine bağlar</b> ile temel ölçülerinden hesaplanır —
-            ofiste olduğu gibi yalnız <b>uzunluk</b> ve <b>genişlik</b> girmeniz yeter.
-            Topraklama planı varsa oradaki gerçek boyu yazın. <b>Kuyu yüksekliğiyle
-            ilgisi yoktur</b>; asansör kartındaki <b>L1 ( kolon hattı )</b> ayrı bir şeydir.</div>
+            <span class="ipucu">(m — temel ölçülerinden hesaplanır)</span></label>
+            <div class="ipucu" id="a_serit_tahmin" style="margin:2px 0 4px"></div>
+            <div class="ipucu" style="margin:0 0 10px">
+              <b>L = 2·( a + b ) + enine bağlar</b> — band temelin çevresini kapalı ring
+              olarak dolaşır, gözler karelaj aralığını ( Sabitler ) geçmez.
+              <b>Kuyu yüksekliğiyle ilgisi yoktur</b>; asansör kartındaki
+              <b>L1 ( kolon hattı )</b> ayrı bir şeydir.
+              <span id="a_temel_cevre"></span></div></div>
           <div class="uyari mavi" style="margin:2px 0 0">
             <b>β — toprak özgül direnci</b> ve <b>Is — çubuk topraklayıcı adedi</b> buradan
             kaldırıldı: projeden projeye değişmiyorlar. Değerleri <b>Sabitler / Ofis Standardı</b>

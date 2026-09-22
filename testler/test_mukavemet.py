@@ -33,18 +33,18 @@ REFERANS_TABLOLAR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 #  bölümde aranır.
 ORNEK_PROJE = {
     "motor_gucu": (
-        ("motor.Gh", 51.47632, "Gh toplam halat ağırlığı"),
-        ("motor.lh", 48.38, "lh halat uzunluğu"),
-        ("motor.F1", 1551.47632, "F1 kabin ve aksesuar yükü"),
+        ("motor.Gh", 52.54032, "Gh toplam halat ağırlığı"),
+        ("motor.lh", 49.38, "lh halat uzunluğu"),
+        ("motor.F1", 1552.54032, "F1 kabin ve aksesuar yükü"),
         ("motor.Ga", 1100, "Ga karşı ağırlık yükü"),
     ),
     "makine_konstruksiyonu": (
-        ("makine.F", 57907.965398399996, "F kaide üzerindeki en büyük kuvvet"),
-        ("makine.F1", 28953.982699199998, "F1 yan yatak putreli"),
-        ("makine.FB", 22025.70826760571, "FB"),
-        ("makine.FA", 6928.274431594287, "FA"),
-        ("makine.Mmax", 7378612.269647916, "Mmax"),
-        ("makine.sigma_e", 121.55868648513865, "σe eğilme gerilmesi"),
+        ("makine.F", 57928.8410784, "F kaide üzerindeki en büyük kuvvet"),
+        ("makine.F1", 28964.4205392, "F1 yan yatak putreli"),
+        ("makine.FB", 22033.648481605716, "FB"),
+        ("makine.FA", 6930.772057594284, "FA"),
+        ("makine.Mmax", 7381272.241337912, "Mmax"),
+        ("makine.sigma_e", 121.60250809452903, "σe eğilme gerilmesi"),
     ),
     "aski_halatlari": (
         ("aski.oran", 36.92307692307692, "Dt / dh"),
@@ -53,7 +53,7 @@ ORNEK_PROJE = {
         #  Örnek projenin kendi dosyasında 1 yazılıydı;  Kp = 1 olduğu için
         #  Nequiv(p) doğrudan Nps'dir.
         ("aski.Nequiv_p", 2, "Nequiv(p)"),
-        ("aski.S", 22.720130951145965, "S gerçek güvenlik katsayısı"),
+        ("aski.S", 22.704560199764753, "S gerçek güvenlik katsayısı"),
     ),
     "regulator_halati": (
         ("regulator.oran", 50, "Dreg / dreg"),
@@ -75,20 +75,21 @@ ORNEK_PROJE = {
         ("agirlik_ray.Dya", 48, "Dya"),
         ("agirlik_ray.Mg", 98.42000000000002, "Mg ağırlık rayı kütlesi"),
         ("agirlik_ray.Fv", 965.5002000000002, "Fv"),
-        ("agirlik_ray.sv", 2.1589477894736846, "σv"),
+        #  ( Fv + k3·MY ) / A = ( 965,5 + 2 × 50 ) / 475  —  k3 = 2 ( ofis )
+        ("agirlik_ray.sv", 2.243158315789474, "σv"),
     ),
     "kuyu_tabani": (
         ("kuyu.LR", 26600, "LR ray boyu"),
     ),
     "siginma_alanlari": (
-        ("siginma.agirlik_paten_ray", 350, "Ç.2 - ağırlık üst pateni"),
+        ("siginma.agirlik_paten_ray", 750.0, "Ç.2 - ağırlık üst pateni"),
         ("siginma.kuyu_tabani_kabin", 1010, "a - kuyu tabanı"),
         ("siginma.etek", 460, "a.1 - kabin eteği"),
         ("siginma.ray_kabin_alt", 280, "a.2 - kılavuz raylar"),
         ("siginma.regulator_kabin", 710, "b - regülatör makarası"),
     ),
 }
-ORNEK_OZET = (("S_gercek", 22.720130951145965), ("Mg_kabin", 329.30800000000005), ("Mg_agirlik", 98.42000000000002))
+ORNEK_OZET = (("S_gercek", 22.704560199764753), ("Mg_kabin", 329.30800000000005), ("Mg_agirlik", 98.42000000000002))
 
 
 def _yakin(a, b, tol=1e-7):
@@ -186,7 +187,8 @@ def calistir():
     #  ( Ek C.2.2.1 b) — payda n·h DEĞİL, (n/2)·h )
     r.kontrol("motor σ(My) için Wx kullanıyor",
               any(_yakin(a["deger"], MK._moment(
-                  1.2 * 9.81 * 1100 * 48 / ((2 / 2) * 3400), 3000) / p)
+                  1.2 * 9.81 * 1100 * 48 / ((2 / 2) * s["girdi"]["agirlik_paten_arasi"]),
+                  3000) / p)
                   for a in b[7]["adimlar"] if isinstance(a["deger"], (int, float))))
     return _girdi_yollari(_denetim_bulgulari(_sapmalar(r)))
 
@@ -206,7 +208,9 @@ def _sapmalar(r):
 
     #  ③ Durum 2'de xQ = xc
     _xc = s["ara"]["kabin_ray.xc"]
-    _bek = 2 * 9.81 * (800 * _xc + _P_std(s) * s["ara"]["kabin_ray.xp"]) / (2 * 3400)
+    #  h VARSAYILANDAN okunur, sayı olarak yazılmaz ( 3400 çivilenmişti ).
+    _bek = (2 * 9.81 * (800 * _xc + _P_std(s) * s["ara"]["kabin_ray.xp"])
+            / (2 * s["girdi"]["kabin_paten_arasi"]))
     r.kontrol("③ Durum 2 Fx, xQ = xc ile hesaplanıyor",
               _yakin(s["ara"]["kabin_ray.c21.d2.Fx"], _bek), f"→ {s['ara']['kabin_ray.c21.d2.Fx']!r} ≠ {_bek!r}")
 
@@ -1221,7 +1225,7 @@ def _denetim_bulgulari(r):
     _sc = MK.hesapla()
     _pc = _MTd.ray("89 x 62 x 15,88", "A")
     _fv = _sc["ozet"]["Mg_kabin"] * 9.81
-    _bek = (_fv + 1.2 * 150) / _pc                    # ω YOK
+    _bek = (_fv + US.sabitler(None)["k3_yardimci"] * 150) / _pc   # ω YOK
     _b7c = [x for x in _sc["bolumler"] if x["baslik"].startswith("7 ")][0]
     _sv = [a["deger"] for a in _b7c["adimlar"]
            if str(a.get("formul", "")).startswith("σv = ")]
@@ -1325,14 +1329,16 @@ def _denetim_bulgulari(r):
     #  Δη KALDIRILDIĞI için η artık kendi başına negatife düşemez;  eski
     #  senaryolar ( η = 0,10 · Δη = 0,10 → sıfıra bölme;  Δη = 0,20 →
     #  η′ = −0,10 ve N = −44,26 kW ) yapısal olarak imkânsızdır.  Kalan risk
-    #  ofis sabitinin kendisidir:  aralık dışı değer REDDEDİLİP varsayılana
-    #  dönmeli, sessizce kullanılmamalı.
+    #  ofis sabitinin kendisidir:  aralık dışı değerle HESAP YAPILMAZ.  Önce
+    #  varsayılana dönülüyordu ve bunu hiçbir yer söylemiyordu — kullanıcı
+    #  0,5 yazıyor, pafta 0,85 ile hesaplanıyordu.
     for _kotu in (0, -0.5, 1.5):
         _d1 = MK.hesapla({"_ofis": {"verim_dislisiz": _kotu}})
-        r.kontrol(f"D1  η = {_kotu} reddedilip varsayılana dönüyor",
-                  _d1["aktif"] is True
-                  and _yakin(_d1["ara"]["motor.eta"], _USd.VARSAYILAN["verim_dislisiz"]),
-                  f"→ aktif {_d1['aktif']} · η {_d1.get('ara', {}).get('motor.eta')!r}")
+        r.kontrol(f"D1  η = {_kotu} ile hesap yapılmıyor", _d1["aktif"] is False)
+        r.kontrol(f"D1  η = {_kotu} hatası ofis alanını ve aralığı söylüyor",
+                  any("Ofis standardı" in h and "geçerli aralık" in h
+                      for h in _d1.get("hata") or []),
+                  f"→ {_d1.get('hata')}")
     r.kontrol("D1  η = 1 sınırı kabul ediliyor",
               MK.hesapla({"_ofis": {"verim_dislisiz": 1.0}})["aktif"] is True)
     #  İKİNCİ KALKAN:  doğrulama ATLANSA ve η yine de sıfır gelse bile

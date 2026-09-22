@@ -248,7 +248,7 @@ function avanGirdi(){
       standardında ).  v() olmayan alan için '' döndürür, motor da boş
       değeri ofis varsayılanına çevirir — liste yine de tam bırakıldı ki
       eski proje dosyalarındaki değerler taşınabilsin. */
-  const ortak={}; ['U','kappa','eps_max','temel_a','temel_b','beta','serit_L','cubuk_sayisi',
+  const ortak={}; ['U','kappa','eps_max','temel_a','temel_b','beta','cubuk_sayisi',
     'mk_uzunluk','mk_genislik'].forEach(k=>ortak[k]=v('a_'+k));
   ortak.mk_yok = !!($('a_mk_yok') && $('a_mk_yok').checked);
   const asansorler=[1,2,3,4].map(i=>{
@@ -640,7 +640,7 @@ function avanAsansorleriKur(){
             <div class="alan"><label>S1 — Kolon hattı kesiti</label>
               <select id="a_S1${i}" class="girdi ofis-alan" data-ofis="S1"><option value="">ofis standardı</option>${kesitOpt()}</select></div>
             <div class="alan"><label>L1 — Kolon hattı uzunluğu (m) <span class="ipucu">elektrik</span>
-              ${bilgiSimgesi(['Boş bırakılırsa L1 = kuyu yüksekliği ( Hk ) + Sabitler sekmesindeki ofis payı kullanılır — pano ile kuyu arasındaki mesafe.','Plandan ölçtüğünüz değer farklıysa buraya yazın.'])}</label>
+              ${bilgiSimgesi(['Boş bırakılırsa L1 = kuyu yüksekliği ( Hk ) + Sabitler sekmesindeki yatay güzergâh payı kullanılır — ana pano → kuyu → asansör panosu yatay kablo yolu ve bağlantı payı.','Plandan ölçtüğünüz değer farklıysa buraya yazın.'])}</label>
               <input id="a_L1${i}" class="girdi" placeholder="Hk + pay"></div>
           </div>
           <div class="satir i2">
@@ -1008,7 +1008,7 @@ function turetilenGoster(r){
       const hk  = sayiOku(v('a_Hk'+i));
       const hes = (oz && oz.L1!=null) ? oz.L1 : ((hk>0 && pay>=0) ? hk+pay : NaN);
       l1.placeholder = isFinite(hes)
-        ? `${tr(hes)}   ( Hk + ${tr(pay)} )` : 'Hk + ofis payı';
+        ? `${tr(hes)}   ( Hk + ${tr(pay)} )` : 'Hk + yatay güzergâh payı';
     }
   }
 }

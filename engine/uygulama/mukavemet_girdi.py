@@ -295,7 +295,12 @@ ALANLAR = (
     ("reg_halat_capi",    "Regülatör halatı çapı",             "mm",   "secim", _s(6, 6.5, 8), 6),
     ("reg_kasnak_capi",   "Regülatör kasnak çapı  ( Dreg )",   "mm",   "sayi", None, 300),
     ("reg_kanal_acisi",   "Regülatör kanal açısı",             "°",    "sayi", None, 40),
-    ("reg_gergi_agirligi", "Regülatör gergi ağırlığı  ( Gra )", "kg",  "sayi", None, 70),
+    #  EŞDEĞER AĞIRLIK:  güncel gergiler kollu ( 15 – 35 kg ağırlık, kol oranıyla
+    #  büyütülür ) ya da yaylıdır;  hesaba giren kasnak merkezindeki kuvvettir.
+    #  Kollu gergide ağırlığın kendi kütlesi girilirse halat gerilimi düşük,
+    #  halat güvenlik katsayısı İYİMSER çıkar ( ELEport:  35 kg kolda 1.030 N
+    #  → eşdeğer 105 kg;  35 girilince S = 11,77, doğrusu 8,04 ).
+    ("reg_gergi_agirligi", "Regülatör gergi ağırlığı — eşdeğer  ( Gra )", "kg",  "sayi", None, 70),
     #  KATALOG VERİSİ ASKI HALATINDA VARDI, REGÜLATÖRDE YOKTU.  TS 12385-5
     #  tablosu yalnız LİF ÖZLÜ halatları kapsar;  regülatör halatları çoğu
     #  zaman çelik özlüdür ve kopma yükleri belirgin biçimde yüksektir
@@ -379,8 +384,19 @@ ALANLAR = (
     #  seçilecek bir şey kalmadı.  Bkz. engine/ortak/ofis.py, "PALANGA VERİM
     #  DÜŞÜŞÜ KALDIRILDI".  Eski projelerin JSON'unda kalan toplam_verim
     #  anahtarı yok sayılır, geri yükleme bozulmaz.
-    ("kabin_paten_arasi", "Kabin paten arası",                 "mm",   "sayi", None, 3400),
-    ("agirlik_paten_arasi", "Ağırlık paten arası",             "mm",   "sayi", None, 3400),
+    #  PATEN ARASI h  —  ray kuvvetinin PAYDASIDIR ( Fx = … / ( n · h ) ) ve
+    #  kuyudaki yığına da girer ( halat boyu, Ç.2 üst açıklığı ).
+    #  Kabin:  eskiden 3.400 — diskteki dört gerçek projenin hepsinden
+    #  büyüktü ( ofis Excel'i makine daireli 3.000 · MRL 3.300 · ELEport
+    #  3.300 · new block 3.200 ).
+    #  Karşı ağırlık:  çerçeve boyu DOLGU MALZEMESİNE bağlıdır.  Gerçek
+    #  projeler:  ELEport 1.300 kg → 1.500 mm ( pik döküm ile tutarlı ) ·
+    #  new block 1.838 kg → 3.200 mm.  Varsayılan malzeme BARİT:  Türk
+    #  piyasasındaki blok 960 × 155 × 120 mm, 50 – 70 kg;  1.200 kg için
+    #  dolgu 2.160 – 2.880 mm, travers payıyla ~3.000.  Pik dökümde ~1.500
+    #  elle girilir.
+    ("kabin_paten_arasi", "Kabin paten arası",                 "mm",   "sayi", None, 3300),
+    ("agirlik_paten_arasi", "Ağırlık paten arası",             "mm",   "sayi", None, 3000),
     ("guvenlik_tertibati", "Güvenlik tertibatı ( fren bloğu ) tipi", "—", "secim",
      MT.DARBE_TIPLERI_ADLARI, "Kaymalı"),
     #  SIĞINMA HACMİ TİPİ  ( TS EN 81-20 m.5.2.5.7.1 · m.5.2.5.8.1 ).
@@ -897,8 +913,10 @@ ACIKLAMA = {
               "Halat çapına oranı en az 30 olmalıdır ( m.5.6.2.2.1.3 ).",
     "reg_kanal_acisi": "Regülatör kasnağı kanalının açısı. Halatı çekme "
               "kuvvetini belirleyen sürtünme buradan çıkar.",
-    "reg_gergi_agirligi": "Gra — kuyu dibindeki regülatör gergi ağırlığının "
-              "kütlesi. Halattaki çekme kuvvetini doğrudan belirler.",
+    "reg_gergi_agirligi": "Gra — gergi kasnağının merkezinde oluşan kuvvet / 9,81. "
+              "Kollu ya da yaylı gergide ağırlığın kendi kütlesini DEĞİL bu "
+              "eşdeğeri girin ( imalatçı belgesinde yazar ); yalnız doğrudan "
+              "asılı ağırlıkta ikisi aynıdır. Halattaki gerilimi belirler.",
     "reg_halat_birim_kutle": "Regülatör halatının metre ağırlığı. Boşsa "
               "tablodan alınır.",
     "reg_halat_kopma_kN": "Regülatör halatının en küçük kopma yükü. Boşsa "
@@ -1480,6 +1498,11 @@ def dogrula(g):
 
     #  REGÜLATÖR SÜRTÜNME KATSAYISI artık asansör bazında sorulmaz:  ofis
     #  sabitidir ( sabitler.reg_mu ) ve üst sınırını ARALIK denetler.
+
+    #  OFİS STANDARDI  ( Sabitler sekmesi ).  Aralık dışı değer varsayılanla
+    #  değiştiriliyor ve bunu hiçbir yer söylemiyordu;  artık hesap durur.
+    from engine.uygulama import sabitler as _US
+    hata += _US.ofis_hatalari(g.get("_ofis"))
     return hata
 
 

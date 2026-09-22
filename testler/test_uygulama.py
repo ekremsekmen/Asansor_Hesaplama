@@ -29,8 +29,9 @@ from engine.uygulama import girdi as UG                # noqa: E402
 from engine.uygulama import sabitler as US             # noqa: E402
 from testler.ortak import P_std as _P_std, Rapor                        # noqa: E402
 
-#  Topraklama ve kolon hattı olmadan elektrik bölümlerinin bir kısmı boş kalır
-TAM = {"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45}
+#  Topraklama olmadan elektrik bölümlerinin bir kısmı boş kalır.  L1 girdi
+#  değildir:  kuyu yüksekliği + Sabitler'deki yatay güzergâh payından kurulur.
+TAM = {"temel_a": 26.55, "temel_b": 16.4}
 
 
 def _bolum_adlari(s):
@@ -94,8 +95,8 @@ def calistir():
          "seyir mesafesi → kuyu boyu → kuyu aydınlatması"),
         ("kolon_kesit", 16, 4, "eps",
          "kolon kesiti → gerilim düşümü"),
-        ("kolon_uzunluk", 45, 120, "eps",
-         "kolon hattı boyu → gerilim düşümü"),
+        ("_ofis", {}, {"L1_pay": 80}, "eps",
+         "L1 yatay güzergâh payı ( Sabitler ) → gerilim düşümü"),
         ("temel_a", 26.55, 8, "Re",
          "temel uzunluğu → topraklama direnci"),
     )
@@ -220,9 +221,15 @@ def calistir():
               any("50 x 50 x 5" in str(s[0]) for s in _ray["satirlar"]))
     _w = [x for x in _tb if x["ad"].startswith("ω")][0]
     r.kontrol("ω tablosu üç Rm sütunu veriyor", len(_w["basliklar"]) == 4)
-    r.kontrol("ω tablosu motorun formülüyle aynı",
-              all(abs(s[1] - round(MT.omega_en8150(s[0], 370), 4)) < 1e-9
-                  for s in _w["satirlar"]))
+    #  Sekmedeki değer paftanın kuralıyla yuvarlanır ( steps.yuvarla ):
+    #  Python'un round()'u λ = 150 · Rm = 520'de ω = 5,69925'i ( ikilide
+    #  5,69924999… ) 5,6992 gösteriyordu, pafta ise 5,6993 basar.  Üç Rm
+    #  sütununun hepsi denetlenir.
+    from engine.ortak.steps import yuvarla as _yuv
+    r.kontrol("ω tablosu motorun formülüyle ve paftanın yuvarlamasıyla aynı",
+              all(s[i] == _yuv(MT.omega_en8150(s[0], rm), 4)
+                  for s in _w["satirlar"] for i, rm in ((1, 370), (2, 440), (3, 520))),
+              f"→ {[(s[0], s[3]) for s in _w['satirlar'] if s[3] != _yuv(MT.omega_en8150(s[0], 520), 4)][:3]}")
 
     # ═══════════════════════════════════════════════════════════════
     #  DENETİMDE BULUNAN SEKİZ HATA  —  her biri yeniden üretilerek
@@ -268,8 +275,7 @@ def calistir():
     #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil
     _s2 = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), tahrik_kasnak_capi=280,
                                      saptirma_kasnak_capi=280, motor_gucu=37,
-                                     kolon_kesit=95, makine_kesit=1.5,
-                                     makine_uzunluk=2)))
+                                     kolon_kesit=95, makine_kesit=1.5)))
     #  SIRAYA DEĞİL KİMLİĞE BAK:  mukavemet tarafına bölüm eklenince
     #  ( TAMPONLAR ) elektrik bölümlerinin numarası kayıyor.
     _b14 = [b for b in _s2["bolumler"] if b["kimlik"] == "gerilim_dusumu"][0]
@@ -311,9 +317,14 @@ def calistir():
                   for a in _rgb["adimlar"]),
               f"→ {[a.get('aciklama') for a in _rgb['adimlar']]}")
 
-    #  BİLGİLENDİRİCİ uyarı uygunluğu ENGELLEMEZ
-    _bg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
-                                     _ofis={"cosfi": 99})))
+    #  BİLGİLENDİRİCİ uyarı uygunluğu ENGELLEMEZ.  Örnek eskiden reddedilen
+    #  bir ofis sabitiydi ( cosφ = 99 );  o artık bilgilendirici değildir,
+    #  hesabı durdurur ( bkz. ④ ).  Makine dairesiz tesiste yükün binaya
+    #  aktarıldığı notu gerçek bir bilgilendirici uyarıdır.
+    _bg = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz, mk_yok=True)))
+    r.kontrol("② örnekte bilgilendirici uyarı var",
+              any("BİNA YAPISINA" in u for u in _bg["uyarilar"]),
+              f"→ {_bg['uyarilar']}")
     r.kontrol("② bilgilendirici uyarı uygunluğu engellemiyor",
               _bg["ozet"]["tumu_uygun"] is True,
               f"→ {_bg['ozet'].get('engelleyici')} / {_bg['ozet'].get('eksik_hesap')}")
@@ -326,9 +337,32 @@ def calistir():
               "sabitler": {"cosfi": 2, "q_denge": 5, "n_ray": 0}, "trafik": {}}
     _S4 = _AV4.sabitler(_veri4["sabitler"])
     for _k, _ham in (("cosfi", 2), ("q_denge", 5), ("n_ray", 0)):
-        r.kontrol(f"④ {_k} reddedilen ham değer ({_ham}) yerine geçerli değer kullanılıyor",
+        r.kontrol(f"④ {_k} reddedilen ham değer ({_ham}) sözlüğe yazılmıyor",
                   _S4[_k] != _ham and _S4[_k] == _AV4.sabitler({})[_k],
                   f"→ {_S4[_k]!r}")
+    #  ... ve o sözlükle HESAP YAPILMAZ:  üçü de adıyla tek hatada söylenir.
+    _h4 = _AV4.hesapla(_veri4).get("hata") or ""
+    r.kontrol("④ reddedilen ofis sabitiyle avan hesabı yapılmıyor",
+              all(x in _h4 for x in ("cosφ", "q — denge faktörü", "n — kabin kılavuz ray")),
+              f"→ {_h4!r}")
+    #  Uygulamada da:  Sabitler sekmesindeki aralık dışı değer eskiden HİÇBİR
+    #  iz bırakmadan varsayılanla değişiyordu ( β = 0,5 → 150 Ω·m ).
+    for _k4, _v4 in (("cosfi", 99), ("beta", 0.5), ("sigma_em", 5), ("U", 50)):
+        _u4 = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz,
+                                         _ofis={_k4: _v4})))
+        r.kontrol(f"④ uygulama: ofis {_k4} = {_v4} ile hesap yapılmıyor",
+                  _u4["aktif"] is False
+                  and any("Ofis standardı" in h and "geçerli aralık" in h
+                          for h in _u4.get("hata") or []),
+                  f"→ aktif {_u4['aktif']} · {_u4.get('hata')}")
+    #  Uygulamanın avan motoruna geçirdiği sabitler İKİ tarafta aynı aralıkta
+    #  olmalı:  yoksa uygulamanın kabul ettiği bir değeri avan motoru reddeder
+    #  ve elektrik hesapları sebepsiz "yapılamadı" görünür.
+    _avr4 = {**_AV4.SABIT_B_ARALIK, **_AV4.OFIS_ARALIK}
+    _fark4 = {k: (_avr4[k], US.ARALIK.get(k)) for k in US.VARSAYILAN
+              if k in _avr4 and k not in UG.AVAN_DISI and US.ARALIK.get(k) != _avr4[k]}
+    r.kontrol("④ avana geçen ofis sabitlerinin aralıkları iki projede aynı",
+              not _fark4, f"→ {_fark4}")
 
     #  ⑤  METİN OFİS ALANI SAYIYA ÇEVRİLMİYOR
     import api.uygulama as _AU4
@@ -632,34 +666,34 @@ def calistir():
               MK.hesapla({"sarilma_acisi": 300}).get("aktif") is False)
     r.kontrol("⑮ aralık dışı açı girdi doğrulamasında reddediliyor",
               MK.hesapla({"sarilma_acisi": 400}).get("aktif") is False)
-    #  ⑯  ARALIK DIŞI ELEKTRİK GİRDİSİ HESABA GİRMİYOR
-    #  Avan motoru L1 · L2 · S1 · S2'yi kendi aralıklarına göre denetler ve
-    #  aralık dışındakini REDDEDİP varsayılana döner;  pafta kullanılan
-    #  değeri basar ve reddi uyarıda söyler.
-    _ARALIK_DISI = {"kolon_uzunluk": 600, "makine_uzunluk": 900,
-                    "kolon_kesit": 900, "makine_kesit": 900}
-    for _alan in _ARALIK_DISI:
-        #  TAM zaten kolon_uzunluk taşıyor;  üzerine yazılır.
+    #  ⑯  AVAN MOTORUNUN KABUL ETMEYECEĞİ KÖPRÜ DEĞERİYLE HESAP YAPILMAZ
+    #  Kesitler, motor gücü ve kabin ağırlığı avan motorunun elektrik
+    #  hesabına girer ve sınırları orada durur.  Önce aralık dışı kesit
+    #  varsayılanla değiştiriliyor ( 900 mm² yazılan paftada 6 mm² ile hesap ),
+    #  sonra yalnız "elektrik hesapları yapılamadı" deniyordu.  Artık girdi
+    #  doğrulaması alanı adıyla reddeder.  L2 ve L1 asansör girdisi değildir
+    #  ( Sabitler sekmesinde denetlenir ).
+    _SINIR16 = {k: aralik for k, _ad, aralik, _b in AV.ASANSOR_SINIRLARI}
+    for _alan, _kotu in (("kolon_kesit", 900), ("makine_kesit", 0.5),
+                         ("motor_gucu", 600), ("kabin_agirligi", 30)):
+        _avan_adi = UG.AVAN_SINIRLI[_alan]
+        _etiket = (UG.EK_ALAN.get(_alan) or UG.MG.ALAN[_alan])[1]
         _ham16 = dict(UG.varsayilanlar(), **TAM)
-        _ham16[_alan] = _ARALIK_DISI[_alan]
-        _g16 = UG.tamamla(_ham16)
-        _r16 = UY.hesapla(_g16)
-        _motor = {"kolon_uzunluk": "L1", "makine_uzunluk": "L2",
-                  "kolon_kesit": "S1", "makine_kesit": "S2"}[_alan]
-        _deg = None
-        for _b in _r16["bolumler"]:
-            for _a in _b.get("adimlar") or []:
-                if (str(_a.get("sembol") or "") == _motor
-                        and _a.get("deger") is not None):
-                    _deg = _a["deger"]
-        r.kontrol(f"⑯ {_motor} girilen aralık dışı değeri KULLANMIYOR",
-                  _deg is not None and abs(float(_deg) - _ARALIK_DISI[_alan]) > 0.01,
-                  f"→ pafta {_deg}, girilen {_ARALIK_DISI[_alan]}")
-        #  Reddin sebebi kullanıcıya söyleniyor mu
-        r.kontrol(f"⑯ {_motor} reddi uyarıda yazıyor",
-                  any(_motor in u and "geçerli aralık" in u
-                      for u in _r16["uyarilar"]),
-                  f"→ {[u for u in _r16['uyarilar'] if 'aralık' in u]}")
+        _ham16[_alan] = _kotu
+        _r16 = UY.hesapla(UG.tamamla(_ham16))
+        r.kontrol(f"⑯ {_alan} = {_kotu} ile hesap yapılmıyor",
+                  _r16["aktif"] is False, "→ hesap yapıldı")
+        r.kontrol(f"⑯ {_alan} reddi alanı ekrandaki adıyla ve aralığıyla söylüyor",
+                  any(_etiket in h and "geçerli aralık" in h
+                      for h in _r16.get("hata") or []),
+                  f"→ {_r16.get('hata')}")
+        #  Sınır İKİ projede aynı yerden okunur:  uç değer kabul edilir
+        _ust16 = _SINIR16[_avan_adi][1]
+        _sinir16 = dict(UG.varsayilanlar(), **TAM, **{_alan: _ust16})
+        _s16 = UY.hesapla(UG.tamamla(_sinir16))
+        r.kontrol(f"⑯ {_alan} üst sınırda ( {_ust16} ) girdi kabul ediliyor",
+                  not any(_etiket in h for h in _s16.get("hata") or []),
+                  f"→ {_s16.get('hata')}")
     #  ⑲  Pm, GÜCÜ VE MOMENTİ BELİRLEYEN YÜKTEN TÜRER
     #  Pm = F1 − Ga idi:  halatın tamamı kabin tarafında, yön · zincir · kablo
     #  yok.  q = 0,60'ta 185,7 kg basılıyor, belirleyici yük 269,1 kg idi.
@@ -887,8 +921,16 @@ def calistir():
                   _bb.extmin.x <= _mrk.x <= _bb.extmax.x
                   and _bb.extmin.y <= _mrk.y <= _bb.extmax.y,
                   f"→ görünüm {_mrk}, çizim {_bb.extmin}-{_bb.extmax}")
-    # Geçersiz q: türetilen kütle ve bütün yük hesapları aynı değeri kullanır.
-    for q, beklenen in ((2, 1100), (-1, 1100), (0.6, 1180), (0.2, 860), (0.8, 1340)):
+    #  Geçersiz q ile hesap YAPILMAZ ( eskiden varsayılan 0,50'ye dönülüyordu ).
+    for q in (2, -1):
+        sonuc = MK.hesapla({"_ofis": {"q_denge": q}})
+        r.kontrol(f"denge {q}: aralık dışı q ile hesap yapılmıyor",
+                  sonuc["aktif"] is False
+                  and any("Ofis standardı" in h and "geçerli aralık" in h
+                          for h in sonuc.get("hata") or []),
+                  f"→ {sonuc.get('hata')}")
+    #  Geçerli q:  türetilen kütle ve bütün yük hesapları aynı değeri kullanır.
+    for q, beklenen in ((0.6, 1180), (0.2, 860), (0.8, 1340), (0.5, 1100)):
         sonuc = MK.hesapla({"_ofis": {"q_denge": q}})
         r.esit(f"denge {q}: türetilen kütle", sonuc["girdi"]["karsi_agirlik"], beklenen)
         r.esit(f"denge {q}: motor kütlesi", sonuc["ara"]["motor.Ga"], beklenen)
@@ -1028,8 +1070,11 @@ def calistir():
                   f"→ {_sira}")
         r.esit("pafta: topraklama bir kez basılıyor",
                _m.count("YATAY ( TEMEL ) TOPRAKLAYICI"), 1)
-        r.kontrol("pafta: proje geneli şeridi açıklamasıyla geliyor",
-                  "bütün asansörler için bir kez" in _m)
+        #  Şerit yalnız başlıktır:  "bütün asansörler için bir kez" yan yazısı
+        #  ve "BİNAYA aittir" kutusu paftayı okuyana bilgi vermiyordu.
+        r.kontrol("pafta: proje geneli şeridinde açıklama yazısı YOK",
+                  "bütün asansörler için bir kez" not in _m
+                  and "BİNAYA aittir" not in _m)
     except ImportError:
         r.kontrol("pafta sırası denetlenemedi ( pypdfium2 yok )", True)
 
@@ -1223,7 +1268,7 @@ def calistir():
     #  PROJE GENELİ ALANLAR TEK KAYNAKTA
     r.kontrol("proje geneli alan listesi motorda",
               set(UG.PROJE_GENELI_ALANLAR)
-              == {"temel_a", "temel_b", "serit_L",
+              == {"temel_a", "temel_b",
                   "mk_yok", "mk_uzunluk", "mk_genislik"},
               f"→ {UG.PROJE_GENELI_ALANLAR}")
 

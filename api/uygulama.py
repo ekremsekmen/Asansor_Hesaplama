@@ -14,7 +14,8 @@ from fastapi.responses import JSONResponse
 
 from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
                        _paket_ekleri, _proje_kimligi, _sabitler_coz, _sayi,
-                       _uretilemedi, belirsiz_sayi_mi)
+                       _sayi_oku, _uretilemedi, belirsiz_sayi_mi)
+from engine.ortak.steps import evet_mi
 from engine.uygulama import girdi as E_UGR
 from engine.uygulama import sabitler as E_US
 from engine.uygulama import tablolar_gorunum as E_UTB
@@ -78,16 +79,12 @@ def _mukavemet_girdi(veri: dict):
                       _uygulanmayan((girdiler or {}) if isinstance(girdiler, dict) else {}))
 
 
-def _onay(ham):
-    return ham if isinstance(ham, bool) else str(ham).lower() in ("1", "true", "evet", "on")
-
-
 def _uygulanmayan(ham):
     """Ham girdideki makine yerleşimine göre hesaba girmeyen alanlar.
 
     Kutu gönderilmemişse sözleşmenin varsayılanı ( makine dairesiz ) geçerlidir.
     """
-    mk_yok = _onay(ham["mk_yok"]) if "mk_yok" in ham else E_UGR.EK_ALAN["mk_yok"][5]
+    mk_yok = evet_mi(ham["mk_yok"]) if "mk_yok" in ham else E_UGR.EK_ALAN["mk_yok"][5]
     return E_UGR.uygulanmayan_alanlar(mk_yok)
 
 
@@ -114,12 +111,7 @@ def _girdi_coz(v, veri, atla=frozenset()):
             g[anahtar] = None
             continue
         ham = v[anahtar]
-        if tur2 == "onay":
-            g[anahtar] = _onay(ham)
-            continue
-        if belirsiz_sayi_mi(ham):
-            _BELIRSIZ.append(f"{_et} = {str(ham).strip()}")
-        g[anahtar] = _sayi(ham)
+        g[anahtar] = evet_mi(ham) if tur2 == "onay" else _sayi_oku(ham, _et)
     for anahtar, etiket, _b, tur, secenekler, _var in E_MGR.ALANLAR:
         if tur == "hesap" or anahtar not in v:
             continue
@@ -127,15 +119,14 @@ def _girdi_coz(v, veri, atla=frozenset()):
             g[anahtar] = None
             continue
         ham = v[anahtar]
+        if secenekler is None:
+            #  Serbest sayı:  okunamayan yazım boş SAYILMAZ, sebebiyle
+            #  reddedilir ( boş kabin kütlesi gibi tablodan doldurulan bir
+            #  alanda "abc" eskiden tablo değerine dönüşürdü ).
+            g[anahtar] = _sayi_oku(ham, etiket) if tur == "sayi" else ham
+            continue
         if belirsiz_sayi_mi(ham):
             _BELIRSIZ.append(f"{etiket} = {str(ham).strip()}")
-        if secenekler is None:
-            g[anahtar] = _sayi(ham) if tur == "sayi" else ham
-            # Boş kütle tablodan doldurulabilir; bozuk giriş boş sayılamaz.
-            if (anahtar == "kabin_agirligi" and g[anahtar] is None
-                    and ham is not None and str(ham).strip()):
-                g[anahtar] = ham
-            continue
         #  Seçenek listesi:  önce birebir, sonra sayısal eşleşme aranır
         if ham in secenekler:
             g[anahtar] = ham
@@ -174,7 +165,13 @@ def _asansor_girdileri(veri):
     #  Proje geneli alanlar:  ayrı gönderilmişse oradan, yoksa İLK asansörün
     #  girdisinden ( eski tek asansörlük istekler bunları orada taşıyor ).
     pg_ham = veri.get("proje_geneli")
-    if not isinstance(pg_ham, dict):
+    if isinstance(pg_ham, dict):
+        #  Ayrı gönderildiyse asansörün İÇİNDEKİ kopyalar okunmaz:  eski bir
+        #  proje dosyasından kalmış olabilirler, ekranda görünmezler ve motor
+        #  zaten ortaktakini kullanır ( bkz. hesap.hesapla_coklu ).
+        ham = [{k: v for k, v in x.items() if k not in PROJE_GENELI_ALANLAR}
+               for x in ham]
+    else:
         pg_ham = {k: ham[0][k] for k in PROJE_GENELI_ALANLAR if k in ham[0]}
     #  Makine yerleşimi proje genelidir:  gizli alanlar bütün asansörlerde aynı.
     atla = _uygulanmayan(pg_ham)

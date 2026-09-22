@@ -10,11 +10,18 @@ Paftanın "işlem satırı":
     kaynak   ->  standart maddesi / verinin kaynağı
 """
 import math
+from decimal import ROUND_HALF_UP, Decimal
 
 
 # ----------------------------------------------------------------- biçimleme
 def tr(x, ondalik=2):
-    """Türkçe sayı biçimi: 1234.5 -> '1.234,50'  (binlik ayracı nokta)."""
+    """Türkçe sayı biçimi: 1234.5 -> '1.234,50'  (binlik ayracı nokta).
+
+    Son hane YARIMI YUKARI yuvarlanır ( bkz. yuvarla ).  Python'un kendi
+    biçimlendirmesi sayının İKİLİ değerini bankacı kuralıyla yuvarlıyordu:
+    2,5 → "2" ama 3,5 → "4";  9,325 ( ikilide 9,32499… ) → "9,32".  Ekran
+    ( static/ortak.js tr ) aynı kuralla yuvarlar — pafta ile ayrışmasınlar.
+    """
     if x is None:
         return "—"
     if isinstance(x, str):
@@ -22,9 +29,12 @@ def tr(x, ondalik=2):
     if isinstance(x, bool):
         return "Evet" if x else "Hayır"
     try:
-        s = f"{float(x):,.{ondalik}f}"
+        f = float(x)
     except (TypeError, ValueError):
         return str(x)
+    if math.isfinite(f):
+        f = yuvarla(f, ondalik)
+    s = f"{f:,.{ondalik}f}"
     return s.replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
@@ -59,17 +69,42 @@ def tavana_yuvarla(x, katsayi):
     return math.ceil(x / katsayi - 1e-9) * katsayi
 
 
+#  Kayan nokta gürültüsünün atıldığı anlamlı hane sayısı.  Programın girdileri
+#  en çok 6-7 anlamlı hanelidir;  bir çarpım ya da toplamın gürültüsü 16.
+#  hanededir.  12, ikisinin arasında güvenli bir sınırdır.
+_ANLAMLI_HANE = 12
+
+
 def yuvarla(x, basamak=0):
-    """Yarımı yukarı yuvarlar ( Python'un round()'u bankacı yuvarlaması yapar )."""
+    """Yarımı SIFIRDAN UZAĞA yuvarlar  ( 2,5 → 3 · −2,5 → −3 ).
+
+    Python'un round()'u bankacı yuvarlaması yapar ( 2,5 → 2 ).  Elle yazılan
+    floor( x·10ⁿ + 0,5 ) ise kayan nokta gürültüsüne takılıyordu:  1,005 ikili
+    sistemde 1,00499999… diye saklanır, 100 ile çarpılınca 100,4999… olur ve
+    1,01 yerine 1,00 veriyordu.  Sayı önce 12 anlamlı haneye indirilip
+    gürültüden arındırılır, yuvarlama ONDALIK aritmetikle yapılır.
+    """
     if x is None:
         return None
-    k = 10 ** basamak
-    y = x * k
-    return (math.floor(y + 0.5) if y >= 0 else math.ceil(y - 0.5)) / k
+    d = Decimal(format(x, f".{_ANLAMLI_HANE}g"))
+    return float(d.quantize(Decimal(1).scaleb(-basamak), rounding=ROUND_HALF_UP))
 
 
 def sayi_mi(x):
     return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+#  ---------------------------------------------------------------------
+#  KULLANILAMAYAN GİRDİNİN METNİ  —  İKİ PROJE AYNI CÜMLEYİ KURAR
+#  ---------------------------------------------------------------------
+#  Girilen bir değer aralığın dışındaysa hesap DURUR ve kullanıcıya hangi
+#  alanın, hangi değerle, hangi aralığa göre reddedildiği söylenir.
+def aralik_disi(ad, deger, alt, ust, birim=""):
+    """'ad = değer birim  ( geçerli aralık alt - üst birim )'."""
+    b = f" {birim}" if birim and birim != "—" else ""
+    if not sayi_mi(deger):
+        return f"{ad} = {deger}  ( sayı değil )"
+    return f"{ad} = {trn(deger)}{b}  ( geçerli aralık {trn(alt)} - {trn(ust)}{b} )"
 
 
 # ------------------------------------------------------------------- Step
@@ -178,8 +213,9 @@ class Bolum(dict):
 #  ---------------------------------------------------------------------
 #  Aynı altı satır birkaç dosyada kopyalanmıştı.  Onay alanı birden çok
 #  biçimde gelir:  arayüzden True/False, eski proje dosyalarından
-#  "EVET"/"HAYIR" ya da "Var"/"Yok".  Kopyalar zamanla ayrışır ve aynı kutu
-#  bir yerde işaretli, öbüründe işaretsiz sayılırdı.
+#  "EVET"/"HAYIR" ya da "Var"/"Yok", HTML işaret kutusundan "on".  Kopyalar
+#  zamanla ayrışır ve aynı kutu bir yerde işaretli, öbüründe işaretsiz
+#  sayılırdı — API katmanındaki kopya "Var"ı HAYIR, motor EVET okuyordu.
 def evet_mi(x):
     """Onay alanı işaretli mi  —  arayüz · eski proje dosyası."""
     if isinstance(x, bool):
@@ -187,4 +223,4 @@ def evet_mi(x):
     if x is None:
         return False
     return str(x).strip().lower() in ("evet", "e", "var", "true", "1", "yes",
-                                      "x", "✓")
+                                      "on", "x", "✓")

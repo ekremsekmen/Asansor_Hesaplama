@@ -47,6 +47,14 @@ def calistir():
     for x, b, bek in ((865, -1, 870), (875, -1, 880), (2.5, 0, 3), (3.5, 0, 4),
                       (-2.5, 0, -3), (0.125, 2, 0.13)):
         r.esit(f"yuvarla({x},{b})", yuvarla(x, b), bek)
+    #  KAYAN NOKTA GÜRÜLTÜSÜ.  1,005 ikili sistemde 1,00499999… diye saklanır;
+    #  floor( x·100 + 0,5 ) bu yüzden 1,01 yerine 1,00 veriyordu.  Yarımın
+    #  GERÇEKTEN altında kalan değer ise yukarı gitmemeli.
+    for x, b, bek in ((1.005, 2, 1.01), (-1.005, 2, -1.01), (4.015, 2, 4.02),
+                      (2.675, 2, 2.68), (1.0049999, 2, 1.0), (0.1 + 0.2, 1, 0.3),
+                      (219.99999999999997, 6, 220.0), (1234.5, -1, 1230)):
+        r.kontrol(f"yuvarla({x!r},{b}) = {bek}  ( gürültü )",
+                  yuvarla(x, b) == bek, f"→ {yuvarla(x, b)!r}")
     for x, k, bek in ((63921.0, 10, 63930), (63930.0, 10, 63930), (0.1, 10, 10)):
         r.esit(f"tavana_yuvarla({x},{k})", tavana_yuvarla(x, k), bek)
     for x, bek in ((3.0001, 4), (3.0, 3), (2.9999, 3)):
@@ -56,6 +64,15 @@ def calistir():
     r.esit("tr(1234.5)", TRS(1234.5), "1.234,50")
     r.esit("tr(0.075, 4)", TRS(0.075, 4), "0,0750")
     r.esit("tr(None)", TRS(None), "—")
+    #  PAFTADAKİ SAYI DA YARIMI YUKARI YUVARLANIR.  Python'un biçimlendirmesi
+    #  sayının ikili değerini bankacı kuralıyla yuvarlıyordu:  2,5 → "2",
+    #  0,125 → "0,12", 9,325 ( ikilide 9,32499… ) → "9,32".  Ekranla aynı
+    #  kural TEST 5'te tarayıcıda denetlenir.
+    for x, n, bek in ((2.5, 0, "3"), (3.5, 0, "4"), (0.5, 0, "1"), (0.125, 2, "0,13"),
+                      (9.325, 2, "9,33"), (347.835, 2, "347,84"), (4978.575, 2, "4.978,58"),
+                      (1.15, 1, "1,2"), (-1.005, 2, "-1,01"), (1.0049999, 2, "1,00"),
+                      (999999.995, 2, "1.000.000,00"), (float("inf"), 2, "inf")):
+        r.esit(f"tr({x}, {n})", TRS(x, n), bek)
 
     # ---------------------------------------------------- Tablo-3 / Tablo-5
     # Kapalı formüller MMO/697 tablolarıyla örtüşmeli, sınır dışında None dönmeli.
@@ -701,20 +718,28 @@ def calistir():
     r.kontrol("Gk elle Tablo-11'i geçersiz kılar",
               AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Gk_elle=740)]}
                          )["asansorler"][0]["ozet"]["Gk"] == 740)
-    #  v2.9 — SINIR AŞILDIYSA GERÇEKTEN VARSAYILANA DÖNÜLÜR.  L1 = 600 m ya da
-    #  Nsç = 600 kW girildiğinde uyarı "varsayılan kullanıldı" diyor ama hesap
-    #  yine 600'ü kullanıyordu — uyarı yalan söylüyordu.
-    _l6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, L1=600)]}
-                     )["asansorler"][0]["ozet"]
-    r.kontrol("L1 aralık dışıysa varsayılana dönülüyor", _l6["L1"] != 600,
-              f"→ {_l6['L1']}")
+    #  SINIR DIŞI DEĞERLE HESAP YAPILMAZ.  L1 = 600 m ya da Nsç = 600 kW
+    #  önce hesaba giriyordu ( uyarı "varsayılan kullanıldı" diyerek yalan
+    #  söylüyordu ), sonra varsayılanla değiştirildi.  İkisi de kullanıcının
+    #  yazmadığı bir sayıyla pafta üretiyordu:  artık asansör DURUR ve hangi
+    #  alanın neden reddedildiği söylenir.
+    for _ad6, _ek6, _parca in (("L1 = 600 m", {"L1": 600}, "L1 — kolon hattı uzunluğu"),
+                               ("Nsç = 600 kW", {"Nsc": 600}, "Nsç — seçilen motor gücü")):
+        _a6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, **_ek6)]})["asansorler"][0]
+        r.kontrol(f"{_ad6}: aralık dışı değerle hesap yapılmıyor", _a6["aktif"] is False)
+        r.kontrol(f"{_ad6}: sebep alanı ve aralığı söylüyor",
+                  _parca in (_a6.get("uyari") or "")
+                  and "geçerli aralık" in (_a6.get("uyari") or ""),
+                  f"→ {_a6.get('uyari')!r}")
     r.esit("L1 geçerliyse kullanılıyor",
            AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, L1=45)]}
                       )["asansorler"][0]["ozet"]["L1"], 45)
-    _n6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Nsc=600)]}
-                     )["asansorler"][0]["ozet"]
-    r.kontrol("Nsç aralık dışıysa otomatik kademe seçiliyor", _n6["Nsc"] != 600,
-              f"→ {_n6['Nsc']}")
+    #  Birden çok hatalı alan TEK SEFERDE söylenir
+    _a6 = AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, L1=600, Nsc=600, S1=0.5)]}
+                     )["asansorler"][0]
+    r.kontrol("üç hatalı alan tek uyarıda sayılıyor",
+              all(x in (_a6.get("uyari") or "") for x in ("L1 —", "Nsç —", "S1 —")),
+              f"→ {_a6.get('uyari')!r}")
 
     r.kontrol("motor yetersizse UYGUN DEĞİL",
               AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, Nsc=5)]}
@@ -888,10 +913,16 @@ def calistir():
     r.esit("karışık projede A1 η", x["eta_p"], 0.85)
     r.esit("karışık projede A2 η", y["eta_p"], 0.50)
     r.esit("karışık projede A2 Ga", y["Ga"], y["P"] + 0.40 * y["Q"])
-    v4 = av(dict(TEMEL_AS, i_palanga=9, q_denge=5))
-    o4 = v4["asansorler"][0]["ozet"]
-    r.esit("geçersiz palanga η'yı etkilemiyor", o4["eta_p"], 0.85)
-    r.esit("geçersiz q varsayılana döner", o4["Ga"], o4["P"] + 0.50 * o4["Q"])
+    #  Geçersiz askı oranı ve q varsayılanla DEĞİŞTİRİLMEZ, asansör durur;
+    #  yan yana duran geçerli asansör hesaplanmaya devam eder.
+    v4 = av(dict(TEMEL_AS, i_palanga=9, q_denge=5), dict(TEMEL_AS))
+    a4 = v4["asansorler"][0]
+    r.kontrol("geçersiz palanga ve q ile hesap yapılmıyor", a4["aktif"] is False)
+    r.kontrol("ikisi de tek uyarıda söyleniyor",
+              "i — askı oranı" in a4.get("uyari", "")
+              and "q — denge faktörü" in a4.get("uyari", ""), f"→ {a4.get('uyari')!r}")
+    r.kontrol("bir asansörün hatası ötekini durdurmuyor",
+              v4["asansorler"][1]["aktif"] is True)
     r.esit("i kaynağı — asansör bazı", v1["asansorler"][0]["ozet"]["i_kaynak"],
            "GİRİŞ — asansör bazında")
     r.esit("i kaynağı — ofis kabulü", o0["i_kaynak"], "KABUL")
@@ -1077,11 +1108,33 @@ def calistir():
     r.esit("asansör bazında kablo tipi eziliyor",
            av(as_ek={"kablo_tipi": "N2XH"})["asansorler"][0]["ozet"]["kablo_tipi"], "N2XH")
 
-    #  Geçersiz ofis değeri yok sayılır, varsayılana dönülür ve bildirilir
+    #  Geçersiz ofis değeriyle HESAP YAPILMAZ.  Eskiden varsayılana dönülüp
+    #  hesap sürüyordu;  sabitler() değeri yine sözlüğe yazmaz, ama hesapla()
+    #  artık durur ve alanı adıyla söyler.
+    r.kontrol("geçersiz ofis değeri sabitler()'de reddediliyor",
+              "gr" in AV.sabitler({"gr": -5})["_reddedilen"])
+    r.esit("reddedilen değer sözlüğe yazılmıyor", AV.sabitler({"gr": -5})["gr"], 17.91)
     t3 = av(sabit={"gr": -5})
-    r.kontrol("geçersiz ofis değeri reddedildi",
-              any("gr" in x for x in t3["sabitler"]["_reddedilen"]))
-    r.esit("reddedilince varsayılana dönüldü", t3["sabitler"]["gr"], 17.91)
+    r.kontrol("geçersiz ofis değeriyle hesap yapılmıyor",
+              set(t3) == {"hata"}, f"→ {sorted(t3)}")
+    r.kontrol("hata alanı adıyla ve aralığıyla söylüyor",
+              "gr — ray birim kütlesi = -5" in t3.get("hata", "")
+              and "geçerli aralık 1 - 200" in t3.get("hata", ""),
+              f"→ {t3.get('hata')!r}")
+    #  Ortak paneldeki β da aynı kurala bağlı:  aralık dışı β eskiden HİÇBİR
+    #  uyarı olmadan 150 Ω·m'ye dönüyordu ( topraklama red listesi almıyordu ).
+    for _ad3, _ok3 in (("β = 0,5", {"beta": 0.5}), ("U = 50", {"U": 50}),
+                       ("Is = -1", {"cubuk_sayisi": -1}), ("şerit L = -5", {"serit_L": -5})):
+        _h3 = av(ortak_ek=_ok3).get("hata") or ""
+        r.kontrol(f"ortak panel {_ad3} hesabı durduruyor", bool(_h3), "→ hesap yapıldı")
+    #  Her sayısal ofis alanının kullanıcıya gösterilecek bir adı var
+    r.kontrol("her ofis aralığının etiketi var",
+              not (set(AV.SABIT_B_ARALIK) | set(AV.OFIS_ARALIK)) - set(AV.OFIS_ETIKET),
+              f"→ etiketsiz: {sorted((set(AV.SABIT_B_ARALIK) | set(AV.OFIS_ARALIK)) - set(AV.OFIS_ETIKET))}")
+    r.kontrol("her sayısal ofis varsayılanının aralığı var",
+              not [k for k, v in {**AV.SABIT_B_VARSAYILAN, **AV.OFIS_VARSAYILAN}.items()
+                   if not isinstance(v, str)
+                   and k not in AV.SABIT_B_ARALIK and k not in AV.OFIS_ARALIK])
 
     #  Ortak alanlar ( U / κ / εmax / β / çubuk adedi ) da ofis varsayılanından
     r.kontrol("ortak alanlar boşken hesap yapılıyor",
@@ -1269,23 +1322,32 @@ def calistir():
     #  6) Denge faktörü q  —  q = 1 iken N = 0 kW çıkıp 2,2 kW motor
     #     "uygun" görünüyordu.
     for _q in (0, 1, 1.5, -0.2):
-        _rq = _av({"q_denge": _q})
-        r.kontrol(f"avan: q = {_q} kullanılmıyor, varsayılana dönülüyor",
-                  abs(_rq["asansorler"][0]["ozet"]["q_denge"] - 0.50) < 1e-9)
-        r.kontrol(f"avan: q = {_q} için uyarı çıkıyor",
-                  any("denge faktörü" in x for x in (_rq.get("uyarilar") or [])))
+        _rq = _av({"q_denge": _q})["asansorler"][0]
+        r.kontrol(f"avan: q = {_q} ile hesap yapılmıyor", _rq["aktif"] is False)
+        r.kontrol(f"avan: q = {_q} için sebep denge faktörünü söylüyor",
+                  "q — denge faktörü" in (_rq.get("uyari") or ""),
+                  f"→ {_rq.get('uyari')!r}")
     r.kontrol("avan: q = 0,45 kabul ediliyor",
               abs(_av({"q_denge": 0.45})["asansorler"][0]["ozet"]["q_denge"] - 0.45) < 1e-9)
     r.kontrol("avan: q = 0,60 kabul ediliyor ama uygulama bandı uyarısı çıkıyor",
               any("bandındadır" in x for x in (_av({"q_denge": 0.60}).get("uyarilar") or [])))
 
-    #  Aralık dışı ofis alanları SESSİZ düşmemeli
+    #  Aralık dışı ofis alanları SESSİZ düşmemeli — ve hesaba da girmemeli
     for _ad, _ek in (("gr = -17", {"gr": -17}), ("Fmk = -350", {"Fmk": -350}),
                      ("Nsç = -11", {"Nsc": -11}), ("L1 = -40", {"L1": -40}),
-                     ("S1 = 0", {"S1": 0})):
+                     ("S1 = 0", {"S1": 0}), ("S2 = 500", {"S2": 500}),
+                     ("L2 = 0", {"L2": 0}), ("Fsh = -1", {"Fsh": -1}),
+                     ("i = 9", {"i_palanga": 9})):
         _ru = _av(_ek)
-        r.kontrol(f"avan: {_ad} uyarı üretiyor",
-                  bool(_ru.get("uyarilar")), f"→ {_ru.get('uyarilar')}")
+        r.kontrol(f"avan: {_ad} hesabı durduruyor",
+                  _ru["asansorler"][0]["aktif"] is False, "→ hesap yapıldı")
+        r.kontrol(f"avan: {_ad} sebebi uyarılarda görünüyor",
+                  any("girilen değer kullanılamıyor" in x
+                      for x in (_ru.get("uyarilar") or [])), f"→ {_ru.get('uyarilar')}")
+    #  Boş bırakılan alan hesabı durdurmaz — ofis varsayılanı kullanılır
+    _bos = _av({"gr": "", "S1": None, "Nsc": "", "L1": None})["asansorler"][0]
+    r.kontrol("avan: boş bırakılan ofis alanları varsayılanla hesaplanıyor",
+              _bos["aktif"] is True and _bos["ozet"]["S1"] == 6)
     r.kontrol("avan: geçerli girdide gereksiz uyarı yok", not (_av().get("uyarilar") or []))
 
     # ==================================================================
@@ -1315,27 +1377,29 @@ def calistir():
     r.esit("L türetildi", round(_t["L"], 2), 118.80)
     r.esit("L kaynağı türetilen", _t["L_kaynak"], "türetilen")
 
-    #  PAFTA, boyun nereden geldiğini YAZMAZ — türetme programın iç
-    #  kolaylığıdır, teslim edilen hesabın konusu değil.
+    #  L TÜRETİLDİYSE PAFTAYA HESABIYLA BASILIR  ( kullanıcı kararı ):
+    #  eskiden "GİRİŞ" diye basılıyordu ve sayının nereden geldiği
+    #  görünmüyordu.  Formül, sayılar ve kaynak ( karelaj gözü ) yazılır.
     _p1 = _t["bolumler"][0]
-    r.kontrol("paftada türetme adımı YOK",
-              not any("enine bağlar" in (x.get("formul") or "") for x in _p1["adimlar"]))
-    r.kontrol("paftada türetme notu YOK",
-              not any("TÜRETİL" in x for x in (_p1.get("notlar") or [])))
-    r.kontrol("paftada L sıradan girdi satırı",
-              any(x.get("sembol") == "L" and x.get("kaynak") == "GİRİŞ"
-                  for x in _p1["adimlar"]))
+    _Ls = [x for x in _p1["adimlar"] if (x.get("formul") or "").startswith("L ")]
+    r.kontrol("paftada L hesabıyla basılıyor",
+              len(_Ls) == 1 and "2 · ( a + b )" in _Ls[0]["formul"]
+              and "31,05" in _Ls[0]["islem"] and "karelaj" in _Ls[0]["kaynak"],
+              f"→ {_Ls}")
+    r.esit("paftadaki L hesabın değeri", round(_Ls[0]["deger"], 2) if _Ls else None, 118.80)
+    r.kontrol("türetilen L için 'GİRİŞ' satırı YOK",
+              not any(x.get("sembol") == "L" and x.get("kaynak") == "GİRİŞ"
+                      for x in _p1["adimlar"]))
 
     #  Elle girilen boy türetileni EZER — plan çizilince gerçek boy yazılır
     _te = AV.hesapla_topraklama(dict(_TO, serit_L=140), _S)
     r.esit("elle girilen L kullanılıyor", _te["L"], 140)
     r.esit("elle girilince kaynak GİRİŞ", _te["L_kaynak"], "GİRİŞ")
     r.kontrol("elle girilince türetme notu yok", not _te["bolumler"][0].get("notlar"))
-    #  Pafta iki durumda da AYNI görünmeli — yalnız sayı değişir
-    r.esit("pafta yapısı türetilende ve elle girilende aynı",
-           [(x.get("sembol"), x.get("formul"), x.get("kaynak")) for x in _p1["adimlar"]],
-           [(x.get("sembol"), x.get("formul"), x.get("kaynak"))
-            for x in _te["bolumler"][0]["adimlar"]])
+    #  Elle girilen boy sıradan bir girdi satırıdır ( hesabı yoktur )
+    r.kontrol("elle girilen L paftada GİRİŞ satırı",
+              any(x.get("sembol") == "L" and x.get("kaynak") == "GİRİŞ"
+                  for x in _te["bolumler"][0]["adimlar"]))
 
     #  Ofis paftasının kendi sayısı ( 31,05 × 18,90 · L = 140 · β = 150 · Is = 4 )
     r.esit("ofis paftası Ry", round(_te["Ry"], 2), 3.82)
@@ -1479,21 +1543,26 @@ def calistir():
     #  ------------------------------------------------------------------
     #  B18  Nsç = 0 girilince paftada TEK bir motor gücü kalır
     #  ------------------------------------------------------------------
-    #  Aralık dışı Nsç varsayılana dönüyor;  dönüş UYARI ile bildirilmeli ve
-    #  bölüm 1 ile kurulu güç cetveli AYNI değeri yazmalı — yoksa paftada iki
-    #  farklı motor gücü görünürdü.
+    #  Nsç = 0 ile hesap YAPILMAZ ( eskiden varsayılana dönüyordu ).  Hesap
+    #  yapıldığında da bölüm 1 ile kurulu güç cetveli AYNI değeri yazmalı —
+    #  yoksa paftada iki farklı motor gücü görünürdü.  İki yol denenir:
+    #  elle girilen Nsç ve boş bırakılıp standart kademeden seçilen Nsç.
     _s0 = _av({"Nsc": 0})["asansorler"][0]
-    r.kontrol("B18  Nsç = 0 uyarı üretiyor",
-              any("Nsç" in x for x in (_s0.get("uyarilar") or [])),
-              f"→ {_s0.get('uyarilar')}")
-    _b1 = [b for b in _s0["bolumler"] if b["baslik"].startswith("1 ")][0]
-    _nsc_b1 = [a["deger"] for a in _b1["adimlar"] if a.get("sembol") == "Nsç"]
-    _cet0 = [b for b in _s0["bolumler"] if b.get("cetvel")][0]["cetvel"]
-    r.esit("B18  bölüm 1'in Nsç'si özetle aynı", _nsc_b1, [_s0["ozet"]["Nsc"]])
-    r.esit("B18  cetveldeki güç aynı Nsç'den geliyor",
-           round(_cet0[0]["guc"], 3), round(_s0["ozet"]["Nsc"] * 1000, 3))
-    r.kontrol("B18  paftada sıfır motor gücü yazmıyor",
-              _s0["ozet"]["Nsc"] > 0 and _cet0[0]["guc"] > 0)
+    r.kontrol("B18  Nsç = 0 ile hesap yapılmıyor", _s0["aktif"] is False)
+    r.kontrol("B18  Nsç = 0 sebebi motor gücünü söylüyor",
+              "Nsç — seçilen motor gücü" in (_s0.get("uyari") or ""),
+              f"→ {_s0.get('uyari')!r}")
+    for _ad18, _nsc18 in (("elle 15 kW", 15), ("otomatik kademe", "")):
+        _s18 = _av({"Nsc": _nsc18})["asansorler"][0]
+        _b1 = [b for b in _s18["bolumler"] if b["baslik"].startswith("1 ")][0]
+        _nsc_b1 = [a["deger"] for a in _b1["adimlar"] if a.get("sembol") == "Nsç"]
+        _cet0 = [b for b in _s18["bolumler"] if b.get("cetvel")][0]["cetvel"]
+        r.esit(f"B18  [{_ad18}] bölüm 1'in Nsç'si özetle aynı",
+               _nsc_b1, [_s18["ozet"]["Nsc"]])
+        r.esit(f"B18  [{_ad18}] cetveldeki güç aynı Nsç'den geliyor",
+               round(_cet0[0]["guc"], 3), round(_s18["ozet"]["Nsc"] * 1000, 3))
+        r.kontrol(f"B18  [{_ad18}] paftada sıfır motor gücü yazmıyor",
+                  _s18["ozet"]["Nsc"] > 0 and _cet0[0]["guc"] > 0)
 
     #  --- S2 ( makine besleme ) akım kontrolü
     #  37 kW motor + 1,5 mm² : I2 = 62 A, kablo 17,5 A taşır.  ε2 küçük

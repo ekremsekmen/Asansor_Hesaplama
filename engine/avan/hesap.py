@@ -11,7 +11,7 @@ ASANSÖR AVAN PROJE HESAPLARI
 import math
 from engine.avan import tablolar as T
 from engine.ortak.steps import (Bolum, veri, hesap, metin, tr, trn,
-                    yukari_yuvarla, tavana_yuvarla, sayi_mi, evet_mi)
+                    yukari_yuvarla, tavana_yuvarla, sayi_mi, evet_mi, aralik_disi)
 
 
 # ---------------------------------------------------------------- SABİTLER
@@ -81,8 +81,9 @@ SABIT_B_VARSAYILAN = {
 
 
 #  Ofis standardı değerlerinin geçerlilik aralıkları.
-#  Aralık dışında bir değer girilirse hesap çökmez; varsayılana dönülür ve
-#  hangi alanın reddedildiği kullanıcıya bildirilir.
+#  Aralık dışında bir değer girilirse HESAP DURUR ve hangi alanın neden
+#  kabul edilmediği söylenir ( bkz. girdi_hatalari ).  Varsayılana dönmek
+#  kullanıcının yazmadığı bir sayıyla hesap yapmak demekti.
 #  ARTIK OFİS SABİTİ DEĞİL — asansörün kendi girdisi olan, burada yalnız
 #  YEDEK olarak duran alanlar.  Askı ( palanga ) oranı asansöre özeldir
 #  ( GİRİŞ 53. satır ); SABİTLER'deki değer yalnız boş bırakılan kolon için
@@ -100,6 +101,10 @@ SABIT_B_ARALIK = {
     "kuyu_armatur_lm": (1, 100000), "kuyu_Dmax": (0, 100), "priz_adedi": (0, 50),
     "priz_gucu": (0, 10000), "cosfi": (0.1, 1), "UL": (1, 1000), "IDn": (0.001, 10),
     "lc": (0.1, 50), "ayd_sutun": (1, 10),
+    #  Aralığı yoktu:  ηm = 5 kabul ediliyor, motor akımı beşte birine
+    #  iniyor, kablo ve sigorta küçük seçiliyordu.  Uygulamanın aynı sabitiyle
+    #  aynı aralık ( engine/uygulama/sabitler.ARALIK ).
+    "motor_elektrik_verimi": (0.1, 1),
 }
 
 
@@ -185,8 +190,9 @@ OFIS_ORTAK_ALANLARI = ("U", "kappa", "eps_max", "beta", "cubuk_sayisi")
 def sabitler(ozel=None):
     """
     Yönetmelik sabitleri (A) + ofis standardı (B).
-    `ozel` içindeki geçersiz değerler yok sayılır, varsayılan kullanılır;
-    reddedilenlerin listesi "_reddedilen" anahtarında döner.
+    `ozel` içindeki geçersiz değerler sözlüğe YAZILMAZ;  anahtarları
+    "_reddedilen" listesinde döner ( uygulamanın sabitler()'i gibi ).
+    hesapla() reddedilen bir değer varken hesap YAPMAZ ( bkz. girdi_hatalari ).
 
     KABUL EDİLEN ezmeler ayrıca "_ozel" listesinde tutulur:  paftada bir
     değerin tablodan mı yoksa kullanıcıdan mı geldiğini yazabilmek için
@@ -208,7 +214,7 @@ def sabitler(ozel=None):
             continue
         alt, ust = SABIT_B_ARALIK.get(k) or OFIS_ARALIK.get(k) or (None, None)
         if not sayi_mi(v) or (alt is not None and not (alt <= v <= ust)):
-            reddedilen.append(f"{k} = {v}")
+            reddedilen.append(k)
             continue
         s[k] = v
         kabul.append(k)
@@ -231,15 +237,36 @@ def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
     return "KABUL  ·  armatür tablosu"
 
 
-#  ELLE GİRİLEN FİZİKSEL BÜYÜKLÜKLERİN SINIRLARI
+#  ASANSÖR KARTINDA ELLE GİRİLEN DEĞERLERİN SINIRLARI
 #  Denetimsizken  Q elle = 0  →  N = 0 kW  →  2,2 kW motor "uygun" çıkıyor;
 #  Gk elle negatif olabiliyor; η = 10 girilince motor gereksiz küçülüyordu.
-#  Bunlar hesabı DURDURUR — sessizce yanlış bir motor seçilmesindense
-#  kullanıcıya hangi alanın imkânsız olduğu söylenir.
-FIZIKSEL_SINIR = (
-    ("Q elle — anma yükü",          "Q_elle",  50,   20000, "kg"),
-    ("Gk elle — boş kabin kütlesi", "Gk_elle", 50,   20000, "kg"),
-    ("η — toplam sistem verimi",    "eta",     0.05, 1.0,   "—"),
+#  Sınır dışı bir değer hesabı DURDURUR — sessizce yanlış bir motor
+#  seçilmesindense kullanıcıya hangi alanın imkânsız olduğu söylenir.
+#
+#  Ofis varsayılanı olan alanlar ( gr · S1 · q … ) da buradadır:  eskiden
+#  aralık dışı değer varsayılanla DEĞİŞTİRİLİYOR ve hesap sürüyordu;  S1 = 0,5
+#  yazılan projede 6 mm² ile hesaplanan pafta "UYGUN" diyebiliyordu.  Boş
+#  bırakılan alan varsayılanı kullanır — yazılan sayı ya kullanılır ya da
+#  hesap durur, üçüncü yol yoktur.
+#
+#  Sınırlar ofis alanlarında aralık tablolarından OKUNUR ( tek kaynak ):
+#  ofis sekmesindeki S1 ile asansör kartındaki S1 aynı aralığa bağlıdır.
+#  L1 ve Nsç'nin alt sınırı fiziksel değildir, yalnız sıfırı ve negatifi
+#  dışarıda bırakır.
+ASANSOR_SINIRLARI = (
+    ("Q_elle",    "Q elle — anma yükü",               (50, 20000),                "kg"),
+    ("Gk_elle",   "Gk elle — boş kabin kütlesi",      (50, 20000),                "kg"),
+    ("eta",       "η — toplam sistem verimi",         (0.05, 1.0),                "—"),
+    ("i_palanga", "i — askı oranı",                   SABIT_B_ARALIK["i_palanga"], "—"),
+    ("q_denge",   "q — denge faktörü",                SABIT_B_ARALIK["q_denge"],  "—"),
+    ("gr",        "gr — ray birim kütlesi",           OFIS_ARALIK["gr"],          "kg/m"),
+    ("Fmk",       "Fmk — makine ağırlığı",            OFIS_ARALIK["Fmk"],         "kg"),
+    ("Fsh",       "Fsh — sehpa ağırlığı",             OFIS_ARALIK["Fsh"],         "kg"),
+    ("S1",        "S1 — kolon hattı kesiti",          OFIS_ARALIK["S1"],          "mm²"),
+    ("S2",        "S2 — makine besleme kesiti",       OFIS_ARALIK["S2"],          "mm²"),
+    ("L2",        "L2 — makine besleme uzunluğu",     OFIS_ARALIK["L2"],          "m"),
+    ("L1",        "L1 — kolon hattı uzunluğu",        (0.1, 500),                 "m"),
+    ("Nsc",       "Nsç — seçilen motor gücü",         (0.1, 500),                 "kW"),
 )
 
 #  HESABA GİRMESİ ZORUNLU ALANLAR.  Üçüncü sütun: sıfır ya da negatif OLAMAZ mı?
@@ -265,18 +292,32 @@ ZORUNLU_ALANLAR = (
 )
 
 
-def _fiziksel_hatasi(no, d):
-    """Elle girilmiş fiziksel büyüklükler sınır dışında mı?  Hata metni ya da None."""
-    for ad, anahtar, alt, ust, birim in FIZIKSEL_SINIR:
-        deger = d.get(anahtar)
-        if deger in (None, ""):
-            continue
-        if not sayi_mi(deger) or not (alt <= deger <= ust):
-            return (f"!!!   {no} NOLU ASANSÖR — {ad} = {tr(deger)} {birim}   ·   "
-                    f"geçerli aralık {tr(alt)} - {tr(ust)} {birim}. "
-                    "Sıfır, negatif ya da fiziksel olmayan bir değer girilemez; "
-                    "boş bırakırsanız tablo / ofis değeri kullanılır.   !!!")
-    return None
+def _girildi_mi(x):
+    """Alan doldurulmuş mu?  Boş alan varsayılanı kullanır, dolu alan denetlenir."""
+    return x not in (None, "")
+
+
+def _gecersiz(deger, aralik):
+    """Girilmiş değer kullanılamaz mı?  ( sayı değil ya da aralık dışı )"""
+    alt, ust = aralik if aralik else (None, None)
+    return not sayi_mi(deger) or (alt is not None and not (alt <= deger <= ust))
+
+
+def _asansor_hatasi(no, a):
+    """Asansör kartındaki sınır dışı değerler  —  hata metni ya da None.
+
+    İLK hatada durmaz, HEPSİNİ söyler:  kullanıcı bir alanı düzeltip
+    yeniden hesaplatınca sıradakiyle karşılaşmasın.
+    """
+    hatalar = [aralik_disi(ad, a.get(anahtar), *aralik, birim)
+               for anahtar, ad, aralik, birim in ASANSOR_SINIRLARI
+               if _girildi_mi(a.get(anahtar)) and _gecersiz(a.get(anahtar), aralik)]
+    if not hatalar:
+        return None
+    return (f"!!!   {no} NOLU ASANSÖR — girilen değer kullanılamıyor   ·   "
+            + "   ·   ".join(hatalar)
+            + "   ·   Değeri düzeltin ya da alanı boşaltın ( boş alan tablo / "
+              "ofis değerini kullanır ).   !!!")
 
 
 def _zorunlu_hatasi(no, d):
@@ -317,73 +358,100 @@ def _aydinlatma(a_m, b_m, E, OL, S, hh=None):
     return k, eta, isik, Z
 
 
-#  Asansör kartında girilen değer aralık dışıysa program varsayılana döner.
-#  Bu SESSİZ kalmamalı: kullanıcı bir sayı yazdı, program başka bir sayı
-#  kullanıyor.  Reddedilenler burada toplanıp uyarı olarak basılır.
-ALAN_ADI = {
-    "i_palanga": "i — askı oranı", "q_denge": "q — denge faktörü",
-    "gr": "gr — ray birim kütlesi", "Fmk": "Fmk — makine ağırlığı",
-    "Fsh": "Fsh — sehpa ağırlığı", "S1": "S1 — kolon hattı kesiti",
-    "S2": "S2 — makine besleme kesiti", "L2": "L2 — makine besleme uzunluğu",
-    "kablo_tipi": "kablo tipi", "U": "U — şebeke gerilimi",
-    "kappa": "κ — iletkenlik", "eps_max": "εmax — gerilim düşümü sınırı",
-    "beta": "β — toprak özgül direnci", "cubuk_sayisi": "Is — çubuk adedi",
-    "goz_araligi": "karelaj gözü — temel topraklama",
-    "sigorta_katsayisi": "motor sigortası kalkış katsayısı",
+#  PROJE GENELİ DEĞERLERİN ADLARI  —  reddedilen değerin metninde görünür.
+#  Ofis sekmesi ile ortak paneldeki her sayısal alanın burada karşılığı
+#  olmalıdır ( TEST 2 denetler );  yoksa kullanıcı "goz_araligi" gibi bir iç
+#  adla karşılaşır.  Arayüzdeki uzun etiketler static/ortak.js SABIT_ETIKET'te.
+OFIS_ETIKET = {
+    "i_palanga": ("i — askı oranı", "—"),
+    "q_denge": ("q — denge faktörü", "—"),
+    "n_ray": ("n — kabin kılavuz ray sayısı", "—"),
+    "gf": ("gf — gezici kablo birim kütlesi", "kg/m"),
+    "Fmt": ("Fmt — montör ağırlığı", "kg"),
+    "kabin_armatur_W": ("kabin armatürü gücü", "W"),
+    "kabin_armatur_lm": ("kabin armatürü ışık akısı", "lm"),
+    "kabin_ustu_armatur": ("kabin üstü armatür adedi", "—"),
+    "kuyu_armatur_W": ("kuyu armatürü gücü", "W"),
+    "kuyu_armatur_lm": ("kuyu armatürü ışık akısı", "lm"),
+    "kuyu_Dmax": ("kuyu armatürü azami aralığı", "m"),
+    "priz_adedi": ("priz adedi", "—"),
+    "priz_gucu": ("priz başına güç", "W"),
+    "cosfi": ("cosφ — güç katsayısı", "—"),
+    "motor_elektrik_verimi": ("ηm — motorun elektrik verimi", "—"),
+    "UL": ("UL — izin verilen temas gerilimi", "V"),
+    "IDn": ("IΔn — kaçak akım rölesi", "A"),
+    "lc": ("lç — çubuk topraklayıcı boyu", "m"),
+    "ayd_sutun": ("aydınlatma verimi sütunu", "—"),
+    "U": ("U — şebeke gerilimi", "V"),
+    "kappa": ("κ — iletkenlik", "m/Ω·mm²"),
+    "eps_max": ("εmax — gerilim düşümü sınırı", "%"),
+    "gr": ("gr — ray birim kütlesi", "kg/m"),
+    "Fmk": ("Fmk — makine ağırlığı", "kg"),
+    "Fsh": ("Fsh — sehpa ağırlığı", "kg"),
+    "S1": ("S1 — kolon hattı kesiti", "mm²"),
+    "S2": ("S2 — makine besleme kesiti", "mm²"),
+    "L2": ("L2 — makine besleme uzunluğu", "m"),
+    "L1_pay": ("L1 yatay güzergâh payı", "m"),
+    "beta": ("β — toprak özgül direnci", "Ω·m"),
+    "cubuk_sayisi": ("Is — çubuk topraklayıcı adedi", "—"),
+    "goz_araligi": ("karelaj gözü — temel topraklama", "m"),
+    "sigorta_katsayisi": ("motor sigortası kalkış katsayısı", "—"),
 }
 
 
-def _red_yaz(red, anahtar, deger, alt, ust, yerine):
-    if red is None:
-        return
-    red.append(f"{ALAN_ADI.get(anahtar, anahtar)} = {tr(deger)} "
-               f"( geçerli aralık {tr(alt)} - {tr(ust)} ) → {tr(yerine)} kullanıldı")
+def _ofis_metni(anahtar, deger):
+    """Proje geneli bir değerin red metni."""
+    ad, birim = OFIS_ETIKET.get(anahtar, (anahtar, ""))
+    alt, ust = SABIT_B_ARALIK.get(anahtar) or OFIS_ARALIK.get(anahtar) or (None, None)
+    return aralik_disi(ad, deger, alt, ust, birim)
 
 
-def _asansor_sabiti(a, S, anahtar, red=None):
+def girdi_hatalari(veriler, S=None):
+    """PROJE GENELİ girdilerden KULLANILAMAYANLAR  —  metin listesi.
+
+    Ofis standardı ( Sabitler sekmesi ) ve ortak panel ( U · κ · εmax · β ·
+    Is · şerit boyu ).  Boş liste hesabın yapılabileceği anlamına gelir.
+    Asansöre ait alanlar burada DEĞİL, asansörün kendi hesabında denetlenir
+    ( bkz. _asansor_hatasi ):  bir asansörün hatası ötekileri durdurmaz.
     """
-    Asansör bazında girilmiş bir ofis-standardı değerini okur.
-    Geçersiz / boş ise SABİTLER B değerine döner.
-    Dönen: (deger, kaynak_metni)
-    """
-    deger = (a or {}).get(anahtar)
-    if deger not in (None, ""):
-        alt, ust = SABIT_B_ARALIK.get(anahtar, (None, None))
-        if sayi_mi(deger) and (alt is None or alt <= deger <= ust):
-            return deger, "GİRİŞ — asansör bazında"
-        _red_yaz(red, anahtar, deger, alt, ust, S[anahtar])
-    return S[anahtar], "KABUL"
+    ozel = veriler.get("sabitler") or {}
+    S = S if S is not None else sabitler(ozel)
+    hatalar = [_ofis_metni(k, ozel.get(k)) for k in S["_reddedilen"]]
+
+    ortak = veriler.get("ortak") or {}
+    for k in OFIS_ORTAK_ALANLARI:
+        if _girildi_mi(ortak.get(k)) and _gecersiz(ortak.get(k), OFIS_ARALIK.get(k)):
+            hatalar.append(_ofis_metni(k, ortak.get(k)))
+    #  Şerit boyu boş bırakılırsa temel ölçülerinden TÜRETİLİR;  girilmişse
+    #  pozitif olmalıdır ( sıfır ya da negatif boy türetmeye düşüyordu ).
+    L = ortak.get("serit_L")
+    if _girildi_mi(L) and not (sayi_mi(L) and L > 0):
+        hatalar.append(f"L — topraklama şeridi boyu = {trn(L)} m  ( sıfırdan büyük olmalı "
+                       "ya da boş bırakılmalı — boşsa temel ölçülerinden türetilir )")
+    return hatalar
 
 
-def _ofis_degeri(a, S, anahtar, red=None):
-    """
-    Ofis varsayılanı olan bir asansör alanını okur.
-    Asansör kartında bir değer varsa o, yoksa ofis varsayılanı kullanılır.
-    Dönen: (deger, kaynak_metni)
+def _ofis_degeri(a, S, anahtar):
+    """Asansör kartındaki değer, boşsa ofis varsayılanı  —  ( değer , kaynak ).
+
+    Dolu alanın aralığı burada DENETLENMEZ:  hesapla_asansor girdiyi önce
+    _asansor_hatasi'ndan geçirir, geçersiz bir değerle buraya gelinmez.
     """
     deger = (a or {}).get(anahtar)
     if anahtar in OFIS_METIN:
-        metin = str(deger or "").strip()
-        if metin:
-            return metin, "GİRİŞ — asansör bazında"
-        return S[anahtar], "KABUL"
-    if deger not in (None, ""):
-        alt, ust = OFIS_ARALIK.get(anahtar, (None, None))
-        if sayi_mi(deger) and (alt is None or alt <= deger <= ust):
-            return deger, "GİRİŞ — asansör bazında"
-        _red_yaz(red, anahtar, deger, alt, ust, S[anahtar])
+        deger = str(deger or "").strip()
+    if _girildi_mi(deger):
+        return deger, "GİRİŞ — asansör bazında"
     return S[anahtar], "KABUL"
 
 
-def _ortak_degeri(ortak, S, anahtar, red=None):
-    """Avan ortak panelindeki bir alanı okur; boşsa ofis varsayılanına düşer."""
+def _ortak_degeri(ortak, S, anahtar):
+    """Ortak paneldeki değer, boşsa ofis varsayılanı.
+
+    Aralık hesapla()'da, hesaptan ÖNCE denetlenir ( bkz. girdi_hatalari ).
+    """
     deger = (ortak or {}).get(anahtar)
-    if deger not in (None, ""):
-        alt, ust = OFIS_ARALIK.get(anahtar, (None, None))
-        if sayi_mi(deger) and (alt is None or alt <= deger <= ust):
-            return deger
-        _red_yaz(red, anahtar, deger, alt, ust, S[anahtar])
-    return S[anahtar]
+    return deger if _girildi_mi(deger) else S[anahtar]
 
 
 # =====================================================================
@@ -405,51 +473,51 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     kuyu_b = a.get("kuyu_genisligi")
     kabin_a = a.get("kabin_boyu")
     kabin_b = a.get("kabin_genisligi")
-    #  OFİS VARSAYILANLARI — asansörden asansöre değişmeyen malzeme değerleri.
-    #  Asansör kartında bir değer varsa o kullanılır, yoksa ofis standardı.
-    #  Aralık dışı bir değer girildiyse varsayılana dönülür ve bu SESSİZ
-    #  kalmaz: red listesi paftaya uyarı olarak basılır.
-    red = []
-    gr,   gr_kaynak   = _ofis_degeri(a, S, "gr", red)
-    Fmk,  Fmk_kaynak  = _ofis_degeri(a, S, "Fmk", red)
-    Fsh,  Fsh_kaynak  = _ofis_degeri(a, S, "Fsh", red)
-    S1,   S1_kaynak   = _ofis_degeri(a, S, "S1", red)
-    S2,   S2_kaynak   = _ofis_degeri(a, S, "S2", red)
-    L2,   L2_kaynak   = _ofis_degeri(a, S, "L2", red)
-    kablo_tipi, kablo_kaynak = _ofis_degeri(a, S, "kablo_tipi", red)
-    Nsc_giris = a.get("Nsc")
-
-    #  L1 — kolon hattı uzunluğu.  Boş bırakılırsa kuyu yüksekliği + ofis payı
-    #  ( pano ile kuyu arasındaki mesafe ) kullanılır; plandan ölçülen değer
-    #  farklıysa alan doldurulur.
-    L1_giris = a.get("L1")
-    if L1_giris not in (None, "") and not (sayi_mi(L1_giris) and 0 < L1_giris <= 500):
-        red.append(f"L1 — kolon hattı uzunluğu = {tr(L1_giris)} ( geçerli aralık "
-                   "0 - 500 m ) → Hk + ofis payı kullanıldı")
-    #  SINIR AŞILDIYSA GERÇEKTEN VARSAYILANA DÖNÜLÜR.  Buradaki koşul yukarıdaki
-    #  red mesajıyla AYNI olmalıdır;  eskiden yalnız "> 0" arıyordu:  L1 = 600 m
-    #  girildiğinde uyarı "Hk + ofis payı kullanıldı" diyor ama hesap yine 600
-    #  kullanıyordu — uyarı yalan söylüyordu.
-    if sayi_mi(L1_giris) and 0 < L1_giris <= 500:
-        L1, L1_kaynak = L1_giris, "GİRİŞ"
-    elif sayi_mi(Hk):
-        L1 = Hk + S["L1_pay"]
-        L1_kaynak = f"Hk + ofis payı ( {tr(S['L1_pay'])} m )"
-    else:
-        L1, L1_kaynak = None, "GİRİŞ"
     Gk_elle = a.get("Gk_elle")
     makine_tipi = a.get("makine_tipi") or ""
 
+    # ---------- elle girilen değerlerin sınırları  ( önce — hepsi birden )
+    _ah = _asansor_hatasi(no, a)
+    if _ah:
+        return {"no": no, "aktif": False, "uyari": _ah}
+
+    #  UYARILAR İKİYE AYRILIR:
+    #    ikaz        bilgilendirici — uygunluğu ENGELLEMEZ
+    #    engelleyici projeyi durduran — genel sonuca girer
+    ikaz = []
+    engelleyici = []
+
+    #  OFİS VARSAYILANLARI — asansörden asansöre değişmeyen malzeme değerleri.
+    #  Asansör kartında bir değer varsa o kullanılır, yoksa ofis standardı.
+    gr,   gr_kaynak   = _ofis_degeri(a, S, "gr")
+    Fmk,  Fmk_kaynak  = _ofis_degeri(a, S, "Fmk")
+    Fsh,  Fsh_kaynak  = _ofis_degeri(a, S, "Fsh")
+    S1,   S1_kaynak   = _ofis_degeri(a, S, "S1")
+    S2,   S2_kaynak   = _ofis_degeri(a, S, "S2")
+    L2,   L2_kaynak   = _ofis_degeri(a, S, "L2")
+    kablo_tipi, kablo_kaynak = _ofis_degeri(a, S, "kablo_tipi")
+    Nsc_giris = a.get("Nsc")
+
+    #  L1 — kolon hattı uzunluğu.  Boş bırakılırsa kuyu yüksekliği + YATAY
+    #  GÜZERGÂH payı kullanılır:  hat kuyu boyunca çıkar, ama ana panodan kuyuya
+    #  ve kuyudan asansör panosuna yatay yol ile uçlardaki bağlantı payı da
+    #  vardır.  Paftaya "ofis payı" yazmak sayıyı keyfi gösteriyordu;  ne
+    #  olduğu yazılır.  Plandan ölçülen değer farklıysa alan doldurulur.
+    L1_giris = a.get("L1")
+    if _girildi_mi(L1_giris):
+        L1, L1_kaynak = L1_giris, "GİRİŞ"
+    elif sayi_mi(Hk):
+        L1 = Hk + S["L1_pay"]
+        L1_kaynak = (f"Hk + yatay güzergâh ( ana pano → kuyu → asansör "
+                     f"panosu ) {tr(S['L1_pay'])} m")
+    else:
+        L1, L1_kaynak = None, "GİRİŞ"
+
     #  Şebeke gerilimi, iletkenlik ve izin verilen gerilim düşümü ofis
     #  varsayılanıdır; ortak panelde boş bırakılırsa oradan gelir.
-    U_sebeke = _ortak_degeri(ortak, S, "U", red)
-    kappa = _ortak_degeri(ortak, S, "kappa", red)
-    eps_max = _ortak_degeri(ortak, S, "eps_max", red)
-
-    # ---------- elle girilen fiziksel büyüklüklerin sınırları
-    _fh = _fiziksel_hatasi(no, {"Q_elle": Q_elle, "Gk_elle": Gk_elle, "eta": eta})
-    if _fh:
-        return {"no": no, "aktif": False, "uyari": _fh}
+    U_sebeke = _ortak_degeri(ortak, S, "U")
+    kappa = _ortak_degeri(ortak, S, "kappa")
+    eps_max = _ortak_degeri(ortak, S, "eps_max")
 
     # ---------- Q  (Tablo-7 → elle)
     Q0 = T.TABLO_7.get(P_kap) if sayi_mi(P_kap) else None
@@ -493,8 +561,8 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  Askı ( palanga ) oranı asansörün kendi özelliğidir; boş bırakılırsa
     #  SABİTLER B'deki yedek değer kullanılır.  Denge faktörü ofis
     #  standardındadır, gerekirse asansör bazında ezilir.
-    i_pal, i_kaynak = _asansor_sabiti(a, S, "i_palanga", red)
-    q, q_kaynak = _asansor_sabiti(a, S, "q_denge", red)
+    i_pal, i_kaynak = _ofis_degeri(a, S, "i_palanga")
+    q, q_kaynak = _ofis_degeri(a, S, "q_denge")
     #  ASKI ORANINA BAĞLI Δη = 0,10 DÜŞÜŞÜ KALDIRILDI ( bkz. ortak/ofis.py ).
     #  Girilen η HER ZAMAN toplam sistem verimidir — askı ( palanga ) kaybı
     #  içindedir ve ikinci kez uygulanmaz.  Askı oranı motor gücüne artık
@@ -524,12 +592,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  Nsç — SEÇİLEN motor gücü.  Elle girilmemişse hesaplanan güçten büyük
     #  ilk STANDART anma gücü seçilir ( IEC 60072 kademeleri ).  Böylece
     #  "hesap 13,33 kW diyor ama 11 kW yazılmış" durumu oluşmaz.
-    if Nsc_giris not in (None, "") and not (sayi_mi(Nsc_giris) and 0 < Nsc_giris <= 500):
-        red.append(f"Nsç — seçilen motor gücü = {tr(Nsc_giris)} kW ( geçerli aralık "
-                   "0 - 500 kW ) → standart kademeden otomatik seçildi")
-    #  Koşul yukarıdaki red mesajıyla AYNI ( bkz. L1 ):  aralık dışı bir Nsç
-    #  "standart kademeden otomatik seçildi" denip yine kullanılıyordu.
-    if sayi_mi(Nsc_giris) and 0 < Nsc_giris <= 500:
+    if _girildi_mi(Nsc_giris):
         Nsc, Nsc_kaynak = Nsc_giris, "GİRİŞ — elle seçildi"
     else:
         Nsc = T.motor_sec(N_hes)
@@ -568,7 +631,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  burası pratikteki bandın dışını "bilerek mi" diye sorar.
     Q_BANT_ALT, Q_BANT_UST = 0.40, 0.55
     if sayi_mi(q) and not (Q_BANT_ALT <= q <= Q_BANT_UST):
-        red.append(f"q — denge faktörü {tr(q)} olarak kullanıldı; uygulamada "
+        ikaz.append(f"q — denge faktörü {tr(q)} olarak kullanıldı; uygulamada "
                    f"{tr(Q_BANT_ALT)} - {tr(Q_BANT_UST)} bandındadır. "
                    "Karşı ağırlık dengelemesi bu değerde ise gerekçesi paftaya yazılmalıdır")
     b1["aciklamalar"] = [T.VERIM_NOTU]
@@ -984,8 +1047,6 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # =========================================================
     #  PAFTAYA GİRMEYEN EK DENETİMLER  —  ⚠ uyarı olarak bildirilir
     # =========================================================
-    ikaz = []            # bilgilendirici — uygunluğu ENGELLEMEZ
-    engelleyici = []     # projeyi durduran — genel sonuca girer
     for _ad, _kesit, _iz, _kesin in (("S1 — kolon hattı", S1, Iz, Iz_kesin),
                                      ("S2 — makine besleme", S2, Iz2, Iz2_kesin)):
         if _kesin:
@@ -1033,14 +1094,12 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
 
     return {
         "no": no, "aktif": True, "tanim": tanim, "baslik": f"{no} NOLU ASANSÖR",
-        #  Girilip de kullanılamayan değerler ve fiziksel tutarsızlıklar —
-        #  sessiz kalmamalı
-        #  UYARILAR İKİYE AYRILIR:
+        #  Fiziksel tutarsızlıklar sessiz kalmamalı.  UYARILAR İKİYE AYRILIR:
         #    ikaz        bilgilendirici — uygunluğu engellemez
         #    engelleyici projeyi durdurur — genel sonuca ( tumu_uygun ) girer
-        #  Reddedilen girdiler ( red ) bilgilendiricidir:  motor zaten
-        #  varsayılana dönüp hesabı yapmıştır.
-        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in (red + ikaz + engelleyici)],
+        #  Kullanılamayan girdi burada YOKTUR:  o, hesabı en başta durdurur
+        #  ( bkz. _asansor_hatasi ).
+        "uyarilar": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in (ikaz + engelleyici)],
         "engelleyici": [f"⚠ {no} NOLU ASANSÖR: {x}" for x in engelleyici],
         "bolumler": bolumler,
         "ozet": {
@@ -1200,11 +1259,19 @@ def hesapla_topraklama(ortak: dict, S: dict, en_buyuk_pe=None) -> dict:
         hesap("r   =   √ ( A / π )", f"=   √ ( {tr(A)} / 3,1416 )", r, "m", "eşdeğer yarıçap"),
         hesap("D   =   2 · r", f"=   2  ·  {tr(r)}", D, "m", "eşdeğer daire çapı"),
         veri("β", "Toprak özgül direnci", beta, "Ω·m", "GİRİŞ", 0),
-        #  PAFTADA L HER ZAMAN SIRADAN BİR GİRDİ SATIRIDIR.  Boyun elle mi
-        #  girildiği yoksa temel ölçülerinden mi türetildiği paftaya YAZILMAZ —
-        #  türetme programın iç kolaylığıdır, teslim edilen hesabın konusu
-        #  değil.  ( Kaynak bilgisi yalnız ekranda, alanın altında görünür. )
-        veri("L", "Temel / şerit iletken uzunluğu", L, "m", "GİRİŞ"),
+        #  L TÜRETİLDİYSE PAFTAYA HESABIYLA BASILIR.  Eskiden her durumda
+        #  "GİRİŞ" diye basılıyordu:  okuyan sayının nereden geldiğini
+        #  göremiyordu.  Şerit temelin çevresini kapalı halka olarak dolaşır,
+        #  gözler karelaj aralığını ( Sabitler ) geçmeyecek biçimde enine ve
+        #  boyuna bağ atılır — bkz. serit_boyu_tahmin.  Elle girildiyse
+        #  sıradan bir girdi satırıdır.
+        (hesap("L   =   2 · ( a + b )   +   na · b   +   nb · a",
+               f"=   2 · ( {tr(a)} + {tr(b)} )   +   {L_na} · {tr(b)}   +   "
+               f"{L_nb} · {tr(a)}",
+               L, "m",
+               f"şerit:  temel çevresi + karelaj bağları  ( göz ≤ {trn(goz, 0)} m )")
+         if L_kaynak == "türetilen" else
+         veri("L", "Temel / şerit iletken uzunluğu", L, "m", "GİRİŞ")),
         hesap("Ry  =   β / ( 2 · D )   +   β / L",
               f"=   {trn(beta,0)} / ( 2 · {tr(D)} )   +   {trn(beta,0)} / {tr(L)}",
               Ry, "Ω", "IEEE Std 80", 3),
@@ -1394,8 +1461,20 @@ def _trafik_tutarlilik(trafik, asansorler_girdi):
 
 
 def hesapla(veriler: dict) -> dict:
+    """Avan projesinin bütün hesapları.
+
+    Proje geneli bir girdi kullanılamıyorsa ( ofis standardı · ortak panel )
+    hesap YAPILMAZ ve yalnız  { "hata": metin }  döner — bu değer her
+    asansörün ve topraklamanın hesabına girer, yarım bir proje çıkmaz.
+    """
     ortak = veriler.get("ortak") or {}
     S = sabitler(veriler.get("sabitler"))
+    hatalar = girdi_hatalari(veriler, S)
+    if hatalar:
+        return {"hata": "HESAP HATASI: Girilen değer kullanılamıyor  —  "
+                        + "  ·  ".join(hatalar)
+                        + "   ·   Değeri düzeltin ya da alanı boşaltın ( boş alan "
+                          "ofis varsayılanını kullanır )."}
     asansorler = []
     for i, a in enumerate(veriler.get("asansorler") or [], 1):
         if not a:
@@ -1429,10 +1508,6 @@ def hesapla(veriler: dict) -> dict:
     }
     uyarilar = []
     engelleyiciler = []
-    if S.get("_reddedilen"):
-        uyarilar.append(
-            "⚠ Ofis standardında geçersiz değer yok sayıldı, varsayılan kullanıldı : "
-            + " · ".join(S["_reddedilen"]))
     for a in asansorler:
         if not a:
             continue

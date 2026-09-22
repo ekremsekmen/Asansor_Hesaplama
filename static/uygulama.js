@@ -825,7 +825,13 @@ function mVarsayilandanFarkli(f){
     return !mGkTazelenecek(MUK_AKTIF)
       && ((SON.m && SON.m.girdi) || {}).kabin_agirligi_kaynak === 'GİRİŞ';
   const s = String(e.value ?? '').trim(), d = f.varsayilan;
-  if(d === null || d === undefined) return s !== '';
+  //  BOŞ KUTU "DEĞİŞTİRİLDİ" SAYILMAZ.  Boşluk kullanıcının girdiği bir değer
+  //  değildir:  S1 · S2 · kuyu genişliği gibi alanlarda motor varsayılana düşer
+  //  ( sonuç birebir aynıdır ), öteki alanlarda hesap durur ve sebebini hata
+  //  mesajı söyler.  sayiOku('') NaN döndüğü için boş S1/S2 "2 değiştirildi"
+  //  diye işaretleniyordu.
+  if(s === '') return false;
+  if(d === null || d === undefined) return true;
   if(e.tagName === 'SELECT' || typeof d !== 'number') return s !== String(d);
   const x = sayiOku(s);
   return !(isFinite(x) && Math.abs(x - d) < 1e-9);

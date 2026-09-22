@@ -96,13 +96,40 @@ _BELIRSIZ = _BelirsizListesi()
 _RED = _BelirsizListesi()
 
 
-def _temiz(d: dict, sayisal: tuple, on_ek: str = "") -> dict:
+def _bos_mu(ham) -> bool:
+    """Alan doldurulmamış mı?  ( yok · boş · yalnız boşluk )"""
+    return ham is None or (isinstance(ham, str) and not ham.strip())
+
+
+def _sayi_oku(ham, etiket):
+    """KULLANICININ YAZDIĞI bir sayıyı okur  —  okuyamazsa SEBEBİNİ kaydeder.
+
+        boş                →  None   ( alan doldurulmamış — varsayılan / eksik )
+        belirsiz yazım     →  None + _BELIRSIZ
+        okunamayan yazım   →  None + _RED
+
+    Okunamayan yazım BOŞ sayılmaz:  "1000 kg" yazılmış anma yükü sessizce
+    None'a düşüyor, motor da tablodaki yükle hesap yapıyordu — kullanıcı
+    yazdığı sayının kullanılmadığını hiçbir yerde görmüyordu.  Çağıran taraf
+    reddedilen girdi varken hesap yapmaz ( bkz. _belirsiz_hata ).
+    """
+    if _bos_mu(ham):
+        return None
+    if belirsiz_sayi_mi(ham):
+        _BELIRSIZ.append(f"{etiket} = {str(ham).strip()}")
+        return None
+    d = _sayi(ham)
+    if d is None:
+        _RED.append(f"{etiket} = {str(ham).strip()[:20]}  ( sayı değil )")
+    return d
+
+
+def _temiz(d: dict, sayisal: tuple, on_ek: str = "", etiket=None) -> dict:
+    """``sayisal`` alanlarını sayıya çevirir;  ``etiket`` red metnindeki adlar."""
+    etiket = etiket or {}
     out = dict(d or {})
     for k in sayisal:
-        ham = out.get(k)
-        if belirsiz_sayi_mi(ham):
-            _BELIRSIZ.append(f"{on_ek}{k} = {str(ham).strip()}")
-        out[k] = _sayi(ham)
+        out[k] = _sayi_oku(out.get(k), f"{on_ek}{etiket.get(k, k)}")
     return out
 
 
@@ -128,16 +155,9 @@ def _sabitler_coz(ham, metin=(), etiket=None):
             if m:
                 out[k] = m
             continue
-        if x is None or (isinstance(x, str) and not x.strip()):
-            continue
-        if belirsiz_sayi_mi(x):
-            _BELIRSIZ.append(f"{etiket(k)} = {str(x).strip()}")
-            continue
-        d = _sayi(x)
-        if d is None:
-            _RED.append(f"{etiket(k)} = {str(x).strip()}  ( sayı değil )")
-            continue
-        out[k] = d
+        d = _sayi_oku(x, etiket(k))
+        if d is not None:
+            out[k] = d
     return out
 
 
@@ -155,18 +175,6 @@ def _belirsiz_hata():
                 + "  ·  ".join(sorted(set(_RED.kalemler))[:6])
                 + "   ·   Satırı düzeltin ya da kaldırın; sessizce yok sayılmaz.")
     return None
-
-TRAFIK_SAYISAL = ("bina_yuksekligi", "yapi_yuksekligi", "N", "hizli1", "hizli2", "h", "P",
-                  "kapi_genisligi", "bodrum", "manuel_k", "manuel_V", "manuel_ta",
-                  "manuel_tk", "manuel_tg", "manuel_tp", "manuel_adet")
-ASANSOR_SAYISAL = ("P", "kapi_genisligi", "V", "durak", "h", "bodrum",
-                   "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp")
-AVAN_ORTAK_SAYISAL = ("U", "kappa", "eps_max", "temel_a", "temel_b", "beta", "serit_L",
-                      "cubuk_sayisi", "mk_uzunluk", "mk_genislik")
-AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
-                   "kapasite", "Q_elle", "V", "eta", "Hk", "kuyu_genisligi", "kabin_boyu",
-                   "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
-                   "S1", "L1", "S2", "L2")
 
 
 def _sozluk_listesi(x):

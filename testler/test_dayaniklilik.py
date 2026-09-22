@@ -186,6 +186,83 @@ def calistir():
                                       "sabitler": {"kablo_tipi": "NYY"}})[0][0]["_ofis"]
            .get("kablo_tipi"), "NYY")
 
+    # ------------------------------------------------ okunamayan yazım BOŞ SAYILMAZ
+    #  _temiz yalnız belirsiz yazımı ( "1.200" ) yakalıyordu:  anma yüküne
+    #  "1000 kg" yazılınca değer sessizce boşa düşüyor, motor Tablo-7'deki yükle
+    #  hesap yapıyordu.  Ofis sekmesi bunu zaten reddediyordu;  artık asansör
+    #  kartı, trafik formu ve uygulama formu da aynı kapıdan geçer.
+    def _hata(yanit):
+        h = json.loads(yanit.body).get("hata")
+        return " ".join(h) if isinstance(h, list) else str(h or "")
+
+    for alan, ham in (("Q_elle", "1000 kg"), ("Gk_elle", "~800"), ("S1", "abc"),
+                      ("L1", "30m"), ("Nsc", "11kW")):
+        h = _hata(UC_AVAN.api_avan({"girdiler": {
+            "ortak": O, "asansorler": [dict(A, **{alan: ham})], "sabitler": {}}}))
+        r.kontrol(f"avan · {alan} = {ham!r} sessizce boş sayılmıyor",
+                  "kabul edilmedi" in h and UC_AVAN.AVAN_AS_ETIKET[alan] in h,
+                  f"→ {h[:120]!r}")
+    #  Red metni alanı İÇ ADIYLA ( "Q_elle" ) değil kullanıcının gördüğü adla söyler
+    r.kontrol("avan · her asansör alanının red metninde görünen bir adı var",
+              set(UC_AVAN.AVAN_AS_SAYISAL) <= set(UC_AVAN.AVAN_AS_ETIKET),
+              f"→ adsız: {set(UC_AVAN.AVAN_AS_SAYISAL) - set(UC_AVAN.AVAN_AS_ETIKET)}")
+    r.kontrol("avan · her ortak alanın red metninde görünen bir adı var",
+              set(UC_AVAN.AVAN_ORTAK_SAYISAL) <= set(UC_AVAN.AVAN_ORTAK_ETIKET),
+              f"→ adsız: {set(UC_AVAN.AVAN_ORTAK_SAYISAL) - set(UC_AVAN.AVAN_ORTAK_ETIKET)}")
+    #  Anma yükü yazılmış ama okunamıyorsa kolon TANIMSIZ sayılmaz
+    h = _hata(UC_AVAN.api_avan({"girdiler": {"ortak": O, "asansorler": [
+        dict(A, kapasite="", Q_elle="bin kg")], "sabitler": {}}}))
+    r.kontrol("avan · okunamayan anma yükü kolonu sessizce düşürmüyor",
+              "kabul edilmedi" in h and "Q elle — anma yükü" in h, f"→ {h[:120]!r}")
+    #  Boş kolondaki artık değer projeyi DURDURMAZ ( kolon hesaba girmiyor )
+    _bos_kolon = dict(A, kapasite="", S1="abc")
+    r.kontrol("avan · tanımsız kolondaki artık değer projeyi durdurmuyor",
+              not json.loads(UC_AVAN.api_avan({"girdiler": {
+                  "ortak": O, "asansorler": [A, _bos_kolon], "sabitler": {}}}).body).get("hata"))
+    for alan, ham in (("manuel_V", "hızlı"), ("N", "on bir")):
+        h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, **{alan: ham})}))
+        r.kontrol(f"trafik · {alan} = {ham!r} sessizce boş sayılmıyor",
+                  "kabul edilmedi" in h and alan in h, f"→ {h[:120]!r}")
+    #  Kişi sayısı okunamayan asansör listeden sessizce düşmüyor
+    h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, asansorler=[
+        {"P": "10", "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto."},
+        {"P": "8 kişi", "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto."}])}))
+    r.kontrol("trafik · okunamayan kişi sayısı asansörü düşürmüyor",
+              "kabul edilmedi" in h and "ASANSÖR-2" in h, f"→ {h[:120]!r}")
+    for alan, ham in (("kabin_agirligi", "abc"), ("kuyu_genisligi", "2400 mm"),
+                      ("halat_adedi", "altı")):
+        h = " ".join(_uyg(asansor={alan: ham}).get("hata") or [])
+        r.kontrol(f"uygulama · {alan} = {ham!r} sessizce boş sayılmıyor",
+                  "kabul edilmedi" in h, f"→ {h[:120]!r}")
+
+    # ------------------------------------------------ onay alanı TEK okuma kuralı
+    #  API'nin kendi kopyası "Var"ı HAYIR, motorun evet_mi'si EVET okuyordu:
+    #  aynı kutu ekranda gizlenen alanları bir kurala, hesabı öbür kurala göre
+    #  seçiyordu.
+    for x in (True, False, None, "", "Var", "Yok", "EVET", "hayır", "on", "1", "0"):
+        r.esit(f"uygulama · mk_yok = {x!r} API'de ve motorda aynı okunuyor",
+               UC_UYG._uygulanmayan({"mk_yok": x}), UYG_GIRDI.uygulanmayan_alanlar(x))
+
+    # ------------------------------------------------ PROJE GENELİ ALANDA ortak kazanır
+    #  Asansörün içinde kalmış eski bir temel ölçüsü binanın topraklamasını
+    #  ezmemeli;  API onu okumamalı ( gizli, düzeltilemez ), motor da ortakta
+    #  yazan değeri kullanmalı.
+    _asl, _ort = UC_UYG._asansor_girdileri({
+        "asansorler": [{"temel_a": "10"}, {"temel_a": "abc"}],
+        "proje_geneli": {"temel_a": "20", "temel_b": "15"}})
+    r.kontrol("uygulama · asansörün içindeki proje geneli kopya okunmuyor",
+              all("temel_a" not in a for a in _asl) and _ort["temel_a"] == 20)
+    r.kontrol("uygulama · asansörde kalmış bozuk proje geneli değer projeyi durdurmuyor",
+              not UC_ORTAK._belirsiz_hata())
+    from engine.uygulama import hesap as UYG_HESAP
+    _pgs = UYG_HESAP.hesapla_coklu([{"temel_a": 10, "temel_b": 15}, {}],
+                                   {"temel_a": 20, "temel_b": 15})
+    r.esit("uygulama · motorda da proje geneli alanda ortak kazanıyor",
+           [a["girdi"]["temel_a"] for a in _pgs["asansorler"]], [20, 20])
+    r.esit("uygulama · ortakta olmayan proje geneli alan asansörden alınıyor",
+           UYG_HESAP.hesapla_coklu([{"temel_a": 12, "temel_b": 9}], {})
+           ["asansorler"][0]["girdi"]["temel_a"], 12)
+
     # ------------------------------------------------ gizli alan projeyi durdurmaz
     #  Makine yerleşimine göre ekranda gizlenen bir alanda kalmış değer projeyi
     #  durduruyordu;  kullanıcı gizli alanı göremez, düzeltemez.  Görünen alanda

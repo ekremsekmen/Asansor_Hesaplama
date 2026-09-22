@@ -156,7 +156,7 @@ PROJE_SENARYOLARI = (
     ("zincir + ağırlıkta ani tertibat + Fp",
      dict(_B, denge_zinciri="Var", agirlik_guvenlik_tertibati="Ani Frenlemeli",
           beyan_hizi=0.63, klips_itme_kuvveti=400)),
-    ("ofis k3", dict(_B, _ofis={"k3_yardimci": 2})),
+    ("ofis k3", dict(_B, _ofis={"k3_yardimci": 1.2})),
     ("ofis k1 kaymalı", dict(_B, _ofis={"k1_kaymali": 3})),
     ("ofis k1 makaralı", dict(_B, guvenlik_tertibati="Ani Frenlemeli Makaralı",
                               beyan_hizi=0.63, _ofis={"k1_makarali": 4})),

@@ -1165,7 +1165,8 @@ def _regulator(g, o):
         veri("", "Regülatör halatı 1 m ağırlığı", gh_m, "kg/m", gh_kaynak),
         hesap("gh = ( 1 m ağırlık ) × ( H × 1000 + son kat + tabliye − 200 ) × 2 / 1000",
               f"{_trh(gh_m)} × {tr(boy)}", gh, "kg"),
-        veri("Gra", "Regülatör alt ağırlığı ve kasnak kütlesi", Gra, "kg", "GİRİŞ"),
+        veri("Gra", "Regülatör gergi ağırlığı — kasnak merkezindeki kuvvetin eşdeğeri",
+             Gra, "kg", "GİRİŞ"),
         veri("Fgt", "Güvenlik tertibatını devreye sokma kuvveti",
              F_devreye if devreye_var else "girilmedi", "N" if devreye_var else "",
              "KATALOG  ·  tip inceleme belgesi" if devreye_var

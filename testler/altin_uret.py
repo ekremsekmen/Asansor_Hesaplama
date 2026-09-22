@@ -209,7 +209,8 @@ def uygulama_senaryolar():
     geneli hesaplar ( topraklama + makine dairesi ) · çok asansörlü proje ·
     hesabı durduran girdi.
     """
-    PG = {"temel_a": 26.55, "temel_b": 16.4, "serit_L": 58.5,
+    #  Şerit boyu girdi değildir — temel ölçülerinden türetilir.
+    PG = {"temel_a": 26.55, "temel_b": 16.4,
           "mk_yok": False, "mk_uzunluk": 4.0, "mk_genislik": 3.0}
 
     #  1) Taban — varsayılan proje, proje geneli hesaplar YOK

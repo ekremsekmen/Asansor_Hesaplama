@@ -27,7 +27,8 @@ Not:  ofis standardı ( U · κ · εmax · armatürler · priz · cosφ · β �
 zaten "Sabitler / Ofis Standardı" sekmesinden gelir;  o da ikinci kez
 sorulmaz.
 """
-from engine.ortak.steps import evet_mi
+from engine.avan import hesap as E_AVAN
+from engine.ortak.steps import aralik_disi, evet_mi
 from engine.uygulama import mukavemet as MK
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_girdi as MG
@@ -45,24 +46,33 @@ MK_VERIM = US.OFIS.VARSAYILAN_VERIM
 #  girilir ve her asansörün girdi setine karıştırılır — elektrik köprüsü
 #  onları orada bekler.  Liste burada durur ki API ve arayüz aynı yerden
 #  okusun;  iki yerde tutulsaydı ayrışırlardı.
-PROJE_GENELI_ALANLAR = ("temel_a", "temel_b", "serit_L",
+PROJE_GENELI_ALANLAR = ("temel_a", "temel_b",
                         "mk_yok", "mk_uzunluk", "mk_genislik")
 
 EK_ALANLAR = (
     ("kuyu_genisligi",  "Kuyu genişliği  ( KG )",            "mm",   "sayi", None, 2400),
-    ("kolon_kesit",     "S1 — Kolon hattı kesiti",           "mm²",  "sayi", None, 16),
-    ("kolon_uzunluk",   "L1 — Kolon hattı uzunluğu",         "m",    "sayi", None, None),
+    #  S1 = 6 mm²:  avan motoru ve ofisin avan Excel'i de 6 kullanır;  eskiden
+    #  burada kaynaksız 16 vardı ve aynı asansöre iki proje farklı kesit
+    #  veriyordu.  4,9 – 15 kW'lık motorlarda ε ≤ %1,6 ve akım yeter;  daha
+    #  büyük motorda yetmezse gerilim düşümü bölümü "kesiti büyütün" der.
+    ("kolon_kesit",     "S1 — Kolon hattı kesiti",           "mm²",  "sayi", None, 6),
     ("makine_kesit",    "S2 — Makine besleme kesiti",        "mm²",  "sayi", None, 6),
-    ("makine_uzunluk",  "L2 — Makine besleme uzunluğu",      "m",    "sayi", None, 12),
     ("temel_a",         "Temel uzunluğu",                    "m",    "sayi", None, None),
     ("temel_b",         "Temel genişliği",                   "m",    "sayi", None, None),
-    ("serit_L",         "Topraklama şeridi boyu",            "m",    "sayi", None, None),
     ("mk_yok",          "Makine dairesiz  ( MRL )",          "—",    "onay", None, True),
     ("mk_uzunluk",      "Makine dairesi uzunluğu",           "mm",   "sayi", None, None),
     ("mk_genislik",     "Makine dairesi genişliği",          "mm",   "sayi", None, None),
 )
 
 EK_ALAN = {a[0]: a for a in EK_ALANLAR}
+
+#  KÖPRÜDEN AVAN MOTORUNA GEÇEN ve orada SINIRLANAN alanlar  →  avandaki adı.
+#  Avan motoru bunları kendi sınırlarıyla denetler ve sınır dışındaysa
+#  asansörü durdurur;  burada denetlenmezse kullanıcı yalnız "elektrik
+#  hesapları yapılamadı" görür, hangi alanı düzelteceğini göremezdi.
+#  Sınırlar avan motorundan OKUNUR ( tek kaynak:  ASANSOR_SINIRLARI ).
+AVAN_SINIRLI = {"kolon_kesit": "S1", "makine_kesit": "S2",
+                "motor_gucu": "Nsc", "kabin_agirligi": "Gk_elle"}
 
 
 #  Elektrik / topraklama alanlarının ⓘ metinleri  ( bkz. MG.ACIKLAMA ).
@@ -72,13 +82,10 @@ EK_ACIKLAMA = {
               "girmez.",
     "kolon_kesit": "S1 — panodan asansör tablosuna gelen kolon hattının "
               "iletken kesiti. Gerilim düşümü ve koruma iletkeni bundan çıkar.",
-    "kolon_uzunluk": "L1 — kolon hattının bina içindeki gerçek uzunluğu.",
     "makine_kesit": "S2 — tablodan makineye giden besleme hattının kesiti.",
-    "makine_uzunluk": "L2 — tablo ile makine arasındaki hat uzunluğu.",
     "temel_a": "Binanın temelinin uzunluğu. Temel topraklamasının eşdeğer "
               "direnci temel ALANINDAN hesaplanır.",
     "temel_b": "Binanın temelinin genişliği.",
-    "serit_L": "Temele gömülü topraklama şeridinin toplam boyu.",
     "mk_yok": "Makine dairesi var mı yok mu. Dairesiz ( MRL ) seçilirse "
               "tabliye betonu ve makine kaidesi kolonu yoktur: kiriş burkulma "
               "kontrolü yapılmaz, ray boyuna tabliye eklenmez.",
@@ -224,6 +231,7 @@ def dogrula(g):
             continue                       # boş bırakılabilir — hesap uyarır
         if not isinstance(d, (int, float)) or isinstance(d, bool) or d < 0:
             hata.append(f"{ad}: negatif olmayan bir sayı olmalı ( {d!r} girildi ).")
+    hata += _avan_siniri_hatalari(g, atla)
     #  Makine dairesi işaretli DEĞİLSE ölçüsü istenir;  yoksa aydınlatma
     #  hesabı sessizce yapılamaz hâle gelirdi.
     if not evet_mi(g.get("mk_yok")):
@@ -231,6 +239,27 @@ def dogrula(g):
             if not (isinstance(g.get(a), (int, float)) and g[a] > 0):
                 hata.append(f"{EK_ALAN[a][1]}: makine dairesi varsa ölçüsü girilmelidir "
                             "( ya da 'Makine dairesiz ( MRL )' kutusunu işaretleyin ).")
+    return hata
+
+
+def _avan_siniri_hatalari(g, atla):
+    """Avan motorunun kabul etmeyeceği köprü değerleri  —  hata metinleri.
+
+    Negatif değer ve bölen alandaki sıfır zaten kendi denetiminde söylenir;
+    burada ikinci kez yazılmaz.
+    """
+    sinir = {k: (aralik, birim) for k, _ad, aralik, birim in E_AVAN.ASANSOR_SINIRLARI}
+    hata = []
+    for a, avan_adi in AVAN_SINIRLI.items():
+        d = g.get(a)
+        if (a in atla or not isinstance(d, (int, float)) or isinstance(d, bool)
+                or d < 0 or (d == 0 and a in MG.BOLEN_ALANLAR)):
+            continue
+        (alt, ust), birim = sinir[avan_adi]
+        if not alt <= d <= ust:
+            et = (EK_ALAN.get(a) or MG.ALAN[a])[1]
+            hata.append(aralik_disi(et, d, alt, ust, birim)
+                        + "  —  elektrik hesapları bu değerle yapılamaz.")
     return hata
 
 
@@ -267,12 +296,22 @@ def kopru(g):
         "eta": MG.sistem_verimi(g)[0],
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
-        "S1": g.get("kolon_kesit"), "L1": g.get("kolon_uzunluk"),
-        "S2": g.get("makine_kesit"), "L2": g.get("makine_uzunluk"),
+        #  L1 GÖNDERİLMEZ:  avan motoru kuyu yüksekliği + yatay güzergâh payıyla
+        #  kurar;  pay uygulamanın Sabitler'indedir ( _avan_sabitleri geçirir ).
+        "S1": g.get("kolon_kesit"),
+        #  L2 GÖNDERİLMEZ:  ofis sabitidir ( Sabitler · ⑤ ) ve her projede
+        #  aynıdır — asansör panosu makineye yakın durur.  Avan motoru asansör
+        #  değeri yoksa ofis değerini kullanır ( _ofis_degeri ).  Eskiden asansör
+        #  formunda kaynaksız 12 m varsayılanla soruluyordu;  avan ve ofisin üç
+        #  şablonu 3 m kullanıyor, aynı asansöre iki proje farklı sayı veriyordu.
+        "S2": g.get("makine_kesit"),
     }
     ortak = {
         "temel_a": g.get("temel_a"), "temel_b": g.get("temel_b"),
-        "serit_L": g.get("serit_L"),
+        #  ŞERİT BOYU GİRDİ DEĞİLDİR:  avan motoru temel ölçülerinden kurar
+        #  ( temel çevresi + karelaj bağları, göz Sabitler'de ) ve paftaya
+        #  hesabıyla basar.  Formda hep boş bırakılan bir kutuydu.
+        "serit_L": None,
         "mk_yok": bool(g.get("mk_yok")),
         "mk_uzunluk": g.get("mk_uzunluk"), "mk_genislik": g.get("mk_genislik"),
     }
@@ -299,12 +338,17 @@ AVAN_DISI = ("q_denge", "sigma_em", "k1_kaymali", "k1_makarali", "k1_ani",
 def _avan_sabitleri(ofis):
     """Uygulamanın ofis setinden, avan motorunun kullanabileceği alt küme."""
     if not isinstance(ofis, dict):
-        return {}
+        ofis = {}
     d = {}
     for k, v in ofis.items():
         if k in AVAN_DISI:
             continue
         d[AVAN_KARSILIGI.get(k, k)] = v
+    #  L2 uygulamanın KENDİ sabitidir:  boş bırakılsa da avan motorunun
+    #  varsayılanına düşmesin diye her zaman açıkça geçirilir.
+    _us = US.sabitler(ofis)
+    d["L2"] = _us["L2"]
+    d["L1_pay"] = _us["L1_pay"]
     return d
 
 

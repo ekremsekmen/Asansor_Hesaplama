@@ -169,10 +169,13 @@ def calistir():
             for _im in (("BİNADA BULUNAN İNSAN SAYISININ TESPİTİ", "B = ROUNDUP( b + ( n · b ) )")
                         if _ad == "tek" else ("ORTAK BİNA BİLGİLERİ", "GRUP KONTROLÜ")):
                 r.kontrol(f"{_ad} paftasında bölüm duruyor: {_im[:28]}", _im in tum)
-        #  Avan paftası çok sayfalıdır ve imza kutusu ORADA durur
+        #  İmza kutusu HİÇBİR paftada yoktur:  boş kalıyordu, imza bilgisi
+        #  kapak sayfasındadır ( trafik paftasından önce, sonra ötekilerden
+        #  de çıkarıldı ).
         d = pdfium.PdfDocument(os.path.join(GECICI, "avan.pdf"))
         _av = "\n".join(d[i].get_textpage().get_text_range() for i in range(len(d)))
-        r.kontrol("avan paftasında imza kutusu duruyor", "Hesabı yapan" in _av)
+        r.kontrol("avan paftasında imza kutusu YOK",
+                  not any(x in _av for x in ("Hesabı yapan", "Kontrol eden")))
 
     # ------------------------------------------------- v1.3 içerik kontrolleri
     #  Yeni büyüklükler paftaya gerçekten basılıyor mu?
@@ -903,9 +906,10 @@ def calistir():
     _mm = _metin(_mpdf)
     for _ara in ("ASANSÖR MUKAVEMET HESAPLARI", "TS EN 81-50",
                  "MOTOR GÜCÜNÜN HESAPLANMASI", "TAHRİK YETENEĞİNİN",
-                 "KILAVUZ RAYLARININ", "SIĞINMA ALANLARI", "SONUÇ ÖZETİ",
-                 "Hesabı yapan"):
+                 "KILAVUZ RAYLARININ", "SIĞINMA ALANLARI", "SONUÇ ÖZETİ"):
         r.kontrol(f"mukavemet PDF: {_ara}", _ara in _mm)
+    r.kontrol("mukavemet PDF: imza kutusu YOK",
+              not any(x in _mm for x in ("Hesabı yapan", "Kontrol eden")))
     #  Sayılar paftaya GERÇEKTEN basılıyor mu — boş şablon "geçti" sayılmasın.
     #  Motor gücü elle YAZILMAZ:  motordan okunur, yoksa hesap değiştiğinde
     #  test sessizce eskir  ( verim makine tipine bağlanınca 4,81 → 5,90 oldu ).
@@ -1007,7 +1011,7 @@ def calistir():
     #  bölümlerin arasında ).  Tek asansörde asansör şeridi basılmaz.
     from engine.uygulama import hesap as _UY
     _uyp = _UY.hesapla_coklu(
-        [{}], {"temel_a": 26.55, "temel_b": 16.4, "kolon_uzunluk": 45})
+        [{}], {"temel_a": 26.55, "temel_b": 16.4})
     _uy = _uyp["asansorler"][0]
     _upd = PE.uygulama_pdf(_uyp, PROJE)
     r.esit("tek asansörlü proje 'tek' yolundan geçiyor", _uyp["yol"], "tek")
@@ -1016,8 +1020,10 @@ def calistir():
     for _ara in ("ASANSÖR UYGULAMA PROJESİ HESAPLARI", "MUKAVEMET HESAPLARI",
                  "ELEKTRİK VE TOPRAKLAMA HESAPLARI", "KABİN AYDINLATMA",
                  "KURULU GÜÇ CETVELİ", "GERİLİM DÜŞÜMÜ", "TOPRAKLAYICI",
-                 "SONUÇ ÖZETİ", "Hesabı yapan"):
+                 "SONUÇ ÖZETİ"):
         r.kontrol(f"uygulama PDF: {_ara}", _ara in _um)
+    r.kontrol("uygulama PDF: imza kutusu YOK",
+              not any(x in _um for x in ("Hesabı yapan", "Kontrol eden")))
     #  Kurulu güç PAFTADAN değil, HESAPTAN okunur:  elle yazılmış bir sayı
     #  motor değiştiğinde sessizce bayatlar ( ηm düzeltmesinde öyle oldu ).
     from engine.ortak.steps import trn as _trn

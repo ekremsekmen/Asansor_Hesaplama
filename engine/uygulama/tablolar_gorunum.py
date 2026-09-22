@@ -14,6 +14,7 @@ eklenir.  Böylece ekrandaki tablo ile hesaba giren tablo bir daha ayrışamaz.
 """
 import math
 
+from engine.ortak.steps import yuvarla
 from engine.uygulama import mukavemet_tablolari as MT
 from engine.uygulama import sabitler as US
 
@@ -67,7 +68,7 @@ def arayuz_tablolari(ofis=None):
         "kaynak": "TS EN 81-20 Çizelge 15  ( A5 > %12 )",
         "aciklama": "σperm = Rm / St;  St = 2,25 normal · 1,8 güvenlik tertibatı.",
         "basliklar": ["Rm  ( N/mm² )", "σperm normal", "σperm güv. tertibatı"],
-        "satirlar": [[rm, round(n, 2), round(gv, 2)] for rm, n, gv in MT.RAY_CELIGI],
+        "satirlar": [[rm, yuvarla(n, 2), yuvarla(gv, 2)] for rm, n, gv in MT.RAY_CELIGI],
     })
     t.append({
         "ad": "ω  —  burkulma katsayısı",
@@ -76,9 +77,9 @@ def arayuz_tablolari(ofis=None):
                      "dayanımlarda doğrusal ara değer alınır."),
         "basliklar": ["λ", "ω  ( Rm = 370 )", "ω  ( Rm = 440 )", "ω  ( Rm = 520 )"],
         "satirlar": [[lam,
-                      round(MT.omega_en8150(lam, 370), 4),
-                      round(MT.omega_en8150(lam, 440), 4),
-                      round(MT.omega_en8150(lam, 520), 4)]
+                      yuvarla(MT.omega_en8150(lam, 370), 4),
+                      yuvarla(MT.omega_en8150(lam, 440), 4),
+                      yuvarla(MT.omega_en8150(lam, 520), 4)]
                      for lam in range(MT.OMEGA_LAMBDA_MIN,
                                       MT.OMEGA_LAMBDA_MAX + 1, 5)],
     })
@@ -118,7 +119,7 @@ def arayuz_tablolari(ofis=None):
                        "U": "yarım daire", "UK": "yarım daire, altı kesik"}[tur],
                       MT.kanal_acisi(ad, O["kanal_gama_v"], O["kanal_gama_yd"]),
                       MT.kanal_beta(ad, O["kanal_beta"]),
-                      round(MT.kanal_nequiv_t(ad, O["kanal_gama_v"],
+                      yuvarla(MT.kanal_nequiv_t(ad, O["kanal_gama_v"],
                                               O["kanal_beta"]), 2)]
                      for ad, tur, _gecis in MT.KANAL_SEKLI],
     })
@@ -141,7 +142,7 @@ def arayuz_tablolari(ofis=None):
                      "kanalın kendi maddesinde ( m.5.11.2.3.1.1 ) sertleştirme "
                      "geçmez."),
         "basliklar": ["Kanal şekli"] + list(MT.KANAL_ISLEME_SEKILLERI),
-        "satirlar": [[ad] + [round(_f_yukleme(
+        "satirlar": [[ad] + [yuvarla(_f_yukleme(
             ad, 0.1,
             MT.kanal_acisi(ad, O["kanal_gama_v"], O["kanal_gama_yd"]),
             MT.kanal_beta(ad, O["kanal_beta"]),

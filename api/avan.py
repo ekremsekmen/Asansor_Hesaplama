@@ -12,9 +12,10 @@ from datetime import date
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _dosya_adi, _indir,
-                       _paket_ekleri, _proje_kimligi, _sabitler_coz, _sayi,
-                       _sozluk_listesi, _temiz, _uretilemedi, belirsiz_sayi_mi)
+from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _bos_mu, _dosya_adi,
+                       _indir, _paket_ekleri, _proje_kimligi, _sabitler_coz,
+                       _sayi, _sozluk_listesi, _temiz, _uretilemedi,
+                       belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
@@ -44,6 +45,21 @@ AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "kapasite", "Q_elle", "V", "eta", "Hk", "kuyu_genisligi", "kabin_boyu",
                    "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
                    "S1", "L1", "S2", "L2")
+
+#  Red metninde görünen adlar:  "Q_elle" değil "Q elle — anma yükü".  Motorun
+#  kendi tablolarından okunur ( tek kaynak );  yalnız motorun denetlemediği
+#  birkaç ortak alanın adı burada yazılıdır.
+AVAN_AS_ETIKET = {
+    "kapasite": "Kapasite",
+    **{k: ad for k, ad, _poz in E_AVAN.ZORUNLU_ALANLAR},
+    **{k: ad for k, ad, _aralik, _birim in E_AVAN.ASANSOR_SINIRLARI},
+}
+AVAN_ORTAK_ETIKET = {
+    **{k: ad for k, (ad, _birim) in E_AVAN.OFIS_ETIKET.items()},
+    "temel_a": "Temel uzunluğu", "temel_b": "Temel genişliği",
+    "serit_L": "L — topraklama şeridi boyu",
+    "mk_uzunluk": "Makine dairesi uzunluğu", "mk_genislik": "Makine dairesi genişliği",
+}
 
 #  Ofis standardında METİN olan sabitler ( kablo tipi … ) — sayıya çevrilmez.
 AVAN_METIN_SABITLER = tuple(
@@ -92,9 +108,12 @@ def _trafik_girdi(veri: dict):
     ham = ham if isinstance(ham, dict) else {}
     g = _temiz(ham, TRAFIK_SAYISAL)
     g["ek_nufus"] = _ek_nufus_oku(ham.get("ek_nufus"))
+    #  Kişi sayısı YAZILMIŞ asansör tanımlıdır.  Okunabilir P aranıyordu:
+    #  "8 kişi" yazılan asansör listeden sessizce düşüyor, trafik bir asansör
+    #  eksik hesaplanıyordu.  Artık okunamayan P, sebebiyle reddedilir.
     liste = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ")
              for i, a in enumerate(_sozluk_listesi(ham.get("asansorler")), 1)
-             if _sayi(a.get("P")) is not None][:4]
+             if not _bos_mu(a.get("P"))][:4]
     if not liste and g.get("P") is not None:
         bir = {k: g.get(k) for k in ("P", "kapi_genisligi",
                                      "manuel_ta", "manuel_tk", "manuel_tg", "manuel_tp")}
@@ -110,16 +129,21 @@ def _avan_girdi(veri: dict):
     v = veri.get("girdiler")
     v = v if isinstance(v, dict) else {}
     ortak_ham = v.get("ortak")
-    ortak = _temiz(ortak_ham if isinstance(ortak_ham, dict) else {}, AVAN_ORTAK_SAYISAL)
+    ortak = _temiz(ortak_ham if isinstance(ortak_ham, dict) else {}, AVAN_ORTAK_SAYISAL,
+                   etiket=AVAN_ORTAK_ETIKET)
     asansorler = []
     for sira, a in enumerate(_sozluk_listesi(v.get("asansorler"))[:4], 1):
-        if not a.get("aktif", True):
+        #  Kapasitesi ya da anma yükü YAZILMAMIŞ kolon tanımsızdır ve okunmaz:
+        #  içinde kalmış bir değer projeyi durdurmamalı.  Yazılmışsa okunur —
+        #  "abc" yazılmış anma yükü eskiden kolonu sessizce tanımsız yapıyordu.
+        if not a.get("aktif", True) or (_bos_mu(a.get("kapasite"))
+                                        and _bos_mu(a.get("Q_elle"))):
             asansorler.append(None)
             continue
-        t = _temiz(a, AVAN_AS_SAYISAL, f"{sira} NOLU ASANSÖR: ")
-        asansorler.append(t if (t.get("kapasite") or t.get("Q_elle")) else None)
+        asansorler.append(_temiz(a, AVAN_AS_SAYISAL, f"{sira} NOLU ASANSÖR: ",
+                                 AVAN_AS_ETIKET))
     sb = _sabitler_coz(v.get("sabitler"), AVAN_METIN_SABITLER,
-                       lambda k: f"Ofis standardı · {k}")
+                       lambda k: f"Ofis standardı · {AVAN_ORTAK_ETIKET.get(k, k)}")
     return {"ortak": ortak, "asansorler": asansorler, "sabitler": sb,
             "trafik": _trafik_koprusu(v.get("trafik"))}
 
@@ -141,6 +165,22 @@ def _trafik_koprusu(ham):
             "N": _sayi(ham.get("N")), "bodrum": _sayi(ham.get("bodrum")),
             "h": _sayi(ham.get("h")), "adet": _sayi(ham.get("adet")),
             "asansorler": liste}
+
+
+def _avan_sonuc(veri):
+    """Avan hesabı  —  ( sonuç , hata_yanıtı ).
+
+    Ekran, PDF ve CAD aynı yoldan geçer:  ekran neyi reddediyorsa çıktı da
+    reddeder.  İki ret kaynağı vardır — okunamayan yazım ( API ) ve
+    kullanılamayan değer ( motor, bkz. engine.avan.hesap.girdi_hatalari ).
+    """
+    g = _avan_girdi(veri)
+    hata = _belirsiz_hata()
+    s = None if hata else E_AVAN.hesapla(g)
+    hata = hata or s.get("hata")
+    if hata:
+        return None, JSONResponse({"hata": hata}, status_code=200)
+    return s, None
 
 
 # ------------------------------------------------------------------ uçlar
@@ -196,11 +236,9 @@ def api_trafik(veri: dict = Body(...)):
 @router.post("/api/avan")
 def api_avan(veri: dict = Body(...)):
     try:
-        g = _avan_girdi(veri)
-        belirsiz = _belirsiz_hata()
-        if belirsiz:
-            return JSONResponse({"hata": belirsiz}, status_code=200)
-        s = E_AVAN.hesapla(g)
+        s, yanit = _avan_sonuc(veri)
+        if yanit is not None:
+            return yanit
         return JSONResponse(json.loads(json.dumps(s, default=str)))
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
@@ -225,11 +263,9 @@ def indir_trafik_pdf(veri: dict = Body(...)):
 @router.post("/api/indir/avan-pdf")
 def indir_avan_pdf(veri: dict = Body(...)):
     try:
-        g = _avan_girdi(veri)
-        belirsiz = _belirsiz_hata()          # ekran neyi reddediyorsa indirme de reddeder
-        if belirsiz:
-            return JSONResponse({"hata": belirsiz}, status_code=200)
-        s = E_AVAN.hesapla(g)
+        s, yanit = _avan_sonuc(veri)
+        if yanit is not None:
+            return yanit
         _p = _proje_kimligi(veri)
         return _indir(X_PDF.avan_pdf(s, _p),
                       _dosya_adi(_p, "Avan Hesaplari", "pdf"), "application/pdf")
@@ -274,11 +310,10 @@ def indir_proje_dwg(veri: dict = Body(...)):
 
         avan_ham = ham.get("avan")
         if isinstance(avan_ham, dict):
-            a = _avan_girdi({"girdiler": avan_ham})
-            belirsiz = _belirsiz_hata()
-            if belirsiz:
-                return JSONResponse({"hata": belirsiz}, status_code=200)
-            paftalar.append(("Avan", X_PDF.avan_pdf(E_AVAN.hesapla(a))))
+            a, yanit = _avan_sonuc({"girdiler": avan_ham})
+            if yanit is not None:
+                return yanit
+            paftalar.append(("Avan", X_PDF.avan_pdf(a)))
 
         if not paftalar:
             return JSONResponse(

@@ -253,6 +253,11 @@ BILEREK_DEGISEN_VARSAYILAN = {
     #  m.5.11.2.2.2 hesaba girecek en küçük yavaşlamayı 0,5 m/s² der;  referans
     #  program ( ELEport ) da 0,5 kullanır.  Bilinmeyen makinede standardın
     #  tabanı alınır, gerçek değer imalatçıdan girilir.
+    "kabin_paten_arasi": (3300, "kabin paten arası h — gerçek projelerin üst "
+                               "sınırı ( ofis MRL · ELEport ) ( kullanıcı kararı )"),
+    "agirlik_paten_arasi": (3000, "karşı ağırlık paten arası — barit dolgu "
+                                 "( new block 3.200 · ELEport pik 1.500 ) "
+                                 "( kullanıcı kararı )"),
     "acil_frenleme_a": (MG.ACIL_FRENLEME_ASGARI,
                         "EN 81-50 m.5.11.2.2.2 tabanı — ELEport da 0,5 "
                         "kullanıyor ( kullanıcı kararı )"),
