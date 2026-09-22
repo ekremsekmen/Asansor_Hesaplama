@@ -210,8 +210,10 @@ def uygulama_senaryolar():
     hesabı durduran girdi.
     """
     #  Şerit boyu girdi değildir — temel ölçülerinden türetilir.
+    #  Makine dairesi ölçüsü MİLİMETREDİR:  4,0 × 3,0 yazılıydı ve senaryolar
+    #  4 mm × 3 mm'lik bir oda hesaplıyordu ( pafta "0,00 · 0,00" basıyordu ).
     PG = {"temel_a": 26.55, "temel_b": 16.4,
-          "mk_yok": False, "mk_uzunluk": 4.0, "mk_genislik": 3.0}
+          "mk_yok": False, "mk_uzunluk": 4000, "mk_genislik": 3000}
 
     #  1) Taban — varsayılan proje, proje geneli hesaplar YOK
     yield {"asansorler": [{}], "ortak": {}}

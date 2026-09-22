@@ -265,11 +265,12 @@ def calistir():
     #  TAHRİK YETENEĞİ için kanalın sertleştirilmiş olması ve denge zinciri
     #  de gerekir;  Ek D'nin ivme işaretleriyle ( ㊳ ) çıplak örnek
     #  tahrikten kalıyor.
-    #  Temiz proje sarılma açısını da BEYAN eder ( zorunlu girdi ).
+    #  Temiz proje sarılma açısını da BEYAN eder ( zorunlu girdi ).  6,5 mm
+    #  halat 8 mm'nin altındadır ( m.5.5.1.2 a) );  sahadaki gibi belgelidir.
     _temiz = dict(tahrik_kasnak_capi=280, saptirma_kasnak_capi=280,
                   motor_gucu=7.5, guvenlik_devreye_kuvvet=200,
                   kanal_isleme="Sertleştirilmiş", denge_zinciri="Var",
-                  sarilma_acisi=180)
+                  sarilma_acisi=180, kasnak_belgesi="Var")
     _t = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), **_temiz)))
     r.kontrol("② temiz proje uygun", _t["ozet"]["tumu_uygun"] is True)
     #  Akım yetersizse İLGİLİ BÖLÜM de uygun değil

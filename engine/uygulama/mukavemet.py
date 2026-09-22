@@ -39,6 +39,7 @@ SABIT = {
     "motor_sabiti":    102,       # kW ↔ kg·m/s dönüşümü
     "hp_carpani":      1.34,      # kW → HP
     "Dt_dh_asgari":    40,        # tahrik kasnağı / halat oranı   EN 81-20 m.5.5.2.1
+    "halat_capi_asgari": 8,       # askı halatı anma çapı [mm]     EN 81-20 m.5.5.1.2 a)
     "Dreg_dreg_asgari": 30,       # regülatör kasnağı / halat oranı
     "reg_kat_asgari":  8,         # regülatör halatı emniyet katsayısı
     "reg_kuvvet_asgari": 300,     # F'reg alt sınırı              [N]
@@ -829,8 +830,8 @@ def _kabin_alani(g, o):
 # =====================================================================
 #  4 -  ASKI HALATLARI                           ( TS EN 81-50 m.5.12 )
 # =====================================================================
-#  D/d < 40 BELGEYLE KABUL EDİLDİĞİNDE basılan hüküm.  "UYGUN" ile başlar
-#  ki okuyan bunu ret sanmasın.
+#  BELGEYLE KABUL EDİLEN SINIRIN hükmü ( halat çapı < 8 mm · D/d < 40 ).
+#  "UYGUN" ile başlar ki okuyan bunu ret sanmasın.
 BELGEYLE_UYGUN = "BELGEYLE UYGUN"
 
 
@@ -851,6 +852,13 @@ def _aski_halatlari(g, o):
     belge = g.get("kasnak_belgesi") == "Var"
     oran_std = oran >= S["Dt_dh_asgari"]
     oran_uygun = oran_std or belge
+    #  HALAT ÇAPI ≥ 8 mm  ( m.5.5.1.2 a) ) — AYNI BELGEYLE AŞILIR.  6,5 mm gibi
+    #  ince halatlar sahada yaygındır ama standardın dışındadır;  küçük
+    #  kasnakla birlikte tek bir onaylanmış kuruluş belgesiyle kullanılır.
+    #  Şart hiç denetlenmiyordu:  400 mm kasnakta 6 mm halat, belgesiz,
+    #  "UYGUNDUR" çıkıyordu ( ⓘ açıklaması 8 mm diyordu ).
+    cap_std = dh >= S["halat_capi_asgari"]
+    cap_uygun = cap_std or belge
 
     #  Nps boşsa ASKI ORANINDAN gelir ( TS EN 81-50 Ek E — bkz. MG ).
     Nps, Nps_girildi = MG.kasnak_tek_yon(g)
@@ -865,11 +873,53 @@ def _aski_halatlari(g, o):
     oran_p_std = oran_p >= S["Dt_dh_asgari"]
     oran_p_uygun = (not kasnak_var) or oran_p_std or belge
 
-    def _dd_kontrol(ad, deger, std):
+    def _sinir_kontrol(ifade, std, esik):
+        """Standart sınırı:  sağlanıyorsa UYGUN, sağlanmıyorsa belgeyle kabul
+        ya da UYGUN DEĞİL."""
         if std or not belge:
-            return kontrol(f"{ad} = {tr(deger)}  ≥  {S['Dt_dh_asgari']}", std)
-        return kontrol(f"{ad} = {tr(deger)}  <  {S['Dt_dh_asgari']}  —  "
-                       "onaylanmış kuruluş belgesiyle", True, BELGEYLE_UYGUN)
+            return kontrol(f"{ifade}  ≥  {esik}", std)
+        return kontrol(f"{ifade}  <  {esik}  —  onaylanmış kuruluş belgesiyle",
+                       True, BELGEYLE_UYGUN)
+
+    def _dd_kontrol(ad, deger, std):
+        return _sinir_kontrol(f"{ad} = {tr(deger)}", std, S["Dt_dh_asgari"])
+
+    _cap_esik = f"{trn(S['halat_capi_asgari'], 0)} mm"
+    #  Belge satırı HANGİ maddeden sapıldığını yazar;  belge beyan edilmiş ama
+    #  hiçbir sınır aşılmamışsa bunu da söyler.
+    _sapmalar = ([] if cap_std else ["m.5.5.1.2"]) + (
+        [] if (oran_std and (oran_p_std or not kasnak_var)) else ["m.5.5.2.1"])
+    _belge_kaynagi = "GİRİŞ  ·  " + (
+        f"{' ve '.join(_sapmalar)}'den sapma  ·  2014/33/AB Ek-I 1.3"
+        if _sapmalar else "standart sınırları zaten sağlanıyor")
+
+    def _belgeli_sinirlar_metni():
+        """Belgeyle aşılabilen sınırlar ( çap · D/d ) TEK cümlede:  ne eksik,
+        standarda nasıl uyulur, ya da belge.  Eskiden her sınır kendi
+        cümlesini kuruyor ve 240 mm kasnakta 6,5 mm halata "halat çapını
+        küçültün" diyordu — standardın öbür şartını çiğneten bir öğüt."""
+        sorun = ([f"dh = {trn(dh, 1)} mm < {_cap_esik}"] if not cap_uygun else []) + (
+            [f"Dt/dh = {tr(oran)} < {trn(S['Dt_dh_asgari'], 0)}"] if not oran_uygun else []) + (
+            [f"Ds/dh = {tr(oran_p)} < {trn(S['Dt_dh_asgari'], 0)}"] if not oran_p_uygun else [])
+        if not sorun:
+            return None
+        #  STANDARDA UYAN EN YAKIN ÇİFT:  halat en az 8 mm, her kasnak 40 × halat.
+        d_std = max(dh, S["halat_capi_asgari"])
+        D_std = S["Dt_dh_asgari"] * d_std
+        kasnaklar = [ad for ad, D, denetle in (("tahrik kasnağı", Dt, True),
+                                               ("saptırma kasnağı", Ds, kasnak_var))
+                     if denetle and D < D_std - 1e-9]
+        parca = ([f"en az {_cap_esik} halat"] if not cap_std else []) + (
+            [f"en az {trn(D_std, 0)} mm "
+             + ("kasnak" if len(kasnaklar) > 1 else kasnaklar[0])] if kasnaklar else [])
+        #  Halat 8 mm'nin üstündeyse İNCELTMEK de bir yoldur — yeter ki 8 mm'nin
+        #  altına inmeden oranı tuttursun.
+        D_kucuk = min([Dt] + ([Ds] if kasnak_var else []))
+        d_ince = D_kucuk / S["Dt_dh_asgari"]
+        incelt = cap_std and d_ince >= S["halat_capi_asgari"] and d_ince < dh
+        return (" · ".join(sorun) + ":  " + " ve ".join(parca) + " kullanın"
+                + (f", halatı en çok {trn(d_ince, 1)} mm'ye inceltin" if incelt else "")
+                + " ya da onaylanmış kuruluş belgesini beyan edin")
     #  Nequiv(t) OFİS AÇILARINDAN HESAPLANIR  ( EN 81-50 Çizelge 2 ).
     #  Kanalın ADINA bağlı sabit bir tablo kullanılsaydı ofis sabiti γ = 45°
     #  yapılsa bile Nequiv(t) 12 kalır, pafta γ = 38° yazmayı sürdürürdü — hesabın bölüm 6'da kullandığı sayı ile paftaya basılan
@@ -912,11 +962,13 @@ def _aski_halatlari(g, o):
         metin("Askı halatı sayısı  ( TS EN 81-20 m.5.5.1.3 ) :"),
         veri("nh", "Askı halatı adedi", nh, "adet", "GİRİŞ", 0),
         kontrol(f"Askı halatı adedi nh = {tr(nh)} ≥ 2  ( TS EN 81-20 m.5.5.1.3 )", nh_uygun),
-        metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
     ] + ([
-        veri("", "Dt/dh < 40 için onaylanmış kuruluş belgesi", "Var", "",
-             "GİRİŞ  ·  m.5.5.2.1'den sapma  ·  2014/33/AB Ek-I 1.3"),
+        veri("", MG.ALAN["kasnak_belgesi"][1], "Var", "", _belge_kaynagi),
     ] if belge else []) + [
+        metin("Askı halatı çapı  ( TS EN 81-20 m.5.5.1.2 a) ) :"),
+        veri("dh", "Askı halatı anma çapı", dh, "mm", "GİRİŞ", 1),
+        _sinir_kontrol(f"dh = {trn(dh, 1)} mm", cap_std, _cap_esik),
+        metin("Tahrik kasnağı & askı halatı oranı  ( TS EN 81-20 m.5.5.2.1 ) :"),
         hesap("Dt / dh", f"{trn(Dt, 0)} / {tr(dh)}", oran, ""),
         _dd_kontrol("Dt / dh", oran, oran_std),
     ] + ([
@@ -973,23 +1025,24 @@ def _aski_halatlari(g, o):
               Sger, ""),
         kontrol(f"S = {tr(Sger)}  ≥  max( Sf ; Smin ) = {tr(sinir)}", s_uygun),
     ]
-    _esik = trn(S["Dt_dh_asgari"], 0) + ("  ( ya da belge )" if belge else "")
-    b["sonuc"] = {"baslik": (f"KONTROL      Dt/dh ≥ {_esik}"
-                             + (f"   ·   Ds/dh ≥ {_esik}" if kasnak_var else "")
+    #  Belgeyle aşılabilen sınırlar GRUP olarak yazılır ve "( ya da belge )"
+    #  bir kez eklenir:  her sınıra ayrı eklenince başlık iki satıra taşıyor,
+    #  "S ≥ max( Sf ; Smin )" ortadan bölünüyordu.
+    _dd_esik = trn(S["Dt_dh_asgari"], 0)
+    _belgeli = " · ".join([f"dh ≥ {_cap_esik}", f"Dt/dh ≥ {_dd_esik}"]
+                          + ([f"Ds/dh ≥ {_dd_esik}"] if kasnak_var else []))
+    _uygun = nh_uygun and cap_uygun and oran_uygun and oran_p_uygun and s_uygun
+    b["sonuc"] = {"baslik": (f"KONTROL      {_belgeli}"
+                             + ("  ( ya da belge )" if belge else "")
                              + "   ·   S ≥ max( Sf ; Smin )"),
-                  "metin": "UYGUNDUR." if (nh_uygun and oran_uygun and oran_p_uygun and s_uygun)
+                  "metin": "UYGUNDUR." if _uygun
                            else ("UYGUN DEĞİLDİR — "
                                  + " ve ".join(
-                                     ([f"tahrik kasnağı çapını büyütün ya da halat çapını "
-                                       f"küçültün ( Dt/dh = {tr(oran)} )"]
-                                      if not oran_uygun else [])
-                                     + ([f"saptırma kasnağı çapını büyütün ya da halat "
-                                         f"çapını küçültün ( Ds/dh = {tr(oran_p)} )"]
-                                        if not oran_p_uygun else [])
+                                     [m for m in [_belgeli_sinirlar_metni()] if m]
                                      + (["en az iki bağımsız askı halatı kullanın"] if not nh_uygun else [])
                                      + (["halat çapını / adedini artırın"]
                                         if not s_uygun else []))),
-                  "uygun": bool(nh_uygun and oran_uygun and oran_p_uygun and s_uygun)}
+                  "uygun": bool(_uygun)}
     b["notlar"] = []
     _iki_cap = []
     if kasnak_var:
@@ -1036,7 +1089,7 @@ def _aski_halatlari(g, o):
 #  5 -  HIZ REGÜLATÖRÜ HALATI               ( TS EN 81-20 m.5.6.2.2.1 )
 # =====================================================================
 def _reg_metni(tip_uygun, hiz_uygun, oran_uygun, kuvvet_uygun, kat_uygun,
-               tertibat, S, oran, Fcekme, sinir_metni, kat):
+               tertibat, S, oran, Fcekme, sinir_metni, kat, Dreg, dreg):
     """Regülatör bölümünün hükmü — GEREKÇE DÜŞEN KONTROLDEN YAZILIR.
 
     Bölümde beş kontrol var;  metin yalnız ikisini ( tip · hız ) açıklıyordu.
@@ -1054,8 +1107,13 @@ def _reg_metni(tip_uygun, hiz_uygun, oran_uygun, kuvvet_uygun, kat_uygun,
     if not hiz_uygun:
         n.append("regülatör devreye girme hızı izin verilen sınırların dışındadır")
     if not oran_uygun:
+        #  Halatı inceltmek ancak listede oranı tutturan daha ince bir halat
+        #  varsa önerilir;  en ince halattayken "küçültün" demek boş öğüttü.
+        incelt = any(d < dreg and Dreg / d >= S["Dreg_dreg_asgari"]
+                     for d in MG.ALAN["reg_halat_capi"][4])
         n.append(f"Dreg / dreg = {tr(oran)} < {S['Dreg_dreg_asgari']} — "
-                 "regülatör kasnağını büyütün ya da halat çapını küçültün")
+                 "regülatör kasnağını büyütün"
+                 + (" ya da halat çapını küçültün" if incelt else ""))
     if not kuvvet_uygun:
         n.append(f"Fçekme = {tr(Fcekme)} N, {sinir_metni} değerinin altında — "
                  "gergi ağırlığını ya da kanal sürtünmesini artırın")
@@ -1228,7 +1286,7 @@ def _regulator(g, o):
                              f"   ·   T'min/F'reg ≥ {trn(S['reg_kat_asgari'], 0)}"),
                   "metin": _reg_metni(tip_uygun, hiz_uygun, oran_uygun,
                                       kuvvet_uygun, kat_uygun, tertibat, S,
-                                      oran, Fcekme, sinir_metni, kat),
+                                      oran, Fcekme, sinir_metni, kat, Dreg, dreg),
                   "uygun": bool(tip_uygun and hiz_uygun and oran_uygun
                                 and kuvvet_uygun and kat_uygun)}
     b["aciklamalar"] = [

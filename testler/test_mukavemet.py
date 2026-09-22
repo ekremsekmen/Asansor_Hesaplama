@@ -153,12 +153,14 @@ def calistir():
     #  SARILMA AÇISI da beyan edilmeli ( zorunlu girdi, varsayılanı yok ).
     #  Senaryo 137,89° ile 180° arasındaki her açıda tam geçiyor;  180°
     #  alındı ( halat kasnaktan dikey iniyor — ELEport'un örneğiyle aynı ).
+    #  6,5 mm HALAT 8 mm'NİN ALTINDADIR ( m.5.5.1.2 a) ):  sahadaki gibi
+    #  onaylanmış kuruluş belgesiyle kullanılır.
     _d = MK.hesapla({"tahrik_kasnak_capi": 280, "saptirma_kasnak_capi": 280,
                      "motor_gucu": 7.5, "guvenlik_devreye_kuvvet": 200,
                      "kanal_isleme": "Sertleştirilmiş", "denge_zinciri": "Var",
-                     "sarilma_acisi": 180})
+                     "sarilma_acisi": 180, "kasnak_belgesi": "Var"})
     r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · sertleştirilmiş "
-              "kanal · denge zinciri girilince bütün bölümler uygun",
+              "kanal · denge zinciri · halat belgesi girilince bütün bölümler uygun",
               _d["aktif"] and _d["ozet"]["tumu_uygun"],
               "→ " + ", ".join(x["baslik"] for x in (_d.get("bolumler") or [])
                                if (x.get("sonuc") or {}).get("uygun") is False))
@@ -915,10 +917,39 @@ def _denetim_bulgulari(r):
     for _ad in ("Dt / dh", "Ds / dh"):
         r.esit(f"B9c2 belgeyle {_ad} kabul ediliyor",
                _dd(_k_var, _ad)["metin"], MK.BELGEYLE_UYGUN)
+    #  Belge satırı HANGİ maddeden sapıldığını yazar:  240 / 6,5'te ikisinden.
     r.kontrol("B9c2 belgeli pafta belgeye dayandığını yazıyor",
-              any(a.get("aciklama") == "Dt/dh < 40 için onaylanmış kuruluş belgesi"
-                  and "m.5.5.2.1" in str(a.get("kaynak")) for a in _b4(_k_var)["adimlar"])
+              any(a.get("aciklama") == MK.MG.ALAN["kasnak_belgesi"][1]
+                  and "m.5.5.2.1" in str(a.get("kaynak"))
+                  and "m.5.5.1.2" in str(a.get("kaynak")) for a in _b4(_k_var)["adimlar"])
               and "belge" in _b4(_k_var)["sonuc"]["baslik"])
+
+    #  ── B9c2b  HALAT ÇAPI ≥ 8 mm  ( m.5.5.1.2 a) ) — AYNI BELGEYLE AŞILIR
+    #  Şart hiç denetlenmiyordu:  400 mm kasnakta ( oran 66 ) 6 mm halat,
+    #  belgesiz, "UYGUNDUR" çıkıyordu.
+    _c6 = {"halat_capi": 6, "tahrik_kasnak_capi": 400, "saptirma_kasnak_capi": 400,
+           "halat_adedi": 8, "sarilma_acisi": 180}
+    _c6_yok, _c6_var = MK.hesapla(dict(_c6)), MK.hesapla(dict(_c6, kasnak_belgesi="Var"))
+    r.kontrol("B9c2b oran 66 olsa da 6 mm halat belgesiz reddediliyor",
+              _b4(_c6_yok)["sonuc"]["uygun"] is False
+              and "dh = 6 mm < 8 mm" in _b4(_c6_yok)["sonuc"]["metin"],
+              f"→ {_b4(_c6_yok)['sonuc']['metin']}")
+    r.esit("B9c2b belgeyle 6 mm halat kabul ediliyor",
+           _dd(_c6_var, "dh")["metin"], MK.BELGEYLE_UYGUN)
+    r.kontrol("B9c2b belge satırı yalnız m.5.5.1.2'den sapmayı yazıyor ( oran tutuyor )",
+              any(a.get("aciklama") == MK.MG.ALAN["kasnak_belgesi"][1]
+                  and "m.5.5.1.2" in str(a.get("kaynak"))
+                  and "m.5.5.2.1" not in str(a.get("kaynak"))
+                  for a in _b4(_c6_var)["adimlar"]))
+    r.esit("B9c2b 8 mm halat sınırı karşılıyor",
+           _dd(MK.hesapla({"halat_capi": 8, "tahrik_kasnak_capi": 320,
+                           "saptirma_kasnak_capi": 320}), "dh")["metin"], "UYGUN")
+    #  Öğüt standardın ÖBÜR şartını çiğnetmemeli:  240 mm kasnakta 6,5 mm
+    #  halata "halat çapını küçültün" demek 8 mm'nin daha da altına iterdi.
+    _m65 = _b4(_k_yok)["sonuc"]["metin"]
+    r.kontrol("B9c2b 240 / 6,5'te öğüt standarda uyan çifti söylüyor",
+              "en az 8 mm halat ve en az 320 mm kasnak" in _m65
+              and "küçültün" not in _m65 and "inceltin" not in _m65, f"→ {_m65}")
     r.kontrol("B9c2 belge Sf'yi DEĞİŞTİRMİYOR",
               _yakin(_k_yok["ozet"]["Sf"], _k_var["ozet"]["Sf"]),
               f"→ {_k_yok['ozet']['Sf']!r} · {_k_var['ozet']['Sf']!r}")

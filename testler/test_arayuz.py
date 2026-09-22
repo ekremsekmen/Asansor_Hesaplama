@@ -776,6 +776,9 @@ def calistir():
         r.kontrol("altı kesik V'de sertleştirilmemiş yine seçilebiliyor",
                   pg.evaluate(_y_kapali) is False)
         pg.select_option("#m_denge_zinciri", "Var")
+        #  6,5 mm HALAT 8 mm'NİN ALTINDADIR ( m.5.5.1.2 a) ):  sahadaki gibi
+        #  onaylanmış kuruluş belgesiyle kullanılır — seçim formda yapılabilmeli.
+        pg.select_option("#m_kasnak_belgesi", "Var")
         #  Sarılma açısı ZORUNLU girdidir ve varsayılanı yoktur;  girilmezse
         #  tahrik sınırları hesaplanmaz.  Formda gerçekten doldurulabildiği
         #  de böylece sınanır.
@@ -790,7 +793,7 @@ def calistir():
         pg.fill("#m_sarilma_acisi", "180")
         pg.wait_for_timeout(1500)
         r.kontrol("kasnak 280 mm · motor 7,5 kW · imalatçı kuvveti · "
-                  "sertleştirilmiş kanal · denge zinciri girilince "
+                  "sertleştirilmiş kanal · denge zinciri · halat belgesi girilince "
                   "bütün bölümler uygun",
                   pg.evaluate("SON.m.ozet.tumu_uygun === true"),
                   f"→ {pg.evaluate('SON.m.bolumler.filter(b=>b.sonuc && b.sonuc.uygun===false).map(b=>b.baslik)')}")

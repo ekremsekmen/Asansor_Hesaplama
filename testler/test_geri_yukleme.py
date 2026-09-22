@@ -105,13 +105,50 @@ def _farkli_anahtarlar(a, b):
     return sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
 
 
-def _gidis_donus(r, pg, mod, hazirla):
-    etiket = f"[{mod}]"
+def _hesap_hatasi(mod, sonuc):
+    """Ekranın hesabı YAPILDIYSA None, yapılmadıysa sebebi."""
+    if mod == "avan":
+        h = sonuc["trafik"].get("hata") or sonuc["avan"].get("hata")
+        if h:
+            return h
+        return None if any(a.get("aktif") for a in sonuc["avan"].get("asansorler") or []) \
+            else "aktif asansör yok"
+    if not sonuc.get("aktif"):
+        return sonuc.get("hata") or "hesap yapılmadı"
+    kalan = [a.get("hata") for a in sonuc.get("asansorler") or [] if not a.get("aktif")]
+    return kalan or None
+
+
+#  Bir alanı kimliğiyle doldurur ve ekranın dinlediği olayları tetikler.
+#  Olmayan kimlik testi durdurur — yazım hatası sessizce "geçti" sayılmasın.
+_DOLDUR = """(d) => {
+  for(const [id, v] of Object.entries(d)){
+    const e = document.getElementById(id);
+    if(!e) throw new Error('alan yok: ' + id);
+    if(e.type === 'checkbox') e.checked = v; else e.value = v;
+    e.dispatchEvent(new Event('input', {bubbles: true}));
+    e.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  return Object.keys(d).length;
+}"""
+
+
+def _gidis_donus(r, pg, mod, hazirla, gecerli=False):
+    """Kaydet → sıfırla → yükle.
+
+    ``gecerli``:  proje HESAPLANABİLİR olmalıdır ve bu, kaydetmeden önce
+    denetlenir.  Her alanı varsayılan dışına çeken tur ( gecerli=False )
+    alan kaybını yakalar ama değerleri fiziksel olarak tutarsızdır;  hesap
+    orada hata verir ve "aynı sonuç" iki HATA MESAJININ eşitliğine iner.
+    Hesabın gidiş-dönüşü ancak geçerli bir projeyle kanıtlanır.
+    """
+    etiket = f"[{mod}{' · geçerli proje' if gecerli else ''}]"
     _ac(pg, mod)
     pg.evaluate("localStorage.clear()")
     _ac(pg, mod)
     degisen = hazirla(pg)
-    r.kontrol(f"{etiket} formdaki alanlar değiştirildi", degisen > 20, f"→ {degisen} alan")
+    r.kontrol(f"{etiket} formdaki alanlar değiştirildi", degisen > (10 if gecerli else 20),
+              f"→ {degisen} alan")
     #  Ekranın bir hesabı yapması:  hesaptan türeyen form durumu ( trafikten
     #  gelen avan kartları gibi ) kaydetmeden önce oturmuş olmalı.
     pg.evaluate("async () => { yaz(); " + ("await hesapMukavemet();" if mod == "uygulama"
@@ -123,6 +160,10 @@ def _gidis_donus(r, pg, mod, hazirla):
     r.esit(f"{etiket} dosya kendi modunu yazıyor", dosya.get("__mod"), mod)
     once_alan = pg.evaluate(f"projeGovdesi('{mod}').alanlar")
     once_sonuc = pg.evaluate(_SONUC[mod])
+    if gecerli:
+        _h = _hesap_hatasi(mod, once_sonuc)
+        r.kontrol(f"{etiket} kaydetmeden önce hesap GERÇEKTEN yapıldı  ( ölçüt boş değil )",
+                  _h is None, f"→ {str(_h)[:160]}")
     for k in sorted(once_alan):
         r.kontrol(f"{etiket} dosyada {k}", dosya["alanlar"].get(k) == once_alan[k],
                   f"→ form {once_alan[k]!r}, dosya {dosya['alanlar'].get(k)!r}")
@@ -132,7 +173,7 @@ def _gidis_donus(r, pg, mod, hazirla):
     _ac(pg, mod)
     bos_alan = pg.evaluate(f"projeGovdesi('{mod}').alanlar")
     r.kontrol(f"{etiket} sıfırlanan form dosyadakinden farklı  ( ölçüt boş değil )",
-              len(_farkli_anahtarlar(bos_alan, once_alan)) > 20,
+              len(_farkli_anahtarlar(bos_alan, once_alan)) > (10 if gecerli else 20),
               f"→ {len(_farkli_anahtarlar(bos_alan, once_alan))} alan farklı")
 
     pg.evaluate("d => projeUygula(d, 'deneme')", dosya)
@@ -155,7 +196,8 @@ def _gidis_donus(r, pg, mod, hazirla):
                       const gizli = a => $('m_' + a).closest('.alan').classList.contains('kural-disi');
                       return g.mrl.every(a => gizli(a) === k) && g.daireli.every(a => gizli(a) === !k); }"""))
     sonra_sonuc = pg.evaluate(_SONUC[mod])
-    r.kontrol(f"{etiket} geri yüklenen proje AYNI hesap sonucunu veriyor",
+    r.kontrol(f"{etiket} geri yüklenen proje AYNI hesap sonucunu veriyor"
+              + ("" if gecerli else "  ( ya da aynı hatayı )"),
               json.dumps(once_sonuc, sort_keys=True) == json.dumps(sonra_sonuc, sort_keys=True))
 
     #  Dosyada olmayan alan sessizce varsayılana dönmemeli — söylenmeli
@@ -204,6 +246,55 @@ def _uygulama_hazirla(pg):
     return adet
 
 
+def _avan_gecerli(pg):
+    """HESAPLANABİLİR avan projesi:  örnek proje + ofis sabitlerinde ve ek
+    nüfusta varsayılan dışı ( ama aralıkta ) değerler."""
+    pg.evaluate("ornekYukle()")
+    pg.wait_for_timeout(1500)
+    pg.evaluate("""() => ekNufusEkle('c', {aciklama: 'Zemin kat dükkân',
+                                          miktar: '14', kalem: 'DOĞRUDAN KİŞİ — Tablo-1 dışı'})""")
+    pg.wait_for_timeout(500)
+    return pg.evaluate(_DOLDUR, {"of_beta": "220", "sb_cosfi": "0,86", "of_S1": "10",
+                                 "sb_priz_adedi": "4", "of_goz_araligi": "15"}) + \
+        pg.evaluate("Object.keys(projeGovdesi('avan').alanlar).filter(k => !k.startsWith('__')"
+                    " && String(projeGovdesi('avan').alanlar[k]).trim() !== '').length")
+
+
+def _uygulama_gecerli(pg):
+    """HESAPLANABİLİR iki asansörlü uygulama projesi.
+
+    Asansörler birbirinden farklıdır;  birinin kabin ağırlığı tablodan
+    ( kendiliğinden ), öbürününki elle gelir.  Gelişmiş alanlar, proje
+    geneli ( makine daireli ) ve ofis sabitleri de varsayılan dışıdır.
+    """
+    pg.evaluate("mAdetDegisti(2)")
+    pg.wait_for_timeout(800)
+    pg.evaluate("mTumGruplariAc()")
+    pg.evaluate("mAsansorSekmesi(0)")
+    pg.wait_for_timeout(600)
+    n = pg.evaluate(_DOLDUR, {
+        "m_asansor_adi": "A1 — ana hol", "m_sarilma_acisi": "180",
+        "m_kasnak_belgesi": "Var", "m_seyir_mesafesi": "24,5",
+        "m_kabin_konsol_arasi": "2500", "m_kabin_paten_arasi": "3400",
+        "m_reg_gergi_agirligi": "80", "m_denge_zinciri": "Var",
+        "m_kanal_isleme": "Sertleştirilmiş"})
+    pg.evaluate("mAsansorSekmesi(1)")
+    pg.wait_for_timeout(800)
+    n += pg.evaluate(_DOLDUR, {
+        "m_asansor_adi": "A2 — servis", "m_sarilma_acisi": "170",
+        "m_kasnak_belgesi": "Var", "m_seyir_mesafesi": "37,5",
+        "m_beyan_yuku": "1000", "m_kabin_agirligi": "990",
+        "m_agirlik_yeri": "Sol", "m_halat_adedi": "8"})
+    pg.evaluate("mAsansorSekmesi(0)")
+    pg.wait_for_timeout(800)
+    n += pg.evaluate(_DOLDUR, {
+        "m_temel_a": "26,55", "m_temel_b": "16,4", "m_mk_yok": False,
+        "m_mk_uzunluk": "3200", "m_mk_genislik": "2600",
+        "uof_beta": "220", "uof_cosfi": "0,86"})
+    pg.wait_for_timeout(800)
+    return n
+
+
 def calistir():
     print("\n\033[1mTEST 6 — PROJE DOSYASI GERİ YÜKLEME (revizyon akışı)\033[0m")
     r = Rapor("Proje dosyası geri yükleme")
@@ -230,6 +321,10 @@ def calistir():
         pg.on("dialog", lambda d: d.dismiss())
 
         _gidis_donus(r, pg, "avan", _avan_hazirla)
+        _gidis_donus(r, pg, "avan", _avan_gecerli, gecerli=True)
+        _gidis_donus(r, pg, "uygulama", _uygulama_gecerli, gecerli=True)
+        #  Bu tur EN SON koşar:  aşağıdaki iki asansör denetimleri onun
+        #  yüklediği projeye bakar.
         _gidis_donus(r, pg, "uygulama", _uygulama_hazirla)
         #  İki asansörün ikisi de dosyada ve birbirinden farklı
         _asl = pg.evaluate("MUK_ASANSORLER.slice(0, MUK_ADET)")

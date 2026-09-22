@@ -211,14 +211,18 @@ ALANLAR = (
      "kN", "sayi", None, None),
     ("halat_capi",        "Askı halatı çapı",                  "mm",   "secim",
      MT.HALAT_CAPLARI, 6.5),
-    #  D/d ≥ 40 — BELGEYLE AŞILABİLEN SINIR.  TS EN 81-20 m.5.5.2.1'in 40'ı
-    #  uyumlaştırılmış standart şartıdır;  Asansör Yönetmeliği ( 2014/33/AB )
-    #  Ek-I 1.3 askı elemanları için sayısal oran vermez.  240 mm kasnak ile
-    #  6,5 mm halat gibi birleşimler bu sapmayı onaylanmış kuruluş belgesiyle
-    #  kanıtlar.  "Var" seçilirse 40'ın altı hata sayılmaz;  Sf ( EN 81-50
-    #  m.5.12 ) yine aynen aranır — küçük kasnağın bedelini zaten o öder.
-    #  ELEport aynı yerde Sf'yi de 12'ye indirir;  bu bilerek alınmadı.
-    ("kasnak_belgesi",    "Dt/dh < 40 için onaylanmış kuruluş belgesi",
+    #  BELGEYLE AŞILABİLEN İKİ SINIR:  halat çapı ≥ 8 mm ( TS EN 81-20
+    #  m.5.5.1.2 a) ) ve D/d ≥ 40 ( m.5.5.2.1 ).  İkisi de uyumlaştırılmış
+    #  standart şartıdır;  Asansör Yönetmeliği ( 2014/33/AB ) Ek-I 1.3 askı
+    #  elemanları için sayı vermez.  240 mm kasnak ile 6,5 mm halat gibi
+    #  birleşimler İKİ sapmayı birlikte, tek bir onaylanmış kuruluş belgesiyle
+    #  kanıtlar ( halat üreticisinin ömür / bükülme deneyine dayanan belgesi ) —
+    #  bu yüzden ayrı seçim açılmadı.  "Var" seçilirse iki sınırın altı hata
+    #  sayılmaz;  Sf ( EN 81-50 m.5.12 ) yine aynen aranır — küçük kasnağın
+    #  bedelini zaten o öder.  ELEport aynı yerde Sf'yi de 12'ye indirir;  bu
+    #  bilerek alınmadı.  ANAHTAR ADI ( kasnak_belgesi ) proje dosyaları için
+    #  korunur.
+    ("kasnak_belgesi",    "Dt/dh < 40 ya da halat çapı < 8 mm için onaylanmış kuruluş belgesi",
      "—",    "secim", ("Yok", "Var"), "Yok"),
     ("kanal_sekli",       "Kasnak kanal şekli",                "—",    "secim",
      MT.KANAL_SEKILLERI, "Altı Kesik V Kanal"),
@@ -863,10 +867,13 @@ ACIKLAMA = {
     "halat_adedi": "Kabini taşıyan bağımsız halat sayısı. En az iki olmalıdır; "
               "iki halatta aranan güvenlik katsayısı 12 yerine 16'dır.",
     "halat_capi": "Askı halatının anma çapı. En az 8 mm olmalıdır "
-              "( m.5.5.1.2 ).",
-    "kasnak_belgesi": "Kasnak / halat oranı 40'ın altındaysa, sapmayı "
-              "kanıtlayan onaylanmış kuruluş belgesi var mı. Belge beyan "
-              "edilirse 40 sınırı hata sayılmaz; güvenlik katsayısı yine aranır.",
+              "( m.5.5.1.2 a) ); 6,5 mm gibi ince halatlar onaylanmış "
+              "kuruluş belgesiyle kullanılır ( aşağıdaki belge seçimi ).",
+    "kasnak_belgesi": "Halat çapı 8 mm'den ince ya da kasnak / halat oranı "
+              "40'ın altındaysa, sapmayı kanıtlayan onaylanmış kuruluş "
+              "belgesi var mı. İnce halat ile küçük kasnak genellikle AYNI "
+              "belgeyle onaylanır. Belge beyan edilirse iki sınır da hata "
+              "sayılmaz; güvenlik katsayısı yine aranır.",
     "kanal_sekli": "Halatın oturduğu kanalın biçimi. Sürtünme katsayısını ve "
               "halatın bükülme yorulmasını ( Nequiv ) belirler.",
     "kasnak_gama": "Tahrik kasnağı kanalının açısı — kasnağın kendi "
@@ -908,7 +915,9 @@ ACIKLAMA = {
     "kablo_birim_kutle": "Bütün gezici kabloların toplam metre ağırlığı. "
               "Boşsa kablo tipinden tabloya bakılır.",
     # ── HIZ REGÜLATÖRÜ ───────────────────────────────────────────────
-    "reg_halat_capi": "Regülatör halatının anma çapı. En az 6 mm olmalıdır.",
+    "reg_halat_capi": "Regülatör halatının anma çapı ( EN 12385-5 ). TS EN "
+              "81-20 çap için ayrı bir alt sınır vermez; kasnak çapına oranı "
+              "en az 30 olmalıdır ( m.5.6.2.2.1.3 c) ).",
     "reg_kasnak_capi": "Dreg — regülatör kasnağının bölüm dairesi çapı. "
               "Halat çapına oranı en az 30 olmalıdır ( m.5.6.2.2.1.3 ).",
     "reg_kanal_acisi": "Regülatör kasnağı kanalının açısı. Halatı çekme "
