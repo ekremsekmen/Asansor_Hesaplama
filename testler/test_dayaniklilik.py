@@ -235,6 +235,28 @@ def calistir():
         r.kontrol(f"uygulama · {alan} = {ham!r} sessizce boş sayılmıyor",
                   "kabul edilmedi" in h, f"→ {h[:120]!r}")
 
+    # ------------------------------------------------ varsayılan BELİRSİZ yazılmamalı
+    #  Arayüz varsayılanları kutuya virgüllü yazar ( 2.128 → "2,128" ).  Tek
+    #  ayraçtan sonra tam üç rakam belirsiz sayıdır ( binlik mi ondalık mı ) ve
+    #  hesabı durdurur:  denge zinciri varsayılanı 2,128 iken ÖRNEK PROJENİN
+    #  avan hesabı hiç yapılamıyordu.  Varsayılanlar ve seçim listeleri bu
+    #  biçime düşmemeli.
+    from engine.uygulama import sabitler as _USd, mukavemet_girdi as _MGd
+    def _yaz(x):
+        return repr(x).replace(".", ",")
+    _vars = {"avan SABIT_B": AV.SABIT_B_VARSAYILAN, "avan OFIS": AV.OFIS_VARSAYILAN,
+             "uygulama Sabitler": _USd.VARSAYILAN,
+             "uygulama form": {a[0]: a[5] for a in _MGd.ALANLAR},
+             "uygulama ek": {a[0]: a[5] for a in UYG_GIRDI.EK_ALANLAR}}
+    _kotu = [(ad, k, v) for ad, d in _vars.items() for k, v in d.items()
+             if isinstance(v, (int, float)) and not isinstance(v, bool)
+             and UC_ORTAK.belirsiz_sayi_mi(_yaz(v))]
+    _kotu += [("seçim", a[0], o) for a in _MGd.ALANLAR if a[4] for o in a[4]
+              if isinstance(o, (int, float)) and not isinstance(o, bool)
+              and UC_ORTAK.belirsiz_sayi_mi(_yaz(o))]
+    r.kontrol("hiçbir varsayılan ya da seçenek belirsiz sayı biçiminde değil", not _kotu,
+              f"→ {_kotu}")
+
     # ------------------------------------------------ onay alanı TEK okuma kuralı
     #  API'nin kendi kopyası "Var"ı HAYIR, motorun evet_mi'si EVET okuyordu:
     #  aynı kutu ekranda gizlenen alanları bir kurala, hesabı öbür kurala göre

@@ -29,6 +29,23 @@ def _bodrum_oku(deger):
     return int(deger), None
 
 
+#  TAAHHÜTNAME  —  MMO/697 Tablo-10 "Şartlı Kabul" sütunu.
+#  Tek asansör tanımında program adedi KENDİ bulur ( n = MAX[taşıma; bekleme] )
+#  ve bunu uygulanan sınırla ( Standart / Yükseltilmiş ) yapar.  Taahhütname
+#  verilecekse bekleme ölçütü şartlı kabul sınırıdır; o sınırda yeten adet
+#  seçilebilmelidir.  Eskiden "şartlı kabulle 1 adet yeterli olurdu" yazılıyor
+#  ama bu adedi seçmenin hiçbir yolu yoktu.
+def _taahhut_oku(deger):
+    """Dönen: (var_mi, hata)   —  boş / Yok  →  (False, None)"""
+    m = "" if deger is None else str(deger).strip().casefold()
+    if m in ("", "yok"):
+        return False, None
+    if m == "var":
+        return True, None
+    return False, (f"HESAP HATASI: taahhütname seçimi okunamadı ( {str(deger).strip()[:20]!r} ) "
+                   "— 'Yok' ya da 'Var' seçilmelidir.")
+
+
 #  DURAK ADEDİ  ( ana giriş dâhil )  —  tek ve çoklu hesapta AYNI kural.
 #  Boş bırakılırsa asansör ana giriş üstündeki bütün katlara hizmet eder
 #  ( Ni = N ).  Kural TEK YERDE dursun ki iki hesap yolu ayrışmasın:
@@ -261,8 +278,8 @@ def hesapla_tek(g: dict) -> dict:
       bina_tipi, bina_yuksekligi, yapi_yuksekligi, N, hizli1, hizli2, h, P,
       kapi_genisligi, kapi_tipi
       opsiyonel: bodrum, manuel_k, manuel_V, manuel_ta, manuel_tk, manuel_tg,
-                 manuel_tp, manuel_adet, ek_nufus[], proje_adi, isveren,
-                 pafta_no, tarih
+                 manuel_tp, manuel_adet, taahhutname ( Yok / Var ), ek_nufus[],
+                 proje_adi, isveren, pafta_no, tarih
     """
     U = []                       # uyarılar
     hata = None
@@ -395,13 +412,35 @@ def hesapla_tek(g: dict) -> dict:
         tasima_adedi = yukari_yuvarla(B * k / R, 0)
         bekleme_adedi = yukari_yuvarla(TR / Izul, 0)
         adet_hesap = int(max(1, tasima_adedi, bekleme_adedi))
-    manuel_adet = g.get("manuel_adet")
-    adet = int(manuel_adet) if (sayi_mi(manuel_adet) and manuel_adet >= 1) else adet_hesap
-    Ieer = (TR / adet) if (sayi_mi(TR) and adet) else None                    # C38
-
     sartli = t10["sartli"]
     esik_standart = t10["standart"]
     esik_yukseltilmis = t10["yukseltilmis"]
+
+    #  Taahhütname yalnız ADEDİ PROGRAMIN BULDUĞU yolda ( tek kolon ) anlamlıdır.
+    #  İki ve daha fazla kolonda adet kullanıcınındır; o yol şartlı kabulü
+    #  zaten kendiliğinden sınıflandırır ( aşağıdaki SONUÇ dalları ).
+    manuel_adet = g.get("manuel_adet")
+    elle_adet = sayi_mi(manuel_adet) and manuel_adet >= 1
+    taahhut, t_hata = _taahhut_oku(g.get("taahhutname"))
+    taahhut = taahhut and not elle_adet
+    taahhut_adet = None
+    if t_hata and not elle_adet:
+        hata = hata or t_hata
+    elif taahhut:
+        if not (sayi_mi(sartli) and sartli):
+            hata = hata or (f"HESAP HATASI: {bina_tipi} için MMO/697 Tablo-10'da şartlı kabul "
+                            "sınırı yoktur — taahhütname 'Yok' seçilmelidir.")
+        else:
+            taahhut_adet = _gerekli_adet(sartli)
+    adet = (int(manuel_adet) if elle_adet
+            else taahhut_adet if taahhut_adet is not None else adet_hesap)
+    Ieer = (TR / adet) if (sayi_mi(TR) and adet) else None                    # C38
+    #  Taahhütname seçili ama uygulanan sınır aynı adetle zaten sağlanıyorsa
+    #  taahhütnameye gerek yoktur — sessiz kalmasın.
+    taahhut_gereksiz = (taahhut_adet is not None and taahhut_adet == adet_hesap)
+    if taahhut_gereksiz:
+        U.append(f"ℹ Taahhütname seçildi ama gerekmiyor: {standart} sınırı "
+                 f"( {trn(Izul,0)} sn ) {adet_hesap} adetle zaten sağlanıyor.")
 
     # ---- SONUÇ (C44)
     #  İKİ ÖLÇÜT AYRI AYRI TUTULUR:  hangisinin sağlanmadığı sonuç cümlesinde
@@ -514,14 +553,20 @@ def hesapla_tek(g: dict) -> dict:
         satir = (f"Taşıma adedi = {int(tasima_adedi)};  Bekleme adedi = {int(bekleme_adedi)}  "
                  f"(uygulanan sınır Izul = {trn(Izul,0)} sn — Tablo-10 {standart})"
                  f"  →  Nihai gerekli sayı = {adet_hesap} adet")
-        if sayi_mi(sartli) and sartli:
+        if taahhut_adet is not None and not taahhut_gereksiz:
+            satir += (f"   |   Taahhütname ile Şartlı Kabul sınırı ({trn(sartli,0)} sn) "
+                      f"uygulandı  →  {taahhut_adet} adet")
+        elif sayi_mi(sartli) and sartli:
             #  Bu sayı da İKİ ölçütü birden sağlamalıdır: taşıma kapasitesi
             #  daha çoğunu gerektiriyorsa taahhütname o eksiği kapatmaz.
             satir += (f"   |   Şartlı Kabul sınırı ({trn(sartli,0)} sn) için "
                       f"{_gerekli_adet(sartli)} adet yeterli olurdu (taahhütname gerekir)")
         b4["notlar"].append(satir)
     b4["adimlar"].append(veri("n", "Uygulanan asansör adedi", adet, "adet",
-                              "Elle seçildi" if sayi_mi(manuel_adet) else "MAX[taşıma; bekleme]", 0))
+                              "Elle seçildi" if elle_adet
+                              else ("Taahhütname — Tablo-10 şartlı kabul"
+                                    if (taahhut_adet is not None and not taahhut_gereksiz)
+                                    else "MAX[taşıma; bekleme]"), 0))
 
     b5 = Bolum("BEKLEME ZAMANI (Izul) KONTROLÜ", "MMO/697 Tablo-10")
     b5["adimlar"] = [
@@ -529,6 +574,10 @@ def hesapla_tek(g: dict) -> dict:
               Ieer, "s", "MMO/697", 1),
         veri("Izul", f"İzin verilen bekleme süresi ({standart})", Izul, "s", "MMO/697 Tablo-10", 0),
     ]
+    sartli_uygulandi = taahhut_adet is not None and not taahhut_gereksiz
+    if sartli_uygulandi:
+        b5["adimlar"].append(veri("", "İzin verilen bekleme süresi (Şartlı Kabul — taahhütname ile)",
+                                  sartli, "s", "MMO/697 Tablo-10", 0))
     #  BELİRLEYİCİ ÖLÇÜTLER  —  paftanın SONUÇ kutusunda gösterilir.
     #  Eskiden bu satır "Bekleme Zamanı" bölümünün dip notuydu; oysa nihai
     #  kararın DAYANAĞI odur: hangi sınır, hangi sayıyla sağlandı.  Sonuçla
@@ -543,7 +592,16 @@ def hesapla_tek(g: dict) -> dict:
                      + ("  ≥  " if _toplam_R >= _gerekli_tasima else "  <  ")
                      + f"B·k = {tr(_gerekli_tasima,1)} kişi/5dk",
             "uygun": bool(_toplam_R >= _gerekli_tasima)})
-    if sayi_mi(Ieer) and sayi_mi(Izul):
+    if sayi_mi(Ieer) and sayi_mi(Izul) and sartli_uygulandi and Ieer > Izul:
+        #  Taahhütname verildi:  ölçüt şartlı kabul sınırıdır.  Aşılan
+        #  Standart / Yükseltilmiş sınırı da aynı satırda açıkça yazılır.
+        karar_olcutleri.append({
+            "ad": "Bekleme",
+            "metin": f"Ieer = {tr(Ieer,1)} s" + ("  ≤  " if Ieer <= sartli else "  >  ")
+                     + f"Şartlı Kabul = {trn(sartli,0)} s ( taahhütname ile )   ·   "
+                     f"{standart} {trn(Izul,0)} s aşılıyor",
+            "uygun": bool(Ieer <= sartli)})
+    elif sayi_mi(Ieer) and sayi_mi(Izul):
         ek = ""
         if sayi_mi(sartli) and sartli:
             ek = (f"   ·   Şartlı Kabul {trn(sartli,0)} sn: "
@@ -565,6 +623,9 @@ def hesapla_tek(g: dict) -> dict:
             "p": p, "V": V, "V_min": V_min, "h": h, "b": b, "n_artis": n_artis, "B": B, "k": k,
             "H": H, "S": S, "ta": ta, "tk": tk, "tg": tg, "tp": tp, "tv": tv, "ts": ts,
             "TR": TR, "R": R, "Izul": Izul, "adet": adet, "adet_hesap": adet_hesap,
+            #  Yalnız taahhütname adedi belirlediğinde yazılır:  seçilmeyen
+            #  projelerin çıktısı ( ve altın kopyası ) bit bit aynı kalır.
+            **({"taahhutname": True} if sartli_uygulandi else {}),
             "Ieer": Ieer, "sonuc": sonuc, "sonuc_cumlesi": sonuc_cumlesi,
             "esik_sartli": sartli, "esik_standart": esik_standart,
             "esik_yukseltilmis": esik_yukseltilmis,
@@ -628,7 +689,7 @@ def _bina_hatasi(N, h, by, yy):
         return ("HESAP HATASI: ② bina yüksekliği girilmedi ya da geçersiz — "
                 "hesap standardı ( Standart / Yükseltilmiş ) buna göre seçilir.")
     if not (sayi_mi(yy) and yy >= 0):
-        return ("HESAP HATASI: ③ yapı yüksekliği girilmedi ya da geçersiz — "
+        return ("HESAP HATASI: ④ yapı yüksekliği girilmedi ya da geçersiz — "
                 "hesap standardı ( Standart / Yükseltilmiş ) buna göre seçilir.")
     return None
 
@@ -680,7 +741,7 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
         return (f"HESAP HATASI: durak adedi {int(Ni) + 1} girilmiş; asansör ana giriş "
                 f"üstündeki {int(N)} katın tümüne hizmet ettiğinden durak adedi "
                 f"N + 1 = {int(N) + 1} olmalıdır. Asansör daha az durakta duruyorsa "
-                "⑩ kat sayısını o asansöre göre girin ya da durak alanını boşaltın.")
+                "③ kat sayısı N'yi o asansöre göre girin ya da durak alanını boşaltın.")
     sure = _manuel_sure_hatasi(g)
     if sure:
         return sure

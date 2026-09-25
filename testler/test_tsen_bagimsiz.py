@@ -880,7 +880,9 @@ class PaftaIslemDenetimi(unittest.TestCase):
                    or str(a.get("formul") or "").startswith("Fy ="))]
         self.assertGreaterEqual(len(fy), 5, "Fy satırları bulunamadı")
         for a in fy:
-            metin = str(a.get("formul") or "") + " " + str(a.get("islem") or "")
+            #  Bölünmez boşluk ( U+00A0 ) okuyan için boşluktur.
+            metin = (str(a.get("formul") or "") + " "
+                     + str(a.get("islem") or "")).replace("\u00a0", " ")
             self.assertIn("n / 2", metin,
                           msg=f"Fy satırı ( n/2 )·h demiyor: {metin!r}")
             #  x ekseninin bağıntısı Fy satırına basılmamalı

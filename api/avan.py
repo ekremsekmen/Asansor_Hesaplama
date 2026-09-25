@@ -44,7 +44,7 @@ AVAN_ORTAK_SAYISAL = ("U", "kappa", "eps_max", "temel_a", "temel_b", "beta", "se
 AVAN_AS_SAYISAL = ("i_palanga", "q_denge",
                    "kapasite", "Q_elle", "V", "eta", "Hk", "kuyu_genisligi", "kabin_boyu",
                    "kabin_genisligi", "Gk_elle", "gr", "Fmk", "Fsh", "Nsc",
-                   "S1", "L1", "S2", "L2")
+                   "S1", "L1", "S2", "L2", "zincir_birim_kutle")
 
 #  Red metninde görünen adlar:  "Q_elle" değil "Q elle — anma yükü".  Motorun
 #  kendi tablolarından okunur ( tek kaynak );  yalnız motorun denetlemediği

@@ -930,7 +930,7 @@ def calistir():
     r.kontrol("mukavemet PDF'inde makine tipi ve η görünüyor",
               "Makine tipi" in _mm and "Toplam sistem verimi" in _mm,
               "→ verim satırları basılmamış")
-    r.kontrol("mukavemet PDF'inde η′ satırı KALMADI  ( Δη kaldırıldı )",
+    r.kontrol("mukavemet PDF'inde η′ satırı yok  ( uygulamada Δη yok )",
               "η′" not in _mm, "→ eski palanga düşüşü satırı hâlâ basılıyor")
 
     #  Hesap durduran girdide de GEÇERLİ belge çıkmalı, sebebi yazmalı

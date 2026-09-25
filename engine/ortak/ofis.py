@@ -26,10 +26,18 @@ MAKINE_VERIMLERI = {
 }
 
 #  ---------------------------------------------------------------------
-#  PALANGA VERİM DÜŞÜŞÜ ( Δη = 0,10 ) KALDIRILDI
+#  PALANGA VERİM DÜŞÜŞÜ ( Δη = 0,10 )  —  UYGULAMADA YOK, AVANDA KİTAPTAN
 #  ---------------------------------------------------------------------
-#  MMO/697 §2.4 "palangalı sistemlerde verim %10 az alınacaktır" der ve
-#  program bunu  η′ = η − 0,10  diye uyguluyordu.  Kural üç yönden yanlıştı:
+#  MMO/697 §2.4 "palangalı sistemlerde verim %10 az alınacaktır" der
+#  ( örnek §4.4:  η = 0,5 − 0,1 = 0,4 ).
+#
+#  AVAN PROJESİ kitaba göre denetlenir ve düşüşü UYGULAR:  orada buradaki
+#  sayılar kitabın η'sı, yani MAKİNE verimidir ( bkz. engine/avan/tablolar
+#  PALANGA_VERIM_DUSUSU ).  2026-09-08'de avandan da kaldırılmış, 2026-09-25'te
+#  geri getirilmiştir:  avan motoru kitabın bulduğundan küçük seçiyordu.
+#
+#  UYGULAMA PROJESİ düşüşü UYGULAMAZ;  orada buradaki sayılar ve projeye
+#  girilen η TOPLAM SİSTEM VERİMİDİR.  Uygulamada kural üç yönden yanlıştır:
 #
 #  1) TOPLAMSAL.  Makara kayıpları ( halatın bükülüp açılmasındaki tel içi
 #     sürtünme + yatak sürtünmesi ) fiziksel olarak ÇARPIMSALDIR:  her
@@ -43,12 +51,13 @@ MAKINE_VERIMLERI = {
 #     için ayrı kalkanlar yazılmıştı;  o kalkanlara ihtiyaç duyulması
 #     girdinin değil MODELİN bozuk olduğunun belirtisiydi.
 #
-#  Yerine geçen kural:  buradaki değerler ve GİRİŞ'ten girilen η artık
-#  TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı zaten içindedir, ikinci
-#  kez uygulanmaz.  İmalatçı kataloğu da bu büyüklüğü verir ( η_ins ), yani girilen sayı ile hesaplanan sayı aynı şeydir.
+#  Uygulamadaki kural:  buradaki değerler ve projeye girilen η TOPLAM
+#  SİSTEM VERİMİDİR — askı ( palanga ) kaybı zaten içindedir, ikinci kez
+#  uygulanmaz.  İmalatçı kataloğu da bu büyüklüğü verir ( η_ins ), yani
+#  girilen sayı ile hesaplanan sayı aynı şeydir.
 #
-#  DİKKAT — 0,85 / 0,50 değerleri eskiden MAKİNE verimi olarak tanımlıydı.
-#  Toplam sistem verimi olarak okunduklarında 2:1 askıda İYİMSERDİRLER
+#  DİKKAT — 0,85 / 0,50 MAKİNE verimidir ( avan böyle okur ).  Uygulamada
+#  toplam sistem verimi olarak okunduklarında 2:1 askıda İYİMSERDİRLER
 #  ( gerçekçi: dişlisiz 2:1 ≈ 0,80 · dişli 2:1 ≈ 0,48 ).  Ofis bu iki
 #  varsayılanı katalog verisiyle güncellemelidir;  asansör bazında girilen
 #  η zaten bunları ezer.
@@ -120,10 +129,10 @@ def makine_verimi(makine_tipi):
 def sistem_verimi(makine_tipi):
     """η  —  makine tipine göre TOPLAM SİSTEM VERİMİ.
 
-    Askı ( palanga ) kaybı bu değerin İÇİNDEDİR;  askı oranına bağlı ayrı
-    bir düzeltme uygulanmaz ( bkz. yukarıdaki "PALANGA VERİM DÜŞÜŞÜ
-    KALDIRILDI" notu ).  Tanınmayan makine tipinde VARSAYILAN_VERIM'e
-    dönülür.
+    Uygulama projesi içindir:  askı ( palanga ) kaybı bu değerin İÇİNDEDİR,
+    askı oranına bağlı ayrı bir düzeltme uygulanmaz ( bkz. yukarıdaki
+    "PALANGA VERİM DÜŞÜŞÜ" notu;  avan kitaba göre 0,10 düşer ).
+    Tanınmayan makine tipinde VARSAYILAN_VERIM'e dönülür.
     """
     eta = makine_verimi(makine_tipi)
     return VARSAYILAN_VERIM if eta is None else eta

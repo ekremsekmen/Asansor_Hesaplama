@@ -327,6 +327,7 @@ const SABIT_ETIKET = {
   gr:['gr — Kılavuz ray birim kütlesi (kg/m)','ofis ray profili'],
   Fmk:['Fmk — Makine ağırlığı (kg)',''],
   Fsh:['Fsh — Makine sehpası ağırlığı (kg)',''],
+  zincir_birim_kutle:['mz — Denge zinciri birim kütlesi (kg/m)','yalnız zincir Var seçilen asansörde;  zincir = halat ağırlığı ( λ = %100 ) · ofisin halat düzeni 7 × Ø6,5 mm · 2:1'],
   S1:['S1 — Kolon hattı kesiti (mm²)',''],
   S2:['S2 — Makine besleme kesiti (mm²)',''],
   L2:['L2 — Makine besleme uzunluğu (m)','pano – makine arası'],
@@ -345,7 +346,7 @@ const SABIT_GRUP = [
   //  Kat yüksekliği ve kapı tipi burada DEĞİL — her projede değişirler,
   //  trafik hesabı sekmesinde girilirler.
   ['① MOTOR GÜCÜ VE KUVVETLER', 'MMO/697 s.18-21 — motor gücü, karşı ağırlık, ray ve kuyu dibi kuvvetleri',
-   ['sb:q_denge', 'of:gr', 'sb:n_ray', 'sb:gf', 'of:Fmk', 'of:Fsh', 'sb:Fmt']],
+   ['sb:q_denge', 'of:gr', 'sb:n_ray', 'sb:gf', 'of:zincir_birim_kutle', 'of:Fmk', 'of:Fsh', 'sb:Fmt']],
   ['② AYDINLATMA', 'kabin · kuyu · makine dairesi aydınlatma hesapları',
    ['sb:kabin_armatur_W', 'sb:kabin_armatur_lm', 'sb:kabin_ustu_armatur',
     'sb:kuyu_armatur_W', 'sb:kuyu_armatur_lm', 'sb:kuyu_Dmax', 'sb:ayd_sutun']],

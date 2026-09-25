@@ -285,15 +285,16 @@ def kopru(g):
         "i_palanga": g.get("aski_orani"),
         "gr": ray,                                # ray metre ağırlığı  [kg/m]
         #  Motor verimi:  MAKİNE TİPİNDEN gelir ( ofis standardı, tek kaynak
-        #  engine/ortak/ofis.py ) ve TOPLAM SİSTEM VERİMİDİR — askı kaybı
-        #  içindedir.  İki taraf aynı sayıyı kullanır;  eskiden avan bunun
-        #  üstüne Δη = 0,10 uyguluyordu ve köprü "taban η" geçirmek zorundaydı.
-        #  Δη kalktığı için o ayrım da kalktı.  ( Daha eskiden buradan sabit
-        #  0,92 geçiyordu:  aynı asansör için avan ve uygulama paftaları
-        #  farklı motor gücü veriyordu. )
+        #  engine/ortak/ofis.py ) ve uygulamada TOPLAM SİSTEM VERİMİDİR — askı
+        #  kaybı içindedir.  Avan motoru ise kitaba göre MAKİNE verimi bekler ve
+        #  palangalı sistemde 0,10 düşer ( MMO/697 §2.4 );  bayrak o düşüşü bu
+        #  yolda kapatır, iki proje aynı η ile aynı elektrik hesabını yapar.
+        #  ( Eskiden buradan sabit 0,92 geçiyordu:  aynı asansör için avan ve
+        #  uygulama paftaları farklı motor gücü veriyordu. )
         "makine_tipi": g.get("makine_tipi"),
         #  Projeye imalatçının verimi girilmişse mukavemetle aynı değer geçer.
         "eta": MG.sistem_verimi(g)[0],
+        E_AVAN.T.ETA_TOPLAM_ANAHTARI: True,
         #  ── uygulama projesine özgü ──
         "kuyu_genisligi": g.get("kuyu_genisligi"),
         #  L1 GÖNDERİLMEZ:  avan motoru kuyu yüksekliği + yatay güzergâh payıyla

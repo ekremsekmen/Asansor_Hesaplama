@@ -169,7 +169,9 @@ def _sayi_araligi(metin):
 
 def aralik_hesapla(ifade):
     """Pafta işlem metnini aralık olarak hesaplar;  çözülemezse None."""
-    s = _ACIKLAMA.sub("", str(ifade)).strip()
+    #  Bölünmez boşluk ( U+00A0 ) paftada satır kırılmasını yönetir;
+    #  okuyan için sıradan boşluktur.
+    s = _ACIKLAMA.sub("", str(ifade).replace("\u00a0", " ")).strip()
     s = re.sub(r"\|([^|]+)\|", r"abs(\1)", s)
     s = s.replace("10⁶", "(10**6)").replace("10³", "(10**3)")
     s = re.sub(r"(\d)\s*%", r"\1/100", s)

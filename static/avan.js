@@ -65,6 +65,9 @@ function cokluKolonlariGoster(){
     const k=$('c_kutu'+i);
     if(k) k.hidden = (i>TRAFIK_ADET);
   }
+  /*  Taahhütname yalnız adedi PROGRAMIN bulduğu tek tanımda anlamlıdır. */
+  const t=$('c_taahhut_alan');
+  if(t) t.hidden = (TRAFIK_ADET>1);
 }
 
 /* ------------------------------------------- avan: asansör adedi
@@ -92,12 +95,17 @@ function avanTaban(){ return Math.max(1, Math.min(4, trafikGrupAdedi())); }
 
 /* Kullanıcının ELLE doldurduğu en yüksek asansör numarası.
    Trafikten otomatik gelen değerler sayılmaz — yoksa trafik grubu küçüldüğünde
-   kendi doldurduğumuz kart "kullanıcı verisi" sanılıp sonsuza dek açık kalırdı. */
+   kendi doldurduğumuz kart "kullanıcı verisi" sanılıp sonsuza dek açık kalırdı.
+   "Q elle" ise HER ZAMAN kullanıcınındır ( trafik onu hiç yazmaz ):  kart
+   otomatik işaretli olsa da sayılır.  Eskiden sayılmıyordu;  trafik kartın
+   kapasitesini bir kez yazınca kart otomatik sayılıyor, grup küçülünce
+   kapanıyor, kapasite / hız siliniyor ama Q elle kalıyordu — bir sonraki
+   eşitlemede kart yeniden açılıyor, arada gösterilen hesapta o asansör
+   yoktu ( TEST 13'ün rastgele dizisi buldu ). */
 function avanDoluUst(){
   let u = 0;
   for(let i=1;i<=4;i++){
-    if(AVAN_OTO[i]) continue;
-    if(v('a_kapasite'+i)!=='' || v('a_Q_elle'+i)!=='') u = i;
+    if(v('a_Q_elle'+i)!=='' || (!AVAN_OTO[i] && v('a_kapasite'+i)!=='')) u = i;
   }
   return u;
 }
@@ -142,6 +150,10 @@ function avanKartlariGoster(){
     delete AVAN_OTO[i]; delete AVAN_TRF[i];
   }
   for(let i=1;i<=4;i++){
+    //  Zincir YOK iken birim kütle hesaba girmez:  kutu soluk ( disabled )
+    //  durur ki içinde kalmış bir sayı kullanılıyor sanılmasın.
+    const z=$('a_zincir_birim_kutle'+i);
+    if(z) z.disabled = v('a_denge_zinciri'+i) !== 'Var';
     const c=$('a_aktif'+i), k=$('a_kutu'+i), e=$('a_etiket'+i);
     if(c) c.checked = (i<=n);
     if(k) k.classList.toggle('pasif', i>n);
@@ -232,6 +244,8 @@ function trafikGirdi(){
     bodrum:v('c_bodrum'),
     hizli1:v('c_hizli1'), hizli2:v('c_hizli2'),
     manuel_k:v('c_manuel_k'), manuel_V:v('c_manuel_V'),
+    //  Gizliyken ( 2-4 asansör ) değer korunur ama hesaba girmez.
+    taahhutname: TRAFIK_ADET===1 ? v('c_taahhut') : '',
     ek_nufus:ekNufusTopla('c'),
     //  YALNIZ GÖRÜNEN kolonlar hesaba girer; gizli kolonlar değerlerini
     //  korur ama tanımlanmamış sayılır.
@@ -255,7 +269,8 @@ function avanGirdi(){
     const o={aktif:$('a_aktif'+i).checked};
     ['tanim','kapasite','Q_elle','V','eta','Hk','kuyu_genisligi','kabin_boyu','kabin_genisligi',
      'Gk_elle','gr','Fmk','Fsh','Nsc','S1','L1','S2','L2','kablo_tipi',
-     'i_palanga','q_denge','makine_tipi']
+     'i_palanga','q_denge','makine_tipi',
+     'denge_zinciri','agirlik_guvenlik_tertibati','zincir_birim_kutle']
       .forEach(k=>o[k]=v('a_'+k+i));
     return o;
   });
@@ -341,14 +356,20 @@ function ciz(hedef, r, mod){
        + kutu('Tasarım nüfusu B', trn(o.B,0), 'kişi')
        + kutu('Taşınacak yüzde k', '%'+tr((o.k||0)*100,1), 'Tablo-9');
     }else{
-      const ok = o.Ieer<=o.Izul;
+      /*  Taahhütname adedi belirlediyse ölçüt şartlı kabul sınırıdır;
+          Standart / Yükseltilmiş için gereken adet yine yazılır. */
+      const tah = !!o.taahhutname;
+      const sinir = tah ? o.esik_sartli : o.Izul;
+      const ok = o.Ieer<=sinir;
       /*  Tanımlanan adet ile GEREKLİ adet ayrı gösterilir: kullanıcı
           fazla ya da eksik koyduğunu görsün.  Eşitse tek satır yeter. */
       const gerekli = o.adet_hesap;
-      h+=kutu('Asansör adedi', o.adet, (gerekli!=null && gerekli!==o.adet)
+      h+=kutu('Asansör adedi', o.adet, tah
+               ? `adet  ·  taahhütname ile  ( ${o.standart} için ${trn(gerekli,0)} )`
+               : (gerekli!=null && gerekli!==o.adet)
                ? `adet  ·  gerekli ${trn(gerekli,0)}` : 'adet  ·  '+trn(o.P,0)+' kişilik',
-               (gerekli!=null && o.adet<gerekli) ? 'hata' : '')
-       + kutu('Bekleme Ieer', tr(o.Ieer,1), 'sn  ·  sınır '+trn(o.Izul,0)+' sn', ok?'ok':'hata')
+               (!tah && gerekli!=null && o.adet<gerekli) ? 'hata' : '')
+       + kutu('Bekleme Ieer', tr(o.Ieer,1), 'sn  ·  '+(tah?'şartlı sınır ':'sınır ')+trn(sinir,0)+' sn', ok?'ok':'hata')
        + kutu('Kabin hızı V', tr(o.V), 'm/s')
        + kutu('Tur süresi TR', tr(o.TR,1), 'sn')
        + kutu('5 dk taşıma R', tr(o.R,1), 'kişi')
@@ -587,13 +608,13 @@ function avanAsansorleriKur(){
         </div>
         <div class="satir i2">
           <div class="alan"><label>i — Askı ( palanga ) oranı
-            ${bilgiSimgesi(['Doğrudan askı 1:1 / palangalı 2:1. Asansörün kendi özelliğidir — kapasite ve hız gibi burada girilir.','Motor GÜCÜ askı oranından bağımsızdır: 2:1 askıda halat hızı iki katına çıkar, kuvvet yarıya iner, çarpımları değişmez. Askı oranı verime de girmez — MMO/697 §2.4\'ün Δη = 0,10 palanga düşüşü kaldırılmıştır ( makara kaybı çarpımsaldır ve η zaten toplam sistem verimidir ).'])}</label>
+            ${bilgiSimgesi(['Doğrudan askı 1:1 / palangalı 2:1. Asansörün kendi özelliğidir — kapasite ve hız gibi burada girilir.','Palangalı ( 2:1 ) sistemde motor gücü hesabında verim 0,10 düşük alınır: η′ = η − 0,10 ( MMO/697 §2.4 ). 1:1 askıda verim olduğu gibi kullanılır.'])}</label>
             <select id="a_i_palanga${i}" class="girdi" onchange="verimTazele(${i});planla()">
               ${Object.keys(SEC.aski_oranlari||{}).map(k=>
                 `<option value="${SEC.aski_oranlari[k]}"${SEC.aski_oranlari[k]===2?' selected':''}>${k}</option>`).join('')}
             </select></div>
-          <div class="alan"><label>η — Toplam sistem verimi
-            ${bilgiSimgesi(['Askı ( palanga ), kasnak ve makine kayıpları DÂHİL tek verim. Ofis kabulü: dişlisiz 0,85 · dişli 0,50 — makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','İmalatçı kataloğundaki toplam sistem verimini ( η_ins ) doğrudan buraya girin. Paftada marka-model referansı belirtilmelidir.','Askı oranına bağlı Δη = 0,10 düşüşü KALDIRILDI: makara kaybı çarpımsaldır ( geçiş başına ≈ 0,98 ) ve sabit bir sayı çıkarmak dişli ile dişlisiz makineyi farklı oranda cezalandırıyordu. Güç zaten askı oranından bağımsızdır.'])}</label>
+          <div class="alan"><label>η — Makine verimi
+            ${bilgiSimgesi(['MMO/697 s.21\'deki η: makinenin verimi, askı ( palanga ) kaybı HARİÇ. Ofis kabulü: dişlisiz 0,85 · dişli 0,50 — makine tipini seçince kendiliğinden dolar, üzerine yazabilirsiniz.','Palangalı ( 2:1 ) sistemde program kitabın gereğini kendisi uygular: η′ = η − 0,10. Buraya düşülmemiş değeri girin.','İmalatçı kataloğundan alınmalı; paftada marka-model referansı belirtilmelidir.'])}</label>
             <input id="a_eta${i}" class="girdi" value="0,85"></div>
         </div>
         <div class="bolum-bas">Boyutlar</div>
@@ -613,6 +634,14 @@ function avanAsansorleriKur(){
           <div class="alan"><label>Nsç — Motor gücü (kW) <span class="ipucu">boş = otomatik</span>
             ${bilgiSimgesi(['Boş bırakılırsa hesaplanan motor gücünden büyük ilk STANDART anma gücü seçilir ( IEC 60072 / TS EN 60034 kademeleri: 2,2 · 3 · 4 · 5,5 · 7,5 · 11 · 15 · 18,5 · 22 · 30 · 37 · 45 kW ).','İmalatçının kademesi farklıysa buraya elle yazın; program yine Nsç ≥ N kontrolünü yapar ve uymuyorsa uyarır.'])}</label>
             <input id="a_Nsc${i}" class="girdi" placeholder="otomatik"></div>
+        </div>
+        <div class="satir i2">
+          <div class="alan"><label>Denge zinciri
+            ${bilgiSimgesi(['Askı halatlarının ağırlığını dengeleyen zincir ya da halat. Hızlı ve yüksek binalarda kullanılır ( 3 m/s üstünde halat zorunludur, TS EN 81-20 m.5.5.6.1 ).','Var seçilirse zincirin kütlesi kabin tarafı kütlesine ( P ) eklenir ve tampon, ray ve kuyu üstü kuvvetleri buna göre büyür ( MMO/697 s.20 P tanımı ).','Kütlesi ofis kabulüdür ( Sabitler · zincir = halat ağırlığı ); ağır bir asansörde "Ofis standardından farklı değerler" bölümünden girilir.'])}</label>
+            <select id="a_denge_zinciri${i}" class="girdi" onchange="avanKartlariGoster()"><option value="Yok">Yok</option><option value="Var">Var</option></select></div>
+          <div class="alan"><label>Karşı ağırlıkta güvenlik tertibatı
+            ${bilgiSimgesi(['Karşı ağırlıkta güvenlik tertibatı yalnız kuyunun altında insanların girebileceği bir boşluk varsa gerekir.','Yok ise karşı ağırlık rayına yalnız rayın kendi ağırlığı gelir ( k1 = 0, MMO/697 s.20 ); kitabın çözümlü örnekleri de böyle hesaplar.'])}</label>
+            <select id="a_agirlik_guvenlik_tertibati${i}" class="girdi"><option value="Yok">Yok</option><option value="Var">Var</option></select></div>
         </div>
         <div class="bolum-bas katla kapali" onclick="katla(this,'a_ozel${i}')">Ofis standardından farklı değerler
           <span class="ipucu">— boş = ofis standardı</span><span class="ozel-rozet" id="a_ozel_rozet${i}"></span></div>
@@ -649,6 +678,9 @@ function avanAsansorleriKur(){
             <div class="alan"><label>L2 — Makine besleme uzunluğu (m)</label><input id="a_L2${i}" class="girdi ofis-alan" data-ofis="L2"></div>
           </div>
           <div class="alan"><label>Kablo tipi <span class="ipucu">metne yazılır</span></label><input id="a_kablo_tipi${i}" class="girdi ofis-alan" data-ofis="kablo_tipi"></div>
+          <div class="alan"><label>mz — Denge zinciri birim kütlesi (kg/m) <span class="ipucu">yalnız zincir Var ise</span>
+            ${bilgiSimgesi(['Kabinin 1 m hareketine düşen zincir kütlesi — zincir halat ağırlığını dengeler, yaklaşık halat adedi × halat 1 m kütlesi × askı oranı.','Boş bırakılırsa Sabitler\'deki ofis kabulü ( 7 × Ø6,5 mm · 2:1 ) kullanılır. Ağır asansörde ( ör. 9 × Ø10 · 2:1 ≈ 6,1 kg/m ) buraya yazın.'])}</label>
+            <input id="a_zincir_birim_kutle${i}" class="girdi ofis-alan" data-ofis="zincir_birim_kutle"></div>
         </div>
       </div></div>`;
   }
@@ -964,7 +996,7 @@ function manuelRozet(){
 function ozelRozet(i){
   const r = $('a_ozel_rozet'+i); if(!r) return;
   const alanlar = ['Q_elle','Gk_elle','gr','Fmk','Fsh','S1','S2','L2',
-                   'kablo_tipi','L1','q_denge'];
+                   'kablo_tipi','L1','q_denge','zincir_birim_kutle'];
   const n = alanlar.filter(k=>v('a_'+k+i)!=='').length;
   r.textContent = n ? `${n} özel` : '';
   r.className = 'ozel-rozet' + (n ? ' dolu' : '');

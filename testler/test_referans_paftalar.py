@@ -299,8 +299,9 @@ def _block(r):
     #  Aşağısı, aynı hatayı yapmadığımızı sabitler.
     s = MK.hesapla({})
     kb = next(x for x in s["bolumler"] if x["kimlik"] == "kabin_raylari")
+    #  Bölünmez boşluk ( U+00A0 ) okuyan için boşluktur.
     metinler = " | ".join(str(a.get("formul") or "") for a in kb["adimlar"]
-                          if isinstance(a, dict))
+                          if isinstance(a, dict)).replace("\u00a0", " ")
     #  ① Paftanın Fy bağıntısı paydaya yalnız h yazar;  C.2.1.1 b) ( n/2 )·h
     #    ister.  n = 2'de ikisi aynıdır, n = 4'te pafta Fy'yi İKİ KAT
     #    büyük gösterir.  Bizde payda her zaman ( n/2 )·h olmalı.

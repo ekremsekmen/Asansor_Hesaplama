@@ -94,6 +94,17 @@ def sayi_mi(x):
     return isinstance(x, (int, float)) and not isinstance(x, bool)
 
 
+def bagla(metin):
+    """Bir ifade grubunu BÖLÜNMEZ yapar  ( boşluklar → U+00A0 ).
+
+    Pafta satırı sütuna sığmadığında ReportLab sözcük sınırından kırar ve
+    bir paydayı ortasından bölebiliyordu:  "… / ( 2 ×"  alt satırda
+    "3.300 )".  Bağlanan grup alt satıra BÜTÜN iner:  "/ ( 2 × 3.300 )".
+    Okuyan için yine boşluktur;  ekran ve CAD aynı biçimde gösterir.
+    """
+    return str(metin).replace(" ", " ")
+
+
 #  ---------------------------------------------------------------------
 #  KULLANILAMAYAN GİRDİNİN METNİ  —  İKİ PROJE AYNI CÜMLEYİ KURAR
 #  ---------------------------------------------------------------------

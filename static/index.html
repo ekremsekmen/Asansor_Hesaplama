@@ -265,6 +265,18 @@
               <div class="alan"><label>Manuel k <span class="ipucu">(0 – 1)</span></label><input id="c_manuel_k" class="girdi" placeholder="Tablo-9"></div>
             </div>
           </div>
+          <div class="alan" id="c_taahhut_alan"><label>Taahhütname <span class="ipucu">(Tablo-10 şartlı kabul)</span>
+            <span class="bilgi" tabindex="0" role="button" aria-label="Açıklamayı göster"
+              onclick="bilgiAc(this,event)"><span class="bilgi-im">!</span><span class="bilgi-balon">
+              <p><b>Yok</b> — program asansör adedini bina için uygulanan sınırla
+                ( <b>Standart</b> / <b>Yükseltilmiş</b> ) bulur.</p>
+              <p><b>Var</b> — bekleme ölçütü MMO/697 Tablo-10 <b>şartlı kabul</b> sınırıdır
+                ( konutta 120 sn ); o sınırda yeten adet seçilir ve pafta
+                "Şartlı Kabul ( taahhütname ile )" der. Taşıma kapasitesi yine
+                aranır — taahhütname onu gevşetmez.</p>
+              <p>Yalnız tek asansör tanımında görünür; 2–4 asansörde adedi siz
+                belirlersiniz, şartlı kabul kendiliğinden sınıflandırılır.</p></span></span></label>
+            <select id="c_taahhut" class="girdi"><option value="Yok">Yok</option><option value="Var">Var</option></select></div>
           <div id="c_std_rozet" style="margin:-2px 0 6px"></div>
 
           <div class="bolum-bas">Asansörler</div>

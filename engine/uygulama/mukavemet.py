@@ -27,7 +27,7 @@ from engine.uygulama import mukavemet_girdi as MG
 from engine.uygulama import sabitler as US
 from engine.uygulama import mukavemet_tablolari as MT
 from engine.ortak.steps import Bolum, hesap, kontrol, numarala, veri
-from engine.ortak.steps import metin, tr, trn, evet_mi
+from engine.ortak.steps import bagla, metin, tr, trn, evet_mi
 
 # =====================================================================
 #  SABİTLER
@@ -2378,10 +2378,42 @@ def _kabin_raylari(g, o):
     #  alıyordu.
     turler = []
 
-    def _kesim(baslik, kaynak, kaynak_y, Fx1, Fy1, Fx2, Fy2, kk, sperm,
-               omega=None, kayit=None):
+    def _kuvvet(eksen, k_ad, k, Qk, Pk, ref=0.0, ref_ad=""):
+        """C.2.1 · C.2.2 eğilme kuvveti  —  ( formül , işlem , değer ).
+
+            Fx = k × gn × ( Q·(xQ − xs) + P·(xp − xs) ) / ( n × h )
+            Fy = k × gn × ( Q·(yQ − ys) + P·(yp − ys) ) / ( ( n / 2 ) × h )
+
+        C.2.1'de moment askı noktasına göre değil alınır ( ref = 0 ).
+        İŞLEM SAYILARLA BASILIR:  satırda formülün kendisi tekrar ediyordu,
+        paftayı denetleyen sonuca hesap makinesiyle ulaşamıyordu — C.2.3 ve
+        karşı ağırlık rayı zaten sayılarla basılıyordu.  Değer eski ifadenin
+        AYNISIDIR ( x − 0 = x );  hiçbir sonuç değişmez.
+        """
+        #  Satır sütuna sığmayabilir ( işlem ≈ 74 mm ):  çarpımlar ve payda
+        #  BAĞLANIR ki kırılma yalnız "+" ile "/" sınırına düşsün.
+        yarim = eksen == "y"
+        q_ad, p_ad = f"{eksen}Q", f"{eksen}p"
+        if ref_ad:
+            terim = f"Q·({q_ad}−{ref_ad}) + P·({p_ad}−{ref_ad})"
+            sayi = (bagla(f"{trn(Q, 0)} × {tr(Qk - ref)}") + " + "
+                    + bagla(f"{trn(P, 0)} × {tr(Pk - ref)}"))
+        else:
+            terim = f"Q·{q_ad} + P·{p_ad}"
+            sayi = bagla(f"{trn(Q, 0)} × {tr(Qk)}") + " + " + bagla(f"{trn(P, 0)} × {tr(Pk)}")
+        payda = (n / 2.0) * h if yarim else n * h
+        return (f"F{eksen} = {k_ad} × gn × ( {terim} ) "
+                + bagla("/ ( ( n / 2 ) × h )" if yarim else "/ ( n × h )"),
+                f"{tr(k)} × {tr(gn)} × ( {sayi} ) "
+                + bagla(f"/ ( {tr(n / 2.0)} × {trn(h, 0)} )" if yarim
+                        else f"/ ( {trn(n, 0)} × {trn(h, 0)} )"),
+                k * gn * (Q * (Qk - ref) + P * (Pk - ref)) / payda)
+
+    def _kesim(baslik, kuvvetler, kk, sperm, omega=None, kayit=None):
         """Bir yükleme durumu için gerilme · burkulma · flanş · sehim satırları.
 
+        kuvvetler  ( ( Fx , Fy ) durum 1 , ( Fx , Fy ) durum 2 );  her biri
+                   _kuvvet()'in ( formül , işlem , değer ) üçlüsü.
         kayit  ara değerlerin ön eki ( ör. "kabin_ray.c21" );  her durum
                "<ön ek>.d1" / ".d2" altında  Fx · sy · Fy · sx · sm · sc ·
                sf · dx · dy  ( burkulmalı durumda ayrıca st )  olarak saklanır.
@@ -2391,16 +2423,17 @@ def _kabin_raylari(g, o):
         ad.append(metin(baslik, vurgu=True))
         sonuc = []
         tur = []
-        for sira, (etiket, Fx, Fy) in enumerate(
-                (("Durum 1  x-ekseni", Fx1, Fy1), ("Durum 2  y-ekseni", Fx2, Fy2))):
+        for sira, (etiket, (fx, fy)) in enumerate(
+                zip(("Durum 1  x-ekseni", "Durum 2  y-ekseni"), kuvvetler)):
             ad.append(metin(etiket + " :"))
             #  Fy'nin KENDİ bağıntısı yazılır.  İkisine de Fx'in formülü
             #  basılıyordu:  y ekseni kuvvetinin yanında x ekseni bağıntısı
             #  duruyor, üstelik paydası ( n·h ) görünüyordu — oysa C.2.1.1 b),
             #  C.2.2.1 b) ve C.2.3.1 b) Fy'yi ( n/2 )·h'ye böler ve hesap da
             #  öyle yapıyor.  Sayı doğruydu, PAFTA yanlış anlatıyordu.
-            ad.append(hesap("Fx", kaynak, Fx, "N"))
-            ad.append(hesap("Fy", kaynak_y, Fy, "N"))
+            Fx, Fy = fx[2], fy[2]
+            ad.append(hesap(fx[0], fx[1], Fx, "N"))
+            ad.append(hesap(fy[0], fy[1], Fy, "N"))
             #  m.C.2.1.1:  Fx → My → Wy   ·   Fy → Mx → Wx
             sy, dx = _ray_satirlari("y", "x", Fx, l, p["Wy"], p["Iy"], ad, dstr_x)
             sx, dy = _ray_satirlari("x", "y", Fy, l, p["Wx"], p["Ix"], ad, dstr_y)
@@ -2490,12 +2523,8 @@ def _kabin_raylari(g, o):
     uygunlar.append(burkulma_uygun)
     turler.append("burkulma")
     _kesim("Eğilme gerilmesi  ( C.2.1 ) :",
-           "k1 × gn × ( Q·xQ + P·xp ) / ( n × h )",
-           "k1 × gn × ( Q·yQ + P·yp ) / ( ( n / 2 ) × h )",
-           k1 * gn * (Q * xQ1_g + P * xp) / (n * h),
-           k1 * gn * (Q * yc + P * yp) / ((n / 2.0) * h),
-           k1 * gn * (Q * xc + P * xp) / (n * h),
-           k1 * gn * (Q * yQ2_g + P * yp) / ((n / 2.0) * h),
+           ((_kuvvet("x", "k1", k1, xQ1_g, xp), _kuvvet("y", "k1", k1, yc, yp)),
+            (_kuvvet("x", "k1", k1, xc, xp), _kuvvet("y", "k1", k1, yQ2_g, yp))),
            {"Fv": Fk, "k": k3, "sigma_k": sigma_k}, sperm_g, omega,
            "kabin_ray.c21")
 
@@ -2519,12 +2548,10 @@ def _kabin_raylari(g, o):
     #  Fy'nin paydası da C.2.1.1 b) ile aynıdır:  ( n / 2 ) · h  —  n·h
     #  Fy'yi YARISI kadar gösterirdi, emniyetsiz.
     _kesim("Eğilme gerilmesi  ( C.2.2 ) :",
-           "k2 × gn × ( Q·(xQ−xs) + P·(xp−xs) ) / ( n × h )",
-           "k2 × gn × ( Q·(yQ−ys) + P·(yp−ys) ) / ( ( n / 2 ) × h )",
-           k2 * gn * (Q * (xQ1_n - xs) + P * (xp - xs)) / (n * h),
-           k2 * gn * (Q * (yc - ys) + P * (yp - ys)) / ((n / 2.0) * h),
-           k2 * gn * (Q * (xc - xs) + P * (xp - xs)) / (n * h),
-           k2 * gn * (Q * (yQ2_n - ys) + P * (yp - ys)) / ((n / 2.0) * h),
+           ((_kuvvet("x", "k2", k2, xQ1_n, xp, xs, "xs"),
+             _kuvvet("y", "k2", k2, yc, yp, ys, "ys")),
+            (_kuvvet("x", "k2", k2, xc, xp, xs, "xs"),
+             _kuvvet("y", "k2", k2, yQ2_n, yp, ys, "ys"))),
            {"Fv": Fv, "k": k3}, sperm_n, None, "kabin_ray.c22")
 
     # ── C.2.3  Normal çalışma, yükleme ────────────────────────────────
@@ -2532,12 +2559,15 @@ def _kabin_raylari(g, o):
     #  Ek C.2.3.1 b) paydası da ( n / 2 ) · h'dir.
     Fy3 = (gn * P * (yp - ys) + Fs * (yi - ys)) / ((n / 2.0) * h)
     ad.append(metin("Normal Çalışma, Yükleme  ( TS EN 81-50 m.C.2.3 ) :", vurgu=True))
-    ad.append(hesap("Fx = ( gn × P × (xp−xs) + Fs × (xi−xs) ) / ( n × h )",
-                    f"( {tr(gn)} × {trn(P, 0)} × {tr(xp - xs)} + {tr(Fs)} × "
-                    f"{tr(xi - xs)} ) / ( {trn(n, 0)} × {trn(h, 0)} )", Fx3, "N"))
-    ad.append(hesap("Fy = ( gn × P × (yp−ys) + Fs × (yi−ys) ) / ( ( n / 2 ) × h )",
-                    f"( {tr(gn)} × {trn(P, 0)} × {tr(yp - ys)} + {tr(Fs)} × "
-                    f"{tr(yi - ys)} ) / ( {tr(n / 2.0)} × {trn(h, 0)} )", Fy3, "N"))
+    #  Çarpımlar ve payda bağlanır ( bkz. _kuvvet ).
+    ad.append(hesap("Fx = ( gn × P × (xp−xs) + Fs × (xi−xs) ) " + bagla("/ ( n × h )"),
+                    "( " + bagla(f"{tr(gn)} × {trn(P, 0)} × {tr(xp - xs)}") + " + "
+                    + bagla(f"{tr(Fs)} × {tr(xi - xs)}") + " ) "
+                    + bagla(f"/ ( {trn(n, 0)} × {trn(h, 0)} )"), Fx3, "N"))
+    ad.append(hesap("Fy = ( gn × P × (yp−ys) + Fs × (yi−ys) ) " + bagla("/ ( ( n / 2 ) × h )"),
+                    "( " + bagla(f"{tr(gn)} × {trn(P, 0)} × {tr(yp - ys)}") + " + "
+                    + bagla(f"{tr(Fs)} × {tr(yi - ys)}") + " ) "
+                    + bagla(f"/ ( {tr(n / 2.0)} × {trn(h, 0)} )"), Fy3, "N"))
     #  m.C.2.3:  Fx → My → Wy   ·   Fy → Mx → Wx
     sy3, dx3 = _ray_satirlari("y", "x", Fx3, l, p["Wy"], p["Iy"], ad, dstr_x)
     sx3, dy3 = _ray_satirlari("x", "y", Fy3, l, p["Wx"], p["Ix"], ad, dstr_y)
@@ -2547,7 +2577,8 @@ def _kabin_raylari(g, o):
     ad += [
         hesap("σm = σx + σy", f"{tr(sx3)} + {tr(sy3)}", sm3, "N/mm²"),
         kontrol(f"σm = {tr(sm3)}  ≤  σperm = {tr(sperm_n)} N/mm²", sm3 <= sperm_n),
-        hesap("σc = ( Fv + k3 × MY ) / A + σm", f"σv + σm", sc3, "N/mm²"),
+        #  σv yukarıda ( C.2.2 ) sayılarıyla basıldı;  burada o değer kullanılır.
+        hesap("σc = σv + σm", f"{tr(sigma_v)} + {tr(sm3)}", sc3, "N/mm²"),
         kontrol(f"σc = {tr(sc3)}  ≤  σperm = {tr(sperm_n)} N/mm²", sc3 <= sperm_n),
         hesap("σF  ( flanş eğilmesi )", f"Fx = {tr(Fx3)} N", sf3, "N/mm²"),
         kontrol(f"σF = {tr(sf3)}  ≤  σperm = {tr(sperm_n)} N/mm²", sf3 <= sperm_n),

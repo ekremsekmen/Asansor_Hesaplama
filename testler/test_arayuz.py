@@ -1595,18 +1595,26 @@ def calistir():
         pg.wait_for_timeout(1300)
         _m = pg.inner_text("#a_sonuc")
         r.kontrol("1:1 askıda η aynen kullanılıyor", "0,85" in _m)
+        #  Satır 1. asansörün KENDİ motor bölümünde aranır:  "η′" açıklama
+        #  balonunda ve öteki asansörlerde de geçer.
+        _eta_satiri = ("() => SON.a.asansorler[0].bolumler[0].adimlar"
+                       ".filter(a => String(a.formul || '').startsWith('η′'))"
+                       ".map(a => [a.islem, a.deger, a.kaynak])")
+        r.esit("1:1 askıda η′ satırı yok", pg.evaluate(_eta_satiri), [])
         pg.select_option("#a_i_palanga1", "2")
         pg.wait_for_timeout(1300)
         _m = pg.inner_text("#a_sonuc")
-        r.kontrol("2:1 askıda da η = 0,85  ( Δη kaldırıldı )", "0,85" in _m)
-        r.kontrol("ekranda artık η′ = 0,75 yok", "0,75" not in _m)
+        r.esit("2:1 askıda η′ = 0,85 − 0,10 = 0,75  ( MMO/697 §2.4 )", pg.evaluate(_eta_satiri),
+               [["=   0,85 − 0,10", 0.75, "palangalı sistem  ·  MMO/697 §2.4"]])
+        r.kontrol("η′ satırı ekrana basılmış", "0,85 − 0,10" in _m)
         r.kontrol("toplam sistem verimi kutusu ekrandan kalktı",
                   not pg.is_visible("#a_toplam_verim1"))
         pg.fill("#a_eta1", "0,82")
         pg.wait_for_timeout(1400)
         _m = pg.inner_text("#a_sonuc")
-        r.kontrol("girilen η aynen kullanılıyor ( 0,82 )", "0,82" in _m)
-        r.kontrol("toplam sistem verimi notu paftada", "TOPLAM SİSTEM VERİMİ" in _m)
+        r.kontrol("girilen η'dan 0,10 düşülüyor ( 0,82 − 0,10 )", "0,82 − 0,10" in _m)
+        r.kontrol("makine verimi notu paftada", "η makine verimidir" in _m)
+        r.kontrol("paftada 'artık uygulanmaz' notu yok", "uygulanmaz" not in _m)
         pg.fill("#a_eta1", "0,85")
         pg.wait_for_timeout(1300)
 
@@ -1963,6 +1971,27 @@ def calistir():
         pg.wait_for_timeout(1400)
         r.esit("boşaltılınca avan adedi 2'ye döndü",
                pg.inner_text("#adet_dugmeler_a .adet-dg.secili").strip(), "2")
+
+        #  "Q elle" dolu kart, trafik kapasitesini yazmış ( otomatik işaretli )
+        #  olsa bile kapanmaz;  eşitleme ikinci kez çalışınca hiçbir şey
+        #  değişmez.  Eskiden kart kapanıyor, Q elle kalıyor, bir sonraki
+        #  eşitlemede yeniden açılıyordu ( TEST 13 rastgele dizide buldu ).
+        _q = pg.evaluate("""() => {
+            const taban = avanTaban();
+            alanaYaz($('a_Q_elle4'), '1000');  AVAN_OTO[4] = true;
+            avanSenkron();
+            const once = JSON.stringify(avanGirdi());
+            const r = {taban, aktif: $('a_aktif4').checked, qelle: v('a_Q_elle4')};
+            avanSenkron();
+            r.ayni = once === JSON.stringify(avanGirdi());
+            $('a_Q_elle4').value = '';  delete AVAN_OTO[4];  AVAN_EK = 0;  avanSenkron();
+            return r; }""")
+        r.kontrol("Q elle dolu kart denemesi trafik grubunun dışında", _q["taban"] < 4,
+                  f"→ {_q}")
+        r.kontrol("Q elle dolu, otomatik işaretli kart kapanmadı",
+                  _q["aktif"] and _q["qelle"] == "1000", f"→ {_q}")
+        r.kontrol("avan eşitlemesi ikinci kez çalışınca kartlar değişmiyor", _q["ayni"],
+                  f"→ {_q}")
         adetSec(pg, 1)
         pg.wait_for_timeout(800)
         pg.fill("#c_N", "11")

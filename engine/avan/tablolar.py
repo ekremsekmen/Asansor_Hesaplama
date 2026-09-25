@@ -604,25 +604,34 @@ BODRUM_NOTU = (
 # ================================================================
 #  MAKİNE TİPİ  ve  ASKI ( PALANGA ) ORANI
 # ================================================================
-#  TOPLAM SİSTEM VERİMİ  ( η )  —  OFİS KABULÜ, MMO/697'DE TABLO YOKTUR.
+#  MAKİNE VERİMİ  ( η )  —  OFİS KABULÜ, MMO/697'DE TABLO YOKTUR.
 #        Dişlisiz  η = 0,85          Dişli  η = 0,50
-#  Kitabın §2.4 (s.21) motor gücü bölümü YALNIZ formülü ve şu cümleyi verir:
-#  "Palangalı sistemlerde verim %10 az alınacaktır."  Verim DEĞERLERİ kitapta
-#  bulunmaz;  yukarıdaki iki sayı ofisin imalatçı deneyiminden gelir.
+#  Kitabın §2.4 (s.21) motor gücü bölümü formülü ve şu cümleyi verir:
+#  "Palangalı sistemlerde verim %10 az alınacaktır."  Verim tablosu vermez;
+#  çözümlü örneği ( §4.4, s.56 ) η = 0,50 kullanır.  Yukarıdaki iki sayı
+#  ofisin imalatçı deneyiminden gelir.
 #
-#  Δη = 0,10 KURALI KALDIRILDI.  Gerekçesi engine/ortak/ofis.py'de ayrıntılı
-#  yazılıdır:  makara kayıpları çarpımsaldır, toplamsal bir düşüş aynı fiziksel
-#  kaybı dişlisizde %11,8 · dişlide %20 göreli ceza yapıyor, makara sayısına
-#  göre ölçeklenmiyor ve η küçükken η′'yü negatife düşürüyordu.
+#  AVAN KİTABA GÖRE HESAPLANIR ( avan kitaba göre denetlenir ):  buradaki η
+#  kitabın η'sıdır — MAKİNE verimi, askı ( palanga ) kaybı HARİÇ.  Palangalı
+#  sistemde ( askı oranı 2:1 ve üstü ) kitabın düşüşü uygulanır:
+#        η′ = η − 0,10
+#  Kitabın örneği:  "palangalı (2/1) sistem olduğundan verim %10 eksiltilir.
+#  η = 0,5 − 0,1 = 0,4"  — yani ORAN değil, 0,10 ÇIKARMA.
+#  2026-09-08 ile 2026-09-25 arasında bu düşüş kaldırılmıştı;  avan motoru
+#  kitabın bulduğundan küçük seçiyor ( 800 kg · 1,6 m/s · 2:1 · η 0,85:
+#  7,5 kW — kitaba göre 8,37 kW, 11 kW ) ve paftaya "artık uygulanmaz"
+#  yazıyordu.  Kitaba göre inceleyen bu motoru reddeder.
 #
-#  Yukarıdaki değerler artık TOPLAM SİSTEM VERİMİDİR — askı ( palanga ) kaybı
-#  içlerindedir.  İmalatçı kataloğu da bu büyüklüğü verir ( η_ins,
-#  installation efficiency ) ve askı oranını ayrıca cezalandırmaz.  Askı oranı motor gücüne HİÇBİR yoldan girmez.
-#  Makine verimi tablosu artık ORTAK ofis standardındadır:  uygulama projesi
-#  ( mukavemet ) de aynı sayıları okur.  Bir süre iki yerde ayrı durdu ve
-#  ayrıştı — bkz. engine/ortak/ofis.py.
+#  UYGULAMA PROJESİ BUNU UYGULAMAZ:  orada η TOPLAM sistem verimidir
+#  ( imalatçı kataloğunun η_ins'i, askı kaybı içinde ) — bkz.
+#  engine/ortak/ofis.py.  Uygulama elektrik hesabını avan motorunda koştuğu
+#  için köprü ( engine/uygulama/girdi.kopru ) "η toplamdır" bayrağını
+#  ( ETA_TOPLAM_ANAHTARI ) geçirir;  düşüş o yolda uygulanmaz.
+#  Tablo ORTAK ofis standardındadır:  iki taraf aynı sayıları okur.
 MAKINE_TIPLERI = _OFIS.MAKINE_VERIMLERI
 ASKI_ORANLARI = {"1:1": 1, "2:1": 2}
+PALANGA_VERIM_DUSUSU = 0.10          # MMO/697 §2.4 s.21 · örnek §4.4 s.56
+ETA_TOPLAM_ANAHTARI = "eta_toplam"   # köprünün bayrağı — avan formunda yoktur
 
 
 def makine_verimi(makine_tipi):
@@ -637,19 +646,19 @@ def aski_orani_metni(i):
     return f"{i}:1" if i else "—"
 
 
+def palangali_mi(i):
+    """Askı oranı 2:1 ve üstü mü  ( MMO/697 §2.4 "palangalı sistem" )."""
+    return isinstance(i, (int, float)) and not isinstance(i, bool) and i > 1
+
+
 VERIM_NOTU = (
-    "N = (1−q)·Q·V / (102·η) bir GÜÇ bağıntısıdır ve güç askı oranından "
-    "BAĞIMSIZDIR — 2:1 askıda halat hızı iki katına çıkar, kuvvet yarıya iner, "
-    "çarpımları değişmez. Askı oranı bu denkleme hiçbir yoldan girmez."
+    "N = (1−q)·Q·V / (102·η) bir güç bağıntısıdır. Askı oranı denkleme yalnız "
+    "verim üzerinden girer: palangalı ( 2:1 ve üstü ) sistemde verim MMO/697 "
+    "§2.4 gereği 0,10 düşük alınır ( η′ = η − 0,10 )."
 )
-TOPLAM_VERIM_NOTU = (
-    "η TOPLAM SİSTEM VERİMİDİR — askı ( palanga ), kasnak ve makine kayıpları "
-    "bu değerin içindedir. MMO/697 §2.4'ün Δη = 0,10 palanga düşüşü artık "
-    "uygulanmaz: makara kaybı fiziksel olarak çarpımsaldır ( geçiş başına "
-    "η ≈ 0,98; burçlu makarada ≈ 0,95 ), sabit bir sayı çıkarmak aynı kaybı "
-    "dişli ve dişlisiz makinede farklı oranda cezalandırıyordu. Değer "
-    "imalatçı kataloğundan alınmalı ve paftada marka-model referansı "
-    "belirtilmelidir."
+MAKINE_VERIM_NOTU = (
+    "η makine verimidir ( askı / palanga kaybı hariç ); imalatçı kataloğundan "
+    "alınmalı ve paftada marka-model referansı belirtilmelidir."
 )
 
 # =====================================================================

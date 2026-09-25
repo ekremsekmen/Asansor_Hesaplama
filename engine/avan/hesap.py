@@ -11,7 +11,8 @@ ASANSÖR AVAN PROJE HESAPLARI
 import math
 from engine.avan import tablolar as T
 from engine.ortak.steps import (Bolum, veri, hesap, metin, tr, trn,
-                    yukari_yuvarla, tavana_yuvarla, sayi_mi, evet_mi, aralik_disi)
+                    yuvarla, yukari_yuvarla, tavana_yuvarla, sayi_mi, evet_mi,
+                    aralik_disi)
 
 
 # ---------------------------------------------------------------- SABİTLER
@@ -151,6 +152,19 @@ OFIS_VARSAYILAN = {
     "gr": 17.91,              # Kılavuz ray birim kütlesi, kg/m
     "Fmk": 350,               # Makine ağırlığı, kg
     "Fsh": 100,               # Makine sehpası ağırlığı, kg
+    #  DENGE ZİNCİRİ BİRİM KÜTLESİ  ( kabinin 1 m hareketine düşen zincir )
+    #  MMO/697 ( s.20 ) ve TS EN 81-20 ( m.5.2.1.8.5 ) P'ye "dengeleme
+    #  halatları/zincirleri ( varsa )" katar ama İKİSİ DE SAYI VERMEZ.
+    #  EN 81-20 m.5.5.6.1 zincirin amacını söyler:  askı halatlarının
+    #  ağırlığını dengelemek.  Zincir halat ağırlığı kadar alınır ( λ = %100,
+    #  uygulama projesinin kabulüyle aynı ) ve avan halatları bilmediği için
+    #  ofisin varsayılan halat düzeni kullanılır:  7 × Ø6,5 mm ( 0,152 kg/m )
+    #  × 2:1 askı  =  2,128  →  2,13 kg/m.  İKİ HANEYE YUVARLANIR:  arayüz
+    #  varsayılanı kutuya yazar ve "2,128" belirsiz sayı kuralına takılıp
+    #  bütün avan hesabını durduruyordu ( binlik ayraçlı 2128 ile karışır ).
+    #  Ağır asansörde ( ör. 9 × Ø10 · 2:1 ≈ 6,1 kg/m ) asansör kartındaki
+    #  "farklı değerler" bölümünden girilir.
+    "zincir_birim_kutle": 2.13,
     "S1": 6,                  # Kolon hattı kesiti, mm²
     "S2": 6,                  # Makine besleme kesiti, mm²
     "L2": 3,                  # Makine besleme uzunluğu, m
@@ -177,12 +191,14 @@ OFIS_ARALIK = {
     "U": (100, 1000), "kappa": (10, 100), "eps_max": (0.1, 20),
     "gr": (1, 200), "Fmk": (1, 5000), "Fsh": (0, 3000),
     "S1": (1, 400), "S2": (1, 400), "L2": (0.1, 500), "L1_pay": (0, 100),
+    "zincir_birim_kutle": (0.1, 50),
     "beta": (1, 100000), "cubuk_sayisi": (0, 100), "goz_araligi": (1, 200),
     "sigorta_katsayisi": (1, 4),
 }
 
 #  Asansör kartından ezilebilen ofis varsayılanları ( "özel değer" bölümü )
-OFIS_ASANSOR_ALANLARI = ("gr", "Fmk", "Fsh", "S1", "S2", "L2", "kablo_tipi")
+OFIS_ASANSOR_ALANLARI = ("gr", "Fmk", "Fsh", "S1", "S2", "L2", "kablo_tipi",
+                         "zincir_birim_kutle")
 #  Avan ortak panelinden gelen, boş bırakılırsa ofis varsayılanına düşenler
 OFIS_ORTAK_ALANLARI = ("U", "kappa", "eps_max", "beta", "cubuk_sayisi")
 
@@ -256,12 +272,14 @@ def _armatur_kaynagi(S, w_anahtar, lm_anahtar):
 ASANSOR_SINIRLARI = (
     ("Q_elle",    "Q elle — anma yükü",               (50, 20000),                "kg"),
     ("Gk_elle",   "Gk elle — boş kabin kütlesi",      (50, 20000),                "kg"),
-    ("eta",       "η — toplam sistem verimi",         (0.05, 1.0),                "—"),
+    ("eta",       "η — makine verimi",                (0.05, 1.0),                "—"),
     ("i_palanga", "i — askı oranı",                   SABIT_B_ARALIK["i_palanga"], "—"),
     ("q_denge",   "q — denge faktörü",                SABIT_B_ARALIK["q_denge"],  "—"),
     ("gr",        "gr — ray birim kütlesi",           OFIS_ARALIK["gr"],          "kg/m"),
     ("Fmk",       "Fmk — makine ağırlığı",            OFIS_ARALIK["Fmk"],         "kg"),
     ("Fsh",       "Fsh — sehpa ağırlığı",             OFIS_ARALIK["Fsh"],         "kg"),
+    ("zincir_birim_kutle", "mz — denge zinciri birim kütlesi",
+                  OFIS_ARALIK["zincir_birim_kutle"], "kg/m"),
     ("S1",        "S1 — kolon hattı kesiti",          OFIS_ARALIK["S1"],          "mm²"),
     ("S2",        "S2 — makine besleme kesiti",       OFIS_ARALIK["S2"],          "mm²"),
     ("L2",        "L2 — makine besleme uzunluğu",     OFIS_ARALIK["L2"],          "m"),
@@ -274,7 +292,7 @@ ASANSOR_SINIRLARI = (
 #    eşlenmek zorundaydı;  tek tabloya alındı, ayrışamazlar. )
 ZORUNLU_ALANLAR = (
     ("V",               "Kabin hızı",                   True),
-    ("eta",             "Toplam sistem verimi",         True),
+    ("eta",             "Makine verimi",                True),
     ("Hk",              "Kuyu yüksekliği",              True),
     ("kuyu_genisligi",  "Kuyu genişliği",               True),
     ("kabin_boyu",      "Kabin boyu",                   True),
@@ -388,6 +406,7 @@ OFIS_ETIKET = {
     "gr": ("gr — ray birim kütlesi", "kg/m"),
     "Fmk": ("Fmk — makine ağırlığı", "kg"),
     "Fsh": ("Fsh — sehpa ağırlığı", "kg"),
+    "zincir_birim_kutle": ("mz — denge zinciri birim kütlesi", "kg/m"),
     "S1": ("S1 — kolon hattı kesiti", "mm²"),
     "S2": ("S2 — makine besleme kesiti", "mm²"),
     "L2": ("L2 — makine besleme uzunluğu", "m"),
@@ -475,6 +494,11 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     kabin_b = a.get("kabin_genisligi")
     Gk_elle = a.get("Gk_elle")
     makine_tipi = a.get("makine_tipi") or ""
+    #  İki seçim, varsayılanları MMO/697'nin çözümlü örnekleri gibi YOK:
+    #    denge zinciri                      →  P'ye zincir kütlesi eklenir
+    #    karşı ağırlıkta güvenlik tertibatı →  karşı ağırlık rayında k1
+    zincir_var = evet_mi(a.get("denge_zinciri"))
+    ag_tertibat_var = evet_mi(a.get("agirlik_guvenlik_tertibati"))
 
     # ---------- elle girilen değerlerin sınırları  ( önce — hepsi birden )
     _ah = _asansor_hatasi(no, a)
@@ -563,21 +587,29 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     #  standardındadır, gerekirse asansör bazında ezilir.
     i_pal, i_kaynak = _ofis_degeri(a, S, "i_palanga")
     q, q_kaynak = _ofis_degeri(a, S, "q_denge")
-    #  ASKI ORANINA BAĞLI Δη = 0,10 DÜŞÜŞÜ KALDIRILDI ( bkz. ortak/ofis.py ).
-    #  Girilen η HER ZAMAN toplam sistem verimidir — askı ( palanga ) kaybı
-    #  içindedir ve ikinci kez uygulanmaz.  Askı oranı motor gücüne artık
-    #  hiçbir yoldan girmez;  güç zaten askı oranından bağımsızdır.
-    eta_p = eta
-    #  η ≤ 0 FİZİKSEL DEĞİLDİR.  Δη kalktığı için verim artık kendi başına
-    #  negatife düşemez ( eskiden η = 0,08 + 2:1 → η′ = −0,02 oluyor, paftaya
-    #  negatif verim basılıyor ve sonuç "UYGUN DEĞİL — motoru büyütün" diyerek
-    #  YANLIŞ TEŞHİS koyuyordu ).  Kalkan yine de durur:  η bir GİRDİdir ve
-    #  aralık denetimi atlanırsa N = …/(102·η) sıfıra bölünür.
+    #  PALANGALI SİSTEMDE VERİM 0,10 DÜŞÜK ALINIR  ( MMO/697 §2.4, örnek §4.4 ).
+    #  Girilen η kitabın η'sıdır — makine verimi, askı kaybı HARİÇ ( bkz.
+    #  tablolar.PALANGA_VERIM_DUSUSU ).  Uygulama projesinin köprüsü TOPLAM
+    #  sistem verimi geçirir ve bunu bayrakla söyler:  o yolda düşüş yoktur.
+    eta_toplam = bool(a.get(T.ETA_TOPLAM_ANAHTARI))
+    palanga_dususu = sayi_mi(eta) and not eta_toplam and T.palangali_mi(i_pal)
+    #  Çıkarma kayan noktada gürültü bırakır ( 0,51 − 0,10 = 0,41000000000000003 ):
+    #  η en çok üç ondalıkla girilir, altı haneye yuvarlamak yalnız gürültüyü siler.
+    eta_p = yuvarla(eta - T.PALANGA_VERIM_DUSUSU, 6) if palanga_dususu else eta
+    #  η′ ≤ 0 FİZİKSEL DEĞİLDİR ( η = 0,08 · 2:1 → η′ = −0,02 ):  paftaya
+    #  negatif verim basılır, N = …/(102·η′) eksi çıkar ve sonuç "motoru
+    #  büyütün" diye yanlış teşhis koyar.  Girilen değer kullanılamıyorsa hesap
+    #  durur — varsayılana dönülmez.
     if not (sayi_mi(eta_p) and eta_p > 0):
         return {"no": no, "aktif": False,
-                "uyari": f"!!!   {no} NOLU ASANSÖR — toplam sistem verimi η = {tr(eta)}   ·   "
-                         "verim sıfır ya da negatif olamaz.  İmalatçının verdiği "
-                         "toplam sistem verimini girin ( askı kaybı dâhil ).   !!!"}
+                "uyari": (f"!!!   {no} NOLU ASANSÖR — makine verimi η = {tr(eta)}, palangalı "
+                          f"sistemde MMO/697 §2.4 gereği {tr(T.PALANGA_VERIM_DUSUSU)} düşük "
+                          f"alınınca η′ = {tr(eta_p)}   ·   verim sıfır ya da negatif olamaz.  "
+                          "İmalatçının makine verimini girin.   !!!"
+                          if palanga_dususu else
+                          f"!!!   {no} NOLU ASANSÖR — makine verimi η = {tr(eta)}   ·   "
+                          "verim sıfır ya da negatif olamaz.  İmalatçının makine "
+                          "verimini girin.   !!!")}
     #  AĞIR ÇALIŞMA YÖNÜ.  Karşı ağırlık q·Q kadarını dengeler:
     #      dolu kabin YUKARI  →  dengesiz yük = ( 1 − q )·Q
     #      boş  kabin AŞAĞI   →  dengesiz yük =        q ·Q   ( karşı ağırlık ağır )
@@ -617,10 +649,19 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
              "GİRİŞ" if makine_tipi else "belirtilmedi"),
         veri("i", f"Askı ( palanga ) oranı   —   {T.aski_orani_metni(i_pal)}",
              i_pal, "—", i_kaynak, 0),
-        veri("η", "Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )", eta, "—",
+        veri("η", ("Toplam sistem verimi  ( askı / palanga kaybı DÂHİL )" if eta_toplam
+                   else "Makine verimi  ( askı / palanga kaybı HARİÇ )"), eta, "—",
              f"GİRİŞ  ( {makine_tipi} )" if makine_tipi else "GİRİŞ"),
-        hesap(("N   =   ( 1 − q ) · Q · V   /   ( 102 · η )" if (1 - q) >= q
-               else "N   =   q · Q · V   /   ( 102 · η )        ( boş kabin aşağı — ağır yön )"),
+    ]
+    _e = "η′" if palanga_dususu else "η"
+    if palanga_dususu:
+        b1["adimlar"].append(
+            hesap(f"η′   =   η − {tr(T.PALANGA_VERIM_DUSUSU)}",
+                  f"=   {tr(eta)} − {tr(T.PALANGA_VERIM_DUSUSU)}", eta_p, "—",
+                  "palangalı sistem  ·  MMO/697 §2.4"))
+    b1["adimlar"] += [
+        hesap((f"N   =   ( 1 − q ) · Q · V   /   ( 102 · {_e} )" if (1 - q) >= q
+               else f"N   =   q · Q · V   /   ( 102 · {_e} )        ( boş kabin aşağı — ağır yön )"),
               (f"=   ( 1 − {tr(q)} ) · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"
                if (1 - q) >= q else
                f"=   {tr(q)} · {trn(Q,0)} · {tr(V)}   /   ( 102 · {tr(eta_p)} )"),
@@ -635,7 +676,7 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
                    f"{tr(Q_BANT_ALT)} - {tr(Q_BANT_UST)} bandındadır. "
                    "Karşı ağırlık dengelemesi bu değerde ise gerekçesi paftaya yazılmalıdır")
     b1["aciklamalar"] = [T.VERIM_NOTU]
-    b1["notlar"] = [T.TOPLAM_VERIM_NOTU]
+    b1["notlar"] = [] if eta_toplam else [T.MAKINE_VERIM_NOTU]
     mmo_eta = T.makine_verimi(makine_tipi)
     if mmo_eta is not None and sayi_mi(eta) and abs(eta - mmo_eta) > 1e-9:
         b1["notlar"] = b1["notlar"] + [
@@ -652,7 +693,15 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     # =========================================================
     gn = S["gn"]
     Gf = S["gf"] * (Hk / 2 + S["flexbil_sabiti"])          # gezici kablo kütlesi
-    P_kut = Gk + Gf                                        # kabin tarafı toplam kütle
+    #  DENGE ZİNCİRİ P'YE GİRER  ( MMO/697 s.20 · TS EN 81-20 m.5.2.1.8.5 ).
+    #  Eskiden avanda zincir hiç yoktu:  zincirli yüksek binada tampon altı
+    #  kuvvetleri uygulama projesinden %17-23 DÜŞÜK çıkıyordu.  Kabin en üstteyken
+    #  altında asılı en uzun zincir kuyu yüksekliğiyle sınırlıdır ( emniyetli ).
+    mz, mz_kaynak = _ofis_degeri(a, S, "zincir_birim_kutle")
+    if mz_kaynak == "KABUL" and "zincir_birim_kutle" not in (S.get("_ozel") or ()):
+        mz_kaynak = "KABUL  ·  zincir = halat ağırlığı ( λ = %100 ) · 7 × Ø6,5 · 2:1"
+    Gz = mz * Hk if zincir_var else 0.0                    # denge zinciri kütlesi
+    P_kut = Gk + Gf + Gz                                   # kabin tarafı toplam kütle
     Ga = P_kut + q * Q                                     # karşı ağırlık kütlesi
     k1 = S["k1_hizli"] if V > 1 else (S["k1_orta"] if V > 0.63 else S["k1_yavas"])
     n_ray = S["n_ray"]
@@ -666,7 +715,13 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
     P1 = tavana_yuvarla(S["tampon_katsayi"] * gn * (P_kut + Q), 10)
     P2 = tavana_yuvarla(S["tampon_katsayi"] * gn * Ga, 10)
     PR = tavana_yuvarla(k1 * gn * (P_kut + Q) / n_ray + Mg * gn, 10)
-    PK = tavana_yuvarla(k1 * gn * Ga / n_ray + Mg * gn, 10)
+    #  KARŞI AĞIRLIK RAYI  —  MMO/697 s.20:  "kılavuz rayı üzerinde güvenlik
+    #  tertibatı etki etmemesinde k1 = 0";  kitabın iki çözümlü örneği ( s.55 ·
+    #  s.56 ) Pk'yı "karşı ağırlıkta güvenlik tertibatı olmadığından" hesaplamaz.
+    #  Eskiden tertibat HER ZAMAN varmış gibi k1 kullanılıyordu ( 10 kata varan
+    #  fazla kuvvet ).  Tertibat yoksa rayın kendi ağırlığı kalır.
+    k1_ag = k1 if ag_tertibat_var else 0
+    PK = tavana_yuvarla(k1_ag * gn * Ga / n_ray + Mg * gn, 10)
     Fs = tavana_yuvarla(gn * (Fmk + Fsh + S["Fmt"] + P_kut + Q + Ga), 10)
 
     b2 = Bolum("2 -  KUVVET HESAPLARI", "MMO / 697  s.18-20   /   TS EN 81-20",
@@ -679,8 +734,17 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         veri("gf", "Gezici kablo ( flexbil ) birim kütlesi", S["gf"], "kg/m", "KABUL"),
         hesap("Gf   =   gf · ( Hk / 2  +  3 )",
               f"=   {tr(S['gf'])}  ·  ( {tr(Hk)} / 2  +  3 )", Gf, "kg", "gezici kablo kütlesi"),
-        hesap("P    =   Gk  +  Gf",
-              f"=   {trn(Gk,0)}  +  {tr(Gf)}", P_kut, "kg", "kabin tarafı toplam kütle"),
+        veri("", "Denge zinciri", "Var" if zincir_var else "Yok", "", "GİRİŞ"),
+        *([veri("mz", "Denge zinciri birim kütlesi", mz, "kg/m", mz_kaynak),
+           hesap("Gz   =   mz · Hk",
+                 f"=   {tr(mz)}  ·  {tr(Hk)}", Gz, "kg",
+                 "zincir kütlesi  ·  MMO/697 s.20 · EN 81-20 m.5.2.1.8.5"),
+           hesap("P    =   Gk  +  Gf  +  Gz",
+                 f"=   {trn(Gk,0)}  +  {tr(Gf)}  +  {tr(Gz)}", P_kut, "kg",
+                 "kabin tarafı toplam kütle")]
+          if zincir_var else
+          [hesap("P    =   Gk  +  Gf",
+                 f"=   {trn(Gk,0)}  +  {tr(Gf)}", P_kut, "kg", "kabin tarafı toplam kütle")]),
         veri("Q", "Anma yükü", Q, "kg", "GİRİŞ", 0),
         veri("q", "Denge faktörü", q, "—", q_kaynak),
         hesap("Ga  =   P  +  q · Q",
@@ -706,9 +770,15 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
               f"   +   {tr(Mg)} · {tr(gn)}", PR, "N", _ON_N, 0),
 
         metin("D -  KARŞI AĞIRLIK KILAVUZ RAYLARINA GELEN DÜŞEY KUVVET"),
-        hesap("PK  =   k1 · gn · Ga / n   +   Mg · gn",
-              f"=   {trn(k1,0)} · {tr(gn)} · {tr(Ga)} / {trn(n_ray,0)}   +   {tr(Mg)} · {tr(gn)}",
-              PK, "N", _ON_N, 0),
+        veri("", "Karşı ağırlıkta güvenlik tertibatı", "Var" if ag_tertibat_var else "Yok",
+             "", "GİRİŞ"),
+        (hesap("PK  =   k1 · gn · Ga / n   +   Mg · gn",
+               f"=   {trn(k1,0)} · {tr(gn)} · {tr(Ga)} / {trn(n_ray,0)}   +   {tr(Mg)} · {tr(gn)}",
+               PK, "N", _ON_N, 0)
+         if ag_tertibat_var else
+         hesap("PK  =   Mg · gn        ( k1 = 0 )",
+               f"=   {tr(Mg)} · {tr(gn)}", PK, "N",
+               "güvenlik tertibatı etki etmiyor  ·  MMO/697 s.20  ·  " + _ON_N, 0)),
 
         metin("E -  KUYU ÜSTÜ BETONUNA ETKİ EDEN KUVVET"),
         hesap("Fs  =   gn · ( Fmk  +  Fsh  +  Fmt  +  P  +  Q  +  Ga )",
@@ -1104,14 +1174,16 @@ def hesapla_asansor(a: dict, ortak: dict, S: dict, no: int = 1) -> dict:
         "bolumler": bolumler,
         "ozet": {
             "tanim": tanim, "kapasite": P_kap, "Q": Q, "Q0": Q0, "V": V, "eta": eta,
-            #  eta_p, Δη kalktıktan sonra η ile AYNIDIR;  anahtar yalnız
-            #  geriye dönük uyum için durur.
+            #  eta_p = motor gücünde kullanılan verim:  palangalı sistemde
+            #  η − 0,10 ( MMO/697 §2.4 ),  öteki durumlarda η.
             "eta_p": eta_p, "Gk": Gk, "Gk0": Gk0, "Gf": Gf, "P": P_kut, "Ga": Ga,
             "i_palanga": i_pal, "q_denge": q,
             "i_kaynak": i_kaynak, "q_kaynak": q_kaynak,
             "makine_tipi": makine_tipi,
             "aski": T.aski_orani_metni(i_pal),
             "k1": k1, "Lr": Lr, "Mg": Mg,
+            "denge_zinciri": zincir_var, "mz": mz if zincir_var else None, "Gz": Gz,
+            "agirlik_guvenlik_tertibati": ag_tertibat_var,
             "N_hes": N_hes, "Nsc": Nsc, "motor_uygun": motor_uygun,
             "P1": P1, "P2": P2, "PR": PR, "PK": PK, "Fs": Fs,
             "n_kabin": n_kabin, "n_kuyu": n_kuyu, "k_kabin": k_kabin, "k_kuyu": k_kuyu,

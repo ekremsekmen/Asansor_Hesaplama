@@ -242,8 +242,8 @@ def avan_senaryolar():
         A(tanim="dişli 2:1",    makine_tipi="Dişli",    eta=0.50, i_palanga=2),
         A(tanim="dişlisiz 1:1", makine_tipi="Dişlisiz", eta=0.85, i_palanga=1),
         A(tanim="dişlisiz 2:1", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2)]}))
-    # b-4) TOPLAM SİSTEM VERİMİ — askı oranı η'yı değiştirmemeli ( Δη yok )
-    s.append(("toplam sistem verimi", {"ortak": ORT, "asansorler": [
+    # b-4) KATALOG VERİMİ — palangalı sistemde η′ = η − 0,10 ( MMO/697 §2.4 )
+    s.append(("katalog makine verimi", {"ortak": ORT, "asansorler": [
         A(tanim="dişli 1:1", makine_tipi="Dişli", eta=0.60, i_palanga=1),
         A(tanim="dişlisiz 2:1", makine_tipi="Dişlisiz", eta=0.82, i_palanga=2),
         A(tanim="dişlisiz 2:1 ofis", makine_tipi="Dişlisiz", eta=0.85, i_palanga=2),

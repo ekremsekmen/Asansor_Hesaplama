@@ -420,6 +420,59 @@ def calistir():
     r.kontrol("şartlı sınırı olmayan tipte adet_sartli boş",
               all(x.get("adet_sartli") is None for x in (_hs.get("oneriler") or [])))
 
+    #  TAAHHÜTNAME SEÇİMİ  —  öneri tablosunun "şartlı kabulle 1 adet"
+    #  dediği adet artık SEÇİLEBİLİYOR.  Kullanıcının projesi:  Konut, 6 kat,
+    #  h = 3,06,  12 daire × 3+1,  10 kişilik 800 mm kapı, Tablo-2 hızı 1 m/s.
+    #  Yok  →  2 adet ( Standart 100 sn );  Var  →  1 adet ( şartlı 120 sn ).
+    _kp = dict(bina_tipi="Konut", bina_yuksekligi=21.33, yapi_yuksekligi=24.33, N=6,
+               h=3.06, hizli1=12, hizli2=3, P=10, kapi_genisligi=800,
+               kapi_tipi="Merkezden Açılan Oto.")
+    _ty = TR.hesapla_tek(dict(_kp))
+    _tv = TR.hesapla_tek(dict(_kp, taahhutname="Var"))
+    _ov = _tv["ozet"]
+    r.esit("taahhütname Yok → Standart adedi", _ty["ozet"]["adet"], _ty["ozet"]["adet_hesap"])
+    _yk = TR.hesapla_tek(dict(_kp, taahhutname="Yok"))
+    r.esit("taahhütname 'Yok' yazmak boş bırakmakla aynı",
+           {k: x for k, x in _yk.items() if k != "girdiler"},
+           {k: x for k, x in _ty.items() if k != "girdiler"})
+    r.kontrol("taahhütname Var → daha az asansör", _ov["adet"] < _ov["adet_hesap"])
+    r.esit("taahhütname Var → şartlı sınırda gereken adet",
+           _ov["adet"], max(1, int(-(-_ov["TR"] // _ov["esik_sartli"]))))
+    r.kontrol("taahhütname Var → sonuç Şartlı Kabul", _ov["sonuc"].startswith("Şartlı Kabul"))
+    r.kontrol("taahhütname Var → Ieer şartlı sınır içinde", _ov["Ieer"] <= _ov["esik_sartli"])
+    r.kontrol("taahhütname Var → Standart için gereken adet yine yazılıyor",
+              f"{_ov['adet_hesap']} adet gerekir" in _ov["sonuc_cumlesi"])
+    r.kontrol("taahhütname Var → karar kutusunda bekleme uygun",
+              all(x["uygun"] for x in _ov["karar_olcutleri"]))
+    r.kontrol("taahhütname Var → avan köprüsü şartlı adedi taşıyor",
+              TR.trafik_ozeti(_tv)["adet"] == _ov["adet"])
+    r.kontrol("taahhütname Var → taşıma kapasitesi yine sağlanıyor",
+              _ov["adet"] * _ov["R"] >= _ov["B"] * _ov["k"])
+    r.kontrol("taahhütname Yok → çıktıda taahhütname işareti yok",
+              "taahhutname" not in _ty["ozet"])
+    #  Gereksiz taahhütname:  Standart sınır aynı adetle zaten sağlanıyorsa
+    #  adet değişmez, sonuç Standart kalır, bilgi notu düşülür.
+    _tg = TR.hesapla_tek(dict(_kp, N=2, taahhutname="Var"))
+    r.kontrol("gereksiz taahhütname → Standart sonuç",
+              _tg["ozet"]["sonuc"].startswith("Standart"))
+    r.kontrol("gereksiz taahhütname → bilgi notu",
+              any("gerekmiyor" in u for u in _tg["uyarilar"]))
+    #  Şartlı sınırı olmayan bina tipinde Var seçimi kullanılamaz → hesap durur
+    #  ( Tablo-2'de Hastane yok → hız elle verilir, yoksa hesap tg'de durur )
+    _th = TR.hesapla_tek(g(bina_tipi="Hastane", hizli1=60, hizli2=None, manuel_k=None,
+                           manuel_V=1.6, taahhutname="Var"))
+    r.kontrol("Hastane senaryosu taahhütname olmadan geçerli",
+              TR.hesapla_tek(g(bina_tipi="Hastane", hizli1=60, hizli2=None, manuel_k=None,
+                               manuel_V=1.6)).get("hata") is None)
+    r.kontrol("şartlı sınırı olmayan tipte taahhütname → HESAP HATASI",
+              "şartlı kabul sınırı yoktur" in (_th.get("hata") or ""))
+    r.kontrol("okunamayan taahhütname → HESAP HATASI",
+              "okunamadı" in (TR.hesapla_tek(dict(_kp, taahhutname="belki")).get("hata") or ""))
+    #  Adedi kullanıcı belirliyorsa ( 2+ kolon ) taahhütname adede dokunmaz
+    _t2 = TR.hesapla(dict(_kp, taahhutname="Var", asansorler=[
+        {"P": 10, "kapi_genisligi": 800, "kapi_tipi": "Merkezden Açılan Oto."}] * 2))
+    r.esit("2 kolonda taahhütname adede dokunmaz", _t2["ozet"]["adet"], 2)
+
     # ---------------------------------------------------- çoklu asansör
     c = dict(bina_tipi="Konut", bina_yuksekligi=39.98, yapi_yuksekligi=43, N=11,
              hizli1=44, hizli2=3, h=3,
@@ -571,18 +624,18 @@ def calistir():
                                        kuyu_genisligi=1800, kabin_boyu=1400,
                                        kabin_genisligi=1100, makine_tipi="Dişlisiz"),
                                   {"mk_yok": True}, AV.sabitler(None), 1)["ozet"]
-    #  η = 0,85 girildiği gibi kullanılır ( Δη kaldırıldı, bkz. ortak/ofis.py )
+    #  2:1 askı:  η′ = 0,85 − 0,10 = 0,75  ( MMO/697 §2.4 )
     r.esit("q=0,50'de kitapla aynı ( Q/2 )", round(_mot(0.50)["N_hes"], 6),
-           round(0.5 * 800 * 1 / (102 * 0.85), 6))
+           round(0.5 * 800 * 1 / (102 * 0.75), 6))
     for _q in (0.55, 0.60, 0.65):
         _o = _mot(_q)
         r.kontrol(f"q={_q}: ağır yön hesaplanıyor",
-                  abs(_o["N_hes"] - _q * 800 / (102 * 0.85)) < 1e-9,
+                  abs(_o["N_hes"] - _q * 800 / (102 * 0.75)) < 1e-9,
                   f"→ N={_o['N_hes']}")
     for _q in (0.40, 0.45, 0.50):
         _o = _mot(_q)
         r.kontrol(f"q={_q}: hafif yön değişmedi",
-                  abs(_o["N_hes"] - (1 - _q) * 800 / (102 * 0.85)) < 1e-9)
+                  abs(_o["N_hes"] - (1 - _q) * 800 / (102 * 0.75)) < 1e-9)
 
     #  v2.8 — KABİN ALANI  ( MMO/697 Tablo-11 = TS EN 81-20, YOLCU asansörü ).
     #  DİKKAT:  kitapta Tablo-11'in hemen ardından Tablo-12 ( hidrolik YÜK
@@ -701,11 +754,11 @@ def calistir():
     for V, k1 in ((0.5, 5), (0.63, 5), (0.7, 3), (1.0, 3), (1.01, 2), (2.5, 2)):
         r.esit(f"k1 (V={V})", AV.hesapla({"ortak": ORT, "asansorler": [dict(AS, V=V)]}
                                          )["asansorler"][0]["ozet"]["k1"], k1)
-    r.esit("palanga i=1 → η değişmez",
+    r.esit("palanga i=1 → η aynen  ( 1:1 askıda düşüş yok )",
            AV.hesapla({"ortak": ORT, "asansorler": [AS], "sabitler": {"i_palanga": 1}}
                       )["asansorler"][0]["ozet"]["eta_p"], 0.85)
-    r.esit("palanga i=2 → η YİNE değişmez  ( Δη kaldırıldı )",
-           AV.hesapla({"ortak": ORT, "asansorler": [AS]})["asansorler"][0]["ozet"]["eta_p"], 0.85)
+    r.esit("palanga i=2 → η′ = η − 0,10  ( MMO/697 §2.4 )",
+           AV.hesapla({"ortak": ORT, "asansorler": [AS]})["asansorler"][0]["ozet"]["eta_p"], 0.75)
     r.kontrol("Dmax=0 → geometrik kontrol kapalı",
               AV.hesapla({"ortak": ORT, "asansorler": [AS], "sabitler": {"kuyu_Dmax": 0}}
                          )["asansorler"][0]["ozet"]["n2_kuyu"] == 0)
@@ -775,26 +828,38 @@ def calistir():
               _kesit(1)["ozet"]["Iz"] is None
               and "KONTROL EDİLEMEDİ" in _kesit(1)["bolumler"][5]["sonuc"]["alt"][1])
 
-    #  η FİZİKSEL OLMALI.  Δη = 0,10 KALDIRILDIĞI için ( bkz. ortak/ofis.py )
-    #  askı oranı η'yı artık düşüremez:  eski "η = 0,08 + 2:1 → η′ = −0,02"
-    #  senaryosu yapısal olarak imkânsızdır.  Geriye η'nın KENDİ aralığı kalır
-    #  ( 0,05 - 1,00 );  dışı hesabı durdurmalı, sessizce kullanılmamalı.
-    def _verim(eta, **kw):
+    #  η FİZİKSEL OLMALI.  η'nın KENDİ aralığı ( 0,05 - 1,00 ) dışı hesabı
+    #  durdurur.  Palangalı sistemde kitabın düşüşünden ( η′ = η − 0,10,
+    #  MMO/697 §2.4 ) sonra da verim sıfırın üstünde kalmalıdır:  η = 0,08 ·
+    #  2:1 → η′ = −0,02 paftaya negatif verim basar, N eksi çıkar.  Aralık
+    #  içindeki bu değer de hesabı durdurur, sessizce kullanılmaz.
+    def _verim(eta, i=2, **kw):
         return AV.hesapla({"ortak": ORT,
-                           "asansorler": [dict(AS, eta=eta, i_palanga=2, **kw)]}
+                           "asansorler": [dict(AS, eta=eta, i_palanga=i, **kw)]}
                           )["asansorler"][0]
 
     for _eta in (0.04, 0, -0.10, 1.5):
         _h = _verim(_eta)
         r.kontrol(f"η = {_eta} → hesap duruyor", _h["aktif"] is False,
                   f"→ {_h.get('uyari')}")
-    for _eta in (0.05, 0.08, 0.10, 0.20, 1.0):
+    for _eta in (0.05, 0.08, 0.10):
         _h = _verim(_eta)
-        r.kontrol(f"η = {_eta} + 2:1 askı → artık hesaplanıyor  ( Δη yok )",
-                  _h["aktif"] is True, f"→ {_h.get('uyari')}")
-    r.esit("2:1 askıda η aynen kullanılıyor", _verim(0.08)["ozet"]["eta_p"], 0.08)
+        r.kontrol(f"η = {_eta} + 2:1 askı → η′ ≤ 0, hesap duruyor",
+                  _h["aktif"] is False and "MMO/697 §2.4" in (_h.get("uyari") or ""),
+                  f"→ {_h.get('uyari')}")
+        _h1 = _verim(_eta, i=1)
+        r.kontrol(f"η = {_eta} + 1:1 askı → hesaplanıyor ( düşüş yok )",
+                  _h1["aktif"] is True and _h1["ozet"]["eta_p"] == _eta,
+                  f"→ {_h1.get('uyari')}")
+    for _eta, _bek in ((0.20, 0.10), (0.85, 0.75), (1.0, 0.90)):
+        _h = _verim(_eta)
+        r.kontrol(f"η = {_eta} + 2:1 askı → η′ = {_bek}",
+                  _h["aktif"] is True and _h["ozet"]["eta_p"] == _bek,
+                  f"→ {_h.get('uyari') or _h['ozet']['eta_p']}")
     r.kontrol("Nsç elle girilmişken de aralık dışı η durduruyor",
               _verim(0.04, Nsc=11)["aktif"] is False)
+    r.kontrol("Nsç elle girilmişken de η′ ≤ 0 durduruyor",
+              _verim(0.08, Nsc=11)["aktif"] is False)
 
     # topraklama
     t = AV.hesapla({"ortak": ORT, "asansorler": [AS]})["topraklama"]
@@ -901,17 +966,18 @@ def calistir():
     v0 = av(dict(TEMEL_AS))
     v1 = av(dict(TEMEL_AS, i_palanga=1))
     o0, o1 = v0["asansorler"][0]["ozet"], v1["asansorler"][0]["ozet"]
-    r.esit("palanga 2 → η değişmez", o0["eta_p"], 0.85)
-    r.esit("palanga 1 → η değişmez", o1["eta_p"], 0.85)
-    r.esit("askı oranı motor gücünü DEĞİŞTİRMİYOR", o1["N_hes"], o0["N_hes"])
+    r.esit("palanga 2 → η′ = η − 0,10  ( MMO/697 §2.4 )", o0["eta_p"], 0.75)
+    r.esit("palanga 1 → η aynen", o1["eta_p"], 0.85)
+    r.esit("askı oranı motor gücüne yalnız verimden giriyor",
+           o0["N_hes"], o1["N_hes"] * 0.85 / 0.75, tol=1e-9)
     v2 = av(dict(TEMEL_AS, q_denge=0.45))
     o2 = v2["asansorler"][0]["ozet"]
     r.esit("asansör bazında q kullanılır", o2["Ga"], o2["P"] + 0.45 * o2["Q"])
     r.esit("varsayılan q kullanılır", o0["Ga"], o0["P"] + 0.50 * o0["Q"])
     v3 = av(dict(TEMEL_AS), dict(TEMEL_AS, eta=0.50, i_palanga=1, q_denge=0.40))
     x, y = v3["asansorler"][0]["ozet"], v3["asansorler"][1]["ozet"]
-    r.esit("karışık projede A1 η", x["eta_p"], 0.85)
-    r.esit("karışık projede A2 η", y["eta_p"], 0.50)
+    r.esit("karışık projede A1 η′  ( 2:1 )", x["eta_p"], 0.75)
+    r.esit("karışık projede A2 η  ( 1:1 )", y["eta_p"], 0.50)
     r.esit("karışık projede A2 Ga", y["Ga"], y["P"] + 0.40 * y["Q"])
     #  Geçersiz askı oranı ve q varsayılanla DEĞİŞTİRİLMEZ, asansör durur;
     #  yan yana duran geçerli asansör hesaplanmaya devam eder.
@@ -981,34 +1047,65 @@ def calistir():
     def eta_p(**kw):
         return av(dict(TEMEL_AS, **kw))["asansorler"][0]["ozet"]["eta_p"]
 
-    #  η TOPLAM SİSTEM VERİMİDİR:  askı oranı onu değiştirmez.
-    for tip, i, bek in (("Dişli", 1, 0.50), ("Dişli", 2, 0.50),
-                        ("Dişlisiz", 1, 0.85), ("Dişlisiz", 2, 0.85)):
-        r.esit(f"{tip} {T.aski_orani_metni(i)} → η",
+    #  η MAKİNE VERİMİDİR ( kitabın η'sı ):  palangalı sistemde 0,10 düşer.
+    for tip, i, bek in (("Dişli", 1, 0.50), ("Dişli", 2, 0.40),
+                        ("Dişlisiz", 1, 0.85), ("Dişlisiz", 2, 0.75)):
+        r.esit(f"{tip} {T.aski_orani_metni(i)} → η′",
                eta_p(makine_tipi=tip, eta=T.makine_verimi(tip), i_palanga=i), bek)
-    #  Motor GÜCÜ askı oranından TAMAMEN bağımsızdır
+    #  Askı oranı motor gücüne YALNIZ verim üzerinden girer
     n11 = av(dict(TEMEL_AS, makine_tipi="Dişlisiz", eta=0.85,
                   i_palanga=1))["asansorler"][0]["ozet"]["N_hes"]
     n21 = av(dict(TEMEL_AS, makine_tipi="Dişlisiz", eta=0.85,
                   i_palanga=2))["asansorler"][0]["ozet"]["N_hes"]
-    r.esit("askı oranı motor gücünü değiştirmiyor", n21, n11, tol=1e-12)
+    r.esit("askı oranı motor gücüne yalnız verimden giriyor", n21, n11 * 0.85 / 0.75,
+           tol=1e-12)
 
-    #  Girilen η ne ise o kullanılır — ikinci bir düzeltme yok
-    r.esit("η = 0,82 · 2:1 → aynen 0,82",
-           eta_p(makine_tipi="Dişlisiz", eta=0.82, i_palanga=2), 0.82)
+    #  KİTABIN ÇÖZÜMLÜ ÖRNEĞİ BİREBİR  ( MMO/697 §4.4, s.56 ):
+    #    1125 kg · 1,6 m/s · 2:1 · η 0,5 → η = 0,5 − 0,1 = 0,4 → N1 = 22 kW
+    #     450 kg · 1,6 m/s · 1:1 · η 0,5                       → N2 = 7,05 kW
+    _k1 = av(dict(TEMEL_AS, Q_elle=1125, V=1.6, eta=0.5, i_palanga=2,
+                  makine_tipi="Dişli"))["asansorler"][0]["ozet"]
+    _k2 = av(dict(TEMEL_AS, Q_elle=450, V=1.6, eta=0.5, i_palanga=1,
+                  makine_tipi="Dişli"))["asansorler"][0]["ozet"]
+    r.esit("kitap örneği N1:  η = 0,5 − 0,1 = 0,4", _k1["eta_p"], 0.4)
+    r.esit("kitap örneği N1 = (1/0,4)·(1125·1,6)/(2·102)", _k1["N_hes"],
+           (1 / 0.4) * (1125 * 1.6) / (2 * 102))
+    r.kontrol("kitap örneği N1 ≈ 22 kW", abs(_k1["N_hes"] - 22) < 0.1, f"→ {_k1['N_hes']}")
+    r.esit("kitap örneği N2 = (1/0,5)·(450·1,6)/(2·102)  ( 7,05 kW )", _k2["N_hes"],
+           (1 / 0.5) * (450 * 1.6) / (2 * 102))
+
+    #  Girilen η kitabın η'sıdır:  palangalı sistemde yalnız 0,10 düşer
+    r.esit("η = 0,82 · 2:1 → η′ = 0,72",
+           eta_p(makine_tipi="Dişlisiz", eta=0.82, i_palanga=2), 0.72)
     r.esit("η = 0,60 · 1:1 → aynen 0,60",
            eta_p(makine_tipi="Dişli", eta=0.60, i_palanga=1), 0.60)
-    r.kontrol("kaldırılan 'toplam_verim' anahtarı hesabı ETKİLEMİYOR",
-              eta_p(makine_tipi="Dişlisiz", eta=0.82, i_palanga=2,
-                    toplam_verim="Hayır") == 0.82,
-              "→ eski projelerden gelen anahtar hâlâ okunuyor")
-    #  Uyarılar
+    for _eski in ("Hayır", "Evet"):
+        r.kontrol(f"kaldırılan 'toplam_verim' anahtarı ( {_eski} ) hesabı ETKİLEMİYOR",
+                  eta_p(makine_tipi="Dişlisiz", eta=0.82, i_palanga=2,
+                        toplam_verim=_eski) == 0.72,
+                  "→ eski projelerden gelen anahtar hâlâ okunuyor")
+    #  Düşüşü YALNIZ uygulama köprüsünün bayrağı kapatır ( η orada toplamdır )
+    r.esit("köprü bayrağı ( η toplam ) → düşüş yok",
+           eta_p(makine_tipi="Dişlisiz", eta=0.82, i_palanga=2,
+                 **{T.ETA_TOPLAM_ANAHTARI: True}), 0.82)
+    #  Pafta satırları ve notlar
     v_t = av(dict(TEMEL_AS, makine_tipi="Dişlisiz", eta=0.82,
                   i_palanga=2))["asansorler"][0]["bolumler"][0]
-    r.kontrol("toplam sistem verimi notu paftada",
-              any("TOPLAM SİSTEM VERİMİ" in n for n in v_t["notlar"]))
+    v_1 = av(dict(TEMEL_AS, makine_tipi="Dişlisiz", eta=0.82,
+                  i_palanga=1))["asansorler"][0]["bolumler"][0]
+
+    def _eta_satiri(b):
+        return [a for a in b["adimlar"] if str(a.get("formul") or "").startswith("η′")]
+    r.kontrol("2:1 → paftada η′ = η − 0,10 satırı, kaynağı MMO/697 §2.4",
+              len(_eta_satiri(v_t)) == 1 and "MMO/697 §2.4" in _eta_satiri(v_t)[0]["kaynak"])
+    r.kontrol("1:1 → η′ satırı yok", not _eta_satiri(v_1))
+    r.kontrol("makine verimi notu paftada",
+              any("η makine verimidir" in n for n in v_t["notlar"]))
+    r.kontrol("paftada kitaptan sapma notu KALMADI",
+              not any("uygulanmaz" in n for n in v_t["notlar"] + v_t["aciklamalar"]),
+              f"→ {v_t['notlar']}")
     r.kontrol("askı oranı açıklaması ( ! ) balonunda",
-              any("GÜÇ bağıntısıdır" in n for n in v_t["aciklamalar"]))
+              any("MMO/697 §2.4" in n for n in v_t["aciklamalar"]))
     v_s = av(dict(TEMEL_AS, makine_tipi="Dişli", eta=0.70,
                   i_palanga=1))["asansorler"][0]["bolumler"][0]
     r.kontrol("MMO değerinden sapma bildiriliyor",
@@ -1212,8 +1309,8 @@ def calistir():
                beklenen)
     _oz_of = AV.hesapla({"ortak": dict(O_ORT), "asansorler": [dict(O_AS)],
                          "sabitler": {}})["asansorler"][0]["ozet"]
-    #  Δη kalkınca N düştü:  11 → 7,5 kW kademesi
-    for anahtar, beklenen in (("L1", 42.0), ("Nsc", 7.5)):
+    #  2:1 · η 0,85 → η′ 0,75 ( MMO/697 §2.4 ) → N = 8,37 kW → 11 kW kademesi
+    for anahtar, beklenen in (("L1", 42.0), ("Nsc", 11.0)):
         r.esit(f"kullanılan değer {anahtar}", _oz_of[anahtar], beklenen)
     #  κ ofis varsayılanı TS HD 60364-5-52 EK-G'ye çekildi ( ρ1 = 1,25·ρ20
     #  → 0,0225 Ω·mm²/m ).  Sayıyı BURAYA ikinci kez yazmak yerine tek
@@ -1459,15 +1556,16 @@ def calistir():
     r.kontrol("ηm atlanmış eski akımdan BÜYÜK",
               _s["I_motor"] > _s["Nsc"] * 1000 / (_m.sqrt(3) * 380 * 0.90),
               f"→ {_s['I_motor']}")
-    r.esit("ofis örneğinde sigorta", _s["motor_sigorta"], "4 x 20")
+    #  Örneğin motoru 11 kW ( 2:1 · η′ 0,75 ):  In = 21,85 A · 1,25 = 27,3 A → 32 A
+    r.esit("ofis örneğinde sigorta", _s["motor_sigorta"], "4 x 32")
     _cet = [b for b in _av()["asansorler"][0]["bolumler"] if b.get("cetvel")][0]["cetvel"]
-    r.esit("cetveldeki sigorta hesaplanan değer", _cet[0]["sigorta"], "4 x 20")
+    r.esit("cetveldeki sigorta hesaplanan değer", _cet[0]["sigorta"], "4 x 32")
     r.kontrol("sigorta artık sabit değil — güç büyüyünce değişiyor",
               _av({"Nsc": 110})["asansorler"][0]["ozet"]["motor_sigorta"] == "4 x 315")
     #  Katsayı ofis standardındadır
     r.esit("katsayı büyüyünce sigorta da büyüyor",
            _av(sab={"sigorta_katsayisi": 2.5})["asansorler"][0]["ozet"]["motor_sigorta"],
-           "4 x 40")
+           "4 x 63")
     #  ηm ofis sabitidir — değiştirilince akım da değişir
     r.kontrol("ηm ofis sabitinden geliyor",
               _av(sab={"motor_elektrik_verimi": 1.0})["asansorler"][0]["ozet"]["I_motor"]
@@ -1771,6 +1869,81 @@ def calistir():
                   T.ana_potansiyel_dengeleme_kesiti(bozuk)[0] is None)
         r.kontrol(f"Stopr({bozuk!r}) hesaplanmıyor",
                   T.topraklama_iletkeni_kesiti(bozuk)[0] is None)
+
+    # ==================================================================
+    #  KARŞI AĞIRLIK RAYI ( PK ) ve DENGE ZİNCİRİ  —  MMO/697'ye göre
+    # ==================================================================
+    #  Kitap ( s.20 ):  "kılavuz rayı üzerinde güvenlik tertibatı etki
+    #  etmemesinde k1 = 0";  iki çözümlü örnek ( s.55 · s.56 ) Pk'yı "karşı
+    #  ağırlıkta güvenlik tertibatı olmadığından" hesaplamaz.  Avan PK'yı her
+    #  zaman k1 ile hesaplıyordu.  Kitabın P tanımı ( s.20 ) "dengeleme
+    #  halatları/zincirleri ( varsa )" katar;  avanda zincir hiç yoktu ve
+    #  zincirli yüksek binada tampon kuvvetleri uygulamadan %17-23 düşüktü.
+    _kap = next(k for k, v in T.TABLO_7.items() if v == 1600)
+    _O = {"temel_a": 25, "temel_b": 15, "mk_yok": True}
+    _A = {"tanim": "A", "kapasite": _kap, "V": 2.5, "eta": 0.85, "Hk": 85,
+          "kuyu_genisligi": 2600, "kabin_boyu": 1600, "kabin_genisligi": 2100,
+          "i_palanga": 2, "makine_tipi": "Dişlisiz"}
+
+    def _oz(**ek):
+        return AV.hesapla({"ortak": _O, "asansorler": [dict(_A, **ek)]})["asansorler"][0]["ozet"]
+
+    _y, _v = _oz(), _oz(agirlik_guvenlik_tertibati="Var")
+    _gn = AV.SABIT_A["gn"]
+    r.esit("PK · tertibat YOK ( varsayılan ):  yalnız rayın ağırlığı ( k1 = 0 )",
+           _y["PK"], tavana_yuvarla(_y["Mg"] * _gn, 10))
+    r.esit("PK · tertibat VAR:  k1 · gn · Ga / n + Mg · gn",
+           _v["PK"], tavana_yuvarla(_v["k1"] * _gn * _v["Ga"] / AV.SABIT_B_VARSAYILAN["n_ray"]
+                                    + _v["Mg"] * _gn, 10))
+    r.kontrol("PK · tertibat başka hiçbir kuvveti değiştirmiyor",
+              all(_y[k] == _v[k] for k in ("P", "P1", "P2", "PR", "Fs")))
+
+    _z = _oz(denge_zinciri="Var")
+    _mz = AV.OFIS_VARSAYILAN["zincir_birim_kutle"]
+    r.esit("zincir Var:  P = Gk + Gf + mz · Hk  ( ofis mz )",
+           _z["P"], _y["P"] + _mz * _A["Hk"])
+    r.kontrol("zincir Var:  tampon ve ray kuvvetleri büyüyor",
+              all(_z[k] > _y[k] for k in ("P1", "P2", "PR", "Fs")))
+    r.esit("zincir Var:  asansör bazında girilen mz kullanılıyor",
+           _oz(denge_zinciri="Var", zincir_birim_kutle=6.1)["P"], _y["P"] + 6.1 * _A["Hk"])
+    r.kontrol("zincir YOK iken girilmiş mz hesaba girmiyor",
+              _oz(zincir_birim_kutle=6.1)["P"] == _y["P"])
+    r.kontrol("aralık dışı mz asansörü durduruyor",
+              AV.hesapla({"ortak": _O, "asansorler": [dict(_A, denge_zinciri="Var",
+                                                          zincir_birim_kutle=-3)]})
+              ["asansorler"][0]["aktif"] is False)
+    #  OFİS KABULÜ TEK KAYNAKTAN:  zincir = halat ağırlığı ( λ = %100 ) ve
+    #  ofisin varsayılan halat düzeni — uygulama projesiyle AYNI sayı.
+    from engine.uygulama import mukavemet_girdi as _MG, mukavemet_tablolari as _MT
+    from engine.uygulama import sabitler as _US
+    _vg = _MG.varsayilanlar()
+    #  İki haneye yuvarlanır ( üç ondalık belirsiz sayı kuralına takılır ).
+    r.kontrol("ofis mz = uygulamanın varsayılan halat düzeni × λ  ( 2 haneye )",
+              abs(_mz - round(_vg["aski_orani"] * _vg["halat_adedi"]
+                              * _MT.halat_agirlik(_vg["halat_capi"])
+                              * _US.VARSAYILAN["denge_zinciri_orani"] / 100, 2)) < 1e-9,
+              f"→ avan {_mz} · uygulama {_vg['halat_adedi']} × {_vg['halat_capi']} mm × "
+              f"{_vg['aski_orani']}:1")
+    #  İKİ PROJE AYNI ASANSÖR İÇİN YAKIN SONUÇ VERMELİ:  zincirli yüksek bina,
+    #  aynı halatların zinciriyle.  Avan kuyu yüksekliğini ( ≥ seyir ) aldığı
+    #  için biraz FAZLA bulur — emniyetli yön;  eksik bulmamalı.
+    from engine.uygulama import hesap as _UH, girdi as _UG
+    _gu = dict(_UG.varsayilanlar(), sarilma_acisi=180, kasnak_belgesi="Var",
+               beyan_yuku=1600, beyan_hizi=2.5, seyir_mesafesi=80, aski_orani=2,
+               kabin_genisligi=2100, kabin_derinligi=1600, halat_capi=10, halat_adedi=9,
+               tahrik_kasnak_capi=400, saptirma_kasnak_capi=400, denge_zinciri="Var",
+               tampon_tipi="Hidrolik  ( enerji yutmalı )", son_kat_yuksekligi=5000,
+               kuyu_dibi=2500, kabin_ray_profili="125 x 82 x 16",
+               agirlik_ray_profili="89 x 62 x 15,88")
+    _ua = _UH.hesapla_coklu([_gu], {"temel_a": 25, "temel_b": 15, "mk_yok": True})["asansorler"][0]
+    _kz = _UG.kopru(_ua["girdi"])
+    _kz["asansorler"][0].update(denge_zinciri="Var", zincir_birim_kutle=2 * 9 * _MT.halat_agirlik(10))
+    _ao = AV.hesapla(_kz)["asansorler"][0]["ozet"]
+    for _ad, _av, _uy in (("kabin tamponu", _ao["P1"], _ua["ozet"]["Fkt"]),
+                          ("karşı ağırlık tamponu", _ao["P2"], _ua["ozet"]["Fat"])):
+        r.kontrol(f"zincirli yüksek bina · {_ad}:  avan uygulamadan eksik değil, en çok %5 fazla",
+                  0 <= (_av - _uy) / _uy <= 0.05,
+                  f"→ avan {_av:.0f} · uygulama {_uy:.0f}")
 
     return r
 

@@ -553,9 +553,12 @@ def _sapmalar(r):
               "→ tablo ikiye ayrılmış;  yeniden ayrışabilir")
     r.esit("⑨ ofis verim tablosu", dict(_OF.MAKINE_VERIMLERI),
            {"Dişlisiz": 0.85, "Dişli": 0.50})
-    r.kontrol("⑨ palanga verim düşüşü Δη KALDIRILDI  ( toplamsal model )",
+    #  Δη = 0,10 YALNIZ AVANDA ( kitaba göre, engine/avan/tablolar ):  ortak
+    #  tabloya taşınırsa uygulamanın toplam verimine de uygulanabilir hâle gelir.
+    r.kontrol("⑨ uygulamada palanga verim düşüşü Δη YOK  ( ortak tabloda değil )",
               not hasattr(_OF, "PALANGA_VERIM_DUSUSU"),
-              "→ Δη geri gelmiş;  makara kaybı çarpımsaldır, sabit sayı çıkarılamaz")
+              "→ Δη ortak tabloya taşınmış;  uygulamada η toplam verimdir, "
+              "makara kaybı çarpımsaldır")
     r.kontrol("⑨ makine tipi girdi",
               "makine_tipi" in _MG.ALAN and _MG.ALAN["makine_tipi"][3] == "secim",
               f"→ {_MG.ALAN.get('makine_tipi')}")
@@ -581,7 +584,7 @@ def _sapmalar(r):
         for _r2 in (1, 2):
             _g9 = _UG.tamamla(dict(_UG.varsayilanlar(), makine_tipi=_t, aski_orani=_r2))
             _oz9 = _AVh.hesapla(_UG.kopru(_g9))["asansorler"][0]["ozet"]
-            r.kontrol(f"⑨ köprü η′ aynı  ( {_t} {_r2}:1 )",
+            r.kontrol(f"⑨ köprü η aynı, avanın palanga düşüşü uygulanmıyor  ( {_t} {_r2}:1 )",
                       _yakin(_oz9["eta_p"], _bek9[(_t, _r2)]),
                       f"→ avan {_oz9['eta_p']!r}, beklenen {_bek9[(_t, _r2)]}")
 
@@ -830,7 +833,7 @@ def _denetim_bulgulari(r):
     #  ── B9  η TOPLAM SİSTEM VERİMİDİR:  askı oranı verimi değiştirmez
     _v0 = MK.hesapla({"aski_orani": 2})["ara"]["motor.eta"]
     _v1 = MK.hesapla({"aski_orani": 1})["ara"]["motor.eta"]
-    r.kontrol("B9  askı oranı η'yı DEĞİŞTİRMİYOR  ( Δη kaldırıldı )",
+    r.kontrol("B9  askı oranı η'yı DEĞİŞTİRMİYOR  ( uygulamada Δη yok )",
               _yakin(_v0, _v1), f"→ 2:1 {_v0!r} · 1:1 {_v1!r}")
     r.kontrol("B9  η ofis tablosundan birebir geliyor",
               _yakin(_v0, _USd.VARSAYILAN["verim_dislisiz"]),
@@ -1552,7 +1555,7 @@ def _denetim_bulgulari(r):
         _xc, _xp, _s2 = _xcxp(ray_kapi_arasi=_rk)
         _b2 = [x for x in _s2["bolumler"] if x["baslik"].startswith("7 ")][0]
         _mom.append(next(a["deger"] for a in _b2["adimlar"]
-                         if (a.get("formul") or "") == "Fx"))
+                         if str(a.get("formul") or "").startswith("Fx = k1")))
     r.kontrol("E2  ray kapıya yaklaşınca Fx büyüyor", abs(_mom[0]) > abs(_mom[1]),
               f"→ RK=500 Fx={_mom[0]:.1f} , RK=830 Fx={_mom[1]:.1f}")
 
@@ -1564,7 +1567,7 @@ def _denetim_bulgulari(r):
         _b = [x for x in _s["bolumler"] if x["baslik"].startswith("7 ")][0]
         _xq = next(a["deger"] for a in _b["adimlar"]
                    if str(a.get("formul") or "").startswith("Durum 1"))
-        _fx = next(a["deger"] for a in _b["adimlar"] if (a.get("formul") or "") == "Fx")
+        _fx = next(a["deger"] for a in _b["adimlar"] if str(a.get("formul") or "").startswith("Fx = k1"))
         _xc = {a.get("sembol"): a["deger"] for a in _b["adimlar"] if a.get("sembol")}["xc"]
         return _xc, _xq, _fx, _b
 
