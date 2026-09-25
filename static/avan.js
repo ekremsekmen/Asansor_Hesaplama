@@ -309,7 +309,7 @@ async function hesapTrafik(){
     const r = await (await fetch('/api/trafik',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({girdiler:trafikGirdi()})})).json();
     if(sira !== ISTEK.trafik) return;          // daha yeni bir istek var — bu yanıt eski
-    SON.c=r; SON.t=r; ciz('c_sonuc', r, r.yol||'tek');
+    SON.c=r; SON.t=r; ciz('c_sonuc', r, r.yol||'tek'); kapakYerTutuculari();
     sekmeRozeti('trafik', !!r.hata, (r.uyarilar||[]).length);
     const rz=$('c_std_rozet');
     if(rz) rz.innerHTML = r.ozet && r.ozet.standart
@@ -322,7 +322,7 @@ async function hesapAvan(){
     const r = await (await fetch('/api/avan',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({girdiler:avanGirdi()})})).json();
     if(sira !== ISTEK.avan) return;            // daha yeni bir istek var — bu yanıt eski
-    SON.a=r; cizAvan(r); turetilenGoster(r); seritGoster(r);
+    SON.a=r; cizAvan(r); turetilenGoster(r); seritGoster(r); kapakYerTutuculari();
     sekmeRozeti('avan', !!r.hata, (r.uyarilar||[]).length);
   }catch(e){ $('a_sonuc').innerHTML=`<div class="kart-ic"><div class="uyari kirmizi">Bağlantı hatası: ${kacis(e)}</div></div>`; }
 }
@@ -749,7 +749,7 @@ async function indirProjeDwg(){
   if(dg){ dg.disabled = true; dg.textContent = 'Çizim hazırlanıyor…'; }
   durum('Proje çizimi hazırlanıyor — bütün paftalar CAD varlığına çevriliyor…');
   try{
-    const govde = {kapak: kapakGirdi(),
+    const govde = {kapak: kapakCiktisi(),
                    girdiler: {trafik: trafikGirdi(), avan: avanGirdi()},
                    //  Paket teslim edilecek çıktıları TAŞIR;  proje dosyası
                    //  onu geri getirir.  İkisi aynı arşivde durmalı.
@@ -789,6 +789,28 @@ async function indirProjeDwg(){
     }
   }catch(e){ durum('İndirme başarısız: '+e.message, true); }
   finally{ if(dg){ dg.disabled = false; dg.textContent = eskiYazi; } }
+}
+
+/*  KAPAĞIN HESAPTAN TÜREYEN ALANLARI  ( engine/avan/kapak.py )
+    Boş bırakılan kutunun gri yer tutucusu hesabın değerini gösterir ve
+    çıktıya O basılır:  ekranda görünen = kâğıda basılan.  Eskiden yer
+    tutucular sabit örneklerdi ( "10 kişi", "7,5 kW" ) — dolu görünüp boş
+    basılıyordu.  Hesap hatalıysa ya da yapılmadıysa yer tutucu boştur. */
+const kapakTuretilenAlanlar = () => SEC.kapak_turetilen || [];
+function kapakTuretilen(){
+  const al = r => (r && !r.hata && r.kapak_bilgileri) || {};
+  return {...al(SON.t), ...al(SON.a)};
+}
+function kapakYerTutuculari(){
+  const d = kapakTuretilen();
+  for(const k of kapakTuretilenAlanlar()){ const e = $('k_'+k); if(e) e.placeholder = d[k] || ''; }
+}
+/*  Çıktıya giden kapak:  yazılan değer, yoksa hesabın değeri.  Yalnız avan
+    kapağı içindir — uygulama paketine giden kapak formu olduğu gibi gider. */
+function kapakCiktisi(){
+  const g = kapakGirdi(), d = kapakTuretilen();
+  for(const k of kapakTuretilenAlanlar()) if(!g[k] && d[k]) g[k] = d[k];
+  return g;
 }
 
 function kapakGirdi(){

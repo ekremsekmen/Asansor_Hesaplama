@@ -182,15 +182,13 @@ function etiketleriGuncelle(){
   ofisTazele();
   temelCevresi();
   [['c','c_bina_tipi']].forEach(([p,id])=>{
+    /*  Adlar motordan gelir ( trafik.hizli_etiketleri ):  hata metni de
+        kutuyu bu adla söyler, ikisi ayrışamaz. */
     const bt=$(id).value||'';
-    let l1='⑤ —', l2='⑥ (bu bina tipinde gerekmiyor — boş bırakın)';
-    if(bt==='Konut'){ l1='⑤ Daire sayısı (bağımsız bölüm adedi)';
-      l2='⑥ Daire başına DİĞER oda sayısı (ilk yatak odası hariç)'; }
-    else if(bt.startsWith('İş Merkezi')||bt.startsWith('Kamu')){ l1='⑤ Toplam çalışma alanı (m²)  →  12 m² = 1 kişi'; }
-    else if(bt.startsWith('Otel')||bt==='Hastane'){ l1='⑤ Toplam yatak sayısı'; }
-    else if(bt==='Katlı Otopark'){ l1='⑤ Özel amaçlı araç adedi'; l2='⑥ Ticari amaçlı araç adedi'; }
-    else { l1='⑤ Bu bina tipinde hızlı giriş yok — ek nüfus kalemlerini kullanın'; }
-    $(p+'_l_hizli1').innerHTML=l1; $(p+'_l_hizli2').innerHTML=l2;
+    const e=(SEC.hizli_etiketleri||{})[bt]||(SEC.hizli_etiketleri||{})['']
+            ||{hizli1:['⑤','—'],hizli2:['⑥','']};
+    const etiket=([ad,ipucu])=>ipucu?ad+' '+ipucu:ad;
+    $(p+'_l_hizli1').textContent=etiket(e.hizli1); $(p+'_l_hizli2').textContent=etiket(e.hizli2);
   });
 }
 
@@ -426,7 +424,7 @@ function indirGovdesi(uc){
   //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI için
   //  kullanır — paftanın içeriği değişmez.
   return uc==='kapak-pdf'
-    ? {kapak:kapakGirdi()}
+    ? {kapak:kapakCiktisi()}
     : uc.startsWith('trafik')
     ? {kapak:kapakGirdi(), girdiler:trafikGirdi()}
     : uc.startsWith('uygulama')

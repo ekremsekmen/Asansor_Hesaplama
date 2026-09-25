@@ -799,6 +799,21 @@ dışıydı ve iki hatayı birlikte gizliyordu.
 
 Bunların hepsi düzeltildi; her biri için pakete kalıcı bir test eklendi.
 
+### Kullanıcı gibi denemede bulunan ve düzeltilen hatalar
+
+Program baştan sona bir kullanıcı gibi kullanılıp ( konut · yüksek konut ·
+iş merkezi · hastane · otel ) her sonuç bağımsız hesapla karşılaştırıldı.
+Hesaplarda sapma bulunmadı;  aşağıdakiler ekranda ya da paftada **yanlış
+ya da yanıltıcı görünen** şeylerdi.
+
+| Bulgu | Etkisi |
+|---|---|
+| **Tablolar sekmesinde beş tablonun başlıkları kaymıştı** ( ray profilleri · ray geometrisi · NPU · gezici kablo · karşı ağırlık malzemesi ) | T 50 rayının 3,7 kg/m'si *"b"*, 14,3 mm'lik *e*'si *"gr"* başlığı altında görünüyordu.  Başlıklar artık motorun **sütun tanımından** kuruluyor, kayamaz.  NPU tablosundaki üç yazım hatası da ( 30x15 Ix · 280 ve 300 A ) DIN 1026-1'e göre düzeltildi — hesaba girmiyorlardı |
+| **Hız seçilmeyince "tg'yi elle girin" deniyordu** | Hastane · poliklinik · karma bina · katlı otopark MMO/697 Tablo-2'de yoktur; eksik olan **hızdı**, tg değil.  Mesaj artık sebebi ve çareyi söylüyor;  kat sayısı boşken de eksik olanın **③ kat sayısı** olduğunu |
+| **Trafik hata metni iç adları gösteriyordu** ( *"hizli1 = 1.200"* ) | Ekranda öyle bir kutu yok.  Metin artık kutunun **ekrandaki adını** söylüyor ( *"⑤ Daire sayısı = 1.200"* );  ⑤ / ⑥ adları bina tipine göre değiştiği için etiket ile hata metni **aynı tanımdan** okunuyor |
+| **Kapağın asansör bilgileri dolu görünüp boş basılıyordu** | Gri yazılar ( *"10 kişi"*, *"7,5 kW"* ) sabit örneklerdi.  Artık boş kutu **projenin hesabından** dolar ( kapasite · hız · durak · seyir · kabin · askı · adet · tahrik · motor gücü · kullanım amacı ) ve gri yazı kapağa basılacak değerin kendisidir.  Birden çok asansörün değeri dar hücreye sığmazsa yandaki hücreye taşmak yerine iki satıra bölünür |
+| **Paftada hızın kaynağı hep "MMO/697 Tablo-2" yazıyordu** | Hastane paftasında ( Tablo-2'de hastane yok ) ve hızı kullanıcı seçtiğinde bile.  Artık hız Tablo-2 asgarisiyse *Tablo-2*, değilse *Proje kararı ( Tablo-2 min. … )* basılıyor |
+
 ### Standarda göre verilen hesap kararları ( uygulama projesi )
 
 Motor ofisin eski mukavemet çalışma kitabından yola çıkarak yazıldı ve kitapta
@@ -1475,7 +1490,8 @@ AVAN HESAPLAMA PROGRAMI/
 │   ├── avan/               ─────────────────────────────── AVAN PROJESİ
 │   │   ├── tablolar.py     ← MMO/697 + ISO + IEC tabloları
 │   │   ├── trafik.py       ← trafik hesabı ( tek + çoklu )
-│   │   └── hesap.py        ← avan hesapları
+│   │   ├── hesap.py        ← avan hesapları
+│   │   └── kapak.py        ← kapağın hesaptan dolan asansör bilgileri
 │   └── uygulama/           ─────────────────────────── UYGULAMA PROJESİ
 │       ├── mukavemet_tablolari.py ← ISO 7465 · TS 12385-5 · EN 81-50
 │       ├── mukavemet_girdi.py     ← 71 girdinin sözleşmesi ( TEK KAYNAK )

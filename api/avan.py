@@ -17,6 +17,7 @@ from api.ortak import (_BELIRSIZ, _RED, _belirsiz_hata, _bos_mu, _dosya_adi,
                        _sayi, _sozluk_listesi, _temiz, _uretilemedi,
                        belirsiz_sayi_mi)
 from engine.avan import hesap as E_AVAN
+from engine.avan import kapak as E_KAPAK
 from engine.avan import tablolar as E_TAB
 from engine.avan import trafik as E_TRF
 from exports import kapak_export as X_KAPAK
@@ -106,12 +107,13 @@ def _trafik_girdi(veri: dict):
     veri = veri if isinstance(veri, dict) else {}
     ham = veri.get("girdiler")
     ham = ham if isinstance(ham, dict) else {}
-    g = _temiz(ham, TRAFIK_SAYISAL)
+    #  Red metni kutunun EKRANDAKİ adını söyler ( "hizli1" değil "⑤ Daire sayısı" ).
+    g = _temiz(ham, TRAFIK_SAYISAL, etiket=E_TRF.girdi_etiketleri(ham.get("bina_tipi")))
     g["ek_nufus"] = _ek_nufus_oku(ham.get("ek_nufus"))
     #  Kişi sayısı YAZILMIŞ asansör tanımlıdır.  Okunabilir P aranıyordu:
     #  "8 kişi" yazılan asansör listeden sessizce düşüyor, trafik bir asansör
     #  eksik hesaplanıyordu.  Artık okunamayan P, sebebiyle reddedilir.
-    liste = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ")
+    liste = [_temiz(a, ASANSOR_SAYISAL, f"ASANSÖR-{i}: ", etiket=E_TRF.ASANSOR_ETIKET)
              for i, a in enumerate(_sozluk_listesi(ham.get("asansorler")), 1)
              if not _bos_mu(a.get("P"))][:4]
     if not liste and g.get("P") is not None:
@@ -188,6 +190,11 @@ def _avan_sonuc(veri):
 def secenekler():
     return {
         "bina_tipleri": E_TAB.BINA_TIPLERI,
+        #  ⑤ / ⑥ kutularının bina tipine göre etiketi —  red metni de aynı adı söyler.
+        "hizli_etiketleri": {bt: E_TRF.hizli_etiketleri(bt)
+                             for bt in ("", *E_TAB.BINA_TIPLERI)},
+        #  Kapakta hesaptan dolan alanlar ( engine/avan/kapak.py ).
+        "kapak_turetilen": list(E_KAPAK.ALANLAR),
         "kapi_genislikleri": E_TAB.KAPI_GENISLIKLERI,
         "kapi_tipleri": E_TAB.KAPI_TIPLERI,
         "kapasiteler": E_TAB.GECERLI_KAPASITELER,
@@ -228,6 +235,9 @@ def api_trafik(veri: dict = Body(...)):
         #  Avan sekmesi bu özeti geri gönderir; kapasite / hız / kuyu yüksekliği
         #  tutarsızlığı orada uyarı olarak görünür.
         s["avan_koprusu"] = E_TRF.trafik_ozeti(s)
+        #  Kapağın boş bırakılan asansör alanları hesaptan dolar ( ekranda
+        #  gri yer tutucu olarak görünür, çıktıya o basılır ).
+        s["kapak_bilgileri"] = E_KAPAK.trafikten(s)
         return JSONResponse(json.loads(json.dumps(s, default=str)))
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)
@@ -239,6 +249,7 @@ def api_avan(veri: dict = Body(...)):
         s, yanit = _avan_sonuc(veri)
         if yanit is not None:
             return yanit
+        s["kapak_bilgileri"] = E_KAPAK.avandan(s)
         return JSONResponse(json.loads(json.dumps(s, default=str)))
     except Exception as e:                                    # noqa: BLE001
         return JSONResponse({"hata": f"HESAP HATASI: {e}"}, status_code=200)

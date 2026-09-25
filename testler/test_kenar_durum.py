@@ -458,7 +458,8 @@ def calistir():
     r.kontrol("gereksiz taahhütname → bilgi notu",
               any("gerekmiyor" in u for u in _tg["uyarilar"]))
     #  Şartlı sınırı olmayan bina tipinde Var seçimi kullanılamaz → hesap durur
-    #  ( Tablo-2'de Hastane yok → hız elle verilir, yoksa hesap tg'de durur )
+    #  ( Tablo-2'de Hastane yok → hız elle verilir, yoksa hesap 'kabin hızı
+    #    belirlenemedi' der )
     _th = TR.hesapla_tek(g(bina_tipi="Hastane", hizli1=60, hizli2=None, manuel_k=None,
                            manuel_V=1.6, taahhutname="Var"))
     r.kontrol("Hastane senaryosu taahhütname olmadan geçerli",
@@ -1944,6 +1945,76 @@ def calistir():
         r.kontrol(f"zincirli yüksek bina · {_ad}:  avan uygulamadan eksik değil, en çok %5 fazla",
                   0 <= (_av - _uy) / _uy <= 0.05,
                   f"→ avan {_av:.0f} · uygulama {_uy:.0f}")
+
+    # ------------------------------------------------------------------
+    #  HIZ BELİRLENEMEYİNCE MESAJ SEBEBİ SÖYLER
+    #  Tablo-2'de olmayan bina tiplerinde ( Karma · Hastane · Poliklinik ·
+    #  Otopark ) hız seçilmediğinde ve kat sayısı boş bırakıldığında kullanıcıya
+    #  "tg'yi elle girin" deniyordu — oysa eksik olan HIZ ya da KAT SAYISIDIR;
+    #  tg hız seçilince tablodan kendiliğinden gelir.
+    # ------------------------------------------------------------------
+    _tablo2_disi = [bt for bt, t in T.TABLO_10.items() if not t["hiz_grubu"]]
+    r.kontrol("Tablo-2 dışı bina tipleri bilinen dördü",
+              len(_tablo2_disi) == 4, f"→ {_tablo2_disi}")
+    for _bt in _tablo2_disi:
+        #  Tablo-9'da k değeri olmayan tiplerde k elle verilir; olanda verilmez.
+        _mk = 0.1 if T.TABLO_10[_bt]["k_tipi"] is None else None
+        _h = TR.hesapla_tek(g(bina_tipi=_bt, hizli1=60, hizli2=10, manuel_k=_mk)).get("hata") or ""
+        r.kontrol(f"{_bt[:24]} · hız seçilmedi → sebep Tablo-2, çare V seçimi",
+                  "Tablo-2'de yoktur" in _h and "Manuel değerler" in _h
+                  and "tg'yi elle girin" not in _h, f"→ {_h[:120]}")
+    _ho = g(bina_tipi="Hastane", hizli1=60, hizli2=None, manuel_k=None)
+    r.kontrol("Hastane · ortak hız seçilince hesap yapılıyor",
+              TR.hesapla_tek(dict(_ho, manuel_V=1.6)).get("hata") is None)
+    r.kontrol("Hastane · hız asansör kutusundan seçilince de hesap yapılıyor  ( tek yol )",
+              TR.hesapla(dict(_ho, asansorler=[{"P": 13, "kapi_genisligi": 900,
+                                                "kapi_tipi": "Merkezden Açılan Oto.",
+                                                "V": 1.6}])).get("hata") is None)
+    #  N boşken hız bile türetilemez; mesaj eksik olanı ( N ) söylemeli.
+    for _n in (None, ""):
+        _h = TR.hesapla_tek(g(N=_n)).get("hata") or ""
+        r.kontrol(f"kat sayısı N = {_n!r} → mesaj kat sayısını söylüyor",
+                  "③ kat sayısı N" in _h and "tg" not in _h, f"→ {_h[:110]}")
+    #  N girilmiş ama aralık dışıysa hız türetilir;  mesaj yine N'yi söyler, tg'yi değil.
+    for _n in (0, 31):
+        _h = TR.hesapla_tek(g(N=_n)).get("hata") or ""
+        r.kontrol(f"kat sayısı N = {_n!r} → mesaj N aralığını söylüyor, tg demiyor",
+                  "N" in _h and "30" in _h and "tg" not in _h, f"→ {_h[:110]}")
+    #  ÇOKLU YOL:  farklı tipte iki asansör, Tablo-2 dışı bina, hız yok
+    _cok = dict(g(bina_tipi="Katlı Otopark", hizli1=40, hizli2=10, manuel_k=None),
+                asansorler=[{"P": 13, "kapi_genisligi": 900, "kapi_tipi": "Merkezden Açılan Oto."},
+                            {"P": 8, "kapi_genisligi": 800, "kapi_tipi": "Teleskopik Otomatik"}])
+    _hc = TR.hesapla(_cok)
+    r.kontrol("çoklu · Tablo-2 dışı bina, hız yok → ASANSÖR-1 için hız mesajı",
+              _hc.get("yol") == "coklu" and "ASANSÖR-1 — kabin hızı belirlenemedi" in (_hc.get("hata") or ""),
+              f"→ {_hc.get('yol')} · {(_hc.get('hata') or '')[:120]}")
+    _cok["asansorler"] = [dict(a, V=1.6) for a in _cok["asansorler"]]
+    r.kontrol("çoklu · her asansöre hız verilince hesap yapılıyor",
+              TR.hesapla(_cok).get("hata") is None, f"→ {TR.hesapla(_cok).get('hata')}")
+
+    #  PAFTADAKİ HIZ KAYNAĞI GERÇEĞİ SÖYLER.  Her durumda "MMO/697 Tablo-2"
+    #  basılıyordu — hastanede ( Tablo-2'de satırı yok ) ve hızı kullanıcı
+    #  seçtiğinde bile.  Not ekranda kalır;  paftaya kaynak sütunu basılır.
+    def _v_kaynak(s):
+        _a = [x for b in s.get("bolumler") or [] for x in b.get("adimlar") or []
+              if x.get("sembol") == "V" and x.get("aciklama") == "Kabin hızı"]
+        return _a[0]["kaynak"] if _a else None
+    for _ad, _g, _bek in (
+            ("Konut · hız Tablo-2'den", g(), "MMO/697 Tablo-2 (durak = 12)"),
+            #  12 durak konutta Tablo-2 asgarisi 1,60 m/s
+            ("Konut · ortak hız Tablo-2 minimumunun üstünde", g(manuel_V=2),
+             "Proje kararı ( Tablo-2 min. 1,60 m/s )"),
+            ("Konut · ortak hız Tablo-2 minimumunun altında", g(manuel_V=1),
+             "Proje kararı ( Tablo-2 min. 1,60 m/s )"),
+            ("Konut · seçilen hız Tablo-2 minimumuna eşit", g(manuel_V=1.6),
+             "MMO/697 Tablo-2 (durak = 12)"),
+            ("Hastane · hız asansör kartından", dict(_ho, asansorler=[
+                {"P": 13, "kapi_genisligi": 900, "kapi_tipi": "Merkezden Açılan Oto.", "V": 1.6}]),
+             "Proje kararı ( Tablo-2'de yok )"),
+            ("Karma · hız seçilmedi ( hesap hatası )",
+             g(bina_tipi="Karma Binalar (İşyeri ve Konut)", hizli1=None, hizli2=None, manuel_k=0.1),
+             "Seçilmedi ( Tablo-2'de yok )")):
+        r.esit(f"paftada V kaynağı · {_ad}", _v_kaynak(TR.hesapla(_g)), _bek)
 
     return r
 

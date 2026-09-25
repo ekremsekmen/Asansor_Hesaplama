@@ -55,16 +55,53 @@ def _fit(text: str, width: float, size: float, minimum: float = 4.3) -> float:
     return max(size, minimum)
 
 
+#  BİRDEN ÇOK ASANSÖRÜN DEĞERİ  ( "1450/1350" · "0,63 / 1,00 / 1,60 m/s" )
+#  en küçük puntoda bile hücreye sığmazsa YANDAKİ HÜCREYE TAŞMAZ:  ayraçtan
+#  iki satıra bölünür.  Kabin derinliği hücresi 17 pt'dir — iki kabin
+#  ölçüsü tek satırda "Standart" hücresinin üstüne biniyordu.  Tek satıra
+#  sığan metin eskisi gibi tek satır basılır.
+IKI_SATIR_EN_KUCUK = 3.2
+
+
+def _satirlar(text, width, size, height):
+    """( satırlar, punto ) — tek satır sığmıyorsa ayraçtan dengeli iki satır."""
+    tek = _fit(text, width, size)
+    if pdfmetrics.stringWidth(text, F, tek) <= max(width - 2, 1):
+        return [text], tek
+    ayrac = " / " if " / " in text else "/" if "/" in text else None
+    if ayrac is None:
+        return [text], tek
+    parca = text.split(ayrac)
+    k = (len(parca) + 1) // 2
+    iki = [ayrac.join(parca[:k]) + ayrac.rstrip(), ayrac.join(parca[k:])]
+    #  İki satır hücre yüksekliğine sığmalı:  satır aralığı ~ 1,05 punto.
+    punto = min(min(_fit(x, width, size, IKI_SATIR_EN_KUCUK) for x in iki),
+                (height - 0.6) / 2.1)
+    if all(pdfmetrics.stringWidth(x, F, punto) <= max(width - 2, 1) for x in iki):
+        return iki, punto
+    return [text], tek
+
+
+def _yaz(c, satirlar, font, font_size, x_of, top, bottom):
+    """Satırları hücrenin düşey ortasına dizer;  x_of( satır ) → sol kenar."""
+    ara = font_size * 1.05
+    orta = (top + bottom) / 2
+    for i, satir in enumerate(satirlar):
+        dy = (i - (len(satirlar) - 1) / 2) * ara
+        c.drawString(x_of(satir), _y(orta + dy) - font_size * 0.33, satir)
+
+
 def _center(c, value, x0, x1, top, bottom, size=7.0, color=BLACK, bold=False):
     text = _s(value)
     if not text:
         return
     font = FB if bold else F
-    font_size = _fit(text, x1 - x0, size)
+    satirlar, font_size = _satirlar(text, x1 - x0, size, abs(bottom - top))
     c.setFont(font, font_size)
     c.setFillColor(color)
-    tw = pdfmetrics.stringWidth(text, font, font_size)
-    c.drawString(x0 + max(1.1, ((x1 - x0) - tw) / 2), _y((top + bottom) / 2) - font_size * 0.33, text)
+    _yaz(c, satirlar, font, font_size,
+         lambda t: x0 + max(1.1, ((x1 - x0) - pdfmetrics.stringWidth(t, font, font_size)) / 2),
+         top, bottom)
 
 
 def _left(c, value, x0, x1, top, bottom, size=6.4, color=BLACK, padding=2.0, bold=False):
@@ -72,10 +109,10 @@ def _left(c, value, x0, x1, top, bottom, size=6.4, color=BLACK, padding=2.0, bol
     if not text:
         return
     font = FB if bold else F
-    font_size = _fit(text, x1 - x0 - padding * 2, size)
+    satirlar, font_size = _satirlar(text, x1 - x0 - padding * 2, size, abs(bottom - top))
     c.setFont(font, font_size)
     c.setFillColor(color)
-    c.drawString(x0 + padding, _y((top + bottom) / 2) - font_size * 0.33, text)
+    _yaz(c, satirlar, font, font_size, lambda _t: x0 + padding, top, bottom)
 
 
 def _wrapped(c, value, x0, x1, top, bottom, size=5.7, color=BLACK, padding=2.0):

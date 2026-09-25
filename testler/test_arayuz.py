@@ -1317,6 +1317,114 @@ def calistir():
                 uzunluk = pg.eval_on_selector(f"#{ic_id}", "e => e.innerText.length")
                 r.kontrol(f"sekme '{sekme}' içerik üretti", uzunluk > 200, f"→ {uzunluk} karakter")
 
+        # ==============================================================
+        #  v3.3 — KAPAK ASANSÖR BİLGİLERİ HESAPTAN DOLAR
+        #  Gri yer tutucular sabit örneklerdi ( "10 kişi", "7,5 kW" ): dolu
+        #  görünüp boş basılıyordu.  Artık yer tutucu hesabın değeridir ve
+        #  boş kutunun yerine çıktıya o basılır.  Örnek proje:  10 + 16
+        #  kişilik iki asansör, 1,6 m/s, N = 11, h = 3 m, MRL, dişlisiz.
+        # ==============================================================
+        pg.click('.sekme[data-sekme="proje"]')
+        pg.wait_for_timeout(300)
+        _yer = pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll(
+            '#s-proje input[id^="k_"]')].map(e => [e.id.slice(2), e.placeholder]))""")
+        _bek = {"usage": "Konut", "stops": "12", "travel": "33,00 m",
+                "capacity": "10 / 16 kişi", "speed": "1,60 m/s",
+                "cabin_width": "1300/2100", "cabin_depth": "1450/1350",
+                "suspension": "2:1", "elevator_count": "2",
+                "drive_type": "Dişlisiz (MRL)", "standard": "TS EN 81-20"}
+        r.esit("kapak · yer tutucular projenin hesabını gösteriyor",
+               {k: _yer.get(k) for k in _bek}, _bek)
+        _nsc = pg.evaluate("SON.a.ozet.asansorler.map(a => a.Nsc)")
+        r.esit("kapak · motor gücü avandaki seçilen Nsç",
+               _yer.get("motor_power"),
+               " / ".join(dict.fromkeys(f"{x:g}".replace(".", ",") for x in _nsc)) + " kW")
+        r.esit("kapak · hesaptan çıkmayan alanlarda örnek değer yok",
+               {k: _yer.get(k) for k in ("block", "elevator_class", "rail_size", "scale")},
+               {"block": "", "elevator_class": "", "rail_size": "", "scale": ""})
+        r.esit("kapak · türeyen alan listesi motordan ( /api/secenekler )",
+               pg.evaluate("SEC.kapak_turetilen").__len__(), 12)
+        #  Çıktıya giden kapak:  boş kutu → hesabın değeri,  yazılan → yazılan
+        _cik = pg.evaluate("kapakCiktisi()")
+        r.esit("kapak · boş kutunun yerine çıktıya hesabın değeri gidiyor",
+               {k: _cik.get(k) for k in _bek}, _bek)
+        pg.fill("#k_capacity", "630 kg")
+        pg.wait_for_timeout(200)
+        r.esit("kapak · yazılan değer hesabın önüne geçiyor",
+               pg.evaluate("kapakCiktisi().capacity"), "630 kg")
+        r.esit("kapak · uygulama paketine giden form olduğu gibi ( türetme yok )",
+               pg.evaluate("[kapakGirdi().capacity, kapakGirdi().speed]"), ["630 kg", ""])
+        #  Kapak PDF'i:  yazılan değer ile hesaptan gelenler birlikte basılıyor
+        _gov = pg.evaluate("indirGovdesi('kapak-pdf')")
+        _pdf = urllib.request.urlopen(urllib.request.Request(
+            BASE + "/api/indir/kapak-pdf", method="POST", data=json.dumps(_gov).encode(),
+            headers={"Content-Type": "application/json"}), timeout=30).read()
+        try:
+            import pypdfium2 as _pdfium
+            _d = _pdfium.PdfDocument(_pdf)
+            _m = "".join(_d[0].get_textpage().get_text_range().split())
+            _yok = [v for v in ("630 kg", "1,60 m/s", "12", "33,00 m", "1300/2100",
+                                "Dişlisiz (MRL)", "Konut", "TS EN 81-20")
+                    if "".join(v.split()) not in _m]
+            r.kontrol("kapak PDF'i · hesaptan gelenler ve yazılan değer basıldı", not _yok,
+                      f"→ basılmayan: {_yok}")
+        except ImportError:
+            r.atla("kapak PDF metni okunamadı — pypdfium2 kurulu değil")
+        pg.fill("#k_capacity", "")
+        #  Trafik hesabı hata verince trafikten gelen yer tutucular boşalır —
+        #  eski değer "doğru" gibi basılmaz.
+        pg.click('.sekme[data-sekme="trafik"]')
+        pg.fill("#c_N", "")
+        pg.wait_for_timeout(1500)
+        r.esit("kapak · trafik hatalıyken durak / seyir / kullanım amacı boş",
+               pg.evaluate("['usage','stops','travel'].map(k => $('k_'+k).placeholder)"),
+               ["", "", ""])
+        r.esit("kapak · trafik hatalıyken çıktıya da gitmiyor",
+               pg.evaluate("[kapakCiktisi().stops, kapakCiktisi().travel]"), ["", ""])
+        #  Kat sayısı boşken mesaj eksik olanı söyler, tg'yi değil
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · N boşken mesaj kat sayısını söylüyor",
+                  "③ kat sayısı N" in _hm and "tg'yi elle girin" not in _hm, f"→ {_hm[:140]!r}")
+        pg.fill("#c_N", "11")
+        pg.wait_for_timeout(1500)
+        r.esit("kapak · trafik düzelince yer tutucular geri geliyor",
+               pg.evaluate("['usage','stops','travel'].map(k => $('k_'+k).placeholder)"),
+               ["Konut", "12", "33,00 m"])
+
+        # ==============================================================
+        #  v3.3 — ⑤ / ⑥ ETİKETİ VE HATA METNİ AYNI ADI SÖYLER
+        #  Red metni "hizli1 = 1.200" diyordu;  ekranda "hizli1" diye bir kutu
+        #  yoktur.  Etiket de hata metni de motordaki tek tanımdan gelir.
+        # ==============================================================
+        _et = lambda: pg.evaluate("[$('c_l_hizli1').textContent, $('c_l_hizli2').textContent]")
+        r.esit("⑤/⑥ etiketleri · Konut", _et(),
+               ["⑤ Daire sayısı (bağımsız bölüm adedi)",
+                "⑥ Daire başına DİĞER oda sayısı (ilk yatak odası hariç)"])
+        pg.fill("#c_hizli1", "1.200")
+        pg.wait_for_timeout(1200)
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · belirsiz ⑤ ekrandaki adıyla bildiriliyor",
+                  "⑤ Daire sayısı = 1.200" in _hm and "hizli1" not in _hm, f"→ {_hm[:160]!r}")
+        pg.fill("#c_hizli1", "44")
+        pg.select_option("#c_bina_tipi", "Katlı Otopark")
+        pg.wait_for_timeout(1500)
+        r.esit("⑤/⑥ etiketleri · Katlı Otopark", _et(),
+               ["⑤ Özel amaçlı araç adedi", "⑥ Ticari amaçlı araç adedi"])
+        #  Tablo-2'de olmayan bina tipinde hız seçilmemişse mesaj sebebi ve
+        #  çareyi söyler ( eskiden "V = — m/s için tg'yi elle girin" ).
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · Tablo-2 dışı bina, hız yok → sebep ve çare",
+                  "Tablo-2'de yoktur" in _hm and "tg'yi elle girin" not in _hm,
+                  f"→ {_hm[:160]!r}")
+        pg.select_option("#c_bina_tipi", "Otel (3* ve altı)")
+        pg.wait_for_timeout(300)
+        r.esit("⑤/⑥ etiketleri · Otel", _et(),
+               ["⑤ Toplam yatak sayısı", "⑥ (bu bina tipinde gerekmiyor — boş bırakın)"])
+        pg.select_option("#c_bina_tipi", "Konut")
+        pg.wait_for_timeout(1500)
+        r.kontrol("örnek projeye dönüldü — trafik yine hatasız",
+                  "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
+
         # --- trafik sonucu doğru mu (sunucudaki motorla aynı olmalı)
         adetSec(pg, 1)
         pg.wait_for_timeout(400)

@@ -124,6 +124,74 @@ def _ts_hatasi(ts, ta, tk, tg, tv, on_ek=""):
             "kontrol edin ya da alanları boşaltıp tablo değerlerini kullanın.")
 
 
+#  GİRDİ KUTULARININ ADLARI  —  arayüz etiketi ile red metni AYNI kaynaktan.
+#  Okunamayan bir girdi "hizli1 = 1.200" diye bildiriliyordu:  kullanıcı
+#  ekranda "hizli1" diye bir kutu görmez.  ⑤ / ⑥ kutularının adı bina tipine
+#  göre değişir;  arayüz de etiketini buradan okur ( /api/secenekler ).
+#  Her kutu:  ( ad, ipucu )  —  etiket = ad + ipucu,  red metni yalnız ad.
+_HIZLI_YOK = ("⑥", "(bu bina tipinde gerekmiyor — boş bırakın)")
+
+
+def hizli_etiketleri(bina_tipi):
+    """⑤ / ⑥ hızlı nüfus girişi kutularının bina tipine göre adı.
+
+    Dönen:  {"hizli1": (ad, ipucu), "hizli2": (ad, ipucu)}  —  dallanma
+    _nufus_satirlari() ile aynıdır ( hangi kutu hangi Tablo-1 kalemine gider ).
+    """
+    bt = bina_tipi if isinstance(bina_tipi, str) else ""
+    if not bt:
+        return {"hizli1": ("⑤", "—"), "hizli2": _HIZLI_YOK}
+    if bt == "Konut":
+        return {"hizli1": ("⑤ Daire sayısı", "(bağımsız bölüm adedi)"),
+                "hizli2": ("⑥ Daire başına DİĞER oda sayısı", "(ilk yatak odası hariç)")}
+    if bt.startswith("İş Merkezi") or bt.startswith("Kamu"):
+        return {"hizli1": ("⑤ Toplam çalışma alanı", "(m²)  →  12 m² = 1 kişi"),
+                "hizli2": _HIZLI_YOK}
+    if bt.startswith("Otel") or bt == "Hastane":
+        return {"hizli1": ("⑤ Toplam yatak sayısı", ""), "hizli2": _HIZLI_YOK}
+    if bt == "Katlı Otopark":
+        return {"hizli1": ("⑤ Özel amaçlı araç adedi", ""),
+                "hizli2": ("⑥ Ticari amaçlı araç adedi", "")}
+    return {"hizli1": ("⑤", "Bu bina tipinde hızlı giriş yok — ek nüfus kalemlerini kullanın"),
+            "hizli2": _HIZLI_YOK}
+
+
+#  Bina ( ortak ) kutuları — arayüzdeki etiketlerin aynısı.  ⑤ / ⑥ yukarıda.
+GIRDI_ETIKET = {
+    "bina_yuksekligi": "② Bina yüksekliği",
+    "N": "③ Kat sayısı N",
+    "yapi_yuksekligi": "④ Yapı yüksekliği",
+    "h": "⑦ Kat yüksekliği h",
+    "P": "⑧ Kapasite P",
+    "kapi_genisligi": "⑨ Kapı genişliği",
+    "bodrum": "⑪ Bodrum durağı",
+    "manuel_V": "Manuel ortak V",
+    "manuel_k": "Manuel k",
+    "manuel_adet": "Asansör adedi",
+    "manuel_ta": "ta ( imalatçı )", "manuel_tk": "tk ( imalatçı )",
+    "manuel_tg": "tg ( imalatçı )", "manuel_tp": "tp ( imalatçı )",
+}
+
+#  Asansör kartı kutuları ( ASANSÖR-i ) — kartta "boş = ortak" olanlar
+#  ortak kutudan ayırt edilsin diye numarasız yazılır.
+ASANSOR_ETIKET = {
+    "P": "⑧ Kapasite P",
+    "kapi_genisligi": "⑨ Kapı genişliği",
+    "V": "V — kabin hızı",
+    "durak": "Durak",
+    "h": "h — kat yüksekliği",
+    "bodrum": "Bodrum durağı",
+    "manuel_ta": "ta ( imalatçı )", "manuel_tk": "tk ( imalatçı )",
+    "manuel_tg": "tg ( imalatçı )", "manuel_tp": "tp ( imalatçı )",
+}
+
+
+def girdi_etiketleri(bina_tipi):
+    """Bina kutularının red metnindeki adları — ⑤ / ⑥ bina tipine göre."""
+    return {**GIRDI_ETIKET,
+            **{k: ad for k, (ad, _ipucu) in hizli_etiketleri(bina_tipi).items()}}
+
+
 #  ⑤ / ⑥ NÜFUS GİRDİLERİ  —  tek ve çoklu hesapta AYNI denetim.
 #  Üst sınır vardı ( "ondalık ayracı olarak virgül kullanın" ), ALT sınır yoktu:
 #  ⑥ diğer oda sayısına −1 girilince bir dairedeki kişi 2 + (−1) = 1 oluyor,
@@ -367,6 +435,18 @@ def hesapla_tek(g: dict) -> dict:
         V_notu = f"Tablo-2 minimumu {tr(V_min)} m/s — seçilen {tr(V)} m/s (üstü)."
     else:
         V_notu = f"Tablo-2 minimumu uygulandı: {tr(V)} m/s."
+    #  PAFTADAKİ KAYNAK HIZIN GERÇEKTEN NEREDEN GELDİĞİNİ SÖYLER.  Her durumda
+    #  "MMO/697 Tablo-2" basılıyordu:  hastane paftasında, Tablo-2'de hastane
+    #  satırı yokken ve hızı kullanıcı seçmişken bile.  ( Not ekranda kalır,
+    #  paftaya basılmaz — kaynak sütunu basılır. )
+    if sayi_mi(V) and sayi_mi(V_min) and V == V_min:
+        V_kaynak = f"MMO/697 Tablo-2 (durak = {durak})"
+    elif sayi_mi(V_min):
+        V_kaynak = f"Proje kararı ( Tablo-2 min. {tr(V_min)} m/s )"
+    elif sayi_mi(V):
+        V_kaynak = "Proje kararı ( Tablo-2'de yok )"
+    else:
+        V_kaynak = "Seçilmedi ( Tablo-2'de yok )"
 
     # ---- tablo değerleri
     H = T.tablo3_H(N, P) if (sayi_mi(N) and sayi_mi(P)) else None
@@ -518,8 +598,7 @@ def hesapla_tek(g: dict) -> dict:
         veri("h", "Katlar arası mesafe", h, "m", "Projeden"),
         veri("", "Toplam seyahat mesafesi  =  ( N + Nb ) · h", toplam_seyahat, "m",
              "Projeden — avan kuyu yüksekliği bu değerden türer"),
-        veri("V", "Kabin hızı", V, "m/s",
-             f"MMO/697 Tablo-2 (durak = {durak})" if durak else "MMO/697 Tablo-2"),
+        veri("V", "Kabin hızı", V, "m/s", V_kaynak),
         veri("H", "Ortalama en yüksek dönüş katı", H, "—", "MMO/697 Tablo-3", 4),
         hesap("tv  =  h / V", f"=  {tr(h)} / {tr(V)}", tv, "s", "h/V"),
         veri("S", "Ortalama durak adedi", S, "—", "MMO/697 Tablo-5", 4),
@@ -681,7 +760,8 @@ def _manuel_sure_hatasi(g, on_ek=""):
 #  karşılanıyor" sonucu üretiyordu. )
 def _bina_hatasi(N, h, by, yy):
     if not (sayi_mi(N) and 1 <= N <= 30):
-        return "HESAP HATASI: Kat sayısı N 1 - 30 aralığında olmalıdır."
+        return ("HESAP HATASI: ③ kat sayısı N girilmedi ya da geçersiz — "
+                "1 ile 30 arasında olmalıdır.")
     if not sayi_mi(h) or not (0 < h <= 10):
         return (f"HESAP HATASI: ⑦ kat yüksekliği h = {tr(h)} m — "
                 "0 ile 10 m arasında olmalıdır.")
@@ -692,6 +772,19 @@ def _bina_hatasi(N, h, by, yy):
         return ("HESAP HATASI: ④ yapı yüksekliği girilmedi ya da geçersiz — "
                 "hesap standardı ( Standart / Yükseltilmiş ) buna göre seçilir.")
     return None
+
+
+#  HIZ BELİRLENEMEDİ  —  tek ve çoklu hesapta AYNI mesaj.
+#  Hız ne seçilmiş ne de Tablo-2'den okunabilmişse Tablo-6'dan tg de
+#  okunamaz.  Kullanıcıya eskiden "tg'yi elle girin" deniyordu — oysa eksik
+#  olan tg değil HIZDIR:  tg, hız seçilince tablodan kendiliğinden gelir.
+#  Tablo-2 yalnız Konut · Büro ve İş Merkezi · Otel gruplarını kapsar;
+#  öteki bina tiplerinde asgari hız proje kararıdır.
+def _hiz_yok_hatasi(bina_tipi, on_ek=""):
+    return (f"HESAP HATASI: {on_ek}kabin hızı belirlenemedi — {bina_tipi} MMO/697 "
+            "Tablo-2'de yoktur, asgari hız tablodan okunamaz. Kabin hızını ( V ) "
+            "asansörün kendi V kutusundan ya da 'Manuel değerler' bölümündeki ortak "
+            "hızdan seçin;  seçilen hız paftaya proje kararı olarak yazılır.")
 
 
 def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
@@ -711,9 +804,16 @@ def _dogrula_tek(g, b, N, P, kg_, kt, ta, tk, tg, tp, k, V, h, by, yy, k_tipi):
     if not sayi_mi(tp):
         return (f"HESAP HATASI: {kg_} mm için tp değeri bulunamadı. "
                 "İmalatçı değerini manuel tp alanına girin.")
+    bt = g.get("bina_tipi") or ""
+    #  HIZ YOKSA SEBEBİ SÖYLENİR  —  tg denetiminden ÖNCE.  Tablo-2 hızı
+    #  durak adedinden okur:  kat sayısı eksikse sebep odur;  değilse bina
+    #  tipi Tablo-2'de yoktur ( bkz. _hiz_yok_hatasi ).
+    if not sayi_mi(V):
+        if not (sayi_mi(N) and 1 <= N <= 30):
+            return _bina_hatasi(N, h, by, yy)                    # ③ kat sayısı
+        return _hiz_yok_hatasi(bt)
     if not sayi_mi(tg):
         return f"HESAP HATASI: V = {tr(V)} m/s için Tablo-6'da tg değeri yok. tg'yi elle girin."
-    bt = g.get("bina_tipi") or ""
     nufus_h = _nufus_girdi_hatasi(bt, g.get("hizli1"), g.get("hizli2"))
     if nufus_h:
         return nufus_h
@@ -990,7 +1090,12 @@ def hesapla_coklu(g: dict) -> dict:
         if not sayi_mi(tp):
             hata = hata or (f"HESAP HATASI: ASANSÖR-{i} — {kg_} mm için tp değeri bulunamadı; "
                             "imalatçı değerini manuel tp alanına girin.")
-        if not sayi_mi(tg):
+        #  Hız yoksa tg de yoktur — eksik olan HIZDIR ( bkz. _hiz_yok_hatasi ).
+        #  Kat sayısı bu yolda en başta denetlenir;  buraya gelindiyse sebep
+        #  bina tipinin Tablo-2'de olmamasıdır.
+        if not sayi_mi(Vi):
+            hata = hata or _hiz_yok_hatasi(bina_tipi, on_ek=f"ASANSÖR-{i} — ")
+        elif not sayi_mi(tg):
             hata = hata or (f"HESAP HATASI: ASANSÖR-{i} — hızı için Tablo-6'da tg değeri yok; "
                             "manuel tg girin.")
         if T.kapsam_disi(Ni, P):
