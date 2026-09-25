@@ -1356,6 +1356,36 @@ def _denetim_bulgulari(r):
                   _s3["ozet"]["Fat"] >= MK.SABIT["tampon_katsayi"]
                   * MK.SABIT["gn"] * _mcwt - 1e-6)
 
+    #  ── C3b  İki kütlenin KAYNAĞI paftada yazılı
+    #  Bölüm 8 karşı ağırlığın fiziksel kütlesini, bölüm 9 standardın P'siyle
+    #  kurulan yükü basar;  ikisi bilerek farklıdır ( C3 ).  Paftayı elden
+    #  denetleyen biri farkı hata sanabiliyordu:  iki satır da nasıl
+    #  kurulduğunu yazmalı ve ekrandaki açıklamanın iddiası — fark yalnız
+    #  gezici kablo payıdır — sayıyla tutmalı.
+    from engine.uygulama import mukavemet_tablolari as _MT3
+    for _z in ("Yok", "Var"):
+        _s4 = MK.hesapla({"denge_zinciri": _z})
+        _g4 = _s4["girdi"]
+        _b8 = next(b for b in _s4["bolumler"] if b["kimlik"] == "agirlik_raylari")
+        _b9 = next(b for b in _s4["bolumler"] if b["kimlik"] == "kuyu_tabani")
+        _mc = next(a for a in _b8["adimlar"] if a.get("sembol") == "Mcwt")
+        _fa = next(a for a in _b9["adimlar"] if (a.get("formul") or "").startswith("Fat ="))
+        r.kontrol(f"C3b zincir {_z}: Mcwt satırı nasıl kurulduğunu yazıyor",
+                  "boş kabin" in (_mc.get("kaynak") or "")
+                  and ("denge zinciri" in _mc["kaynak"]) == (_z == "Var"),
+                  f"→ {_mc.get('kaynak')!r}")
+        r.kontrol(f"C3b zincir {_z}: Fat satırı standardın maddesini yazıyor",
+                  "m.5.2.1.8.6" in (_fa.get("kaynak") or ""), f"→ {_fa.get('kaynak')!r}")
+        r.kontrol(f"C3b zincir {_z}: ekranda farkın nedeni açıklanıyor",
+                  any("m.5.2.1.8.6" in x and "gezici kablo" in x
+                      for x in _b9.get("aciklamalar") or []))
+        #  Gezici kablo payı motordan okunmaz:  0,5 · H · mt  ( iki kablo )
+        _mtrav = 0.5 * _g4["seyir_mesafesi"] * sum(
+            _MT3.kablo_agirligi(_g4.get(k)) or 0.0 for k in ("kablo_tipi_1", "kablo_tipi_2"))
+        _fark = _fa["deger"] / (MK.SABIT["tampon_katsayi"] * MK.SABIT["gn"]) - _mc["deger"]
+        r.kontrol(f"C3b zincir {_z}: fark tam gezici kablo payı ( {_mtrav:.3f} kg )",
+                  _yakin(_fark, _mtrav), f"→ fark {_fark!r}")
+
     #  ══════════════════════════════════════════════════════════════
     #  DÖRDÜNCÜ TUR  —  SINIR DURUMLARI
     #  ══════════════════════════════════════════════════════════════

@@ -2748,7 +2748,12 @@ def _agirlik_raylari(g, o):
         veri("n", "Ağırlık rayı sayısı", n, "adet", "GİRİŞ", 0),
         veri("h", "Ağırlık paten arası", h, "mm", "GİRİŞ"),
         veri("l", "Ağırlık rayı konsollar arası en uzun mesafe", l, "mm", "GİRİŞ"),
-        veri("Mcwt", "Karşı ağırlık kütlesi", Mcwt, "kg"),
+        #  KÜTLENİN NASIL KURULDUĞU YAZILIR:  bölüm 9'daki ağırlık tamponu
+        #  kuvveti standardın P'siyle kurulur ve bu sayıdan biraz büyüktür;
+        #  okuyan iki sayının kaynağını paftada görebilmelidir.
+        veri("Mcwt", "Karşı ağırlık kütlesi", Mcwt, "kg",
+             f"boş kabin + {tr(o['ofis']['q_denge'])} × Q"
+             + ("  +  denge zinciri" if o.get("MCR") else "")),
         veri("", "Karşı ağırlıkta güvenlik tertibatı", gt, "", "GİRİŞ"),
         kontrol(f"{gt} tertibat, beyan hızı {tr(g['beyan_hizi'])} m/s"
                 + ("  ( m.5.6.2.1.2.3:  v > 1 m/s ise KAYMALI olmalı )"
@@ -3040,7 +3045,7 @@ def _kuyu_tabani(g, o):
         metin("Ağırlık tamponlarına gelen kuvvetler :"),
         hesap("Fat = 4 × gn × ( P + q × Q )",
               f"4 × {tr(gn)} × ( {trn(P, 0)} + {tr(O['q_denge'])} × {trn(Q, 0)} )",
-              Fat, "N"),
+              Fat, "N", "m.5.2.1.8.6  ·  standardın P'si"),
         veri("ncwt", "Ağırlık tamponu adedi", n_at, "adet", "GİRİŞ", 0),
         hesap("Fat1 = Fat / ncwt", f"{trn(Fat, 0)} / {trn(n_at, 0)}",
               Fat1, "N", "m.5.2.1.8.6  ·  bir tampon altına"),
@@ -3048,6 +3053,20 @@ def _kuyu_tabani(g, o):
     b["notlar"] = [
         "Bu kuvvetler kuyu alt boşluğu tabanının ( temel / döşeme ) statik "
         "hesabına girer; inşaat projesine bildirilmelidir."]
+    #  EKRANDA ⓘ:  ağırlık tamponu kuvvetindeki kütle ile bölüm 8'deki
+    #  karşı ağırlık kütlesi AYNI SAYI DEĞİLDİR ve bu bilerek böyledir.
+    #  Paftayı elden denetleyen biri farkı hata sanabiliyordu.
+    b["aciklamalar"] = [
+        "AĞIRLIK TAMPONU KUVVETİ STANDARDIN BAĞINTISIYLA YAZILIR.  TS EN 81-20 "
+        "m.5.2.1.8.6:  F = 4·gn·( P + q·Q );  buradaki P, sembol listesinin "
+        "tanımıyla boş kabin + kabinin taşıdığı parçalardır — gezici kablo payı "
+        "ve varsa denge zinciri DÂHİL.  Bölüm 8'deki karşı ağırlık kütlesi "
+        f"( Mcwt = boş kabin + q·Q{' + denge zinciri' if o.get('MCR') else ''} ) "
+        "ise karşı ağırlığın fiziksel kütlesidir;  tahrik ve ray hesapları onu "
+        "kullanır.  Aradaki fark gezici kablo payı kadardır;  standardın "
+        "yazdığı büyük olandır, yani inşaat projesine bildirilen yük emniyetli "
+        "taraftadır.",
+    ]
     b["sonuc"] = {"baslik": "KUYU TABANI YÜKLERİ",
                   "metin": f"FKR = {tr(FKR)} N  ·  FAR = {tr(FAR)} N  ·  "
                            f"Fkt = {tr(Fkt)} N  ·  Fat = {tr(Fat)} N",
