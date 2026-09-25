@@ -23,6 +23,31 @@ def _satirlar(kayitlar):
     return [[("" if h is None else h) for h in k] for k in kayitlar]
 
 
+def _basliklar(ilk, sutun, ad):
+    """Başlıkları motorun SÜTUN TANIMINDAN kurar  ( ilk sütun: satırın anahtarı ).
+
+    Başlıklar elle sıralandığında veriyle kayıyordu:  ray tablosunda birim
+    ağırlık 3,7 kg/m "b ( balata yarı gen. )" başlığının, e = 14,3 mm
+    "gr ( kg/m )" başlığının altında görünüyordu — hesap doğru sütunu
+    okurken tabloya bakan mühendis yanlış sayıyı görüyordu.  Sıra artık
+    motorun o tabloyu okuduğu sözlükten gelir;  biri değişirse öbürü de.
+    """
+    return [ilk] + [ad[k] for k in sorted(sutun, key=sutun.get)]
+
+
+_RAY_AD = {"Gr": "Gr  ( kg/m )", "A": "A  ( mm² )", "Ix": "Ix  ( mm⁴ )",
+           "Iy": "Iy  ( mm⁴ )", "Wx": "Wx  ( mm³ )", "Wy": "Wy  ( mm³ )",
+           "ix": "ix  ( mm )", "iy": "iy  ( mm )", "c": "c  ( mm )", "e": "e  ( mm )"}
+_RAY_GEO_AD = {"f": "f  ( mm )", "b": "b  ( balata yarı gen., mm )", "h1": "h1  ( mm )",
+               "h1_b_f": "h1 − b − f  ( mm )", "h1_f": "h1 − f  ( mm )"}
+_NPU_AD = {"A": "A  ( cm² )", "G": "G  ( kg/m )", "Ix": "Ix  ( cm⁴ )",
+           "Wx": "Wx  ( cm³ )", "ix": "ix  ( cm )", "Iy": "Iy  ( cm⁴ )",
+           "Wy": "Wy  ( cm³ )", "iy": "iy  ( cm )"}
+_KABLO_AD = {"genislik": "Genişlik  ( mm )", "kalinlik": "Kalınlık  ( mm )",
+             "agirlik": "Ağırlık  ( kg/m )"}
+_MALZEME_AD = {"derinlik": "Derinlik  ( mm )", "yukseklik": "Yükseklik  ( mm )"}
+
+
 def _f_yukleme(sekil, mu, gama_d, beta_d, sert):
     """TS EN 81-50 m.5.11.2.3.1'in sürtünme çarpanı  —  motorla AYNI bağıntı."""
     beta = math.radians(beta_d)
@@ -51,16 +76,15 @@ def arayuz_tablolari(ofis=None):
         "ad": "Kılavuz ray profilleri",
         "kaynak": "ISO 7465",
         "aciklama": "Ray hesabının bütün kesit değerleri buradan okunur.",
-        "basliklar": ["Profil", "b  ( balata yarı gen. )", "A  ( mm² )",
-                      "Ix  ( mm⁴ )", "Iy  ( mm⁴ )", "Wx  ( mm³ )", "Wy  ( mm³ )",
-                      "ix  ( mm )", "iy  ( mm )", "c  ( mm )", "gr  ( kg/m )"],
+        "basliklar": _basliklar("Profil", MT._RAY_SUTUN, _RAY_AD),
         "satirlar": _satirlar(MT.RAY_PROFILI),
     })
     t.append({
         "ad": "Ray geometrisi  ( flanş eğilmesi )",
         "kaynak": "TS EN 81-50 m.5.10.5",
-        "aciklama": "σF hesabındaki c · h1 · f ölçüleri.",
-        "basliklar": ["Profil", "f", "h1", "Genişlik", "Ayak", "Yükseklik"],
+        "aciklama": ("σF = | Fx | · ( h1 − b − f ) · 6  /  ( c² · ( ℓ + 2 · ( h1 − f ) ) ) "
+                     "bağıntısının ölçüleri;  c ray profilleri tablosundadır."),
+        "basliklar": _basliklar("Profil", MT._RAY_GEO_SUTUN, _RAY_GEO_AD),
         "satirlar": _satirlar(MT.RAY_GEOMETRI),
     })
     t.append({
@@ -88,7 +112,7 @@ def arayuz_tablolari(ofis=None):
         "kaynak": "NPU profil tablosu  ( ofis )",
         "aciklama": ("240 · 280 · 300 satırlarında atalet yarıçapı ix BOŞTUR; "
                      "program bu seçimi açık mesajla reddeder."),
-        "basliklar": ["Ölçü", "A  ( cm² )", "Wx", "Wy", "Ix", "Iy", "ix", "iy", "e"],
+        "basliklar": _basliklar("Ölçü", MT._NPU_SUTUN, _NPU_AD),
         "satirlar": _satirlar(MT.NPU_PROFIL),
     })
     t.append({
@@ -162,15 +186,17 @@ def arayuz_tablolari(ofis=None):
     t.append({
         "ad": "Karşı ağırlık malzemesi",
         "kaynak": "ofis tablosu",
-        "aciklama": "Malzeme → özgül ağırlık ve blok yüksekliği.",
-        "basliklar": ["Malzeme", "γ", "h  ( mm )"],
+        "aciklama": ("Derinlik, 'Karşı ağırlık derinliği' kutusunun başlangıç "
+                     "değeridir;  hesap kutuya girilen değeri okur."),
+        "basliklar": _basliklar("Malzeme", MT._MALZEME_SUTUN, _MALZEME_AD),
         "satirlar": _satirlar(MT.AGIRLIK_MALZEMESI),
     })
     t.append({
         "ad": "Gezici kablo  ( bükülgen )",
         "kaynak": "ofis tablosu",
-        "aciklama": "Kablo tipi → ağırlık · çap · kesit.",
-        "basliklar": ["Tip", "Ağırlık", "Çap", "Kesit"],
+        "aciklama": ("Yassı bükülgen kablo;  hesaba yalnız metre ağırlığı girer "
+                     "( gezici kablo kütlesi MTrav )."),
+        "basliklar": _basliklar("Tip", MT._KABLO_SUTUN, _KABLO_AD),
         "satirlar": _satirlar(MT.BUKULGEN_KABLO),
     })
     t.append({

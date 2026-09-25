@@ -1317,6 +1317,114 @@ def calistir():
                 uzunluk = pg.eval_on_selector(f"#{ic_id}", "e => e.innerText.length")
                 r.kontrol(f"sekme '{sekme}' içerik üretti", uzunluk > 200, f"→ {uzunluk} karakter")
 
+        # ==============================================================
+        #  v3.3 — KAPAK ASANSÖR BİLGİLERİ HESAPTAN DOLAR
+        #  Gri yer tutucular sabit örneklerdi ( "10 kişi", "7,5 kW" ): dolu
+        #  görünüp boş basılıyordu.  Artık yer tutucu hesabın değeridir ve
+        #  boş kutunun yerine çıktıya o basılır.  Örnek proje:  10 + 16
+        #  kişilik iki asansör, 1,6 m/s, N = 11, h = 3 m, MRL, dişlisiz.
+        # ==============================================================
+        pg.click('.sekme[data-sekme="proje"]')
+        pg.wait_for_timeout(300)
+        _yer = pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll(
+            '#s-proje input[id^="k_"]')].map(e => [e.id.slice(2), e.placeholder]))""")
+        _bek = {"usage": "Konut", "stops": "12", "travel": "33,00 m",
+                "capacity": "10 / 16 kişi", "speed": "1,60 m/s",
+                "cabin_width": "1300/2100", "cabin_depth": "1450/1350",
+                "suspension": "2:1", "elevator_count": "2",
+                "drive_type": "Dişlisiz (MRL)", "standard": "TS EN 81-20"}
+        r.esit("kapak · yer tutucular projenin hesabını gösteriyor",
+               {k: _yer.get(k) for k in _bek}, _bek)
+        _nsc = pg.evaluate("SON.a.ozet.asansorler.map(a => a.Nsc)")
+        r.esit("kapak · motor gücü avandaki seçilen Nsç",
+               _yer.get("motor_power"),
+               " / ".join(dict.fromkeys(f"{x:g}".replace(".", ",") for x in _nsc)) + " kW")
+        r.esit("kapak · hesaptan çıkmayan alanlarda örnek değer yok",
+               {k: _yer.get(k) for k in ("block", "elevator_class", "rail_size", "scale")},
+               {"block": "", "elevator_class": "", "rail_size": "", "scale": ""})
+        r.esit("kapak · türeyen alan listesi motordan ( /api/secenekler )",
+               pg.evaluate("SEC.kapak_turetilen").__len__(), 12)
+        #  Çıktıya giden kapak:  boş kutu → hesabın değeri,  yazılan → yazılan
+        _cik = pg.evaluate("kapakCiktisi()")
+        r.esit("kapak · boş kutunun yerine çıktıya hesabın değeri gidiyor",
+               {k: _cik.get(k) for k in _bek}, _bek)
+        pg.fill("#k_capacity", "630 kg")
+        pg.wait_for_timeout(200)
+        r.esit("kapak · yazılan değer hesabın önüne geçiyor",
+               pg.evaluate("kapakCiktisi().capacity"), "630 kg")
+        r.esit("kapak · uygulama paketine giden form olduğu gibi ( türetme yok )",
+               pg.evaluate("[kapakGirdi().capacity, kapakGirdi().speed]"), ["630 kg", ""])
+        #  Kapak PDF'i:  yazılan değer ile hesaptan gelenler birlikte basılıyor
+        _gov = pg.evaluate("indirGovdesi('kapak-pdf')")
+        _pdf = urllib.request.urlopen(urllib.request.Request(
+            BASE + "/api/indir/kapak-pdf", method="POST", data=json.dumps(_gov).encode(),
+            headers={"Content-Type": "application/json"}), timeout=30).read()
+        try:
+            import pypdfium2 as _pdfium
+            _d = _pdfium.PdfDocument(_pdf)
+            _m = "".join(_d[0].get_textpage().get_text_range().split())
+            _yok = [v for v in ("630 kg", "1,60 m/s", "12", "33,00 m", "1300/2100",
+                                "Dişlisiz (MRL)", "Konut", "TS EN 81-20")
+                    if "".join(v.split()) not in _m]
+            r.kontrol("kapak PDF'i · hesaptan gelenler ve yazılan değer basıldı", not _yok,
+                      f"→ basılmayan: {_yok}")
+        except ImportError:
+            r.atla("kapak PDF metni okunamadı — pypdfium2 kurulu değil")
+        pg.fill("#k_capacity", "")
+        #  Trafik hesabı hata verince trafikten gelen yer tutucular boşalır —
+        #  eski değer "doğru" gibi basılmaz.
+        pg.click('.sekme[data-sekme="trafik"]')
+        pg.fill("#c_N", "")
+        pg.wait_for_timeout(1500)
+        r.esit("kapak · trafik hatalıyken durak / seyir / kullanım amacı boş",
+               pg.evaluate("['usage','stops','travel'].map(k => $('k_'+k).placeholder)"),
+               ["", "", ""])
+        r.esit("kapak · trafik hatalıyken çıktıya da gitmiyor",
+               pg.evaluate("[kapakCiktisi().stops, kapakCiktisi().travel]"), ["", ""])
+        #  Kat sayısı boşken mesaj eksik olanı söyler, tg'yi değil
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · N boşken mesaj kat sayısını söylüyor",
+                  "③ kat sayısı N" in _hm and "tg'yi elle girin" not in _hm, f"→ {_hm[:140]!r}")
+        pg.fill("#c_N", "11")
+        pg.wait_for_timeout(1500)
+        r.esit("kapak · trafik düzelince yer tutucular geri geliyor",
+               pg.evaluate("['usage','stops','travel'].map(k => $('k_'+k).placeholder)"),
+               ["Konut", "12", "33,00 m"])
+
+        # ==============================================================
+        #  v3.3 — ⑤ / ⑥ ETİKETİ VE HATA METNİ AYNI ADI SÖYLER
+        #  Red metni "hizli1 = 1.200" diyordu;  ekranda "hizli1" diye bir kutu
+        #  yoktur.  Etiket de hata metni de motordaki tek tanımdan gelir.
+        # ==============================================================
+        _et = lambda: pg.evaluate("[$('c_l_hizli1').textContent, $('c_l_hizli2').textContent]")
+        r.esit("⑤/⑥ etiketleri · Konut", _et(),
+               ["⑤ Daire sayısı (bağımsız bölüm adedi)",
+                "⑥ Daire başına DİĞER oda sayısı (ilk yatak odası hariç)"])
+        pg.fill("#c_hizli1", "1.200")
+        pg.wait_for_timeout(1200)
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · belirsiz ⑤ ekrandaki adıyla bildiriliyor",
+                  "⑤ Daire sayısı = 1.200" in _hm and "hizli1" not in _hm, f"→ {_hm[:160]!r}")
+        pg.fill("#c_hizli1", "44")
+        pg.select_option("#c_bina_tipi", "Katlı Otopark")
+        pg.wait_for_timeout(1500)
+        r.esit("⑤/⑥ etiketleri · Katlı Otopark", _et(),
+               ["⑤ Özel amaçlı araç adedi", "⑥ Ticari amaçlı araç adedi"])
+        #  Tablo-2'de olmayan bina tipinde hız seçilmemişse mesaj sebebi ve
+        #  çareyi söyler ( eskiden "V = — m/s için tg'yi elle girin" ).
+        _hm = pg.inner_text("#c_sonuc")
+        r.kontrol("trafik · Tablo-2 dışı bina, hız yok → sebep ve çare",
+                  "Tablo-2'de yoktur" in _hm and "tg'yi elle girin" not in _hm,
+                  f"→ {_hm[:160]!r}")
+        pg.select_option("#c_bina_tipi", "Otel (3* ve altı)")
+        pg.wait_for_timeout(300)
+        r.esit("⑤/⑥ etiketleri · Otel", _et(),
+               ["⑤ Toplam yatak sayısı", "⑥ (bu bina tipinde gerekmiyor — boş bırakın)"])
+        pg.select_option("#c_bina_tipi", "Konut")
+        pg.wait_for_timeout(1500)
+        r.kontrol("örnek projeye dönüldü — trafik yine hatasız",
+                  "HESAP HATASI" not in pg.inner_text("#c_sonuc"))
+
         # --- trafik sonucu doğru mu (sunucudaki motorla aynı olmalı)
         adetSec(pg, 1)
         pg.wait_for_timeout(400)
@@ -2306,6 +2414,135 @@ def calistir():
         r.kontrol("proje özeti: her asansörün sonucu hükmünün renginde",
                   _renk["ozet"] and all(b == g for _u, b, g in _renk["ozet"]),
                   f"→ {_renk['ozet']}")
+
+        # ==============================================================
+        #  v3.2 — SONUÇ TABLOSU ↔ AYRINTILI HESAP
+        #  Satır tıklaması yalnız girdileri açar, sayfayı oynatmaz.  "Hesaba
+        #  git" bölümün hesabına iner ve girdilerini de açar;  bölüm
+        #  şeridindeki "Özete dön" tablodaki satırına geri getirir.  Canlı
+        #  hesap sonucu yeniden çizdiğinde okunan bölüm yerinde kalır;
+        #  kaydırma sürerken çizim gelirse gidiş yarıda kalmaz.
+        # ==============================================================
+        pg.set_viewport_size({"width": 1440, "height": 900})
+        pg.evaluate("window.scrollTo(0, 0)")
+        #  Sayaçlar — sarmalayan ifade 0 döndürür:  Playwright dönen işlevi
+        #  çağırmaya kalkar.
+        pg.evaluate("""window.__grup = 0; window.__ciz = 0;
+            const _g = mGrupAc; mGrupAc = function(){ __grup++; return _g.apply(this, arguments); };
+            const _c = cizMukavemet; cizMukavemet = function(){ __ciz++; return _c.apply(this, arguments); };
+            0""")
+        _say = pg.evaluate("""() => ({
+            bolum: SON.m.bolumler.length,
+            git: document.querySelectorAll('#m_sonuc tr[data-kimlik] .m-hesaba-git').length,
+            don: document.querySelectorAll('#m_sonuc .serit[id] .m-ozete-don').length})""")
+        r.kontrol("her bölüm satırında 'Hesaba git', her bölüm şeridinde 'Özete dön' var",
+                  _say["bolum"] > 0 and _say["git"] == _say["bolum"] == _say["don"], f"→ {_say}")
+
+        #  Ortadaki bölüm — sayı elle yazılmaz, motora bölüm eklenince kaymasın
+        _kim = pg.evaluate("SON.m.bolumler[Math.floor(SON.m.bolumler.length / 2)].kimlik")
+        _tr = f'#m_sonuc tr[data-kimlik="{_kim}"]'
+        _ac = ("() => [...document.querySelectorAll('#m_form .m-grup.acik')]"
+               ".map(g => MUK.gruplar[+g.dataset.grup].ad).sort()")
+
+        pg.evaluate(f"window.scrollTo(0, document.querySelector('{_tr}')"
+                    ".getBoundingClientRect().top + scrollY - 300)")
+        pg.wait_for_timeout(300)
+        _y0 = pg.evaluate("scrollY")
+        pg.click(f"{_tr} td:nth-child(2)")
+        pg.wait_for_timeout(800)
+        r.esit("satır tıklaması sayfayı oynatmıyor", pg.evaluate("scrollY"), _y0)
+        r.esit("satır tıklaması bölümün girdilerini açıyor", pg.evaluate(_ac),
+               sorted(pg.evaluate(f"mBolumGruplari('{_kim}')")))
+
+        pg.evaluate("__grup = 0")
+        pg.click(f"{_tr} .m-hesaba-git")
+        pg.wait_for_timeout(1500)
+        _k = pg.evaluate(f"""() => {{
+            const b = document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect();
+            const p = document.querySelector('#s-mukavemet .sol').getBoundingClientRect();
+            const g = document.querySelector('#m_form .m-grup[data-grup="'
+                          + mBolumGrupNolari('{_kim}')[0] + '"]').getBoundingClientRect();
+            return {{baslik: b.top, sekme: document.querySelector('.sekmeler').getBoundingClientRect().bottom,
+                    grup: [g.top, g.top + 40], panel: [p.top, p.bottom], cagri: __grup,
+                    odak: document.activeElement.className, odak_kimlik: document.activeElement.dataset.kimlik}};
+        }}""")
+        r.kontrol("'Hesaba git' bölüm başlığını sekmelerin hemen altına getiriyor",
+                  0 < _k["sekme"] <= _k["baslik"] <= _k["sekme"] + 20, f"→ {_k}")
+        r.esit("'Hesaba git' bölümün girdilerini de açıyor", pg.evaluate(_ac),
+               sorted(pg.evaluate(f"mBolumGruplari('{_kim}')")))
+        r.kontrol("açılan ilk girdi grubu sol panelde görünür",
+                  _k["panel"][0] <= _k["grup"][0] and _k["grup"][1] <= _k["panel"][1], f"→ {_k}")
+        r.esit("'Hesaba git' satırın tıklamasını ayrıca tetiklemiyor", _k["cagri"], 1)
+        r.esit("odak bölümün 'Özete dön' düğmesinde",
+               (_k["odak"], _k["odak_kimlik"]), ("m-ozete-don", _kim))
+
+        #  CANLI HESAP:  α girilince üstteki iki uyarı kalkar ( içerik kısalır );
+        #  okunan bölüm yine de yerinde kalmalı.
+        _once = pg.evaluate(f"""() => [document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect().top,
+                                      document.querySelectorAll('#m_sonuc .uyari').length, __ciz]""")
+        pg.evaluate("""() => { const e = document.getElementById('m_sarilma_acisi');
+            e.value = '180'; e.dispatchEvent(new Event('input', {bubbles: true}));
+            e.dispatchEvent(new Event('change', {bubbles: true})); }""")
+        pg.wait_for_timeout(1600)
+        _sonra = pg.evaluate(f"""() => [document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect().top,
+                                       document.querySelectorAll('#m_sonuc .uyari').length, __ciz]""")
+        r.kontrol("canlı hesap: üstteki içerik değişti ( sınama anlamlı )",
+                  _sonra[2] > _once[2] and _sonra[1] < _once[1], f"→ {_once} → {_sonra}")
+        r.kontrol("canlı hesap: okunan bölüm yerinde kaldı",
+                  abs(_sonra[0] - _once[0]) <= 2, f"→ {_once[0]} → {_sonra[0]}")
+
+        #  KAYDIRMA SÜRERKEN ÇİZİM:  α kutusu odaktayken "Özete dön"e basmak
+        #  kutudan çıkarır, hesap tazelenir ve çizim kaydırmanın ortasına
+        #  denk gelir.  Gidiş yarıda kalmamalı.
+        #  Kutuya KULLANICI GİBİ yazılır:  betikle değiştirilen kutudan
+        #  çıkılınca tarayıcı "change" üretmez, çizim araya girmezdi.
+        pg.evaluate("mGrupAc(+document.getElementById('m_sarilma_acisi')"
+                    ".closest('.m-grup').dataset.grup, true)")
+        pg.fill("#m_sarilma_acisi", "170")
+        pg.wait_for_timeout(1200)
+        _c0 = pg.evaluate("__ciz")
+        pg.click(f"#{pg.evaluate(f'mBolumCapa({_kim!r})')} .m-ozete-don")
+        pg.wait_for_timeout(2000)
+        _d = pg.evaluate(f"""() => {{
+            const t = document.querySelector('{_tr}').getBoundingClientRect();
+            return {{ust: t.top, alt: t.bottom, ekran: innerHeight, cizim: __ciz,
+                    sekme: document.querySelector('.sekmeler').getBoundingClientRect().bottom,
+                    odak: document.activeElement.className, odak_kimlik: document.activeElement.dataset.kimlik}};
+        }}""")
+        r.kontrol("özete dönerken sonuç yeniden çizildi ( sınama anlamlı )",
+                  _d["cizim"] > _c0, f"→ {_c0} → {_d['cizim']}")
+        r.kontrol("'Özete dön' satırı ekrana getiriyor — araya giren çizime rağmen",
+                  _d["sekme"] <= _d["ust"] and _d["alt"] <= _d["ekran"], f"→ {_d}")
+        r.esit("odak satırın 'Hesaba git' düğmesinde — çizimden sonra da",
+               (_d["odak"], _d["odak_kimlik"]), ("m-hesaba-git", _kim))
+
+        #  Kullanıcı tekerleği çevirince ya da başka bir yere tıklayınca gidiş
+        #  biter:  sonraki bir çizim onu hedefe geri çekmemeli, tıkladığı
+        #  kutudan odağı çalmamalı.
+        for _olay, _js in (("tekerlek", "new WheelEvent('wheel', {deltaY: -100})"),
+                           ("fare", "new PointerEvent('pointerdown')")):
+            pg.evaluate("window.scrollTo(0, 0)")
+            pg.click(f"{_tr} .m-hesaba-git")
+            pg.wait_for_timeout(60)
+            _once_g = pg.evaluate("M_GIDIS !== null")
+            pg.evaluate(f"dispatchEvent({_js})")
+            r.kontrol(f"{_olay} süren gidişi bitiriyor",
+                      _once_g and pg.evaluate("M_GIDIS === null"),
+                      f"→ gidiş başlamış mıydı: {_once_g}")
+            pg.wait_for_timeout(1200)
+
+        #  Avan ve trafik bölümleri değişmedi:  ek verilmeden çizilen şerit
+        #  eskisinin birebir aynısı ( kimlik yok, sağda düğme yok ).
+        r.kontrol("ek verilmeyen bölüm şeridi eskisinin aynısı ( avan · trafik )",
+                  pg.evaluate("""() => bolumCiz({baslik: 'B', kaynak: 'K'}) ===
+                      '<div class="serit"><span>B' + bilgiSimgesi([]) +
+                      '</span><span class="kaynak">K</span></div>'"""))
+
+        pg.emulate_media(media="print")
+        r.esit("yazdırırken 'Hesaba git' ve 'Özete dön' basılmıyor",
+               pg.evaluate("[...document.querySelectorAll('.m-hesaba-git, .m-ozete-don')]"
+                           ".filter(e => getComputedStyle(e).display !== 'none').length"), 0)
+        pg.emulate_media(media="screen")
 
         r.kontrol("konsol hatası yok", not konsol, f"→ {konsol[:4]}")
         tarayici.close()

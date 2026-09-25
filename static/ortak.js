@@ -182,15 +182,13 @@ function etiketleriGuncelle(){
   ofisTazele();
   temelCevresi();
   [['c','c_bina_tipi']].forEach(([p,id])=>{
+    /*  Adlar motordan gelir ( trafik.hizli_etiketleri ):  hata metni de
+        kutuyu bu adla söyler, ikisi ayrışamaz. */
     const bt=$(id).value||'';
-    let l1='⑤ —', l2='⑥ (bu bina tipinde gerekmiyor — boş bırakın)';
-    if(bt==='Konut'){ l1='⑤ Daire sayısı (bağımsız bölüm adedi)';
-      l2='⑥ Daire başına DİĞER oda sayısı (ilk yatak odası hariç)'; }
-    else if(bt.startsWith('İş Merkezi')||bt.startsWith('Kamu')){ l1='⑤ Toplam çalışma alanı (m²)  →  12 m² = 1 kişi'; }
-    else if(bt.startsWith('Otel')||bt==='Hastane'){ l1='⑤ Toplam yatak sayısı'; }
-    else if(bt==='Katlı Otopark'){ l1='⑤ Özel amaçlı araç adedi'; l2='⑥ Ticari amaçlı araç adedi'; }
-    else { l1='⑤ Bu bina tipinde hızlı giriş yok — ek nüfus kalemlerini kullanın'; }
-    $(p+'_l_hizli1').innerHTML=l1; $(p+'_l_hizli2').innerHTML=l2;
+    const e=(SEC.hizli_etiketleri||{})[bt]||(SEC.hizli_etiketleri||{})['']
+            ||{hizli1:['⑤','—'],hizli2:['⑥','']};
+    const etiket=([ad,ipucu])=>ipucu?ad+' '+ipucu:ad;
+    $(p+'_l_hizli1').textContent=etiket(e.hizli1); $(p+'_l_hizli2').textContent=etiket(e.hizli2);
   });
 }
 
@@ -275,12 +273,18 @@ addEventListener('scroll',()=>{const a=document.querySelector('.bilgi.acik');
 addEventListener('resize',()=>document.querySelectorAll('.bilgi.acik')
   .forEach(x=>x.classList.remove('acik')));
 
-function bolumCiz(b){
+/*  ek ( isteğe bağlı ):  {id, sag}  —  şeride kimlik ve sağ uca bir düğme
+    ( uygulama projesinin "Özete dön"ü ).  Verilmezse şerit eskisinin
+    birebir aynısıdır;  avan ve trafik bölümleri böyle çizilir. */
+function bolumCiz(b, ek){
   //  "ekran_notlari":  paftaya basılmayan ama ekranda kalması gereken
   //  açıklamalar ( bkz. engine/avan.py — topraklama kontrolü ).
   const bilgi = [...(b.aciklamalar||[]), ...(b.ekran_notlari||[])];
-  let h=`<div class="serit"><span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
-      + `<span class="kaynak">${kacis(b.kaynak||'')}</span></div>`;
+  const kaynak = `<span class="kaynak">${kacis(b.kaynak||'')}</span>`;
+  let h=`<div class="serit"${ek && ek.id ? ` id="${kacis(ek.id)}"` : ''}>`
+      + `<span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
+      + (ek && ek.sag ? `<span class="serit-sag">${kaynak}${ek.sag}</span>` : kaynak)
+      + '</div>';
   if(b.adimlar&&b.adimlar.length) h+=adimTablosu(b.adimlar);
   if(b.cetvel&&b.cetvel.length) h+=cetvelTablosu(b.cetvel);
   if(b.sonuc) h+=`<div class="sonuc-kutu ${b.sonuc.uygun?'ok':'hata'}"><span class="et">${kacis(b.sonuc.baslik)}</span><span>${kacis(b.sonuc.metin)}</span></div>`
@@ -420,7 +424,7 @@ function indirGovdesi(uc){
   //  KAPAK HER İSTEKTE GİDER:  sunucu proje adını yalnız dosyanın ADI için
   //  kullanır — paftanın içeriği değişmez.
   return uc==='kapak-pdf'
-    ? {kapak:kapakGirdi()}
+    ? {kapak:kapakCiktisi()}
     : uc.startsWith('trafik')
     ? {kapak:kapakGirdi(), girdiler:trafikGirdi()}
     : uc.startsWith('uygulama')

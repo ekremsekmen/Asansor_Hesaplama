@@ -1078,7 +1078,8 @@ def arayuz_alanlari():
             #  malzemeden türetiyordu;  o türetme kaldırıldı ( TS EN 81-50
             #  Ek C.2.2 ölçüyü veri olarak ister ), ama seçim yapınca ekranda
             #  hiçbir şeyin değişmemesi sessiz bir tuzaktı.
-            "malzeme_derinligi": {r[0]: r[1] for r in MT.AGIRLIK_MALZEMESI},
+            "malzeme_derinligi": {r[0]: r[MT._MALZEME_SUTUN["derinlik"]]
+                                  for r in MT.AGIRLIK_MALZEMESI},
             "hesaplanan": list(HESAPLANAN)}
 
 

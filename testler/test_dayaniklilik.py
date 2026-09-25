@@ -222,7 +222,50 @@ def calistir():
     for alan, ham in (("manuel_V", "hızlı"), ("N", "on bir")):
         h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, **{alan: ham})}))
         r.kontrol(f"trafik · {alan} = {ham!r} sessizce boş sayılmıyor",
-                  "kabul edilmedi" in h and alan in h, f"→ {h[:120]!r}")
+                  "kabul edilmedi" in h and f"{TR.GIRDI_ETIKET[alan]} = {ham}" in h,
+                  f"→ {h[:120]!r}")
+    #  Trafik red metni de kutuyu EKRANDAKİ adıyla söyler:  "hizli1 = 1.200"
+    #  diye bir kutu yoktur.  ⑤ / ⑥ adı bina tipine göre değişir.
+    for _bt, _h1, _h2 in (("Konut", "⑤ Daire sayısı", "⑥ Daire başına DİĞER oda sayısı"),
+                          ("Katlı Otopark", "⑤ Özel amaçlı araç adedi",
+                           "⑥ Ticari amaçlı araç adedi"),
+                          ("Otel (3* ve altı)", "⑤ Toplam yatak sayısı", "⑥")):
+        h = _hata(UC_AVAN.api_trafik({"girdiler": dict(
+            TEMEL, bina_tipi=_bt, hizli1="1.200")}))
+        r.kontrol(f"trafik · {_bt[:14]} · belirsiz ⑤ ekrandaki adıyla",
+                  f"{_h1} = 1.200" in h and "hizli1" not in h, f"→ {h[:120]!r}")
+        h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, bina_tipi=_bt, hizli2="abc")}))
+        r.kontrol(f"trafik · {_bt[:14]} · okunamayan ⑥ ekrandaki adıyla",
+                  f"{_h2} = abc" in h and "hizli2" not in h, f"→ {h[:120]!r}")
+    h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, asansorler=[
+        {"P": "10", "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto.",
+         "h": "3.000", "durak": "on iki", "manuel_tg": "iki"}])}))
+    r.kontrol("trafik · asansör kartındaki belirsiz h ekrandaki adıyla",
+              "ASANSÖR-1: h — kat yüksekliği = 3.000" in h, f"→ {h[:140]!r}")
+    h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, asansorler=[
+        {"P": "10", "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto.",
+         "durak": "on iki", "manuel_tg": "iki"}])}))
+    r.kontrol("trafik · asansör kartındaki okunamayan alanlar ekrandaki adıyla",
+              "ASANSÖR-1: Durak = on iki" in h and "ASANSÖR-1: tg ( imalatçı ) = iki" in h
+              and "manuel_tg" not in h, f"→ {h[:160]!r}")
+    #  Hiçbir sayısal trafik alanı iç adıyla kalmaz — her bina tipinde
+    for _bt in ("", *TR.T.BINA_TIPLERI):
+        _ad = TR.girdi_etiketleri(_bt)
+        r.kontrol(f"trafik · {_bt[:18] or 'bina tipi boş'} · her bina alanının görünen adı var",
+                  set(UC_AVAN.TRAFIK_SAYISAL) <= set(_ad), f"→ adsız: "
+                  f"{set(UC_AVAN.TRAFIK_SAYISAL) - set(_ad)}")
+    r.kontrol("trafik · her asansör kartı alanının görünen adı var",
+              set(UC_AVAN.ASANSOR_SAYISAL) <= set(TR.ASANSOR_ETIKET),
+              f"→ adsız: {set(UC_AVAN.ASANSOR_SAYISAL) - set(TR.ASANSOR_ETIKET)}")
+    #  Arayüz ⑤ / ⑥ etiketini AYNI kaynaktan okur ( /api/secenekler )
+    _he = UC_AVAN.secenekler()["hizli_etiketleri"]
+    r.kontrol("secenekler · ⑤/⑥ etiketi her bina tipi ve boş seçim için var",
+              set(_he) == {"", *TR.T.BINA_TIPLERI}
+              and all(set(v) == {"hizli1", "hizli2"} for v in _he.values()))
+    r.esit("secenekler · Konut ⑤ etiketi motorla aynı",
+           tuple(_he["Konut"]["hizli1"]), ("⑤ Daire sayısı", "(bağımsız bölüm adedi)"))
+    r.kontrol("bozuk bina tipi ( sayı ) etiket kurarken çökmüyor",
+              TR.hizli_etiketleri(5)["hizli1"][0] == "⑤")
     #  Kişi sayısı okunamayan asansör listeden sessizce düşmüyor
     h = _hata(UC_AVAN.api_trafik({"girdiler": dict(TEMEL, asansorler=[
         {"P": "10", "kapi_genisligi": "900", "kapi_tipi": "Merkezden Açılan Oto."},

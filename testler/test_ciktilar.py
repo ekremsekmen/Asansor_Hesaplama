@@ -312,6 +312,93 @@ def calistir():
         r.kontrol("sığmayan adreste kırpma işareti basılıyor",
                   "…" in _kapak_metni(_cok))
 
+    # ---------------------------------------------------------- KAPAK: hesaptan dolan alanlar
+    #  Kapağın asansör bilgileri projenin kendi hesabından dolar ( boş kutu →
+    #  hesabın değeri ).  Eskiden formdaki gri örnekler ( "10 kişi", "7,5 kW" )
+    #  dolu görünüyor, kapak ise BOŞ basılıyordu.  Beklenen değerler girdiden
+    #  bağımsız olarak yazılır:  N = 11, h = 3 m → seyir 33 m, durak N + 1 = 12.
+    from engine.avan import kapak as KAP
+    _kt = KAP.trafikten(TR.hesapla_tek(GT))
+    r.esit("kapak · trafikten türeyenler",
+           _kt, {"usage": "Konut", "stops": "12", "travel": "33,00 m"})
+    r.esit("kapak · bodrum durağı durak ve seyre giriyor  ( 11 + 1 + 2 · ( 11 + 2 ) · 3 )",
+           KAP.trafikten(TR.hesapla_tek(dict(GT, bodrum=2))),
+           {"usage": "Konut", "stops": "14", "travel": "39,00 m"})
+    r.esit("kapak · çoklu trafikte ( 10 + 16 kişi ) aynı değerler bir kez",
+           KAP.trafikten(TR.hesapla_coklu(GC)),
+           {"usage": "Konut", "stops": "12", "travel": "33,00 m"})
+    r.esit("kapak · hatalı trafik hesabından değer türetilmez",
+           KAP.trafikten(TR.hesapla_tek({"bina_tipi": "Konut"})), {})
+
+    _ka = KAP.avandan(AV.hesapla({"ortak": ORT, "asansorler": [A1, A2]}))
+    r.esit("kapak · iki farklı asansör — değerler sırayla, aynısı bir kez", _ka, {
+        "capacity": "10 / 16 kişi", "speed": "1,60 / 1,00 m/s",
+        "cabin_width": "1300/2100", "cabin_depth": "1450/1350",
+        "suspension": AV.hesapla({"ortak": ORT, "asansorler": [A1]})
+                        ["ozet"]["asansorler"][0]["aski"],
+        "elevator_count": "2", "motor_power": "11 kW", "standard": "TS EN 81-20"})
+    r.esit("kapak · özdeş iki asansör — tek değer ( kabin mm, birimsiz )",
+           {k: v for k, v in KAP.avandan(AV.hesapla(
+               {"ortak": ORT, "asansorler": [A1, A1]})).items()
+            if k in ("capacity", "cabin_width", "cabin_depth", "elevator_count")},
+           {"capacity": "10 kişi", "cabin_width": "1300", "cabin_depth": "1450",
+            "elevator_count": "2"})
+    _a3 = dict(A1, kabin_boyu=1400, kabin_genisligi=1100)
+    _k3 = KAP.avandan(AV.hesapla({"ortak": ORT, "asansorler": [A1, A2, _a3]}))
+    r.kontrol("kapak · üç farklı kabin dar hücrede okunmaz — kabin türetilmez, öteki alanlar gelir",
+              "cabin_width" not in _k3 and "cabin_depth" not in _k3
+              and _k3.get("elevator_count") == "3", f"→ {_k3}")
+    _mrl = dict(ORT, mk_yok=True)
+    _a1d = dict(A1, makine_tipi="Dişlisiz", i_palanga=2, Nsc=5.5)
+    _k1 = KAP.avandan(AV.hesapla({"ortak": _mrl, "asansorler": [_a1d]}))
+    r.esit("kapak · MRL işaretliyse tahrik cinsine yazılır",
+           (_k1.get("drive_type"), _k1.get("suspension"), _k1.get("motor_power")),
+           ("Dişlisiz (MRL)", "2:1", "5,5 kW"))
+    r.esit("kapak · makine daireli projede MRL yazılmaz",
+           KAP.avandan(AV.hesapla({"ortak": ORT, "asansorler": [_a1d]})).get("drive_type"),
+           "Dişlisiz")
+    r.esit("kapak · yalnız anma yükü girilmiş asansör kg ile, birimler karışıksa her değerde",
+           KAP.avandan(AV.hesapla({"ortak": ORT, "asansorler": [
+               A1, dict(A1, kapasite=None, Q_elle=1000)]})).get("capacity"),
+           "10 kişi / 1000 kg")
+    r.esit("kapak · bir asansörü eksik projeden değer türetilmez ( adet yanlış yazılmasın )",
+           KAP.avandan(AV.hesapla({"ortak": ORT, "asansorler": [A1, dict(A2, Hk=None)]})), {})
+    r.esit("kapak · hatalı avan hesabından değer türetilmez",
+           KAP.avandan({"hata": "HESAP HATASI: x"}), {})
+    #  Türeyen her alan kapak PDF'inin bastığı bir alandır;  türeyen ile
+    #  türemeyen ayrıktır ve asansör bilgilerinin hepsini kapsar.
+    import inspect as _insp
+    _basilan = set(re.findall(r'"([a-z_]+)"', _insp.getsource(KPK._values)))
+    r.kontrol("kapak · türeyen / türemeyen her alanı kapak PDF'i basıyor",
+              set(KAP.ALANLAR) | set(KAP.TURETILMEYEN) <= _basilan,
+              f"→ basılmayan: {(set(KAP.ALANLAR) | set(KAP.TURETILMEYEN)) - _basilan}")
+    r.kontrol("kapak · türeyen ile türemeyen ayrık", not set(KAP.ALANLAR) & set(KAP.TURETILMEYEN))
+    r.kontrol("kapak · iki kaynak yalnız ALANLAR'daki adları üretiyor",
+              set(_kt) | set(_ka) | set(_k1) <= set(KAP.ALANLAR))
+    #  Birden çok asansörün değeri en küçük puntoda sığmıyorsa YANDAKİ
+    #  HÜCREYE TAŞMAZ, ayraçtan iki satıra bölünür.  "D:" kabin derinliği
+    #  hücresi 378,0 – 395,2 ( iç boşluk 0,8 );  hız hücresi 179,0 – 223,0.
+    from reportlab.pdfbase import pdfmetrics as _pm
+    for _ad, _metin_, _gen, _hucre_y in (
+            ("kabin derinliği · 2 kabin", "1450/1350", 395.2 - 378.0 - 1.6, 8.9),
+            ("hız · 4 asansör", "0,63 / 1,00 / 1,60 / 2,50 m/s", 223.0 - 179.0, 8.9)):
+        _sat, _pt = KPK._satirlar(_metin_, _gen, 7.0, _hucre_y)
+        r.kontrol(f"kapak · {_ad} hücreye sığıyor ( {len(_sat)} satır, {_pt:.1f} pt )",
+                  len(_sat) == 2 and 2 * _pt * 1.05 <= _hucre_y
+                  and all(_pm.stringWidth(x, KPK.F, _pt) <= _gen for x in _sat)
+                  and "".join(_sat).replace(" ", "") == _metin_.replace(" ", ""),
+                  f"→ {_sat} · {_pt:.2f} pt")
+    _sat, _pt = KPK._satirlar("TS EN 81-20", 504.1 - 395.2, 7.0, 8.9)
+    r.kontrol("kapak · sığan metin eskisi gibi tek satır, puntosu küçülmeden",
+              _sat == ["TS EN 81-20"] and _pt == 7.0, f"→ {_sat} · {_pt}")
+    if pdfium:
+        _km = _metin(KPK.pdf_bytes({**_kt, **_ka}))
+        #  İki satıra bölünen değer PDF metninde satır sonuyla gelir.
+        _km = re.sub(r"\s+", "", _km)
+        _eksik = [v for v in {**_kt, **_ka}.values() if re.sub(r"\s+", "", v) not in _km]
+        r.kontrol("kapak · türeyen değerlerin hepsi kapak PDF'ine basılıyor", not _eksik,
+                  f"→ basılmayan: {_eksik}")
+
     #  v2.9 — ÇÖKEN TEST ÇIKIŞ KODUNU BOZMALIDIR.  Bir test modülü istisna
     #  atınca ( kaldi = 0 ) sayaç artmıyor, özet "0 başarısız" diyor ve çıkış
     #  kodu 0 oluyordu:  sürekli tümleştirme yeşil görünürken test hiç

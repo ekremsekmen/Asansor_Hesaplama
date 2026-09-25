@@ -585,7 +585,7 @@ async function hesapMukavemet(){
       yazildi = true;
     }
     if(yazildi) yaz();
-    cizMukavemet(aktif);
+    mYeriKoruyarakCiz(()=>cizMukavemet(aktif));
     mGelismisTazele();
     //  Asansör listesi YALNIZ PROJE sekmesindedir.  Bir süre her asansörün
     //  sonuç panelinin başına da basılıyordu;  ASANSÖR 1 sekmesinde "1 · 2"
@@ -644,9 +644,14 @@ function cizMukavemet(r){
     //  bölümler hiç eşlenemiyordu.  Kimlik bölümün doğduğu yerde verilir.
     const kim = b.kimlik || '';
     const gidilir = mBolumGruplari(kim).join('  ·  ');
-    h += `<tr${gidilir ? ` class="m-gidilir" onclick="mGirdiyeGit('${kacis(kim)}')"
+    //  "Hesaba git" satırın İÇİNDEDİR ama satırın tıklamasını tetiklemez:
+    //  satır girdileri açar ve sayfayı oynatmaz, düğme hesaba iner.
+    const git = kim ? `<button type="button" class="m-hesaba-git" data-kimlik="${kacis(kim)}"
+              onclick="event.stopPropagation(); mHesabaGit('${kacis(kim)}')"
+              title="Bu bölümün hesap adımlarına in  ·  girdileri solda açılır">Hesaba git ↓</button>` : '';
+    h += `<tr data-kimlik="${kacis(kim)}"${gidilir ? ` class="m-gidilir" onclick="mGirdiyeGit('${kacis(kim)}')"
               title="Girdilerine git — ${kacis(gidilir)}"` : ''}>
-            <td class="etiket">${kacis(b.baslik)}</td>
+            <td class="etiket">${kacis(b.baslik)}${git}</td>
             <td>${kacis(b.kaynak||'')}</td>
             <td class="${sinif}">${kacis(sn.metin||'—')}</td></tr>`;
   });
@@ -664,7 +669,12 @@ function cizMukavemet(r){
        + '</div>';
   }
 
-  (r.bolumler||[]).forEach(b=>{ h += bolumCiz(b); });
+  (r.bolumler||[]).forEach(b=>{
+    h += bolumCiz(b, b.kimlik ? {id: mBolumCapa(b.kimlik),
+      sag: `<button type="button" class="m-ozete-don" data-kimlik="${kacis(b.kimlik)}"
+              onclick="mOzeteDon('${kacis(b.kimlik)}')"
+              title="Bölüm sonuçları tablosunda bu bölümün satırına dön">↑ Özete dön</button>`} : undefined);
+  });
   $('m_sonuc').innerHTML = h + '</div>';
 }
 
@@ -782,11 +792,157 @@ function mAramaUygula(){
     ( mukavemet_girdi.BOLUM_GRUBU ) — arayüzde tutulsaydı motor değişince
     sessizce bayatlardı. */
 function mGirdiyeGit(kimlik){
-  if(!MUK || !MUK.bolum_grubu) return;
-  const no = mBolumGruplari(kimlik).map(ad=>MUK.gruplar.findIndex(g=>g.ad === ad))
-                                   .filter(i=>i >= 0);
+  const no = mBolumGrupNolari(kimlik);
   if(!no.length) return;
   mGrupAc(no);
+}
+/*  Bölümü besleyen girdi gruplarının formdaki sıra numaraları. */
+function mBolumGrupNolari(kimlik){
+  if(!MUK || !MUK.bolum_grubu) return [];
+  return mBolumGruplari(kimlik).map(ad=>MUK.gruplar.findIndex(g=>g.ad === ad))
+                               .filter(i=>i >= 0);
+}
+
+/* ==========================================================================
+   SONUÇ TABLOSU  ↔  AYRINTILI HESAP
+   Satıra tıklamak yalnız girdileri açar, sayfayı oynatmaz.  "Hesaba git"
+   bölümün hesap adımlarına iner ve girdilerini de açar:  sol panel
+   yapışkan olduğu için girdi solda, hesap sağda yan yana durur.  Bölümün
+   şeridindeki "Özete dön" tablodaki satırına geri getirir.
+   ========================================================================== */
+const mBolumCapa = kimlik => 'mh-' + kimlik;
+
+function mKaydirma(){
+  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+/*  Yapışkan üst şerit ve sekmelerin kapladığı yükseklik:  kaydırılan yer
+    onların altında kalmasın.  Dar ekranda yalnız sekmeler yapışkandır. */
+function mUstPay(){
+  let pay = 8;
+  for(const s of ['.ust', '.sekmeler']){
+    const e = document.querySelector(s);
+    if(e && getComputedStyle(e).position === 'sticky') pay += e.offsetHeight;
+  }
+  return pay;
+}
+
+/*  Sayfa kaydırmasının hedefi — belgenin sınırları içinde ( son bölüme
+    inerken hedef sayfa sonunu aşabilir, oraya hiç varılmaz ). */
+function mSayfaHedefi(y){
+  return Math.max(0, Math.min(Math.round(y),
+                              document.documentElement.scrollHeight - innerHeight));
+}
+const mBolumDugmesi = (sinif, kimlik) =>
+  [...document.querySelectorAll('#m_sonuc .' + sinif)].find(x=>x.dataset.kimlik === kimlik);
+
+/*  Bölümün girdi gruplarını açar ve sol paneli ilkine kaydırır — BİR KEZ
+    yapılır;  süren gidiş yeniden çizimde yenilenirken tekrarlanmaz ( o
+    arada kullanıcı solda başka bir grup açtıysa kapanmasın ). */
+function mBolumGirdileriniAc(kimlik){
+  //  Gruplar SESSİZ açılır:  mGrupAc'ın kendi kaydırması sayfayı da
+  //  oynatabilir;  burada paneli ve sayfayı ayrı ayrı biz kaydırıyoruz.
+  const no = mBolumGrupNolari(kimlik);
+  if(!no.length) return;
+  mGrupAc(no, true);
+  const gr = document.querySelector(`#m_form .m-grup[data-grup="${no[0]}"]`);
+  const panel = gr && gr.closest('.sol');
+  //  Panel yalnız geniş ekranda kendi içinde kayar;  dar ekranda normal akıştadır.
+  if(panel && panel.scrollHeight > panel.clientHeight)
+    panel.scrollTo({top: panel.scrollTop + gr.getBoundingClientRect().top
+                         - panel.getBoundingClientRect().top - 8, behavior: mKaydirma()});
+}
+
+function mBolumeIn(kimlik){
+  const hedef = document.getElementById(mBolumCapa(kimlik));
+  if(!hedef) return null;
+  const y = mSayfaHedefi(hedef.getBoundingClientRect().top + scrollY - mUstPay());
+  window.scrollTo({top: y, behavior: mKaydirma()});
+  const don = mBolumDugmesi('m-ozete-don', kimlik);
+  if(don) don.focus({preventScroll: true});      // klavyeyle hemen geri dönülebilsin
+  return y;
+}
+
+function mSatiraCik(kimlik){
+  const tr = [...document.querySelectorAll('#m_sonuc tr[data-kimlik]')]
+               .find(x=>x.dataset.kimlik === kimlik);
+  if(!tr) return null;
+  //  Satır, yapışkan şeridin altında kalan alanın ortasına gelir.
+  const pay = mUstPay(), r = tr.getBoundingClientRect();
+  const orta = pay + Math.max(0, (innerHeight - pay - r.height) / 2);
+  const y = mSayfaHedefi(r.top + scrollY - orta);
+  window.scrollTo({top: y, behavior: mKaydirma()});
+  tr.classList.remove('m-vurgu'); void tr.offsetWidth; tr.classList.add('m-vurgu');
+  const git = mBolumDugmesi('m-hesaba-git', kimlik);
+  if(git) git.focus({preventScroll: true});
+  return y;
+}
+
+/*  SÜREN GİDİŞ.  Kaydırma sürerken sonuç yeniden çizilebilir:  α kutusuna
+    yazıp doğrudan "Özete dön"e basınca kutudan çıkılır, hesap tazelenir ve
+    çizim kaydırmanın ortasına denk gelir.  Eski öğeler silindiği için gidiş
+    yeni çizim üzerinde YENİDEN yapılır ( bkz. mYeriKoruyarakCiz ).  Gidiş
+    hedefe varınca, kullanıcı tekerleği / fareyi / dokunmayı / klavyeyi
+    kullanınca ya da en geç 2,5 sn sonra biter — yenilenen gidiş, kullanıcının
+    o arada tıkladığı kutudan odağı çalmasın. */
+let M_GIDIS = null;
+function mGit(yap){
+  M_GIDIS = {yap, hedef: null, bitis: performance.now() + 2500};
+  M_GIDIS.hedef = yap();
+  if(M_GIDIS.hedef === null) M_GIDIS = null;
+}
+function mGidisSuruyor(){
+  if(M_GIDIS && performance.now() > M_GIDIS.bitis) M_GIDIS = null;
+  return !!M_GIDIS;
+}
+addEventListener('scroll', ()=>{
+  if(M_GIDIS && Math.abs(scrollY - M_GIDIS.hedef) < 2) M_GIDIS = null;
+}, {passive: true});
+for(const olay of ['wheel', 'pointerdown', 'keydown'])
+  addEventListener(olay, ()=>{ M_GIDIS = null; }, {passive: true, capture: true});
+
+function mHesabaGit(kimlik){
+  if(!document.getElementById(mBolumCapa(kimlik))) return;
+  mBolumGirdileriniAc(kimlik);
+  mGit(()=>mBolumeIn(kimlik));
+}
+function mOzeteDon(kimlik){ mGit(()=>mSatiraCik(kimlik)); }
+
+/*  CANLI HESAPTA YER KAYBOLMASIN.  Her girdi değişikliğinde sonuç baştan
+    çizilir;  üstteki bir uyarı kalkınca ya da bir bölüm kısalınca, okunan
+    hesap ekranda yukarı kayıyordu ( "Hesaba git" ile inip α girildiğinde
+    iki uyarı birden kalkar ).
+      · süren bir gidiş varsa yeni çizimde yeniden yapılır;
+      · yoksa ekranın başındaki bölüm çizimden sonra aynı yere getirilir
+        ( özet tablodayken — henüz bir bölüme inilmemişken — yer değişmez );
+      · odak "Hesaba git" / "Özete dön" düğmesindeyse yenisine geçer —
+        klavyeyle gezen kullanıcı yerini kaybetmez. */
+function mGorunenBolum(){
+  const pay = mUstPay();
+  let son = null;
+  for(const s of document.querySelectorAll('#m_sonuc .serit[id]')){
+    if(s.getBoundingClientRect().top > pay + 1) break;
+    son = s;
+  }
+  return son ? {id: son.id, ust: son.getBoundingClientRect().top} : null;
+}
+function mYeriKoruyarakCiz(ciz){
+  const gidis = mGidisSuruyor() ? M_GIDIS : null;
+  const yer = gidis ? null : mGorunenBolum();
+  const e = document.activeElement;
+  const odak = e && e.matches && e.matches('#m_sonuc .m-hesaba-git, #m_sonuc .m-ozete-don')
+    ? {sinif: e.classList.contains('m-hesaba-git') ? 'm-hesaba-git' : 'm-ozete-don',
+       kimlik: e.dataset.kimlik} : null;
+  ciz();
+  if(gidis){
+    gidis.hedef = gidis.yap();
+    if(gidis.hedef === null) M_GIDIS = null;
+  }else{
+    const s = yer && document.getElementById(yer.id);
+    if(s) window.scrollBy(0, s.getBoundingClientRect().top - yer.ust);
+  }
+  const yeni = odak && mBolumDugmesi(odak.sinif, odak.kimlik);
+  if(yeni && document.activeElement !== yeni) yeni.focus({preventScroll: true});
 }
 
 /* ==========================================================================

@@ -55,7 +55,48 @@ GENISLETILEN = {
         "eklenen": (450,),
         "degisen": {rm: (rm / 2.25, rm / 1.8) for rm in (370, 440, 520)},
     },
+    #  NPU:  üç değer DIN 1026-1'e göre düzeltildi ( bkz. mukavemet_tablolari ).
+    #  Düzeltmeyi satırın KENDİ öteki sütunları doğrular ( aşağıda
+    #  _profil_tutarliligi ):  30x15'in ix'i ancak Ix = 2,53 ile, 280 · 300'ün
+    #  G'si ancak A = 53,3 · 58,8 ile tutar.
+    "NPU_PROFIL": {
+        "eklenen": (),
+        "degisen": {"30x15": (2.21, 1.74, 2.53, 1.69, 1.07, 0.38, 0.39, 0.42),
+                    280: (53.3, 41.8, 6280, 448, None, 399, 57.2, None),
+                    300: (58.8, 46.2, 8030, 535, None, 495, 67.8, None)},
+    },
 }
+
+
+def _profil_tutarliligi(r):
+    """Profil tablolarının KENDİ İÇİNDEKİ bağıntıları  ( %2 ).
+
+    Kaynağa karşı birebir karşılaştırma, kaynağın kendi yazım hatasını
+    göremez:  NPU 30x15'te A değeri Ix sütununa da yazılmıştı, 280 · 300'ün
+    A'sı G'leriyle çelişiyordu — üçü de yıllarca "kaynakla aynı" diye geçti.
+    Kesit değerleri birbirinden bağımsız değildir:
+        atalet yarıçapı  i = √( I / A )
+        birim ağırlık    G = ρ · A     ( çelik 7.850 kg/m³ )
+    """
+    #  Sütun sayısı bozuk satırı tablo karşılaştırması zaten yazar — burada atlanır.
+    for olcu, A, G, Ix, _Wx, ix, Iy, _Wy, iy in (x for x in MT.NPU_PROFIL if len(x) == 9):
+        r.kontrol(f"NPU {olcu}: G = 0,785 × A", abs(G - 0.785 * A) <= 0.02 * G,
+                  f"→ G {G} · 0,785 × A {0.785 * A:.3f}")
+        for ad, i, I in (("ix", ix, Ix), ("iy", iy, Iy)):
+            if i is not None:
+                r.kontrol(f"NPU {olcu}: {ad} = √( I / A )",
+                          abs(i - (I / A) ** 0.5) <= 0.02 * i,
+                          f"→ {ad} {i} · √( I / A ) {(I / A) ** 0.5:.3f}")
+    for p, Gr, A, Ix, Iy, _Wx, _Wy, ix, iy, _c, _e in (x for x in MT.RAY_PROFILI if len(x) == 11):
+        r.kontrol(f"ray {p}: Gr = 0,00785 × A", abs(Gr - 0.00785 * A) <= 0.02 * Gr,
+                  f"→ Gr {Gr} · 0,00785 × A {0.00785 * A:.3f}")
+        r.kontrol(f"ray {p}: ix = √( Ix / A )", abs(ix - (Ix / A) ** 0.5) <= 0.02 * ix,
+                  f"→ ix {ix} · √( Ix / A ) {(Ix / A) ** 0.5:.3f}")
+        #  125x82x16'nın iy'si kaynakta tutarsızdır ve bilerek öyle kalır:
+        #  küçük iy burkulmayı emniyetli tarafta hesaplar;  paftaya not düşülür.
+        if p not in MT.RAY_TUTARSIZ:
+            r.kontrol(f"ray {p}: iy = √( Iy / A )", abs(iy - (Iy / A) ** 0.5) <= 0.02 * iy,
+                      f"→ iy {iy} · √( Iy / A ) {(Iy / A) ** 0.5:.3f}")
 
 
 def _kanal_tablosu(r, kaynak):
@@ -146,14 +187,23 @@ def _genisletilen_tablo(r, ad, tablo, kaynak):
     mo = {satir[0]: tuple(satir[1:]) for satir in tablo}
     kural = GENISLETILEN[ad]
     r.esit(f"{ad}: kaynağın satırlarının hepsi duruyor",
-           sorted(set(ex) - set(mo)), [])
+           sorted(set(ex) - set(mo), key=str), [])
     r.esit(f"{ad}: eklenenler beklenenlerle aynı",
-           sorted(set(mo) - set(ex)), sorted(kural["eklenen"]))
-    for anahtar, deger in sorted(ex.items()):
+           sorted(set(mo) - set(ex), key=str), sorted(kural["eklenen"], key=str))
+    #  Anahtarlar karışık türde olabilir ( NPU:  '30x15' ve 30 ) — metin olarak sıralanır.
+    #  HÜCRE HÜCRE ve sütun sayısıyla:  toplu karşılaştırma ( zip ) eksik bir
+    #  sütunu göremezdi;  değişmeyen tabloların denetimiyle aynı incelikte.
+    for anahtar, deger in sorted(ex.items(), key=lambda kv: str(kv[0])):
         beklenen = kural["degisen"].get(anahtar, deger)
-        r.kontrol(f"{ad}[{anahtar}]",
-                  all(_esit(a, b) for a, b in zip(mo[anahtar], beklenen)),
-                  f"→ modül {mo[anahtar]!r}, beklenen {beklenen!r}")
+        if anahtar not in mo or not r.esit(f"{ad}[{anahtar}]: sütun sayısı",
+                                           len(mo[anahtar]), len(beklenen)):
+            continue
+        for j, (mv, bv) in enumerate(zip(mo[anahtar], beklenen), 1):
+            r.kontrol(f"{ad}[{anahtar}][{j}]", _esit(mv, bv),
+                      f"→ modül {mv!r}, beklenen {bv!r}  ( satır {mo[anahtar]!r} )")
+    #  Satır SIRASI da korunur ( seçim listeleri tablodan bu sırayla kurulur ).
+    r.esit(f"{ad}: kaynağın satırları aynı sırada",
+           [a for a in mo if a in ex], [a for a in ex if a in mo])
 
 
 def _esit(a, b):
@@ -185,6 +235,7 @@ def calistir():
     #  KANAL TABLOSU:  modül Nequiv(t)'yi ofis açılarından ve TS EN 81-50
     #  Çizelge 2'den türetiyor.
     _kanal_tablosu(r, kaynak["kanal"])
+    _profil_tutarliligi(r)
 
     #  ω:  kaynak tablo λ = 20 … 250, Rm = 370 eğrisidir.  Modül standardın
     #  iki eğrisini ( 370 · 520 ) formülle kurar;  370 eğrisi tabloyu üretmeli.
