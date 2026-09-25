@@ -94,9 +94,19 @@ a{color:var(--mavi2)}
 .kart-ic{padding:14px}
 .kart-ic.sikisik{padding:10px 14px 14px}
 
-/* sol panel yapışkan */
+/*  SOL PANEL YAPIŞKAN.  Ekrandan uzunsa KENDİ İÇİNDE kayar:  yalnız
+    yapışkan olsaydı alt kısmına ( çıktı düğmeleri ) sayfanın sonuna
+    gelmeden ulaşılamazdı.  Yapışkanlığın çalışması için html/body'nin
+    kaydırma kabı OLMAMASI gerekir — bkz. aşağıda "overflow-x:clip".
+    170 = 110 ( yapıştığı yer ) + 60 ( .kabuk alt boşluğu ):  panel daha
+    uzun olursa sayfanın sonunda yukarı itilip başı sekmelerin altında
+    kalıyordu.  clip'i tanımayan tarayıcıda yapışkanlık çalışmaz;  orada
+    panel de eskisi gibi sayfayla birlikte kayar.                         */
 .sol{position:sticky;top:110px}
-@media(max-width:1100px){.sol{position:static}}
+@supports (overflow-x:clip){
+  .sol{max-height:calc(100vh - 170px);overflow-y:auto}
+}
+@media(max-width:1100px){.sol{position:static;max-height:none;overflow:visible}}
 
 /* ---------------------------------------------------------- form */
 .alan{margin-bottom:11px}
@@ -230,6 +240,12 @@ table.veri tr.toplam td{background:var(--gri-ac);font-weight:700}
 table.veri tr.onerilen td{background:var(--yesil-ac)}
 table.veri tr.ilk-kolon td:first-child{background:var(--gri-ac);font-weight:600}
 table.veri td.etiket{background:var(--gri-ac);font-weight:600;font-variant-numeric:normal}
+/*  SONUÇ HÜCRESİ  ( uygulama — bölüm sonuçları · proje özeti ).  Arayüz
+    hükme göre ok / hata sınıfını veriyordu ama kuralı yoktu:  "UYGUN
+    DEĞİLDİR" ile "UYGUNDUR" aynı siyahla yazılıyor, takılan bölüm tabloda
+    göze çarpmıyordu.                                                      */
+table.veri td.ok{color:var(--yesil);font-weight:600}
+table.veri td.hata{color:var(--kirmizi);font-weight:600;background:var(--kirmizi-ac)}
 .kaydir{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
 table.veri{min-width:520px}
 
@@ -298,8 +314,12 @@ table.veri{min-width:520px}
   .pafta-bas h2{font-size:15px}
   .dugmeler .dg{flex:1 1 auto;justify-content:center}
 }
-/* hiçbir durumda sayfa yatay kaymasın — geniş içerik kendi kutusunda kayar */
-html,body{max-width:100%;overflow-x:hidden}
+/* hiçbir durumda sayfa yatay kaymasın — geniş içerik kendi kutusunda kayar.
+   HIDDEN DEĞİL CLIP:  hidden body'yi bir kaydırma kabına çeviriyordu;  üst
+   şerit, sekmeler ve sol panel ( position:sticky ) o kaba yapışıp sayfayla
+   birlikte kayıp gidiyordu.  clip taşanı kaba dönüştürmeden keser.  clip'i
+   tanımayan eski tarayıcı ( Safari 16 öncesi ) hidden'da kalır — eski hâl. */
+html,body{max-width:100%;overflow-x:hidden;overflow-x:clip}
 .kart,.kart-ic,.sayfa,.ikili>div{min-width:0}
 
 
