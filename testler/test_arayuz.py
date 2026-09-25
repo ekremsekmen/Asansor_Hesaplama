@@ -2204,6 +2204,109 @@ def calistir():
             "(document.querySelector('#c_eknufus_liste .en-mi')||{}).value")
         r.esit("miktar korunuyor", _mi, "12")
 
+        # ==============================================================
+        #  v3.1 — ÜST ŞERİT VE SOL PANEL YAPIŞKAN KALIR
+        #  CSS'te position:sticky yazılıydı ama html/body'deki
+        #  overflow-x:hidden body'yi kaydırma kabına çeviriyor, şerit ve
+        #  panel sayfayla birlikte kayıp gidiyordu:  900 px aşağıda girdi
+        #  paneli ekranın 781 px üstündeydi.  Uzun panel KENDİ İÇİNDE kayar;
+        #  sayfanın sonunda bile başı sekmelerin altına girmez.
+        # ==============================================================
+        _olc = """sec => {
+            const k = s => document.querySelector(s).getBoundingClientRect();
+            return {y: scrollY, ust: k('.ust').top, sekme: k('.sekmeler').bottom,
+                    ust_p: k(sec + ' .sol').top, alt_p: k(sec + ' .sol').bottom,
+                    ekran: innerHeight};
+        }"""
+
+        def _yapiskan(etiket, sec):
+            for _yer, _y in (("aşağıdayken", 1200), ("en alttayken", 10 ** 7)):
+                pg.evaluate(f"window.scrollTo(0, {_y})")
+                pg.wait_for_timeout(250)
+                k = pg.evaluate(_olc, sec)
+                r.kontrol(f"{etiket}: sayfa gerçekten kaydırıldı ( {_yer} )",
+                          k["y"] > 300, f"→ {k}")
+                r.kontrol(f"{etiket}: {_yer} üst şerit görünür",
+                          abs(k["ust"]) < 1, f"→ {k}")
+                #  Ölçü EKRANA göredir:  şeride göre ölçülseydi, ikisi birlikte
+                #  kayıp gittiğinde aradaki mesafe değişmez, kontrol geçerdi.
+                r.kontrol(f"{etiket}: {_yer} sol panel sekmelerin hemen altında",
+                          0 < k["sekme"] <= k["ust_p"] <= k["sekme"] + 20, f"→ {k}")
+                r.kontrol(f"{etiket}: {_yer} sol panelin tamamı ekranda",
+                          0 < k["ust_p"] and k["alt_p"] <= k["ekran"], f"→ {k}")
+            pg.evaluate("window.scrollTo(0, 0)")
+
+        pg.set_viewport_size({"width": 1440, "height": 900})
+        pg.click('.sekme[data-sekme="avan"]')
+        pg.wait_for_timeout(1500)
+        _yapiskan("avan", "#s-avan")
+        #  Panelin altındaki düğme, panel kendi içinde kaydırılınca ekrana gelir
+        pg.evaluate("document.querySelector('#s-avan .sol').scrollTop = 1e6")
+        pg.wait_for_timeout(250)
+        _d = pg.evaluate("""() => {
+            const r = document.getElementById('dg_proje_dwg').getBoundingClientRect();
+            return {ust: r.top, alt: r.bottom, sekme:
+                    document.querySelector('.sekmeler').getBoundingClientRect().bottom,
+                    ekran: innerHeight};
+        }""")
+        r.kontrol("avan: panelin en altındaki paket düğmesine ulaşılıyor",
+                  _d["sekme"] <= _d["ust"] and _d["alt"] <= _d["ekran"], f"→ {_d}")
+        pg.evaluate("document.querySelector('#s-avan .sol').scrollTop = 0")
+
+        #  Uygulama projesi temiz girdiyle:  α varsayılanı yoktur, girilmezse
+        #  tahrik bölümü HESAP EKSİK kalır — tabloda en az bir "uygun değil"
+        #  satırı her zaman bulunur.
+        pg.evaluate("localStorage.removeItem('uygulama_program_v1')")
+        pg.reload(wait_until="networkidle")
+        pg.wait_for_timeout(600)
+        pg.click("#gk_uygulama")
+        pg.wait_for_timeout(2200)
+        pg.click('.sekme[data-sekme="mukavemet"]')
+        pg.wait_for_timeout(1500)
+        _yapiskan("uygulama", "#s-mukavemet")
+
+        # ==============================================================
+        #  v3.1 — SONUÇ HÜCRESİ HÜKMÜN RENGİYLE YAZILIR
+        #  Arayüz "uygun değil" hücresine hata, "uygun" hücresine ok sınıfını
+        #  veriyordu ama CSS'te kuralı yoktu:  "UYGUN DEĞİLDİR" ile
+        #  "UYGUNDUR" aynı siyahla yazılıyordu.  Beklenen renk sayfanın kendi
+        #  renk değişkenlerinden okunur — elle yazılmaz.
+        # ==============================================================
+        _renk = pg.evaluate("""() => {
+            const renk = v => {
+                const e = document.createElement('span');
+                e.style.color = `var(${v})`;
+                document.body.appendChild(e);
+                const c = getComputedStyle(e).color;
+                e.remove();
+                return c;
+            };
+            const bek = u => u === true ? renk('--yesil')
+                           : u === false ? renk('--kirmizi') : renk('--yazi');
+            const satir = [...document.querySelectorAll('#m_sonuc tr.m-gidilir')];
+            const ozet = [...document.querySelectorAll('#p_ozet tr.m-gidilir')];
+            return {
+                bolum: satir.map((tr, i) => [(SON.m.bolumler[i].sonuc || {}).uygun,
+                    bek((SON.m.bolumler[i].sonuc || {}).uygun),
+                    getComputedStyle(tr.lastElementChild).color]),
+                bolum_sayisi: SON.m.bolumler.length,
+                ozet: ozet.map((tr, i) => [SON.mc.ozet.asansorler[i].tumu_uygun,
+                    bek(SON.mc.ozet.asansorler[i].tumu_uygun),
+                    getComputedStyle(tr.lastElementChild).color]),
+            };
+        }""")
+        r.esit("bölüm sonuçları: her bölümün bir satırı var",
+               len(_renk["bolum"]), _renk["bolum_sayisi"])
+        r.kontrol("bölüm sonuçları: hem uygun hem uygun değil satırı var",
+                  {True, False} <= {u for u, _b, _g in _renk["bolum"]},
+                  f"→ {[u for u, _b, _g in _renk['bolum']]}")
+        _yanlis = [(i + 1, u, g) for i, (u, b, g) in enumerate(_renk["bolum"]) if b != g]
+        r.kontrol("bölüm sonuçları: uygun yeşil, uygun değil kırmızı yazılıyor",
+                  not _yanlis, f"→ ( bölüm, hüküm, renk ) {_yanlis}")
+        r.kontrol("proje özeti: her asansörün sonucu hükmünün renginde",
+                  _renk["ozet"] and all(b == g for _u, b, g in _renk["ozet"]),
+                  f"→ {_renk['ozet']}")
+
         r.kontrol("konsol hatası yok", not konsol, f"→ {konsol[:4]}")
         tarayici.close()
     return r
