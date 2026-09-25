@@ -275,12 +275,18 @@ addEventListener('scroll',()=>{const a=document.querySelector('.bilgi.acik');
 addEventListener('resize',()=>document.querySelectorAll('.bilgi.acik')
   .forEach(x=>x.classList.remove('acik')));
 
-function bolumCiz(b){
+/*  ek ( isteğe bağlı ):  {id, sag}  —  şeride kimlik ve sağ uca bir düğme
+    ( uygulama projesinin "Özete dön"ü ).  Verilmezse şerit eskisinin
+    birebir aynısıdır;  avan ve trafik bölümleri böyle çizilir. */
+function bolumCiz(b, ek){
   //  "ekran_notlari":  paftaya basılmayan ama ekranda kalması gereken
   //  açıklamalar ( bkz. engine/avan.py — topraklama kontrolü ).
   const bilgi = [...(b.aciklamalar||[]), ...(b.ekran_notlari||[])];
-  let h=`<div class="serit"><span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
-      + `<span class="kaynak">${kacis(b.kaynak||'')}</span></div>`;
+  const kaynak = `<span class="kaynak">${kacis(b.kaynak||'')}</span>`;
+  let h=`<div class="serit"${ek && ek.id ? ` id="${kacis(ek.id)}"` : ''}>`
+      + `<span>${kacis(b.baslik)}${bilgiSimgesi(bilgi)}</span>`
+      + (ek && ek.sag ? `<span class="serit-sag">${kaynak}${ek.sag}</span>` : kaynak)
+      + '</div>';
   if(b.adimlar&&b.adimlar.length) h+=adimTablosu(b.adimlar);
   if(b.cetvel&&b.cetvel.length) h+=cetvelTablosu(b.cetvel);
   if(b.sonuc) h+=`<div class="sonuc-kutu ${b.sonuc.uygun?'ok':'hata'}"><span class="et">${kacis(b.sonuc.baslik)}</span><span>${kacis(b.sonuc.metin)}</span></div>`

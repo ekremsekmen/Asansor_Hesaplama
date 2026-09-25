@@ -310,6 +310,9 @@ table.veri{min-width:520px}
   .olcut{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
   .serit{flex-wrap:wrap;gap:2px}
   .serit .kaynak{flex:1 0 100%}
+  /* kaynak + "Özete dön" alt satırda yan yana */
+  .serit-sag{flex:1 0 100%}
+  .serit-sag .kaynak{flex:1 1 auto}
   .sonuc-kutu{flex-direction:column;align-items:flex-start;gap:4px}
   .pafta-bas h2{font-size:15px}
   .dugmeler .dg{flex:1 1 auto;justify-content:center}
@@ -552,6 +555,27 @@ tr.m-gidilir{cursor:pointer}
 tr.m-gidilir:hover td{background:#EEF4FB}
 tr.m-gidilir .etiket{text-decoration:underline;text-decoration-style:dotted;
   text-underline-offset:2px}
+/*  "Hesaba git" ( satırda ) ve "Özete dön" ( bölüm şeridinde ).  Düğme
+    satırın sağına yaslanır;  float olduğu için başlığın noktalı alt çizgisi
+    ona geçmez. */
+.m-hesaba-git{
+  float:right;margin:0 0 0 10px;padding:1px 8px;border:1px solid var(--cizgi);
+  border-radius:5px;background:var(--zemin);color:var(--mavi2);
+  font-size:10.5px;font-weight:600;line-height:1.6;white-space:nowrap;cursor:pointer;
+}
+.m-hesaba-git:hover{background:var(--mavi2);border-color:var(--mavi2);color:#fff}
+.serit-sag{display:flex;align-items:center;gap:10px}
+.m-ozete-don{
+  padding:1px 8px;border:1px solid rgba(255,255,255,.4);border-radius:5px;
+  background:none;color:#fff;font-size:10.5px;font-weight:600;line-height:1.6;
+  white-space:nowrap;cursor:pointer;
+}
+.m-ozete-don:hover{background:rgba(255,255,255,.16)}
+/*  Özete dönülen satır bir an vurgulanır — nereden gelindiği görünsün.
+    Bitiş karesi yazılmaz:  renk hücrenin kendi zeminine ( ör. kırmızı ) söner. */
+tr.m-vurgu td{animation:m-vurgu 1.6s ease-out}
+@keyframes m-vurgu{from{background-color:#FFE9A8}}
+@media print{.m-hesaba-git,.m-ozete-don{display:none}}
 
 /* ------------------------------------------------------- asansör şeridi
    Bir binada 1-4 asansör;  form tek kopyadır, şerit aktif olanı seçer. */

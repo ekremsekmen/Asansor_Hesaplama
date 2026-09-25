@@ -2307,6 +2307,135 @@ def calistir():
                   _renk["ozet"] and all(b == g for _u, b, g in _renk["ozet"]),
                   f"→ {_renk['ozet']}")
 
+        # ==============================================================
+        #  v3.2 — SONUÇ TABLOSU ↔ AYRINTILI HESAP
+        #  Satır tıklaması yalnız girdileri açar, sayfayı oynatmaz.  "Hesaba
+        #  git" bölümün hesabına iner ve girdilerini de açar;  bölüm
+        #  şeridindeki "Özete dön" tablodaki satırına geri getirir.  Canlı
+        #  hesap sonucu yeniden çizdiğinde okunan bölüm yerinde kalır;
+        #  kaydırma sürerken çizim gelirse gidiş yarıda kalmaz.
+        # ==============================================================
+        pg.set_viewport_size({"width": 1440, "height": 900})
+        pg.evaluate("window.scrollTo(0, 0)")
+        #  Sayaçlar — sarmalayan ifade 0 döndürür:  Playwright dönen işlevi
+        #  çağırmaya kalkar.
+        pg.evaluate("""window.__grup = 0; window.__ciz = 0;
+            const _g = mGrupAc; mGrupAc = function(){ __grup++; return _g.apply(this, arguments); };
+            const _c = cizMukavemet; cizMukavemet = function(){ __ciz++; return _c.apply(this, arguments); };
+            0""")
+        _say = pg.evaluate("""() => ({
+            bolum: SON.m.bolumler.length,
+            git: document.querySelectorAll('#m_sonuc tr[data-kimlik] .m-hesaba-git').length,
+            don: document.querySelectorAll('#m_sonuc .serit[id] .m-ozete-don').length})""")
+        r.kontrol("her bölüm satırında 'Hesaba git', her bölüm şeridinde 'Özete dön' var",
+                  _say["bolum"] > 0 and _say["git"] == _say["bolum"] == _say["don"], f"→ {_say}")
+
+        #  Ortadaki bölüm — sayı elle yazılmaz, motora bölüm eklenince kaymasın
+        _kim = pg.evaluate("SON.m.bolumler[Math.floor(SON.m.bolumler.length / 2)].kimlik")
+        _tr = f'#m_sonuc tr[data-kimlik="{_kim}"]'
+        _ac = ("() => [...document.querySelectorAll('#m_form .m-grup.acik')]"
+               ".map(g => MUK.gruplar[+g.dataset.grup].ad).sort()")
+
+        pg.evaluate(f"window.scrollTo(0, document.querySelector('{_tr}')"
+                    ".getBoundingClientRect().top + scrollY - 300)")
+        pg.wait_for_timeout(300)
+        _y0 = pg.evaluate("scrollY")
+        pg.click(f"{_tr} td:nth-child(2)")
+        pg.wait_for_timeout(800)
+        r.esit("satır tıklaması sayfayı oynatmıyor", pg.evaluate("scrollY"), _y0)
+        r.esit("satır tıklaması bölümün girdilerini açıyor", pg.evaluate(_ac),
+               sorted(pg.evaluate(f"mBolumGruplari('{_kim}')")))
+
+        pg.evaluate("__grup = 0")
+        pg.click(f"{_tr} .m-hesaba-git")
+        pg.wait_for_timeout(1500)
+        _k = pg.evaluate(f"""() => {{
+            const b = document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect();
+            const p = document.querySelector('#s-mukavemet .sol').getBoundingClientRect();
+            const g = document.querySelector('#m_form .m-grup[data-grup="'
+                          + mBolumGrupNolari('{_kim}')[0] + '"]').getBoundingClientRect();
+            return {{baslik: b.top, sekme: document.querySelector('.sekmeler').getBoundingClientRect().bottom,
+                    grup: [g.top, g.top + 40], panel: [p.top, p.bottom], cagri: __grup,
+                    odak: document.activeElement.className, odak_kimlik: document.activeElement.dataset.kimlik}};
+        }}""")
+        r.kontrol("'Hesaba git' bölüm başlığını sekmelerin hemen altına getiriyor",
+                  0 < _k["sekme"] <= _k["baslik"] <= _k["sekme"] + 20, f"→ {_k}")
+        r.esit("'Hesaba git' bölümün girdilerini de açıyor", pg.evaluate(_ac),
+               sorted(pg.evaluate(f"mBolumGruplari('{_kim}')")))
+        r.kontrol("açılan ilk girdi grubu sol panelde görünür",
+                  _k["panel"][0] <= _k["grup"][0] and _k["grup"][1] <= _k["panel"][1], f"→ {_k}")
+        r.esit("'Hesaba git' satırın tıklamasını ayrıca tetiklemiyor", _k["cagri"], 1)
+        r.esit("odak bölümün 'Özete dön' düğmesinde",
+               (_k["odak"], _k["odak_kimlik"]), ("m-ozete-don", _kim))
+
+        #  CANLI HESAP:  α girilince üstteki iki uyarı kalkar ( içerik kısalır );
+        #  okunan bölüm yine de yerinde kalmalı.
+        _once = pg.evaluate(f"""() => [document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect().top,
+                                      document.querySelectorAll('#m_sonuc .uyari').length, __ciz]""")
+        pg.evaluate("""() => { const e = document.getElementById('m_sarilma_acisi');
+            e.value = '180'; e.dispatchEvent(new Event('input', {bubbles: true}));
+            e.dispatchEvent(new Event('change', {bubbles: true})); }""")
+        pg.wait_for_timeout(1600)
+        _sonra = pg.evaluate(f"""() => [document.getElementById(mBolumCapa('{_kim}')).getBoundingClientRect().top,
+                                       document.querySelectorAll('#m_sonuc .uyari').length, __ciz]""")
+        r.kontrol("canlı hesap: üstteki içerik değişti ( sınama anlamlı )",
+                  _sonra[2] > _once[2] and _sonra[1] < _once[1], f"→ {_once} → {_sonra}")
+        r.kontrol("canlı hesap: okunan bölüm yerinde kaldı",
+                  abs(_sonra[0] - _once[0]) <= 2, f"→ {_once[0]} → {_sonra[0]}")
+
+        #  KAYDIRMA SÜRERKEN ÇİZİM:  α kutusu odaktayken "Özete dön"e basmak
+        #  kutudan çıkarır, hesap tazelenir ve çizim kaydırmanın ortasına
+        #  denk gelir.  Gidiş yarıda kalmamalı.
+        #  Kutuya KULLANICI GİBİ yazılır:  betikle değiştirilen kutudan
+        #  çıkılınca tarayıcı "change" üretmez, çizim araya girmezdi.
+        pg.evaluate("mGrupAc(+document.getElementById('m_sarilma_acisi')"
+                    ".closest('.m-grup').dataset.grup, true)")
+        pg.fill("#m_sarilma_acisi", "170")
+        pg.wait_for_timeout(1200)
+        _c0 = pg.evaluate("__ciz")
+        pg.click(f"#{pg.evaluate(f'mBolumCapa({_kim!r})')} .m-ozete-don")
+        pg.wait_for_timeout(2000)
+        _d = pg.evaluate(f"""() => {{
+            const t = document.querySelector('{_tr}').getBoundingClientRect();
+            return {{ust: t.top, alt: t.bottom, ekran: innerHeight, cizim: __ciz,
+                    sekme: document.querySelector('.sekmeler').getBoundingClientRect().bottom,
+                    odak: document.activeElement.className, odak_kimlik: document.activeElement.dataset.kimlik}};
+        }}""")
+        r.kontrol("özete dönerken sonuç yeniden çizildi ( sınama anlamlı )",
+                  _d["cizim"] > _c0, f"→ {_c0} → {_d['cizim']}")
+        r.kontrol("'Özete dön' satırı ekrana getiriyor — araya giren çizime rağmen",
+                  _d["sekme"] <= _d["ust"] and _d["alt"] <= _d["ekran"], f"→ {_d}")
+        r.esit("odak satırın 'Hesaba git' düğmesinde — çizimden sonra da",
+               (_d["odak"], _d["odak_kimlik"]), ("m-hesaba-git", _kim))
+
+        #  Kullanıcı tekerleği çevirince ya da başka bir yere tıklayınca gidiş
+        #  biter:  sonraki bir çizim onu hedefe geri çekmemeli, tıkladığı
+        #  kutudan odağı çalmamalı.
+        for _olay, _js in (("tekerlek", "new WheelEvent('wheel', {deltaY: -100})"),
+                           ("fare", "new PointerEvent('pointerdown')")):
+            pg.evaluate("window.scrollTo(0, 0)")
+            pg.click(f"{_tr} .m-hesaba-git")
+            pg.wait_for_timeout(60)
+            _once_g = pg.evaluate("M_GIDIS !== null")
+            pg.evaluate(f"dispatchEvent({_js})")
+            r.kontrol(f"{_olay} süren gidişi bitiriyor",
+                      _once_g and pg.evaluate("M_GIDIS === null"),
+                      f"→ gidiş başlamış mıydı: {_once_g}")
+            pg.wait_for_timeout(1200)
+
+        #  Avan ve trafik bölümleri değişmedi:  ek verilmeden çizilen şerit
+        #  eskisinin birebir aynısı ( kimlik yok, sağda düğme yok ).
+        r.kontrol("ek verilmeyen bölüm şeridi eskisinin aynısı ( avan · trafik )",
+                  pg.evaluate("""() => bolumCiz({baslik: 'B', kaynak: 'K'}) ===
+                      '<div class="serit"><span>B' + bilgiSimgesi([]) +
+                      '</span><span class="kaynak">K</span></div>'"""))
+
+        pg.emulate_media(media="print")
+        r.esit("yazdırırken 'Hesaba git' ve 'Özete dön' basılmıyor",
+               pg.evaluate("[...document.querySelectorAll('.m-hesaba-git, .m-ozete-don')]"
+                           ".filter(e => getComputedStyle(e).display !== 'none').length"), 0)
+        pg.emulate_media(media="screen")
+
         r.kontrol("konsol hatası yok", not konsol, f"→ {konsol[:4]}")
         tarayici.close()
     return r
