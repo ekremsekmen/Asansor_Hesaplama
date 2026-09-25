@@ -219,6 +219,34 @@ def calistir():
            len(_ray["satirlar"]), len(MT.RAY_PROFILI))
     r.kontrol("ray tablosu gerçek profil taşıyor",
               any("50 x 50 x 5" in str(s[0]) for s in _ray["satirlar"]))
+    #  BAŞLIK DOĞRU SAYININ ÜSTÜNDE Mİ.  Sütun SAYISI tutarken başlıklar
+    #  kayabiliyordu:  T50'nin 3,7 kg/m'si "b ( balata yarı gen. )", e = 14,3
+    #  mm'si "gr ( kg/m )" başlığıyla görünüyordu.  Her tabloda başlığın
+    #  altındaki değer, motorun o büyüklüğü okuduğu işlevle karşılaştırılır.
+    def _hucre(tablo_adi, anahtar, baslik):
+        """Başlığın altındaki hücre;  başlık ya da satır yoksa açıklayan metin
+        döner ( kontrol ÇÖKMEZ, başarısız yazılır )."""
+        _t = [x for x in _tb if x["ad"].startswith(tablo_adi)][0]
+        _s = [s for s in _t["satirlar"] if s[0] == anahtar]
+        if not _s or baslik not in _t["basliklar"]:
+            return f"başlık ya da satır yok — başlıklar: {_t['basliklar']}"
+        return _s[0][_t["basliklar"].index(baslik)]
+    for _tab, _key, _bas, _bek in (
+            ("Kılavuz ray", "50 x 50 x 5", "Gr  ( kg/m )", MT.ray("50 x 50 x 5", "Gr")),
+            ("Kılavuz ray", "89 x 62 x 15,88", "Wx  ( mm³ )", MT.ray("89 x 62 x 15,88", "Wx")),
+            ("Kılavuz ray", "89 x 62 x 15,88", "iy  ( mm )", MT.ray("89 x 62 x 15,88", "iy")),
+            ("Kılavuz ray", "50 x 50 x 5", "e  ( mm )", MT.ray("50 x 50 x 5", "e")),
+            ("Ray geometrisi", "89 x 62 x 15,88", "h1  ( mm )", MT.ray_geo("89 x 62 x 15,88", "h1")),
+            ("Ray geometrisi", "89 x 62 x 15,88", "b  ( balata yarı gen., mm )",
+             MT.ray_geo("89 x 62 x 15,88", "b")),
+            ("NPU profilleri", 140, "Wx  ( cm³ )", MT.npu(140, "Wx")),
+            ("NPU profilleri", 140, "G  ( kg/m )", MT.npu(140, "G")),
+            ("NPU profilleri", 140, "iy  ( cm )", MT.npu(140, "iy")),
+            ("Gezici kablo", "24 x 0,75", "Ağırlık  ( kg/m )", MT.kablo_agirligi("24 x 0,75")),
+            ("Karşı ağırlık", "Barit", "Derinlik  ( mm )",
+             UG.arayuz_alanlari()["malzeme_derinligi"]["Barit"])):
+        r.esit(f"tablo '{_tab}' · {_key} · {_bas.split('(')[0].strip()} başlığı motorun değerini gösteriyor",
+               _hucre(_tab, _key, _bas), _bek)
     _w = [x for x in _tb if x["ad"].startswith("ω")][0]
     r.kontrol("ω tablosu üç Rm sütunu veriyor", len(_w["basliklar"]) == 4)
     #  Sekmedeki değer paftanın kuralıyla yuvarlanır ( steps.yuvarla ):

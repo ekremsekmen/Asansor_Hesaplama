@@ -196,9 +196,19 @@ def omega_en8150(lam, rm=OMEGA_RM_ALT):
 #  NPU / NPI PROFİLLERİ  ( makine kaidesi kirişleri )
 #      A cm² · G kg/m · Ix cm⁴ · Wx cm³ · ix cm · Iy cm⁴ · Wy cm³ · iy cm
 #  ix / iy atalet YARIÇAPIDIR ( λ = L1 / imin'de öyle kullanılır ).
+#
+#  ÜÇ DEĞER KAYNAKTAN DÜZELTİLDİ  ( DIN 1026-1 · UPN ) :
+#      30x15  Ix  2,21 → 2,53 cm⁴   kaynak A'yı ( 2,21 ) Ix sütununa da
+#                                   yazmış;  satırın kendi ix'i ( 1,07 )
+#                                   ancak √( 2,53 / 2,21 ) ile tutar.
+#      280    A  47,5 → 53,3 cm²    kaynağın kendi G'si ( 41,8 kg/m ) çelik
+#      300    A  50   → 58,8 cm²    yoğunluğuyla A = G / 0,785 verir.
+#  Üçü de şu an hesaba girmez ( 30x15'in Ix'i hiç okunmaz;  280 · 300'ün ix'i
+#  boş olduğundan dikine kiriş seçimi reddedilir ) — ama Tablolar sekmesinde
+#  görünürler ve yanlış görünmemelidirler.
 # =====================================================================
 NPU_PROFIL = (
-    ('30x15', 2.21, 1.74, 2.21, 1.69, 1.07, 0.38, 0.39, 0.42),
+    ('30x15', 2.21, 1.74, 2.53, 1.69, 1.07, 0.38, 0.39, 0.42),
     (30, 5.44, 4.27, 6.39, 4.26, 1.08, 5.33, 2.68, 0.99),
     ('40x20', 3.66, 2.87, 7.58, 3.79, 1.44, 1.14, 0.86, 0.56),
     (40, 6.21, 4.87, 14.1, 7.05, 1.5, 6.68, 3.08, 1.04),
@@ -214,8 +224,8 @@ NPU_PROFIL = (
     (180, 28, 22, 1350, 150, 6.95, 114, 22.4, 2.02),
     (200, 32.2, 25.3, 1910, 191, 7.7, 148, 27, 2.14),
     (240, 42.3, 33.2, 3600, 300, None, 248, 39.6, None),
-    (280, 47.5, 41.8, 6280, 448, None, 399, 57.2, None),
-    (300, 50, 46.2, 8030, 535, None, 495, 67.8, None),
+    (280, 53.3, 41.8, 6280, 448, None, 399, 57.2, None),
+    (300, 58.8, 46.2, 8030, 535, None, 495, 67.8, None),
 )
 
 NPU_OLCULERI = tuple(r[0] for r in NPU_PROFIL)
@@ -571,6 +581,8 @@ K2_NORMAL_KULLANMA = 1.2
 # =====================================================================
 #  Kabin ile kuyu arasındaki asma kablo.  MTrav ( gezici kablo indirgenmiş
 #  kütlesi ) hesabına girer.
+#      tip · genişlik mm · kalınlık mm · ağırlık kg/m   ( yassı kablo )
+#  Hesaba yalnız ağırlık girer.
 BUKULGEN_KABLO = (
     ('12 x 0,75', 33.8, 4.2, 0.284),
     ('24 x 0,75', 70.4, 4.2, 0.642),
@@ -579,6 +591,7 @@ BUKULGEN_KABLO = (
 )
 
 KABLO_TIPLERI = tuple(r[0] for r in BUKULGEN_KABLO)
+_KABLO_SUTUN = {"genislik": 1, "kalinlik": 2, "agirlik": 3}
 
 
 # =====================================================================
@@ -604,7 +617,7 @@ def kapi_kablosu(kapi_tipi):
 
 def kablo_agirligi(tip):
     """Bükülgen kablonun metre ağırlığı ( kg/m )."""
-    return _ara(BUKULGEN_KABLO, tip, 3)
+    return _ara(BUKULGEN_KABLO, tip, _KABLO_SUTUN["agirlik"])
 
 
 def kablo_en(tip):
@@ -630,6 +643,7 @@ AGIRLIK_MALZEMESI = (
 )
 
 AGIRLIK_MALZEMELERI = tuple(r[0] for r in AGIRLIK_MALZEMESI)
+_MALZEME_SUTUN = {"derinlik": 1, "yukseklik": 2}
 
 
 #  KARŞI AĞIRLIĞIN GENİŞLİĞİ DE GİRDİDİR.  Ray arasından türetilemez:  TS EN
