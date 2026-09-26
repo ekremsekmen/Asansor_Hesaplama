@@ -130,6 +130,13 @@ function mukavemetGeriYukle(){
   //  Uygulamanın KENDİ kovası okunur — avanınki ayrı dosyadadır.
   let o; try{ o = JSON.parse(localStorage.getItem(KOVA.uygulama)||'null'); }catch(e){ o = null; }
   if(!o) return;
+  const mukDizi = Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length;
+  //  TANINMAYAN DEĞERLER ( bkz. taninmayanBildir ) — kimliğe göre bir kez.
+  //  Dizi varsa asansöre ait alanların asıl kaynağı odur;  onlar aşağıda
+  //  asansör numarasıyla sayılır.
+  const taninmayan = new Map();
+  const say = (e, v) => { if(!taninmayan.has(e.id) && !(mukDizi && mAsansorAlaniMi(e.id)))
+    taninmayan.set(e.id, {etiket: alanEtiketi(e), deger: String(v), yeni: e.value}); };
   //  KOVA ALAN KİMLİĞİYLE ( "m_beyan_yuku" ) anahtarlanır, sözleşme
   //  anahtarıyla değil;  o yüzden burada mFormaYaz kullanılamaz.  Gezinti
   //  yine ortak, yalnız kaynağı ve boş-değer kuralı farklı:  kovada boş
@@ -140,28 +147,36 @@ function mukavemetGeriYukle(){
     //  Kovada BOŞ duran alan formdakini ezmez ( onay kutusu hariç:  orada
     //  "false" geçerli bir değerdir ).
     if(e.type !== 'checkbox' && o[e.id] === '') continue;
-    mAlanYaz(f, o[e.id]);
+    if(!mAlanYaz(f, o[e.id])) say(e, o[e.id]);
   }
   //  UYGULAMAYA AİT HER ALAN geri yazılır — yalnız sözleşmedekiler değil.
   //  Proje kimliği ( mk_… ) ve ofis sabitleri ( uof_… ) de buradadır;
   //  yoksa sayfa yenilendiğinde proje adı ve ofis ayarları kayboluyordu.
+  //  Sözleşme alanı yine mAlanYaz'dan geçer:  tanınmayan değer kutuda duranı
+  //  ( öncekinin değerini ) değil alanın varsayılanını bıraksın.
+  const sozlesme = new Map(mAlanlar().map(f => [M_ID(f.anahtar), f]));
   document.querySelectorAll('input,select').forEach(e=>{
     if(!e.id || e.id.indexOf('_goster') >= 0) return;
     if(alanModu(e.id) !== 'uygulama') return;
     if(o[e.id] === undefined) return;
-    if(e.type === 'checkbox') e.checked = !!o[e.id];
-    else alanaYaz(e, o[e.id]);
+    if(e.type === 'checkbox'){ e.checked = !!o[e.id]; return; }
+    const f = sozlesme.get(e.id);
+    if(!(f ? mAlanYaz(f, o[e.id]) : alanaYaz(e, o[e.id]))) say(e, o[e.id]);
   });
   //  Çoklu asansör dizisi.  Form kurulduktan SONRA aktif olan basılır
   //  ( bkz. mukavemetKur ) — burada yalnız durum geri alınır.
-  if(Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length){
+  const liste = [...taninmayan.values()];
+  if(mukDizi){
     MUK_ASANSORLER = o.__muk_asansorler
       .slice(0, (MUK && MUK.asansor_azami) || 4)
-      .map(x => (x && typeof x === 'object') ? x : {});
+      .map(x => (x && typeof x === 'object') ? {...x} : {});
+    MUK_ASANSORLER.forEach((x, i) => liste.push(
+      ...mTaninmayanAyikla(x, MUK_ASANSORLER.length > 1 ? i + 1 : null)));
     MUK_ADET = Math.min(Math.max(1, Number(o.__muk_adet) || MUK_ASANSORLER.length),
                         MUK_ASANSORLER.length);
     MUK_AKTIF = Math.min(Math.max(0, Number(o.__muk_aktif) || 0), MUK_ADET - 1);
   }
+  taninmayanBildir(liste, 'Tarayıcıda kayıtlı uygulama projesinde');
 }
 
 const mSatir = alanlar => `<div class="satir i${alanlar.length}">${alanlar.join('')}</div>`;
@@ -445,10 +460,40 @@ function mAlanOku(f){
   return (e.type === 'checkbox') ? e.checked : e.value;
 }
 
-/*  Tek alana değer basar.  Yazma her yerde alanaYaz() üzerinden gider. */
+/*  Tek alana değer basar.  Yazma her yerde alanaYaz() üzerinden gider.
+    Seçim kutusu değeri TANIMAZSA false döner;  kutu alanın varsayılanına
+    döner ( secimVarsayilani — form seçenekleri alanın varsayılanı seçili
+    çizilir ).  Eskiden kutuda duran kalıyordu:  asansör değiştirilirken o
+    bir önceki asansörün değeriydi — tanınmayan değer sessizce BAŞKA
+    asansörün değeri oluyordu. */
 function mAlanYaz(f, deger){
   const e = $(M_ID(f.anahtar));
-  if(e) alanaYaz(e, deger);
+  return !e || alanaYaz(e, deger);
+}
+
+/*  Asansöre ait ( proje geneli olmayan ) bir sözleşme alanının kimliği mi? */
+function mAsansorAlaniMi(id){
+  return mAlanlar(M_ASANSOR_ALANI).some(f => M_ID(f.anahtar) === id);
+}
+
+/*  BİR ASANSÖRÜN TANINMAYAN SEÇİM DEĞERLERİ.  Dosyada ( ya da tarayıcıda )
+    duran asansör haritasında bu sürümün listesinde olmayan bir seçim değeri
+    varsa alanın varsayılanına çekilir ve listelenir.  Yalnız açık asansör
+    forma basıldığı için öbürlerinin değerleri ham kalıyor ve hesap onlarda
+    "geçersiz seçim" diye duruyordu;  açık olanınki ise sessizce
+    değişiyordu.  Artık hepsi aynı kuralla düzelir ve söylenir.
+    ``no``:  asansör numarası ( tek asansörlü projede null ).            */
+function mTaninmayanAyikla(harita, no){
+  const liste = [];
+  for(const f of mAlanlar(M_ASANSOR_ALANI)){
+    const e = $(M_ID(f.anahtar)), v = harita[f.anahtar];
+    if(!e || e.tagName !== 'SELECT' || v === undefined || v === null || String(v).trim() === '') continue;
+    if(secenekKarsiligi(e, v) !== undefined) continue;
+    harita[f.anahtar] = secimVarsayilani(e);
+    liste.push({etiket: f.etiket + (no ? ` ( ${no}. asansör )` : ''),
+                deger: String(v), yeni: harita[f.anahtar]});
+  }
+  return liste;
 }
 
 function mFormOku(sec){
