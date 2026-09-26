@@ -27,6 +27,7 @@ from engine.ortak.steps import numarala
 from engine.uygulama import mukavemet as E_MUK
 from engine.avan import tablolar as T
 from engine.uygulama import girdi as UG
+from engine.uygulama import mukavemet_girdi as MG
 
 #  Avanın uygulama projesine giren bölümleri  ( 0-tabanlı sıra )
 ELEKTRIK_BOLUMLERI = (2, 3, 4, 5)          # kabin ayd. · kuyu ayd. · TAS · ε
@@ -163,7 +164,14 @@ def hesapla(veriler=None):
     #  yapılamamış bir hesapla ya da kurulamaz bir geometriyle teslim edilirdi.
     engelleyici = list(av.get("engelleyici") or [])
     uyarilar += [x for x in engelleyici if x not in uyarilar]
-    uyarilar += [f"⚠ {x}" for x in eksik]
+    #  AYNI EKSİKLİK İKİ KEZ YAZILMASIN.  Sarılma açısı girilmemişse girdi
+    #  denetimi ne yapılacağını anlatan uyarıyı zaten koymuştur
+    #  ( MG.ALFA_UYARI );  altına bir de "HESAP EKSİK — α girilmedi"
+    #  basılınca paftanın ilk satırları aynı şeyi iki kez söylüyordu.
+    #  Eksik LİSTESİ ( özet · genel hüküm ) aynen kalır;  yalnız uyarı
+    #  kutusundaki tekrar düşer.
+    _anlatilan = {E_MUK.ALFA_YOK} if MG.ALFA_UYARI in uyarilar else set()
+    uyarilar += [f"⚠ {x}" for x in eksik if x not in _anlatilan]
     uygunlar = [b["sonuc"]["uygun"] for b in bolumler
                 if b.get("sonuc") and b["sonuc"].get("uygun") is not None]
     uygunlar += [False] * (len(engelleyici) + len(eksik))

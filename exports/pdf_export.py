@@ -1051,8 +1051,8 @@ def _mukavemet_ozet(sonuc):
                                        f"   ·   {trn(o.get('kabin_kisi'), 0)} kişi"),
         ("Sf — Halat güvenlik katsayısı", tr(o.get("Sf"))),
         ("Kılavuz ray boyu", f"{tr(o.get('ray_boyu'))} m"),
-        ("FKR — Kabin raylarına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
-        ("FAR — Ağırlık raylarına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
+        ("FKR — Bir kabin rayına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
+        ("FAR — Bir ağırlık rayına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
         ("Fkt — Kabin tamponlarına gelen kuvvet", f"{trn(o.get('Fkt'), 0)} N"),
         ("Fat — Ağırlık tamponlarına gelen kuvvet", f"{trn(o.get('Fat'), 0)} N"),
         #  HÜKÜM MOTORDAN GELİR ( mukavemet.genel_hukum ):  "uygun değil" >
@@ -1174,8 +1174,8 @@ def _uygulama_ozet(sonuc):
                                        f"   ·   {trn(o.get('kabin_kisi'), 0)} kişi"),
         ("Sf — Halat güvenlik katsayısı", tr(o.get("Sf"))),
         ("Kılavuz ray boyu", f"{tr(o.get('ray_boyu'))} m"),
-        ("FKR — Kabin raylarına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
-        ("FAR — Ağırlık raylarına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
+        ("FKR — Bir kabin rayına gelen kuvvet", f"{trn(o.get('FKR'), 0)} N"),
+        ("FAR — Bir ağırlık rayına gelen kuvvet", f"{trn(o.get('FAR'), 0)} N"),
         ("Fkt — Kabin tamponlarına gelen kuvvet", f"{trn(o.get('Fkt'), 0)} N"),
         ("Fat — Ağırlık tamponlarına gelen kuvvet", f"{trn(o.get('Fat'), 0)} N"),
     ]

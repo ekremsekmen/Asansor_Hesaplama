@@ -1301,9 +1301,98 @@ def calistir():
                   "mk_yok", "mk_uzunluk", "mk_genislik"},
               f"→ {UG.PROJE_GENELI_ALANLAR}")
 
+    _muhendis_okumasi(r)
     _sira_degismezligi(r)
     _pafta_zinciri(r)
     return r
+
+
+# =====================================================================
+#  MÜHENDİS OKUMASI  —  paftanın NE SÖYLEDİĞİ
+# =====================================================================
+#  Program bir mühendis gibi kullanılıp pafta baştan sona okununca üç yer
+#  bulundu.  Hiçbiri bir sayıyı değiştirmez;  üçü de paftayı okuyanın
+#  sayıyı doğru anlamasıyla ilgilidir.
+def _muhendis_okumasi(r):
+    from engine.uygulama import hesap as UH
+    from engine.uygulama import mukavemet_girdi as MG
+
+    #  ①  FKR / FAR BİR RAYIN KUVVETİDİR.  Paftada "Kabin raylarına gelen
+    #  kuvvet" yazıyordu;  inşaat mühendisi sayıyı toplam sanıp raylara
+    #  bölseydi yükün yarısını kullanırdı.  Anlamı SAYIYLA sınanır:  kabin
+    #  rayında FKR = a + b / n olmalı ( a = bir rayın kütlesi ve donanımı,
+    #  b / n = güvenlik tertibatı payı ).  Öyleyse n = 2 · 3 · 6 için art
+    #  arda iki fark eşittir;  toplam olsaydı ( a·n + b ) eşit çıkmazdı.
+    _f = {n: MK.hesapla({"sarilma_acisi": 180, "kabin_ray_sayisi": n})["ozet"]["FKR"]
+          for n in (2, 3, 6)}
+    r.kontrol("① FKR bir rayın kuvveti:  FKR(2) − FKR(3) = FKR(3) − FKR(6)",
+              abs((_f[2] - _f[3]) - (_f[3] - _f[6])) < 1e-6, f"→ {_f}")
+    #  b = k1 · gn · ( P + Q ):  güvenlik tertibatı payının tamamı.  P
+    #  standardın P'sidir ( gezici kablo dâhil ) ve motordan okunmaz.
+    _s = MK.hesapla({"sarilma_acisi": 180})
+    _b = 6 * (_f[2] - _f[3])
+    _bek = (MK.SABIT["gn"] * 2   # k1 = 2 ( kaymalı — örnek projenin tertibatı )
+            * (_P_std(_s) + _s["girdi"]["beyan_yuku"]))
+    r.kontrol("① FKR'deki tertibat payı k1·gn·( P + Q ) / n",
+              abs(_b - _bek) < 1e-6 * _bek, f"→ {_b} · beklenen {_bek}")
+    #  Karşı ağırlıkta tertibat yokken FAR ray sayısından bağımsızdır:
+    #  içinde yalnız BİR rayın kütlesi ve donanımı vardır.
+    _far = {n: MK.hesapla({"sarilma_acisi": 180, "agirlik_ray_sayisi": n})["ozet"]["FAR"]
+            for n in (2, 4)}
+    r.kontrol("① FAR bir rayın kuvveti:  ray sayısı değişince aynı kalıyor",
+              abs(_far[2] - _far[4]) < 1e-9, f"→ {_far}")
+    _kt = next(b for b in _s["bolumler"] if b["kimlik"] == "kuyu_tabani")
+    _metin = [str(a.get("deger")) for a in _kt["adimlar"] if a.get("tip") == "metin"]
+    r.kontrol("① bölüm 9 başlıkları 'bir kabin rayına' / 'bir ağırlık rayına'",
+              any(m.startswith("Bir kabin rayına gelen kuvvet") for m in _metin)
+              and any(m.startswith("Bir ağırlık rayına gelen kuvvet") for m in _metin)
+              and not any("raylarına gelen" in m for m in _metin), f"→ {_metin}")
+    r.kontrol("① bölüm 9 sonucu FKR ve FAR'ı 'N / ray' yazıyor",
+              _kt["sonuc"]["metin"].count("N / ray") == 2, f"→ {_kt['sonuc']['metin']}")
+    _pdf = io.open(os.path.join(KOK, "exports", "pdf_export.py"), encoding="utf-8").read()
+    _js = io.open(os.path.join(KOK, "static", "uygulama.js"), encoding="utf-8").read()
+    r.kontrol("① PDF özetleri ( tek ve çoklu ) 'bir rayına' yazıyor",
+              _pdf.count("FKR — Bir kabin rayına gelen kuvvet") == 2
+              and _pdf.count("FAR — Bir ağırlık rayına gelen kuvvet") == 2
+              and "raylarına gelen kuvvet" not in _pdf)
+    r.kontrol("① ekran kutuları 'bir rayına' yazıyor",
+              "FKR — Bir kabin rayına" in _js and "FAR — Bir ağırlık rayına" in _js
+              and "Kabin rayları'" not in _js and "Ağırlık rayları'" not in _js)
+
+    #  ②  HALAT BOYUNDAKİ YIĞIN AÇIK YAZILIR.  Paftada yalnız toplamı
+    #  ( 6.660 mm ) görünüyordu;  hangi beş ölçünün toplandığı yoktu.
+    _g = _s["girdi"]
+    _mb = next(b for b in _s["bolumler"] if b["kimlik"] == "motor_gucu")
+    _y = [a for a in _mb["adimlar"] if a.get("tip") == "hesap"
+          and str(a.get("formul", "")).startswith("Yığın")]
+    _top = (_g["agirlik_tampon_baba"] + _g["agirlik_carpma_arasi"]
+            - _g["agirlik_tampon_ezilme"] + _g["agirlik_paten_arasi"]
+            + _g["kabin_paten_arasi"])
+    r.kontrol("② bölüm 1'de yığın satırı var ve beş ölçünün toplamı",
+              len(_y) == 1 and abs(_y[0]["deger"] - _top) < 1e-9,
+              f"→ {[a.get('deger') for a in _y]} · beklenen {_top}")
+    _lh = next(a for a in _mb["adimlar"] if a.get("tip") == "hesap"
+               and str(a.get("formul", "")).startswith("lh"))
+    r.kontrol("② halat boyu satırı aynı yığını kullanıyor",
+              f"− {MK.trn(_top, 0)} )" in _lh["islem"], f"→ {_lh['islem']}")
+
+    #  ③  AYNI EKSİKLİK UYARILARDA BİR KEZ.  α girilmeyince sayfa 1'de hem
+    #  ne yapılacağını anlatan uyarı hem "HESAP EKSİK — α girilmedi" satırı
+    #  basılıyordu.  Eksik LİSTESİ ( özet · genel hüküm ) değişmemeli.
+    def _alfa_sayisi(u):
+        return sum(("α GİRİLMEDİ" in x) or ("α girilmedi" in x) for x in u)
+    _a = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), temel_a=10, temel_b=None)))
+    r.esit("③ α yokken α uyarısı BİR kez", _alfa_sayisi(_a["uyarilar"]), 1)
+    r.kontrol("③ kalan uyarı ne yapılacağını anlatan uzun uyarı",
+              MG.ALFA_UYARI in _a["uyarilar"])
+    r.kontrol("③ eksik listesinde α yine var ( hüküm HESAP EKSİK'i görür )",
+              MK.ALFA_YOK in (_a["ozet"].get("eksik_hesap") or []))
+    _oteki = [x for x in (_a["ozet"].get("eksik_hesap") or []) if x != MK.ALFA_YOK]
+    r.kontrol("③ α dışındaki eksikler uyarılarda aynen duruyor",
+              bool(_oteki) and all(f"⚠ {x}" in _a["uyarilar"] for x in _oteki),
+              f"→ eksik {_oteki} · uyarılar {_a['uyarilar']}")
+    _v = UH.hesapla(UG.tamamla(dict(UG.varsayilanlar(), sarilma_acisi=180)))
+    r.esit("③ α girilince α uyarısı yok", _alfa_sayisi(_v["uyarilar"]), 0)
 
 
 # =====================================================================

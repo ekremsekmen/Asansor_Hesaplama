@@ -662,8 +662,8 @@ function cizMukavemet(r){
     h += `<div class="serit"><span>KUYU TABANINA GELEN YÜKLER</span>
           <span class="kaynak">inşaat projesine bildirilir</span></div>
           <div class="olcut">`
-       + kutu('FKR — Kabin rayları', trn(o.FKR,0), 'N')
-       + kutu('FAR — Ağırlık rayları', trn(o.FAR,0), 'N')
+       + kutu('FKR — Bir kabin rayına', trn(o.FKR,0), 'N')
+       + kutu('FAR — Bir ağırlık rayına', trn(o.FAR,0), 'N')
        + kutu('Fkt — Kabin tamponları', trn(o.Fkt,0), 'N')
        + kutu('Fat — Ağırlık tamponları', trn(o.Fat,0), 'N')
        + '</div>';
