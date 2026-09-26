@@ -1516,6 +1516,16 @@ def dogrula(g):
     return hata
 
 
+#  Sarılma açısı girilmediğinde paftanın başına basılan uyarı.  Sabittir,
+#  çünkü uygulama projesi ( engine/uygulama/hesap.py ) aynı eksikliği bir de
+#  kısa "HESAP EKSİK" satırıyla yazmasın diye bu metni arar.
+ALFA_UYARI = (
+    "SARILMA AÇISI α GİRİLMEDİ — halatın tahrik kasnağını sardığı "
+    "toplam açıyı proje yerleşiminden belirleyip girin (tek sarımda en "
+    "çok 180°, çift sarımda 180°–360°). Açı girilene kadar tahrik "
+    "yeteneğinin dört sınırı hesaplanmaz ve bölüm HESAP EKSİK kalır.")
+
+
 def uyarilar(g):
     """Hesabı DURDURMAYAN ama paftaya yazılması gereken uyarılar.
 
@@ -1531,11 +1541,7 @@ def uyarilar(g):
     #  "uygundur" çıkamaz ve sebep burada, açıkça söylenir.
     #  ------------------------------------------------------------------
     if g.get("sarilma_acisi") in (None, ""):
-        uyari.append(
-            "SARILMA AÇISI α GİRİLMEDİ — halatın tahrik kasnağını sardığı "
-            "toplam açıyı proje yerleşiminden belirleyip girin (tek sarımda en "
-            "çok 180°, çift sarımda 180°–360°). Açı girilene kadar tahrik "
-            "yeteneğinin dört sınırı hesaplanmaz ve bölüm HESAP EKSİK kalır.")
+        uyari.append(ALFA_UYARI)
     #  ------------------------------------------------------------------
     #  MAKİNE DAİRESİZ TESİSTE MAKİNENİN YÜKÜ BİR YERE GİDER.
     #  TS EN 81-20 m.5.7.2.3.7 makine raya bağlıysa EK YÜK DURUMLARI ister.

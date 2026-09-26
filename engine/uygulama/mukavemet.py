@@ -442,6 +442,15 @@ def _motor(g, o):
         veri("dh", "Halat çapı", dh, "mm", "GİRİŞ"),
         veri("nh", "Halat sayısı", nh, "adet", "GİRİŞ"),
         veri("gh", "Halatın 1 m'deki ağırlığı", gh, "kg/m", gh_kaynak, 4),
+        #  YIĞIN PAFTADA AÇIK YAZILIR:  eskiden halat boyu satırında yalnız
+        #  toplamı ( ör. 6.660 mm ) görünüyordu;  elle yeniden hesaplayan
+        #  hangi beş ölçünün toplandığını paftadan okuyamıyordu.
+        hesap("Yığın = ağırlık tamponu baba + çarpma arası − ezilme"
+              " + ağırlık paten arası + kabin paten arası",
+              f"{trn(g['agirlik_tampon_baba'])} + {trn(g['agirlik_carpma_arasi'])}"
+              f" − {trn(g['agirlik_tampon_ezilme'])} + {trn(g['agirlik_paten_arasi'])}"
+              f" + {trn(g['kabin_paten_arasi'])}",
+              yigin, "mm", "KABUL  ·  halat boyu"),
         #  2:1 askıda PAY DA iki kat gider:  köşeli parantez yazılmazsa satır
         #  "… + 5 × 2" okunur ve yeniden hesaplayan sonucu bulamaz.
         hesap(("lh = [ ( Kuyu boyu − tampon/paten yığını ) / 1000 + halat payı ] × 2"
@@ -3004,7 +3013,12 @@ def _kuyu_tabani(g, o):
         veri("LR", "Kılavuz ray boyu", LR, "mm",
              "H × 1000 + son kat + tabliye − 200 + kuyu dibi − 300"
              + ( "  ·  MRL:  tabliye yok ( 0 )" if evet_mi(g.get("mk_yok")) else ""), 0),
-        metin("Kabin raylarına gelen kuvvetler :"),
+        #  FKR / FAR TEK BİR RAYIN KUVVETİDİR:  ray kütlesi bir rayındır,
+        #  güvenlik tertibatı tepkisi ( P + Q ) / n'dir ( bölüm 7, Fk ).
+        #  Başlık eskiden "raylarına" diyordu;  inşaat mühendisi sayıyı toplam
+        #  sanıp raylara bölseydi yükün yarısını kullanırdı.  Avan aynı
+        #  büyüklüğü zaten "bir kabin kılavuz rayına" diye yazıyor.
+        metin("Bir kabin rayına gelen kuvvet  ( her ray altına ayrı ayrı ) :"),
         hesap("FKR = gn × Gr × LR / 1000 + k3 × MY + Fgt" + ("  +  Fp" if Fp else ""),
               f"{tr(gn)} × {tr(Gr_k)} × {trn(LR, 0)} / 1000 + "
               f"{tr(k3)} × {trn(MY_k, 0)} + {tr(guvenlik_tepkisi)}"
@@ -3020,7 +3034,7 @@ def _kuyu_tabani(g, o):
              "ray kütlesi ayrı kalemdir, iki kez sayılmaz"),
         *( [veri("Fp", "Klips itme kuvveti  ( her rayda )", Fp, "N",
                  "GİRİŞ  ·  m.5.2.1.8.4 · m.5.7.2.3.5", 0)] if Fp else [] ),
-        metin("Ağırlık raylarına gelen kuvvetler :"),
+        metin("Bir ağırlık rayına gelen kuvvet  ( her ray altına ayrı ayrı ) :"),
         hesap("FAR = gn × Gar × Lar / 1000 + k3 × Ma"
               + ("  +  Fgt" if agirlik_tepkisi else "") + ("  +  Fp" if Fp else ""),
               f"{tr(gn)} × {tr(Gr_a)} × {trn(LR, 0)} / 1000 + "
@@ -3068,7 +3082,7 @@ def _kuyu_tabani(g, o):
         "taraftadır.",
     ]
     b["sonuc"] = {"baslik": "KUYU TABANI YÜKLERİ",
-                  "metin": f"FKR = {tr(FKR)} N  ·  FAR = {tr(FAR)} N  ·  "
+                  "metin": f"FKR = {tr(FKR)} N / ray  ·  FAR = {tr(FAR)} N / ray  ·  "
                            f"Fkt = {tr(Fkt)} N  ·  Fat = {tr(Fat)} N",
                   "uygun": None}
     _kay(o, "kuyu", LR=LR, FKR=FKR, FAR=FAR, Fkt=Fkt, Fat=Fat)
