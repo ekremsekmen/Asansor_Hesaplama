@@ -1283,9 +1283,17 @@ Kapsam tablo sınırlarıyla aynıdır: **P = 6…34 kişi, N = 1…30 kat.**
   karşılar; **kalkış ( ivmelenme ) momenti** — kabin, karşı ağırlık, halat,
   kasnak ve rotor ataletleri — hesaba girmez. Motor seçiminde üretici kalkış
   verisi ayrıca kontrol edilmelidir.
-- **Karşı ağırlık denge oranı q = 0,50 sabittir** ( Ga = P + Q/2 ). Kaynak
-  kitabın tamamı bu kabul üzerine kuruludur — karşı ağırlık kütlesi tahrik,
-  ray ve tampon hesaplarına da aynı yerden girer.
+- **Karşı ağırlık denge oranı q bir ofis sabitidir, varsayılanı 0,50'dir**
+  ( Ga = P + q·Q ;  Sabitler sekmesinden 0,20 – 0,80 arası değiştirilebilir ).
+  Karşı ağırlık kütlesi motor, tahrik ve ray hesaplarına aynı yerden girer.
+  **Ağırlık tamponu kuvveti bilerek bu kütleyle yazılmaz:** TS EN 81-20
+  m.5.2.1.8.6'nın kendi bağıntısı F = 4·gn·( P + q·Q ) kullanılır ve oradaki P,
+  standardın sembol listesindeki tanımıyla **gezici kablo payı ve varsa denge
+  zinciri dâhil** kabin kütlesidir. Bu yüzden paftada kuyu tabanındaki kütle
+  ray bölümündeki karşı ağırlık kütlesinden gezici kablo payı kadar büyüktür
+  ( 630 kg'lık örnekte 13,5 kg, %1,4 ) — standardın yazdığı büyük olandır,
+  inşaat projesine bildirilen yük emniyetli taraftadır. Paftada iki satır da
+  kaynağını yazar;  ekranda ( ! ) altında gerekçesi okunur.
 - **Makine kaidesinde ( bölüm 2 ) darbe katsayısı k1 ve σem ofis kabulüdür.**
   TS EN 81-20 makine kaidesi için yük modeli **vermez** — Çizelge 14
   ( k1·k2·k3 ) o standartta açıkça **kılavuz ray** hesabına aittir. Buradaki
