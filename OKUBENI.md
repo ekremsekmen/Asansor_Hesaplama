@@ -453,9 +453,19 @@ kapasite değişti ) hiçbir şeyi baştan girmezsiniz:
 4. Güncel PDF'i ya da paketi yeniden indirin, **projeyi yeniden kaydedin**.
 
 Dosyada bulunmayan bir alan varsa ( eski bir sürümün dosyası ) program kaç
-alanın varsayılana döndüğünü **söyler** — sessiz kalmaz.  Doğrulama paketinin
-TEST 6'sı formdaki bütün alanların dosyaya yazılıp aynen geri geldiğini ve
-geri yüklenen projenin aynı hesap sonucunu verdiğini denetler.
+alanın varsayılana döndüğünü **söyler** — sessiz kalmaz.
+
+Dosyadaki bir **seçim değerini bu sürüm tanımıyorsa** ( program güncellenmiş,
+bir seçenek kalkmış ya da adı değişmiştir ) alan listenin varsayılanına döner
+ve program bunu **pencereyle** söyler:  hangi alan, hangi asansör, eski değer
+ve yerine geçen değer.  Hesap artık o değerle yapıldığı için doğru değeri
+seçip projeyi yeniden kaydedin.  Aynı kural tarayıcıda saklı proje için de
+geçerlidir.
+
+Doğrulama paketinin TEST 6'sı formdaki bütün alanların dosyaya yazılıp aynen
+geri geldiğini, geri yüklenen projenin aynı hesap sonucunu verdiğini,
+dosyanın gerçek **Proje aç** düğmesiyle ve **başka bir proje açıkken**
+açılabildiğini, tanınmayan değerin söylendiğini denetler.
 
 ---
 
@@ -500,6 +510,13 @@ OKUBENI.txt
 Çıktılar projeyi **anlatır**, proje dosyası onu **geri getirir**. İkisi ayrı
 yerlerde durursa arşivden dönmek imkânsızlaşır — bu yüzden birlikte inerler.
 
+> **Bilinen sınırlama — uygulama paketinin kapağı.**  Uygulama paketindeki
+> `Kapak.pdf`, tarayıcıda o an açık olan **avan projesinin** kapak
+> alanlarından alınır;  `.uygulama` dosyasında saklanmaz.  Aynı `.uygulama`
+> dosyası, avan tarafında başka bir proje açıkken başka bir projenin kapağıyla,
+> tarayıcı belleği boşken kapaksız paketlenir.  Uygulama paketini
+> hazırlamadan önce avan tarafında **aynı projenin** `.avan` dosyasını açın.
+
 ### Kalıcılık
 
 Girdiler tarayıcıda da kendiliğinden saklanır; programı kapatıp açtığınızda
@@ -523,7 +540,7 @@ Program bir **doğrulama paketiyle** birlikte gelir ve son çalıştırmada
 | **3 · Girdi dayanıklılığı** | ~1.900 bozuk girdi birleşimi + tüm API uçları ( kaldırılan Excel uçlarının gerçekten yok olduğu dâhil ) + **ofis standardında belirsiz / okunamayan sayının sessizce varsayılana dönmediği** + **gizli alanın projeyi durdurmadığı** | **138 / 138** |
 | **4 · Çıktı bütünlüğü** | PDF açılabilirliği ve içeriği, uygulama paftası, paketlerin içeriği ve **CAD çizimini AutoCAD'in açtığı** ( şapka · `%%` · sınırlar · açılış görünümü ) | **282 / 282** |
 | **5 · Arayüz** | tarayıcıda iki modun tüm sekmeleri, canlı hesap, indirme, **ayrı veri kovaları**, **proje dosyası**, revizyon, yerleşim taşması, **kabin ağırlığının beyan yükünü izlemesi**, **Gelişmiş bölümleri** ( kapalı açılış · sayaç ve işaret · gizli alandaki hatada açılma · arama ) | **487 / 487** |
-| **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan, **hesap sonucu** ve **makine daireli projede ekranın yerleşimi** aynı | **824 / 824** |
+| **6 · Proje dosyası geri yükleme** | avan ve iki asansörlü uygulama projesinde formun **her alanı** değiştirilir → "Projeyi kaydet" → program sıfırlanır → dosya yüklenir → her alan, **hesap sonucu** ve **makine daireli projede ekranın yerleşimi** aynı;  gerçek **Proje aç** düğmesi, **başka proje açıkken** açma, kaydet → aç → kaydet aynılığı, tek hesap + ek asansörün kart sayısı, `.uygulama`'nın avana dokunmaması, **tanınmayan değer uyarısı** | **1.735 / 1.735** |
 | **7 · Altın çıktı** | 432 senaryonun tüm sonucu satır satır kilitli — refactor kalkanı | **867 / 867** |
 | **8 · Mukavemet tabloları** | 9 tablo + ω + kanal tablosu, **ofisin kaynak tablolarının dondurulmuş kopyasına** karşı hücre hücre;  standarda göre genişletilen satırlar ayrıca;  Nequiv(t) **Çizelge 2'den türetilir**;  girdi sözleşmesinin varsayılanları ve seçenekleri;  **hangi girdinin Gelişmiş'te, hangisinin görünür kaldığı** | **1.016 / 1.016** |
 | **9 · Mukavemet motoru** | örnek projenin ara değerleri + **standart gereği verilen kararların her birinin uygulandığının kanıtı** + **standardın metnine karşı bağımsız doğrulama** + **denetimlerin her bulgusu yeniden üretilerek** + girdi reddi | **534 / 534** |
@@ -815,6 +832,9 @@ ya da yanıltıcı görünen** şeylerdi.
 | **Paftada hızın kaynağı hep "MMO/697 Tablo-2" yazıyordu** | Hastane paftasında ( Tablo-2'de hastane yok ) ve hızı kullanıcı seçtiğinde bile.  Artık hız Tablo-2 asgarisiyse *Tablo-2*, değilse *Proje kararı ( Tablo-2 min. … )* basılıyor |
 | **Uygulama paftası ray kuvvetini "kabin raylarına gelen kuvvet" diye yazıyordu** | FKR ve FAR **tek bir rayın** kuvvetidir ( bir rayın kütlesi + güvenlik tertibatı payı ( P + Q ) / n ).  İnşaat mühendisi sayıyı toplam sanıp raylara bölseydi yükün yarısını kullanırdı.  Bölüm 9 başlıkları, sonuç satırı ( *N / ray* ), PDF özeti ve ekran kutusu artık *"bir kabin rayına"* diyor — avan bunu zaten böyle yazıyordu.  Sayı değişmedi;  anlamı TEST 11 ray sayısıyla sınıyor |
 | **Halat boyundaki "tampon/paten yığını" yalnız toplam olarak görünüyordu** ( ör. 6.660 mm ) | Bölüm 1'e yığının beş ölçüsünü tek tek yazan satır eklendi ( ağırlık tamponu baba + çarpma arası − ezilme + ağırlık paten arası + kabin paten arası );  elle yeniden hesaplayan artık paftadan bulabiliyor |
+| **Tek hesap + ek asansörlü avan projesi her açılışta bir asansör fazla açılıyordu** | Adedi trafik bulan ( ör. 2 ) projeye bir yük asansörü eklenince proje 3 asansörle kaydediliyor, ama sayfa yenilenince de, dosya boş sayfada ya da başka bir proje açıkken açılınca da **4 kartla** açılıyordu.  Açılış anında trafik sonucu henüz yoktu ( ya da önceki projeninkiydi );  grup 1 sanılıyor, "dolu kart kapanmaz" kuralı ek asansör sayısını şişiriyordu.  Hesap ve PDF'ler değişmiyordu ( 4. kart boştu ) ama yeniden kaydedilen dosya 4 asansör diyordu.  Artık önceki projenin sonucu atılır ve grup adedi dosyadaki açık kart sayısından kurulur;  tek hesapta trafik geçici olarak hatalıyken de son bilinen adet kullanılır |
+| **`.uygulama` açmak avan projesinin bellekteki durumunu bozuyordu** | Yükleme avan durumunu ( trafik adedi · ek asansör · otomatik alan izleri ) her dosyada yeniden kuruyordu;  uygulama dosyası açılınca avanın izleri siliniyor, ek asansör sayısı yanlış türetiliyordu.  Avan durumu artık yalnız avan verisinden kurulur |
+| **Tanınmayan seçim değeri sessizce değişiyordu** | Dosyadaki değer bu sürümün listesinde yoksa açık asansörde uyarısız varsayılana — dolu formda **önceki projenin ya da önceki asansörün değerine** — dönüyor, öbür asansörlerde ham kalıp hesabı "geçersiz seçim" diye durduruyordu;  ekranda yalnız "Proje açıldı" yazıyordu.  Artık bütün asansörlerde aynı kuralla listenin varsayılanına döner ve pencere hangi alanın hangi değerinin neye döndüğünü sayar |
 | **Sarılma açısı girilmeyince sayfa 1 aynı eksikliği iki kez yazıyordu** | Ne yapılacağını anlatan uyarı kaldı, altındaki *"HESAP EKSİK — α girilmedi"* tekrarı kalktı.  Eksik listesi ve genel hüküm değişmedi;  α dışındaki eksikler uyarılarda aynen duruyor |
 
 ### Standarda göre verilen hesap kararları ( uygulama projesi )

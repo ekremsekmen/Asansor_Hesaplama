@@ -18,6 +18,9 @@ let TRAFIK_ADET = 1;          // 1 → tek hesap (adet hesaplanır) · 2-4 → g
 let AVAN_EK = 0;              // avanda TRAFİK GRUBUNA girmeyen asansör adedi (yük/sedye)
 let AVAN_OTO = {};            // kapasite/hızı trafikten OTOMATİK gelen asansörler
 let AVAN_TRF = {};            // her asansöre en son YANSITILAN trafik değeri
+let AVAN_TABAN = null;        // trafik grubunun SON BİLİNEN adedi — tek hesapta adedi
+                              // trafik sonucu verir;  sonuç yokken ( proje yeni açıldı,
+                              // hesap yolda, girdi geçici hatalı ) bu kullanılır
 /*  İSTEK SIRA SAYACI.  Ekran her tuş vuruşunda hesap ister; ağ gecikmesiyle
     ESKİ bir isteğin yanıtı YENİSİNDEN SONRA gelebilir.  Sayaç olmadan geç gelen
     eski yanıt ekranı ve avana aktarılan kapasite/hızı geri alıyordu — kullanıcı
@@ -516,24 +519,34 @@ function yaz(){
 }
 function oku(){
   let o; try{ o=JSON.parse(localStorage.getItem(KOVA[MOD])||'null'); }catch(e){ o=null; }
-  if(o) uygula(o);
+  if(o) taninmayanBildir(uygula(o), 'Tarayıcıda kayıtlı avan projesinde');
 }
-/* Bir alana değer yazar.
-   Açılır listelerde ondalık ayracı farkı olabilir: kayıtlı dosyada "1,6"
-   durabilir ama seçeneğin değeri "1.6"dır.  Bu durumda sayısal karşılaştırma ile eşleştirilir;
-   aksi hâlde seçim boş kalır ve hesap sessizce yapılamaz. */
-function alanaYaz(e, val){
-  if(e.type==='checkbox'){ e.checked = !!val; return; }
+/*  Bir değerin seçim kutusundaki karşılığı  ( seçeneğin kendi değeri ) ;
+    listede yoksa undefined.  Açılır listelerde ondalık ayracı farkı olabilir:
+    kayıtlı dosyada "1,6" durabilir ama seçeneğin değeri "1.6"dır — bu durumda
+    sayısal karşılaştırma ile eşleştirilir. */
+function secenekKarsiligi(e, val){
   const s = (val===null||val===undefined) ? '' : String(val);
-  if(e.tagName!=='SELECT'){ e.value = s; return; }
   const secenekler = [...e.options].map(o=>o.value);
-  if(secenekler.includes(s)){ e.value = s; return; }
+  if(secenekler.includes(s)) return s;
   const sayi = parseFloat(s.replace(',','.'));
   if(isFinite(sayi)){
     const esles = secenekler.find(o=>{
       const x = parseFloat(o); return isFinite(x) && Math.abs(x-sayi) < 1e-9; });
-    if(esles !== undefined){ e.value = esles; return; }
+    if(esles !== undefined) return esles;
   }
+  return undefined;
+}
+/* Bir alana değer yazar.  Seçim kutusu değeri TANIMADIYSA false döner
+   ( boş değer tanınmayan sayılmaz );  çağıran bunu kullanıcıya söyler —
+   aksi hâlde proje sessizce başka bir değerle hesaplanırdı. */
+function alanaYaz(e, val){
+  if(e.type==='checkbox'){ e.checked = !!val; return true; }
+  const s = (val===null||val===undefined) ? '' : String(val);
+  if(e.tagName!=='SELECT'){ e.value = s; return true; }
+  const karsilik = secenekKarsiligi(e, s);
+  if(karsilik !== undefined){ e.value = karsilik; return true; }
+  const secenekler = [...e.options].map(o=>o.value);
   //  EŞLEŞME YOK:  SEÇİM KUTUSU BOŞA DÜŞMEZ.
   //  Boş bir <select> value olarak "" gönderir ve motor "boş bırakılamaz"
   //  der — oysa kullanıcı hiçbir şey yapmamıştır.  Bu yola şunlar düşer:
@@ -543,7 +556,53 @@ function alanaYaz(e, val){
   //    · tablo değişince kalkan bir profil/ölçü.
   //  Bu durumda listenin KENDİ varsayılanı korunur:  form açılışta doğru
   //  seçenekle çizilmiştir, ona dokunulmaz.
+  //  "KENDİ VARSAYILANI" GERÇEKTEN VARSAYILANDIR:  kutuda o an duran değer
+  //  değil.  Başka bir proje ya da başka bir asansör açıkken kutu ONUN
+  //  değerini taşır;  tanınmayan değer sessizce o değere dönüşüyordu.
+  //  Varsayılan, formun çizildiği seçenektir ( selected ) ya da ilk seçenek.
+  //  Boş değerde eski davranış korunur ( kutuya dokunulmaz ).
+  //  AMA SESSİZ KALINMAZ:  değer değişmiştir — false döner, yükleyen söyler.
   if(secenekler.includes('')){ e.value = ''; }
+  else if(s.trim() !== ''){ e.value = secimVarsayilani(e); }
+  return s.trim() === '';
+}
+
+/*  Seçim kutusunun KENDİ varsayılanı:  boş seçenek varsa o ( "ofis
+    standardı" ), yoksa formun çizildiği seçenek ( selected ) ya da ilki.
+    Tanınmayan değerin döndüğü yer budur — form da, asansör dizisi de. */
+function secimVarsayilani(e){
+  if([...e.options].some(o => o.value === '')) return '';
+  const d = [...e.options].find(o => o.defaultSelected) || e.options[0];
+  return d ? d.value : '';
+}
+
+/*  Alanın ekrandaki adı ( uyarı metinleri için ) ;  asansör kartındaki ya da
+    trafik sütunundaki alanda asansörün numarası da eklenir. */
+function alanEtiketi(e){
+  const l = e.closest('.alan') && e.closest('.alan').querySelector('label');
+  let ad = l ? [...l.childNodes].filter(n => n.nodeType === 3)
+                 .map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim() : '';
+  if(!ad) ad = e.id;
+  const kart = e.closest('[id^="a_kutu"]');
+  const no = kart ? kart.id.slice(-1)
+    : ((/^c_(P|kg|kt|V|durak|h|bodrum|mta|mtk|mtg|mtp)([1-4])$/.exec(e.id) || [])[2]);
+  return no ? `${ad} ( ${no}. asansör )` : ad;
+}
+
+/*  TANINMAYAN DEĞERLER SESSİZ GEÇMEZ.  Dosyadaki ( ya da tarayıcıda saklı )
+    bir seçim değeri bu sürümün listesinde yoksa — program güncellenmiş, bir
+    seçenek kalkmış ya da adı değişmiştir — alan varsayılanına döner ve proje
+    artık o değerle hesaplanır.  Bu bir veri değişikliğidir;  durum satırı
+    birkaç saniyede kaybolduğu için ayrıca pencereyle söylenir.
+    ``liste``:  [ { etiket , deger , yeni } ]                               */
+function taninmayanBildir(liste, kaynak){
+  if(!liste || !liste.length) return '';
+  const satir = x => `• ${x.etiket} :  "${x.deger}"  →  ${x.yeni === '' ? '( boş — ofis standardı )' : `"${x.yeni}"`}`;
+  const kisa = `${liste.length} değer bu sürümde yok, VARSAYILAN kullanıldı`;
+  console.warn(kaynak + ' tanınmayan değerler:', liste);
+  alert(`${kaynak} ${kisa}:\n\n${liste.map(satir).join('\n')}\n\n`
+        + 'Hesap artık bu yeni değerlerle yapılıyor.  Doğru değerleri seçip projeyi yeniden kaydedin.');
+  return kisa;
 }
 
 /*  Yeni proje yüklenmeden önce ilgili bölüm TEMİZLENİR.
@@ -587,12 +646,29 @@ function bolumuTemizle(tur){
   }
 }
 
+/*  Kayıtlı bir projeyi ( dosya · tarayıcı belleği · örnek ) forma basar.
+    Döner:  TANINMAYAN seçim değerleri  [ { etiket , deger , yeni } ] —
+    bu sürümün listesinde olmadığı için varsayılana dönenler ( bkz.
+    taninmayanBildir ).  */
 function uygula(o){
   if(o.__tur) bolumuTemizle(o.__tur);
+  //  VERİ HANGİ PROJENİN?  Avan durumu ( trafik adedi · ek asansör · otomatik
+  //  alan izleri ) YALNIZ avan verisinden kurulur.  Eskiden .uygulama dosyası
+  //  açılınca da yeniden kuruluyordu:  bellekteki avan projesinin otomatik
+  //  izleri siliniyor, ek asansör sayısı ekrandaki kutulardan yanlış
+  //  türetiliyordu — avana dönülüp bir şey değişince bozuk hâli kaydedilirdi.
+  const avanVerisi = o.__mod ? o.__mod !== 'uygulama'
+                             : Object.keys(o).some(k => /^(c_|a_|k_|of_|sb_)/.test(k));
+  const mukDizi = typeof MUK_ASANSORLER !== 'undefined'
+                  && Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length;
+  const taninmayan = [];
   Object.entries(o).forEach(([k,val])=>{
     if(k.startsWith('__')) return;
     const e=$(k); if(!e) return;
-    alanaYaz(e, val);
+    //  Uygulamada asansöre ait alanın asıl kaynağı asansör dizisidir;  onun
+    //  tanınmayan değerleri aşağıda, asansör numarasıyla birlikte sayılır.
+    if(!alanaYaz(e, val) && !(mukDizi && typeof mAsansorAlaniMi === 'function' && mAsansorAlaniMi(k)))
+      taninmayan.push({etiket: alanEtiketi(e), deger: String(val), yeni: e.value});
   });
   // Ek nüfus listeleri yalnız o bölüm gerçekten verilmişse yeniden kurulur;
   // böylece kısmi yükleme (yalnız trafik ya da yalnız avan) diğerini bozmaz.
@@ -605,30 +681,48 @@ function uygula(o){
     $('c_eknufus_liste').innerHTML='';
     liste.forEach(s=>ekNufusEkle('c', s));
   });
-  /* Asansör adedi: kaydedilmişse ondan, yoksa dolu çoklu kolon sayısından
-     türetilir — eski proje dosyalarında da doğru gövde açılsın. */
-  let adet = parseInt(o.__trafik_adet, 10);
-  if(!(adet>=1 && adet<=4)){
-    const dolu=[1,2,3,4].filter(i=>$('c_P'+i) && $('c_P'+i).value!=='').length;
-    adet = dolu>1 ? dolu : TRAFIK_ADET;
+  if(avanVerisi){
+    /* Asansör adedi: kaydedilmişse ondan, yoksa dolu çoklu kolon sayısından
+       türetilir — eski proje dosyalarında da doğru gövde açılsın. */
+    let adet = parseInt(o.__trafik_adet, 10);
+    if(!(adet>=1 && adet<=4)){
+      const dolu=[1,2,3,4].filter(i=>$('c_P'+i) && $('c_P'+i).value!=='').length;
+      adet = dolu>1 ? dolu : TRAFIK_ADET;
+    }
+    TRAFIK_ADET = Math.max(1, Math.min(4, adet));
+    /* Trafik grubu dışı asansör adedi: kaydedilmişse ondan, yoksa "kullan"
+       kutularından türetilir ( eski dosyalar için ). */
+    let ek = parseInt(o.__avan_ek, 10);
+    const ekYazili = ek>=0 && ek<=3;
+    if(!ekYazili){
+      const etkin=[1,2,3,4].filter(i=>$('a_aktif'+i) && $('a_aktif'+i).checked).length;
+      ek = Math.max(0, etkin - TRAFIK_ADET);
+    }
+    AVAN_EK = Math.max(0, Math.min(3, ek));
+    /*  ÖNCEKİ PROJENİN TRAFİK SONUCU GEÇMEZ.  Kart sayısı trafik grubunun
+        adedinden kurulur;  ekranda başka bir projenin sonucu dururken o
+        projenin adedi okunuyor, ek asansör sayısı ona göre yeniden
+        hesaplanıyordu.  Sonuçlar yeni proje hesaplanınca yeniden gelir.
+        Grubun adedi kaydedildiği andaki AÇIK KART sayısından türetilir:
+        açık kart = grup + ek ( bkz. avanAdedi ) — dosya ikisini de taşır. */
+    SON.c = SON.t = SON.a = null;
+    const acik = [1,2,3,4].filter(i => o['a_aktif'+i] === true).length;
+    AVAN_TABAN = (ekYazili && acik >= 1) ? Math.max(1, acik - AVAN_EK) : null;
+    AVAN_OTO = (o.__avan_oto && typeof o.__avan_oto==='object') ? {...o.__avan_oto} : {};
+    AVAN_TRF = (o.__avan_trf && typeof o.__avan_trf==='object') ? {...o.__avan_trf} : {};
   }
-  TRAFIK_ADET = Math.max(1, Math.min(4, adet));
-  /* Trafik grubu dışı asansör adedi: kaydedilmişse ondan, yoksa "kullan"
-     kutularından türetilir ( eski dosyalar için ). */
-  let ek = parseInt(o.__avan_ek, 10);
-  if(!(ek>=0 && ek<=3)){
-    const etkin=[1,2,3,4].filter(i=>$('a_aktif'+i) && $('a_aktif'+i).checked).length;
-    ek = Math.max(0, etkin - TRAFIK_ADET);
-  }
-  AVAN_EK = Math.max(0, Math.min(3, ek));
   /*  Çoklu asansör dizisi de bir form alanı DEĞİLDİR.  Proje dosyasından
       ( .uygulama ) geri yüklenirken buradan kurulur;  form ayaktaysa aktif
       asansör hemen basılır, değilse mukavemetKur() onu yerine oturtur. */
-  if(Array.isArray(o.__muk_asansorler) && o.__muk_asansorler.length
-     && typeof MUK_ASANSORLER !== 'undefined'){
+  if(mukDizi){
     MUK_ASANSORLER = o.__muk_asansorler
       .slice(0, (MUK && MUK.asansor_azami) || 4)
-      .map(x => (x && typeof x === 'object') ? x : {});
+      .map(x => (x && typeof x === 'object') ? {...x} : {});
+    //  Asansörlerin tanınmayan seçim değerleri HEPSİNDE aynı biçimde
+    //  varsayılana çekilir ve sayılır ( bkz. mTaninmayanAyikla ).
+    if(typeof mTaninmayanAyikla === 'function' && $('m_form') && $('m_form').innerHTML)
+      MUK_ASANSORLER.forEach((x, i) => taninmayan.push(
+        ...mTaninmayanAyikla(x, MUK_ASANSORLER.length > 1 ? i + 1 : null)));
     MUK_ADET = Math.min(Math.max(1, Number(o.__muk_adet) || MUK_ASANSORLER.length),
                         MUK_ASANSORLER.length);
     MUK_AKTIF = Math.min(Math.max(0, Number(o.__muk_aktif) || 0), MUK_ADET - 1);
@@ -651,14 +745,13 @@ function uygula(o){
     mKanalUyumu();
     mGelismisTazele();
   }
-  AVAN_OTO = (o.__avan_oto && typeof o.__avan_oto==='object') ? {...o.__avan_oto} : {};
-  AVAN_TRF = (o.__avan_trf && typeof o.__avan_trf==='object') ? {...o.__avan_trf} : {};
   cokluKolonlariGoster();
   avanKartlariGoster();
   adetDugmeleriKur();
   mkYokUygula();
   ofisTazele();
   etiketleriGuncelle();
+  return taninmayan;
 }
 
 /* ═══════════════════════════ PROJE DOSYASI ═══════════════════════════
@@ -727,13 +820,15 @@ function projeUygula(d, dosyaAdi){
   const eksik = eksikAlanlar(govde, MOD);
   bolumuTemizle(MOD === 'uygulama' ? 'mukavemet' : 'avan');
   if(MOD !== 'uygulama'){ bolumuTemizle('tek'); bolumuTemizle('coklu'); }
-  uygula(govde);
+  const taninmayan = uygula(govde) || [];
   yaz();
   if(MOD === 'uygulama'){ mGkBoslariIsaretle(); hesapMukavemet(); } else hesaplaHepsi();
   let m = 'Proje açıldı: ' + dosyaAdi;
   if(surum && surum !== PROJE_SURUM) m += `  ( dosya sürüm ${surum}, program sürüm ${PROJE_SURUM} )`;
   if(eksik.length) m += `  ·  dosyada bulunmayan ${eksik.length} alan VARSAYILANA döndü`;
-  durum(m, eksik.length > 0);
+  const t = taninmayanBildir(taninmayan, `"${dosyaAdi}" dosyasında`);
+  if(t) m += '  ·  ' + t;
+  durum(m, eksik.length > 0 || !!t);
   if(eksik.length) console.warn('Varsayılana dönen alanlar:', eksik);
 }
 /*  Dosyada olmayan ama formda bulunan alanlar.  Sürüm farkının somut

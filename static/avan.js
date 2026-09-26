@@ -45,6 +45,7 @@ function trafikAdedi(n){
   n=Math.max(1,Math.min(4,parseInt(n,10)||1));
   if(n===TRAFIK_ADET){ return; }
   TRAFIK_ADET=n;
+  AVAN_TABAN = null;            // hesap yöntemi değişti — eski grup adedi geçmez
   for(let i=2;i<=n;i++){
     if($('c_P'+i) && !$('c_P'+i).value){
       alanaYaz($('c_P'+i),  v('c_P1'));
@@ -89,7 +90,14 @@ function cokluKolonlariGoster(){
 function trafikGrupAdedi(){
   const k = trafikKoprusu();
   const n = k && Array.isArray(k.asansorler) ? k.asansorler.length : 0;
-  return n > 0 ? n : TRAFIK_ADET;          // ham değer — 4'ten büyük olabilir
+  if(n > 0) return n;                      // ham değer — 4'ten büyük olabilir
+  //  TRAFİK SONUCU YOKKEN.  Grup hesabında adet kullanıcınındır ( TRAFIK_ADET ).
+  //  Tek hesapta ise adedi trafik bulur;  sonuç henüz yokken 1 sanılırsa
+  //  "dolu kart kapanmaz" kuralı ( avanAdedi ) ek asansörü trafik grubu dışı
+  //  sayıp AVAN_EK'i şişiriyordu:  2 + 1 asansörlük proje her açılışta
+  //  2 + 2 = 4 kartla açılıyordu.  Son bilinen adet ( dosyadan ya da son
+  //  hesaptan ) kullanılır.
+  return (TRAFIK_ADET === 1 && AVAN_TABAN) ? AVAN_TABAN : TRAFIK_ADET;
 }
 function avanTaban(){ return Math.max(1, Math.min(4, trafikGrupAdedi())); }
 
@@ -310,6 +318,8 @@ async function hesapTrafik(){
       body:JSON.stringify({girdiler:trafikGirdi()})})).json();
     if(sira !== ISTEK.trafik) return;          // daha yeni bir istek var — bu yanıt eski
     SON.c=r; SON.t=r; ciz('c_sonuc', r, r.yol||'tek'); kapakYerTutuculari();
+    const _kopru = trafikKoprusu();
+    if(_kopru) AVAN_TABAN = _kopru.asansorler.length;   // son bilinen grup adedi
     sekmeRozeti('trafik', !!r.hata, (r.uyarilar||[]).length);
     const rz=$('c_std_rozet');
     if(rz) rz.innerHTML = r.ozet && r.ozet.standart
